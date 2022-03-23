@@ -21,8 +21,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        with:
-          path: '.dotfiles'
       - name: Install and test
         shell: bash
         run: |
