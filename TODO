@@ -1,0 +1,3 @@
+- empty kvs
+- commit without measurements
+- commit with malformed measurements
