@@ -14,15 +14,22 @@ for line in sys.stdin.readlines():
         print(
             f"Already have input but commit is unknown: '{line.rstrip()}'", file=sys.stderr)
         assert(False)
+        continue
     data = line.strip()
-    items = data.split(" ")
+    items = data.split()
     if len(items) < 3:
         print(
-            f"Too few items for commit {commit} in input line: '{line.rstrip()}'", file=sys.stderr)
+            f"Too few items for commit {commit} in input line: '{data}'", file=sys.stderr)
         assert(False)
+        continue
     name = items[0]
     time = items[1]
     val = items[2]
+    if not val.isnumeric():
+        print(
+            f"Found non-numeric value '{val}' as measurement for commit {commit} in line: '{data}'", file=sys.stderr)
+        assert(False)
+        continue
     kvs = items[3:]
     records.append({"commit": commit, "name": name, "time": pd.to_datetime(
         time, unit='s'), "val": val, "kvs": kvs})

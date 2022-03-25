@@ -42,6 +42,24 @@ git checkout master~2
 git checkout master
 "${script_dir}/measure.sh"
 
+echo Add invalid measurements
+# Empty measurement
+"${script_dir}/measure.sh" ""
+# Measurement with just date
+"${script_dir}/measure.sh" "$(date +%s)"
+# Measurement without date
+"${script_dir}/measure.sh" "myothermeasurement $RANDOM key=value"
+# Measurement without kvs
+"${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM"
+# Measurement with invalid kvs
+"${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM test othertest stuff"
+# Measurement valid but with too many spaces
+"${script_dir}/measure.sh" "myothermeasurement    $(date +%s)      $RANDOM key=value"
+# Duplicate kvs
+"${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM key=value key=value"
+# Conflicting kvs
+"${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM key=value key=value2"
+#
 echo Print from second repo
 cd "$repo2"
 
