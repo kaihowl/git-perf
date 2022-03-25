@@ -27,7 +27,8 @@ for line in sys.stdin.readlines():
     records.append({"commit": commit, "name": name, "time": pd.to_datetime(
         time, unit='s'), "val": val, "kvs": kvs})
 df = pd.DataFrame(records)
-df = df.join(df.kvs.explode().str.split('=', expand=True).pivot(columns=0)[1])
+df = df.join(df.kvs.explode().str.split(
+    '=', expand=True).pivot_table(columns=0, aggfunc='last'))
 df = df.drop(['kvs'], axis=1)
 if 'os' in df.columns and 'runner_os' in df.columns:
     df['os'] = df['os'].fillna(df['runner_os'])
