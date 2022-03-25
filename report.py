@@ -25,8 +25,16 @@ for line in sys.stdin.readlines():
 df = pd.DataFrame(records)
 df = df.join(df.kvs.explode().str.split('=', expand=True).pivot(columns=0)[1])
 df = df.drop(['kvs'], axis=1)
-df['os'] = df['os'].fillna(df['runner_os'])
+if 'os' in df.columns and 'runner_os' in df.columns:
+    df['os'] = df['os'].fillna(df['runner_os'])
 df = df.fillna("n/a")
-# print(df.to_markdown())
-px.scatter(df, x='time', y='val', color='name', symbol='os',
-           hover_data=df.columns).write_html('result.html')
+print(df.to_markdown())
+args = {
+    'x': 'time',
+    'y': 'val',
+    'color': 'name',
+    'hover_data': df.columns,
+}
+if 'os' in df.columns:
+    args['symbol'] = 'os'
+px.scatter(df, **args).write_html('result.html')
