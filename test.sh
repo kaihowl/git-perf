@@ -5,7 +5,7 @@ set -x
 
 script_dir=$(pwd)
 
-cd $(mktemp -d)
+cd "$(mktemp -d)"
 root=$(pwd)
 
 mkdir orig
@@ -28,24 +28,24 @@ git commit -m 'third commit'
 
 
 orig=$(pwd)
-cd $root
+cd "$root"
 git clone "$orig" repo1
 git clone "$orig" repo2
 repo1=$(pwd)/repo1
 repo2=$(pwd)/repo2
 
 echo Leave one commit in middle without any notes
-cd $repo1
+cd "$repo1"
 git checkout master~2
-${script_dir}/measure.sh
-${script_dir}/measure.sh
+"${script_dir}/measure.sh"
+"${script_dir}/measure.sh"
 git checkout master
-${script_dir}/measure.sh
+"${script_dir}/measure.sh"
 
 echo Print from second repo
-cd $repo2
+cd "$repo2"
 
 echo from hereon
 git --no-pager log --no-color --pretty='oneline'
-${script_dir}/report.sh
-echo $(pwd)/result.html
+"${script_dir}/report.sh"
+echo "$(pwd)/result.html"
