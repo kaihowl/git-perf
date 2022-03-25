@@ -11,10 +11,14 @@ for line in sys.stdin.readlines():
     if len(line.strip()) == 0:
         continue
     if commit is None:
+        print(
+            f"Already have input but commit is unknown: '{line.rstrip()}'", file=sys.stderr)
         assert(False)
     data = line.strip()
     items = data.split(" ")
     if len(items) < 3:
+        print(
+            f"Too few items for commit {commit} in input line: '{line.rstrip()}'", file=sys.stderr)
         assert(False)
     name = items[0]
     time = items[1]
