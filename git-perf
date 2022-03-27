@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+
+import argparse
+import time
+import subprocess
+from typing import List
+import sys
+import pandas as pd
+import plotly.express as px
+
+PERF_REF = 'refs/notes/perf'
+MAX_PUSHES = 3
+
+# TODO(kaihowl) key values
+
+parser = argparse.ArgumentParser()
+sub_parser = parser.add_subparsers(dest='subcommand')
+
+measure_parser = sub_parser.add_parser(
+    "measure", help='Measure the supplied commands runtime')
+measure_parser.add_argument(
+    '--measurement', '-m', help='Name of measurement', required=True,
+    dest='measurement')
+measure_parser.add_argument(
+    '--number', '-n', help='Number of measurements', type=int, default=1)
+measure_parser.add_argument(
+    'command', nargs=argparse.REMAINDER, help='Command to measure')
+
+add_parser = sub_parser.add_parser('add', help='Add single measurement')
+add_parser.add_argument('--measurement', '-m',
+                        help='Name of measurement', required=True)
+add_parser.add_argument('value')
+
+push_parser = sub_parser.add_parser(
+    'push', help='Publish performance results to remote')
+
+report_parser = sub_parser.add_parser(
+    'report', help='Create an HTML performance report')
+
+audit_parser = sub_parser.add_parser(
+    'audit', help='Check for perfomance deviations')
+
+
+def measure(measurement: str, number: int, command: List[str]):
+    for i in range(number):
+        start = time.time_ns()
+        subprocess.check_call(command)
+        end = time.time_ns()
+        value = end - start
+        add(measurement, str(value))
+
+
+def add(measurement: str, value: str):
+    if not value.isnumeric():
+        print(f"Value '{value}' is not numeric", file=sys.stderr)
+        assert(False)
+
+    formatted_measurement = f"{measurement} {time.time()} {value}"
+    print(formatted_measurement)
+
+    notes_call = ['git', 'notes', '--ref', PERF_REF,
+                  'append', '-m', formatted_measurement]
+    subprocess.check_call(notes_call)
+
+
+def push():
+    counter = 0
+    while counter < MAX_PUSHES and push_to_origin() != 0:
+        fetch()
+        reconcile()
+        counter += 1
+
+
+def push_to_origin() -> int:
+    return subprocess.call(['git', 'push', 'origin', PERF_REF])
+
+
+def fetch():
+    subprocess.check_call(['git', 'fetch', 'origin', PERF_REF])
+
+
+def reconcile():
+    subprocess.check_call(['git',
+                           'notes',
+                           '--ref',
+                           PERF_REF,
+                           'merge',
+                           '-s',
+                           'cat_sort_uniq',
+                           'FETCH_HEAD'])
+
+
+def get_raw_notes() -> str:
+    command = ['git',
+               '--no-pager',
+               'log',
+               '--no-color',
+               '--pretty=-- %H%n%N',
+               f"--notes={PERF_REF}"]
+    print(" ".join(command))
+    return subprocess.check_output(command, text=True)
+
+
+def report():
+    records = []
+    commit = None
+    for line in get_raw_notes().splitlines():
+        print(line)
+        if line.startswith('--'):
+            commit = line.split(" ")[1].strip()
+            continue
+        if len(line.strip()) == 0:
+            continue
+        if commit is None:
+            print(
+                f"Already have input but commit is unknown: ''", file=sys.stderr)
+            assert(False)
+            continue
+        data = line.strip()
+        items = data.split()
+        if len(items) < 3:
+            print(
+                f"Too few items for commit in input line: '{data}'", file=sys.stderr)
+            assert(False)
+            continue
+        name = items[0]
+        time = items[1]
+        val = items[2]
+        if not val.isnumeric():
+            print(
+                f"Found non-numeric value '{val}' as measurement for commit {commit} in line: '{data}'", file=sys.stderr)
+            assert(False)
+            continue
+        kvs = items[3:]
+        records.append({"commit": commit, "name": name, "time": pd.to_datetime(
+            time, unit='s'), "val": float(val), "kvs": kvs})
+    # TODO(kaihowl) handle empty records
+    df = pd.DataFrame(records)
+
+    df.index.name = 'num'
+    df = df.join(df.kvs.explode().str.split(
+        '=', expand=True).pivot_table(columns=0, index='num', values=1, aggfunc='last'))
+    df = df.drop(['kvs'], axis=1)
+    if 'os' in df.columns and 'runner_os' in df.columns:
+        df['os'] = df['os'].fillna(df['runner_os'])
+    df = df.fillna("n/a")
+    print(df.to_markdown())
+    args = {
+        'x': 'time',
+        'y': 'val',
+        'color': 'name',
+        'hover_data': df.columns,
+    }
+    if 'os' in df.columns:
+        args['symbol'] = 'os'
+    px.scatter(df, **args).write_html('result.html')
+
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    subcommand = args.subcommand
+    del args.subcommand
+    locals()[subcommand](**vars(args))
