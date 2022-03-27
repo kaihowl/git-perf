@@ -1,1 +1,4 @@
+mymeasurement 1648191186 18031 github_action=__run github_run_id=2038576319 github_run_number=15 runner_arch=X64 runner_os=Linux runner_name=GitHub Actions 2
+mymeasurement 1648191193 16149 github_action=__run github_run_id=2038576319 github_run_number=15 runner_arch=X64 runner_os=macOS runner_name=Hosted Agent
+mymeasurement 1648381503 17051 github_action=__run github_run_id=2047641975 github_run_number=16 runner_arch=X64 runner_os=Linux runner_name=GitHub Actions 4
 mymeasurement 1648381583 31274 github_action=__run github_run_id=2047641975 github_run_number=16 runner_arch=X64 runner_os=macOS runner_name=Hosted Agent
