@@ -12,10 +12,12 @@ PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 
 # TODO(kaihowl) key values
+# TODO(kaihowl) select perf by kay value
 
 parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
+# subcommand: measure
 measure_parser = sub_parser.add_parser(
     "measure", help='Measure the supplied commands runtime')
 measure_parser.add_argument(
@@ -26,17 +28,21 @@ measure_parser.add_argument(
 measure_parser.add_argument(
     'command', nargs=argparse.REMAINDER, help='Command to measure')
 
+# subcommand: add
 add_parser = sub_parser.add_parser('add', help='Add single measurement')
 add_parser.add_argument('--measurement', '-m',
                         help='Name of measurement', required=True)
 add_parser.add_argument('value')
 
+# subcommand: push
 push_parser = sub_parser.add_parser(
     'push', help='Publish performance results to remote')
 
+# subcommand: report
 report_parser = sub_parser.add_parser(
     'report', help='Create an HTML performance report')
 
+# subcommand: audit
 audit_parser = sub_parser.add_parser(
     'audit', help='Check for perfomance deviations')
 
@@ -153,6 +159,7 @@ def report():
     }
     if 'os' in df.columns:
         args['symbol'] = 'os'
+    # TODO(kaihowl) make configurable
     px.scatter(df, **args).write_html('result.html')
 
 
