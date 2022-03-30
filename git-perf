@@ -218,7 +218,6 @@ def get_df(max_count_commits: int):
         kvs = items[3:]
         records.append({"commit": commit, "name": name, "time": pd.to_datetime(
             time, unit='s'), "val": float(val), "kvs": kvs})
-    # TODO(kaihowl) handle and test empty records
     df = pd.DataFrame(records)
 
     df.index.name = 'num'
