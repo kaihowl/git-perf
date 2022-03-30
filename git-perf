@@ -35,7 +35,7 @@ def add_measurement_option(parser):
         dest='measurement')
 
 
-def keyvalue(val):
+def keyvalue(val) -> Tuple[str, str]:
     if len(val.split()) != 1:
         raise argparse.ArgumentTypeError(f"Key value pair '{val}' contains whitespace")
 
@@ -115,7 +115,7 @@ audit_parser.add_argument(
     default='min')
 
 
-def measure(measurement: str, number: int, keyvalue: List[str], command: List[str]):
+def measure(measurement: str, number: int, keyvalue: List[Tuple[str, str]], command: List[str]):
     for i in range(number):
         start = time.time_ns()
         subprocess.check_call(command)
@@ -124,7 +124,7 @@ def measure(measurement: str, number: int, keyvalue: List[str], command: List[st
         add(measurement, keyvalue, str(value))
 
 
-def add(measurement: str, keyvalue: List[str], value: str):
+def add(measurement: str, keyvalue: List[Tuple[str, str]], value: str):
     formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in keyvalue])
     formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
     print(formatted_measurement)
@@ -234,9 +234,9 @@ def report():
 
 
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
-def audit(measurement: str, max_count: int, group_by: str, aggregate_by: str, selector: List[Tuple[str]]):
+def audit(measurement: str, max_count: int, group_by: str, aggregate_by: str, selector: List[Tuple[str, str]]):
     df = get_df()
-    selector.append(['name', measurement])
+    selector.append(('name', measurement))
     for (key, value) in selector:
         df = df[df[key] == value]
     print(df.groupby(group_by).val.agg(aggregate_by).mean())
