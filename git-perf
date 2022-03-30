@@ -10,7 +10,6 @@ import plotly.express as px  # type: ignore
 
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
-# TODO(kaihowl) unused for actual git-log invocation
 DEFAULT_MAX_COUNT = 40
 
 # TODO(kaihowl) select perf by key value
@@ -80,6 +79,12 @@ push_parser = sub_parser.add_parser(
 # subcommand: report
 report_parser = sub_parser.add_parser(
     'report', help='Create an HTML performance report')
+report_parser.add_argument(
+    '-n',
+    '--max-count',
+    help='Limit to the number of previous commits considered',
+    type=int,
+    default=DEFAULT_MAX_COUNT)
 
 # subcommand: audit
 audit_parser = sub_parser.add_parser(
@@ -160,10 +165,11 @@ def reconcile():
                            'FETCH_HEAD'])
 
 
-def get_raw_notes() -> str:
+def get_raw_notes(max_count_commits: int) -> str:
     command = ['git',
                '--no-pager',
                'log',
+               '-n', str(max_count_commits),
                '--no-color',
                '--pretty=-- %H%n%N',
                f"--notes={PERF_REF}"]
@@ -171,10 +177,10 @@ def get_raw_notes() -> str:
     return subprocess.check_output(command, text=True)
 
 
-def get_df():
+def get_df(max_count_commits: int):
     records = []
     commit = None
-    for line in get_raw_notes().splitlines():
+    for line in get_raw_notes(max_count_commits).splitlines():
         if line.startswith('--'):
             commit = line.split(" ")[1].strip()
             continue
@@ -208,14 +214,15 @@ def get_df():
     df = pd.DataFrame(records)
 
     df.index.name = 'num'
-    df = df.join(df.kvs.explode().str.split(
-        '=', expand=True).pivot_table(columns=0, index='num', values=1, aggfunc='last'))
-    df = df.drop(['kvs'], axis=1)
+    if 'kvs' in df.columns:
+        df = df.join(df.kvs.explode().str.split(
+            '=', expand=True).pivot_table(columns=0, index='num', values=1, aggfunc='last'))
+        df = df.drop(['kvs'], axis=1)
     return df
 
 
-def report():
-    df = get_df()
+def report(max_count: int):
+    df = get_df(max_count)
     if 'os' in df.columns and 'runner_os' in df.columns:
         df['os'] = df['os'].fillna(df['runner_os'])
     df = df.fillna("n/a")
@@ -228,14 +235,23 @@ def report():
     }
     if 'os' in df.columns:
         args['symbol'] = 'os'
+    if (len(df) == 0):
+        print("No performance measurements found", file=sys.stderr)
+        sys.exit(1)
     # TODO(kaihowl) make configurable
     px.scatter(df, **args).write_html('result.html')
 
 
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
-def audit(measurement: str, max_count: int, group_by: str, aggregate_by: str, selector: List[Tuple[str, str]]):
-    df = get_df()
+def audit(measurement: str,
+          max_count: int,
+          group_by: str,
+          aggregate_by: str,
+          selector: List[Tuple[str, str]]):
+    # HEAD commit + max_count == max_count + 1 for the final count
+    df = get_df(max_count + 1)
     selector.append(('name', measurement))
+    # TODO(kaihowl) handle non-existent selectors
     for (key, value) in selector:
         df = df[df[key] == value]
     print(df.groupby(group_by).val.agg(aggregate_by).mean())
