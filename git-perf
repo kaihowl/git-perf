@@ -17,18 +17,27 @@ parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
 
-def add_measurement_options(parser: argparse.ArgumentParser):
+def add_measurement_option(parser):
     parser.add_argument(
         '--measurement', '-m', help='Name of measurement', required=True,
         dest='measurement')
+
+
+def add_kv_option(parser):
+    # TODO(kaihowl) validate argument here already with action?
     parser.add_argument(
-        '--keyvalue', '-kv', action='append', help='Key-value pair separated by "=", no whitespace', default=[])
+        '--keyvalue',
+        '-kv',
+        action='append',
+        help='Key-value pair separated by "=" with no whitespaces',
+        default=[])
 
 
 # subcommand: measure
 measure_parser = sub_parser.add_parser(
     "measure", help='Measure the supplied commands runtime')
-add_measurement_options(measure_parser)
+add_kv_option(measure_parser)
+add_measurement_option(measure_parser)
 measure_parser.add_argument(
     '--number', '-n', help='Number of measurements', type=int, default=1)
 measure_parser.add_argument(
@@ -36,7 +45,8 @@ measure_parser.add_argument(
 
 # subcommand: add
 add_parser = sub_parser.add_parser('add', help='Add single measurement')
-add_measurement_options(add_parser)
+add_kv_option(add_parser)
+add_measurement_option(add_parser)
 add_parser.add_argument('value')
 
 # subcommand: push
@@ -50,6 +60,14 @@ report_parser = sub_parser.add_parser(
 # subcommand: audit
 audit_parser = sub_parser.add_parser(
     'audit', help='Check for perfomance deviations')
+add_measurement_option(audit_parser)
+# TODO(kaihowl) add validation for kv
+audit_parser.add_argument(
+    '--selector',
+    '-s',
+    action='append',
+    help='Key-value pair separated by "=" with no whitespaces to subselect measurements',
+    default=[])
 
 
 def measure(measurement: str, number: int, keyvalue: List[str], command: List[str]):
@@ -122,11 +140,10 @@ def get_raw_notes() -> str:
     return subprocess.check_output(command, text=True)
 
 
-def report():
+def get_df():
     records = []
     commit = None
     for line in get_raw_notes().splitlines():
-        print(line)
         if line.startswith('--'):
             commit = line.split(" ")[1].strip()
             continue
@@ -155,13 +172,18 @@ def report():
         kvs = items[3:]
         records.append({"commit": commit, "name": name, "time": pd.to_datetime(
             time, unit='s'), "val": float(val), "kvs": kvs})
-    # TODO(kaihowl) handle empty records
+    # TODO(kaihowl) handle and test empty records
     df = pd.DataFrame(records)
 
     df.index.name = 'num'
     df = df.join(df.kvs.explode().str.split(
         '=', expand=True).pivot_table(columns=0, index='num', values=1, aggfunc='last'))
     df = df.drop(['kvs'], axis=1)
+    return df
+
+
+def report():
+    df = get_df()
     if 'os' in df.columns and 'runner_os' in df.columns:
         df['os'] = df['os'].fillna(df['runner_os'])
     df = df.fillna("n/a")
@@ -176,6 +198,14 @@ def report():
         args['symbol'] = 'os'
     # TODO(kaihowl) make configurable
     px.scatter(df, **args).write_html('result.html')
+
+
+# TODO(kaihowl) groupby
+# TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
+def audit(measurement: str, selector: List[str]):
+    df = get_df()
+    # TODO(kaihowl) selector unused
+    print(df[df.name == measurement].val.mean())
 
 
 if __name__ == '__main__':
