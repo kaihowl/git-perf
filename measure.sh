@@ -3,7 +3,7 @@
 set -e
 set -x
 
-# TODO(kaihowl) used for tests will break when adding arguments
+# TODO(kaihowl) used for tests, will break when adding arguments
 if [[ $# -gt 0 ]]; then
   measurements=$*
 else
