@@ -19,6 +19,16 @@ parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
 
+def numeric(val):
+    try:
+        float(val)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{val}' is not numeric")
+
+    # Keep as string, this is parsed in Pandas to the most appropriate type
+    return val
+
+
 def add_measurement_option(parser):
     parser.add_argument(
         '--measurement', '-m', help='Name of measurement', required=True,
@@ -62,7 +72,7 @@ measure_parser.add_argument(
 add_parser = sub_parser.add_parser('add', help='Add single measurement')
 add_kv_option(add_parser)
 add_measurement_option(add_parser)
-add_parser.add_argument('value')
+add_parser.add_argument('value', help='Measured value to be added (numeric)', type=numeric)
 
 # subcommand: push
 push_parser = sub_parser.add_parser(
@@ -115,11 +125,6 @@ def measure(measurement: str, number: int, keyvalue: List[str], command: List[st
 
 
 def add(measurement: str, keyvalue: List[str], value: str):
-    # TODO(kaihowl) make to argparse type validator
-    if not value.isnumeric():
-        print(f"Value '{value}' is not numeric", file=sys.stderr)
-        sys.exit(1)
-
     formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in keyvalue])
     formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
     print(formatted_measurement)
