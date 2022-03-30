@@ -47,10 +47,9 @@ def keyvalue(val) -> Tuple[str, str]:
     return split
 
 
-# TODO(kaihowl) make keyvalue to key-value as option
 def add_kv_option(parser):
     parser.add_argument(
-        '--keyvalue',
+        '--key-value',
         '-kv',
         action='append',
         type=keyvalue,
@@ -115,17 +114,17 @@ audit_parser.add_argument(
     default='min')
 
 
-def measure(measurement: str, number: int, keyvalue: List[Tuple[str, str]], command: List[str]):
+def measure(measurement: str, number: int, key_value: List[Tuple[str, str]], command: List[str]):
     for i in range(number):
         start = time.time_ns()
         subprocess.check_call(command)
         end = time.time_ns()
         value = end - start
-        add(measurement, keyvalue, str(value))
+        add(measurement, key_value, str(value))
 
 
-def add(measurement: str, keyvalue: List[Tuple[str, str]], value: str):
-    formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in keyvalue])
+def add(measurement: str, key_value: List[Tuple[str, str]], value: str):
+    formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in key_value])
     formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
     print(formatted_measurement)
 
