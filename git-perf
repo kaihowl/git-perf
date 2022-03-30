@@ -10,6 +10,8 @@ import plotly.express as px  # type: ignore
 
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
+# TODO(kaihowl) unused for actual git-log invocation
+DEFAULT_MAX_COUNT = 40
 
 # TODO(kaihowl) select perf by kay value
 
@@ -23,6 +25,7 @@ def add_measurement_option(parser):
         dest='measurement')
 
 
+# TODO(kaihowl) make keyvalue to key-value as option
 def add_kv_option(parser):
     # TODO(kaihowl) validate argument here already with action?
     parser.add_argument(
