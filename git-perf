@@ -62,7 +62,11 @@ report_parser = sub_parser.add_parser(
 
 # subcommand: audit
 audit_parser = sub_parser.add_parser(
-    'audit', help='Check for perfomance deviations')
+    'audit', help="""
+    For a given measurement, check perfomance deviations of the HEAD commit
+    against <n> previous commits. Group previous results and aggregate their
+    results before comparison.
+    """)
 add_measurement_option(audit_parser)
 # TODO(kaihowl) add validation for kv
 audit_parser.add_argument(
@@ -71,6 +75,22 @@ audit_parser.add_argument(
     action='append',
     help='Key-value pair separated by "=" with no whitespaces to subselect measurements',
     default=[])
+audit_parser.add_argument(
+    '-n',
+    '--max-count',
+    help='Limit to the number of previous commits considered',
+    type=int,
+    default=DEFAULT_MAX_COUNT)
+audit_parser.add_argument(
+    '-g',
+    '--group-by',
+    help='What to group the measurements by',
+    default='commit')
+audit_parser.add_argument(
+    '-agg',
+    '--aggregate-by',
+    help='What to aggregate the measurements in each group with',
+    default='min')
 
 
 def measure(measurement: str, number: int, keyvalue: List[str], command: List[str]):
@@ -205,10 +225,10 @@ def report():
 
 # TODO(kaihowl) groupby
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
-def audit(measurement: str, selector: List[str]):
+def audit(measurement: str, max_count: int, group_by: str, aggregate_by: str, selector: List[str]):
     df = get_df()
     # TODO(kaihowl) selector unused
-    print(df[df.name == measurement].val.mean())
+    print(df[df.name == measurement].groupby(group_by).agg(aggregate_by).val.mean())
 
 
 if __name__ == '__main__':
