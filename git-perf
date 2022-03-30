@@ -5,24 +5,30 @@ import time
 import subprocess
 from typing import List
 import sys
-import pandas as pd
-import plotly.express as px
+import pandas as pd  # type: ignore
+import plotly.express as px  # type: ignore
 
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 
-# TODO(kaihowl) key values
 # TODO(kaihowl) select perf by kay value
 
 parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
+
+def add_measurement_options(parser: argparse.ArgumentParser):
+    parser.add_argument(
+        '--measurement', '-m', help='Name of measurement', required=True,
+        dest='measurement')
+    parser.add_argument(
+        '--keyvalue', '-kv', action='append', help='Key-value pair separated by "=", no whitespace', default=[])
+
+
 # subcommand: measure
 measure_parser = sub_parser.add_parser(
     "measure", help='Measure the supplied commands runtime')
-measure_parser.add_argument(
-    '--measurement', '-m', help='Name of measurement', required=True,
-    dest='measurement')
+add_measurement_options(measure_parser)
 measure_parser.add_argument(
     '--number', '-n', help='Number of measurements', type=int, default=1)
 measure_parser.add_argument(
@@ -30,8 +36,7 @@ measure_parser.add_argument(
 
 # subcommand: add
 add_parser = sub_parser.add_parser('add', help='Add single measurement')
-add_parser.add_argument('--measurement', '-m',
-                        help='Name of measurement', required=True)
+add_measurement_options(add_parser)
 add_parser.add_argument('value')
 
 # subcommand: push
@@ -47,21 +52,31 @@ audit_parser = sub_parser.add_parser(
     'audit', help='Check for perfomance deviations')
 
 
-def measure(measurement: str, number: int, command: List[str]):
+def measure(measurement: str, number: int, keyvalue: List[str], command: List[str]):
     for i in range(number):
         start = time.time_ns()
         subprocess.check_call(command)
         end = time.time_ns()
         value = end - start
-        add(measurement, str(value))
+        add(measurement, keyvalue, str(value))
 
 
-def add(measurement: str, value: str):
+def add(measurement: str, keyvalue: List[str], value: str):
     if not value.isnumeric():
         print(f"Value '{value}' is not numeric", file=sys.stderr)
-        assert(False)
+        sys.exit(1)
 
-    formatted_measurement = f"{measurement} {time.time()} {value}"
+    for kv in keyvalue:
+        if len(kv.split()) != 1:
+            print(f"Key value pair '{kv}' contains whitespace", file=sys.stderr)
+            sys.exit(1)
+
+        if len(kv.split('=')) != 2:
+            print(f"Key value pair '{kv}' does not follow 'key=value' format", file=sys.stderr)
+            sys.exit(1)
+
+    formatted_kvs = ' '.join([kv.strip() for kv in keyvalue])
+    formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
     print(formatted_measurement)
 
     notes_call = ['git', 'notes', '--ref', PERF_REF,
