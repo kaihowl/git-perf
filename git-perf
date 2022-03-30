@@ -250,6 +250,8 @@ def report(max_count: int, output: str):
 
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
 # TODO(kaihowl) add -d / --sigma parameter
+
+
 def audit(measurement: str,
           max_count: int,
           group_by: str,
@@ -258,8 +260,9 @@ def audit(measurement: str,
     # HEAD commit + max_count == max_count + 1 for the final count
     df = get_df(max_count + 1)
     selector.append(('name', measurement))
-    # TODO(kaihowl) handle non-existent selectors
     for (key, value) in selector:
+        if key not in df.columns:
+            raise ValueError(f"Selector '{key}' does not exist")
         df = df[df[key] == value]
     print(df.groupby(group_by).val.agg(aggregate_by).mean())
 
