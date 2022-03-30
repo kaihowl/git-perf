@@ -4,6 +4,7 @@ set -e
 set -x
 
 # TODO(kaihowl) used for tests, will break when adding arguments
+# TODO(kaihowl) make this script only used for adding invalid values
 if [[ $# -gt 0 ]]; then
   measurements=$*
 else

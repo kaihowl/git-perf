@@ -76,6 +76,7 @@ add_parser.add_argument('value', help='Measured value to be added (numeric)', ty
 push_parser = sub_parser.add_parser(
     'push', help='Publish performance results to remote')
 
+# TODO(kaihowl) report should have same parameters as audit
 # subcommand: report
 report_parser = sub_parser.add_parser(
     'report', help='Create an HTML performance report')
