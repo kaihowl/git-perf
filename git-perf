@@ -16,10 +16,17 @@ parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
 
-def numeric(val):
+def isnumeric(val: str):
     try:
         float(val)
     except ValueError:
+        return False
+
+    return True
+
+
+def numerictype(val):
+    if not isnumeric(val):
         raise argparse.ArgumentTypeError(f"'{val}' is not numeric")
 
     # Keep as string, this is parsed in Pandas to the most appropriate type
@@ -68,7 +75,7 @@ measure_parser.add_argument(
 add_parser = sub_parser.add_parser('add', help='Add single measurement')
 add_kv_option(add_parser)
 add_measurement_option(add_parser)
-add_parser.add_argument('value', help='Measured value to be added (numeric)', type=numeric)
+add_parser.add_argument('value', help='Measured value to be added (numeric)', type=numerictype)
 
 # subcommand: push
 push_parser = sub_parser.add_parser(
@@ -200,10 +207,11 @@ def get_df(max_count_commits: int):
         name = items[0]
         time = items[1]
         val = items[2]
-        # TODO(kaihowl) fix up check
-        if not val.isnumeric():
+        if not isnumeric(val):
             print(
-                f"Found non-numeric value '{val}' as measurement for commit {commit} in line: '{data}'", file=sys.stderr)
+                f"Found non-numeric value '{val}' as measurement "
+                f"for commit {commit} in line: '{data}'",
+                file=sys.stderr)
             assert(False)
             continue
         kvs = items[3:]
