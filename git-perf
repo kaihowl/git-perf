@@ -250,6 +250,7 @@ def report(max_count: int, output: str):
 
 
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
+# TODO(kaihowl) add -d / --sigma parameter
 def audit(measurement: str,
           max_count: int,
           group_by: str,
