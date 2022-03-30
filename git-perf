@@ -3,7 +3,7 @@
 import argparse
 import time
 import subprocess
-from typing import List
+from typing import List, Tuple
 import sys
 import pandas as pd  # type: ignore
 import plotly.express as px  # type: ignore
@@ -232,12 +232,13 @@ def report():
     px.scatter(df, **args).write_html('result.html')
 
 
-# TODO(kaihowl) groupby
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
-def audit(measurement: str, max_count: int, group_by: str, aggregate_by: str, selector: List[str]):
+def audit(measurement: str, max_count: int, group_by: str, aggregate_by: str, selector: List[Tuple[str]]):
     df = get_df()
-    # TODO(kaihowl) selector unused
-    print(df[df.name == measurement].groupby(group_by).agg(aggregate_by).val.mean())
+    selector.append(['name', measurement])
+    for (key, value) in selector:
+        df = df[df[key] == value]
+    print(df.groupby(group_by).val.agg(aggregate_by).mean())
 
 
 if __name__ == '__main__':
