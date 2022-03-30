@@ -19,3 +19,5 @@ echo 1648652689.570857 5486000 mytest=12
 echo 1648652689.590297 4156000 mytest=12
 
 testval 1648652695.609411 -12334 test=something test2=something2
+
+testval 1648652732.5030231 12334.12 test=something test2=something2
