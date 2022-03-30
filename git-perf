@@ -12,8 +12,6 @@ PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
 
-# TODO(kaihowl) select perf by key value
-
 parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
