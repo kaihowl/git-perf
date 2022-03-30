@@ -80,11 +80,11 @@ audit_parser = sub_parser.add_parser(
     results before comparison.
     """)
 add_measurement_option(audit_parser)
-# TODO(kaihowl) add validation for kv
 audit_parser.add_argument(
     '--selector',
     '-s',
     action='append',
+    type=keyvalue,
     help='Key-value pair separated by "=" with no whitespaces to subselect measurements',
     default=[])
 audit_parser.add_argument(
