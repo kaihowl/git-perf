@@ -25,13 +25,25 @@ def add_measurement_option(parser):
         dest='measurement')
 
 
+def keyvalue(val):
+    if len(val.split()) != 1:
+        raise argparse.ArgumentTypeError(f"Key value pair '{val}' contains whitespace")
+
+    split = val.strip().split('=')
+    if len(split) != 2:
+        raise argparse.ArgumentTypeError(
+            f"Key value pair '{val}' does not follow 'key=value' format")
+
+    return split
+
+
 # TODO(kaihowl) make keyvalue to key-value as option
 def add_kv_option(parser):
-    # TODO(kaihowl) validate argument here already with action?
     parser.add_argument(
         '--keyvalue',
         '-kv',
         action='append',
+        type=keyvalue,
         help='Key-value pair separated by "=" with no whitespaces',
         default=[])
 
@@ -103,20 +115,12 @@ def measure(measurement: str, number: int, keyvalue: List[str], command: List[st
 
 
 def add(measurement: str, keyvalue: List[str], value: str):
+    # TODO(kaihowl) make to argparse type validator
     if not value.isnumeric():
         print(f"Value '{value}' is not numeric", file=sys.stderr)
         sys.exit(1)
 
-    for kv in keyvalue:
-        if len(kv.split()) != 1:
-            print(f"Key value pair '{kv}' contains whitespace", file=sys.stderr)
-            sys.exit(1)
-
-        if len(kv.split('=')) != 2:
-            print(f"Key value pair '{kv}' does not follow 'key=value' format", file=sys.stderr)
-            sys.exit(1)
-
-    formatted_kvs = ' '.join([kv.strip() for kv in keyvalue])
+    formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in keyvalue])
     formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
     print(formatted_measurement)
 
