@@ -13,7 +13,7 @@ MAX_PUSHES = 3
 # TODO(kaihowl) unused for actual git-log invocation
 DEFAULT_MAX_COUNT = 40
 
-# TODO(kaihowl) select perf by kay value
+# TODO(kaihowl) select perf by key value
 
 parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
@@ -196,6 +196,7 @@ def get_df():
         name = items[0]
         time = items[1]
         val = items[2]
+        # TODO(kaihowl) fix up check
         if not val.isnumeric():
             print(
                 f"Found non-numeric value '{val}' as measurement for commit {commit} in line: '{data}'", file=sys.stderr)
