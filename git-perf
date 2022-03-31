@@ -12,6 +12,8 @@ PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
 
+KeyValueList = List[Tuple[str, str]]
+
 parser = argparse.ArgumentParser()
 sub_parser = parser.add_subparsers(dest='subcommand')
 
@@ -131,7 +133,7 @@ audit_parser.add_argument(
     default=4)
 
 
-def measure(measurement: str, number: int, key_value: List[Tuple[str, str]], command: List[str]):
+def measure(measurement: str, number: int, key_value: KeyValueList, command: List[str]):
     for i in range(number):
         start = time.time_ns()
         subprocess.check_call(command)
@@ -140,7 +142,7 @@ def measure(measurement: str, number: int, key_value: List[Tuple[str, str]], com
         add(measurement, key_value, str(value))
 
 
-def add(measurement: str, key_value: List[Tuple[str, str]], value: str):
+def add(measurement: str, key_value: KeyValueList, value: str):
     formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in key_value])
     formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
     print(formatted_measurement)
@@ -254,9 +256,7 @@ def report(max_count: int, output: str):
     px.scatter(df, **args).write_html(output)
 
 
-# TODO(kaihowl) type alias for selector list
-
-def filter_df(df: pd.DataFrame, selector: List[Tuple[str, str]]) -> pd.DataFrame:
+def filter_df(df: pd.DataFrame, selector: KeyValueList) -> pd.DataFrame:
     for (key, value) in selector:
         if key not in df.columns:
             raise ValueError(f"Selector '{key}' does not exist")
@@ -273,7 +273,7 @@ def audit(measurement: str,
           max_count: int,
           group_by: str,
           aggregate_by: str,
-          selector: List[Tuple[str, str]],
+          selector: KeyValueList,
           sigma: float):
     df = get_df(max_count, offset=1)
     df_head = get_df(1)
