@@ -8,6 +8,9 @@ set -x
 
 script_dir=$(pwd)
 
+PATH=${script_dir}/:$PATH
+python3 -m pip install -r ${script_dir}/requirements.txt
+
 cd "$(mktemp -d)"
 root=$(pwd)
 
@@ -40,10 +43,11 @@ repo2=$(pwd)/repo2
 echo Leave one commit in middle without any notes
 cd "$repo1"
 git checkout master~2
-"${script_dir}/measure.sh"
-"${script_dir}/measure.sh"
+git perf measure -m sleep sleep 0.1
+git perf measure -m sleep sleep 0.1
+git perf measure -m sleep sleep 0.1
 git checkout master
-"${script_dir}/measure.sh"
+git perf measure -m sleep sleep 0.1
 
 echo Add invalid measurements
 # Empty measurement
@@ -62,11 +66,14 @@ echo Add invalid measurements
 "${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM key=value key=value"
 # Conflicting kvs
 "${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM key=value key=value2"
-#
+
+git perf push
+
 echo Print from second repo
 cd "$repo2"
 
 echo from hereon
-git --no-pager log --no-color --pretty='oneline'
-"${script_dir}/report.sh"
+git perf pull
+git perf report -o result.html
+
 echo "$(pwd)/result.html"
