@@ -25,5 +25,5 @@ jobs:
       - name: Install and test
         shell: bash
         run: |
-          ./measure.sh
+          ./test.sh
 
