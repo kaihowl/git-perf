@@ -8,6 +8,8 @@ set -x
 
 script_dir=$(pwd)
 
+export PYTHONOPTIMIZE=TRUE
+
 export GIT_COMMITTER_EMAIL="<>"
 export GIT_COMMITTER_NAME="GitHub Actions Test"
 export GIT_AUTHOR_EMAIL="<>"
