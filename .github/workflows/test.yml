@@ -21,10 +21,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: setup git config
-        run: |
-              git config user.name "GitHub Actions Bot"
-              git config user.email "<>"
+      - uses: fregante/setup-git-user@v1
       - name: Install and test
         shell: bash
         run: |
