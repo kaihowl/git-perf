@@ -254,9 +254,7 @@ def report(max_count: int, output: str):
     px.scatter(df, **args).write_html(output)
 
 
-# TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
 # TODO(kaihowl) type alias for selector list
-# TODO(kaihowl) add -d / --sigma parameter
 
 def filter_df(df: pd.DataFrame, selector: List[Tuple[str, str]]) -> pd.DataFrame:
     for (key, value) in selector:
