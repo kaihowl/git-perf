@@ -8,8 +8,8 @@ set -x
 
 script_dir=$(pwd)
 
-GIT_COMMITTER_EMAIL="<>"
-GIT_COMMITTER_NAME="GitHub Actions Test"
+export GIT_COMMITTER_EMAIL="<>"
+export GIT_COMMITTER_NAME="GitHub Actions Test"
 
 PATH=${script_dir}/:$PATH
 python3 -m pip install -r ${script_dir}/requirements.txt
