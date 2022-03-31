@@ -83,6 +83,10 @@ add_parser.add_argument('value', help='Measured value to be added (numeric)', ty
 push_parser = sub_parser.add_parser(
     'push', help='Publish performance results to remote')
 
+# subcommand: push
+pull = sub_parser.add_parser(
+    'pull', help='Pull performance results from remote')
+
 # TODO(kaihowl) report should have same parameters as audit
 # subcommand: report
 report_parser = sub_parser.add_parser(
@@ -152,11 +156,15 @@ def add(measurement: str, key_value: KeyValueList, value: str):
     subprocess.check_call(notes_call)
 
 
+def pull():
+    fetch()
+    reconcile()
+
+
 def push():
     counter = 0
     while counter < MAX_PUSHES and push_to_origin() != 0:
-        fetch()
-        reconcile()
+        pull()
         counter += 1
 
 
