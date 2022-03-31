@@ -124,6 +124,11 @@ audit_parser.add_argument(
     '--aggregate-by',
     help='What to aggregate the measurements in each group with',
     default='min')
+audit_parser.add_argument(
+    '-d', '--sigma',
+    help='Multiple of the stddev after which a outlier is detected',
+    type=float,
+    default=4)
 
 
 def measure(measurement: str, number: int, key_value: List[Tuple[str, str]], command: List[str]):
@@ -172,22 +177,23 @@ def reconcile():
                            'FETCH_HEAD'])
 
 
-def get_raw_notes(max_count_commits: int) -> str:
+def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
     command = ['git',
                '--no-pager',
                'log',
                '-n', str(max_count_commits),
                '--no-color',
                '--pretty=-- %H%n%N',
-               f"--notes={PERF_REF}"]
+               f"--notes={PERF_REF}",
+               f"HEAD~{offset}"]
     print(" ".join(command))
     return subprocess.check_output(command, text=True)
 
 
-def get_df(max_count_commits: int):
+def get_df(max_count_commits: int, offset: int = 0):
     records = []
     commit = None
-    for line in get_raw_notes(max_count_commits).splitlines():
+    for line in get_raw_notes(max_count_commits, offset).splitlines():
         if line.startswith('--'):
             commit = line.split(" ")[1].strip()
             continue
@@ -249,22 +255,40 @@ def report(max_count: int, output: str):
 
 
 # TODO(kaihowl) how to pass / select last value? Just use commit on top compared to <n> previous?
+# TODO(kaihowl) type alias for selector list
 # TODO(kaihowl) add -d / --sigma parameter
+
+def filter_df(df: pd.DataFrame, selector: List[Tuple[str, str]]) -> pd.DataFrame:
+    for (key, value) in selector:
+        if key not in df.columns:
+            raise ValueError(f"Selector '{key}' does not exist")
+        df = df[df[key] == value]
+    return df
+
+
+def summarize(df: pd.DataFrame, group_by: str, aggregate_by: str) -> Tuple[float, float]:
+    group = df.groupby(group_by).val.agg(aggregate_by)
+    return (group.mean(), group.std())
 
 
 def audit(measurement: str,
           max_count: int,
           group_by: str,
           aggregate_by: str,
-          selector: List[Tuple[str, str]]):
-    # HEAD commit + max_count == max_count + 1 for the final count
-    df = get_df(max_count + 1)
+          selector: List[Tuple[str, str]],
+          sigma: float):
+    df = get_df(max_count, offset=1)
+    df_head = get_df(1)
     selector.append(('name', measurement))
-    for (key, value) in selector:
-        if key not in df.columns:
-            raise ValueError(f"Selector '{key}' does not exist")
-        df = df[df[key] == value]
-    print(df.groupby(group_by).val.agg(aggregate_by).mean())
+    df = filter_df(df, selector)
+    df_head = filter_df(df_head, selector)
+    print(df.to_markdown())
+    mean, std = summarize(df, group_by, aggregate_by)
+    print(f"mean: {mean}")
+    print(f"std: {std}")
+    head_mean, _ = summarize(df_head, group_by, aggregate_by)
+    print(f"head_mean: {head_mean}")
+    print(f"is regular: {-sigma * std + mean <= head_mean <= mean + sigma * std}")
 
 
 if __name__ == '__main__':
