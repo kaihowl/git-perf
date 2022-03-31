@@ -3,6 +3,9 @@
 set -e
 set -x
 
+# TODO(kaihowl) extend with error code checking and output expectations for error messages
+# TODO(kaihowl) extend with "audit" use cases
+
 script_dir=$(pwd)
 
 cd "$(mktemp -d)"
