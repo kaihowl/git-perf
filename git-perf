@@ -83,7 +83,7 @@ push_parser = sub_parser.add_parser(
     'push', help='Publish performance results to remote')
 
 # subcommand: push
-pull = sub_parser.add_parser(
+pull_parser = sub_parser.add_parser(
     'pull', help='Pull performance results from remote')
 
 # TODO(kaihowl) report should have same parameters as audit
