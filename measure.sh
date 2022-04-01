@@ -1,7 +1,5 @@
 #!/bin/bash
-
 set -e
-set -x
 
 if [[ $# -eq 0 ]]; then
   echo Two few arguments
@@ -10,4 +8,4 @@ fi
 
 measurements=$*
 
-git notes --ref refs/notes/perf append -m "$measurements"
+git notes --ref refs/notes/perf append -m "${measurements[@]}"
