@@ -16,7 +16,7 @@ DEFAULT_MAX_COUNT = 40
 KeyValueList = List[Tuple[str, str]]
 
 parser = argparse.ArgumentParser()
-sub_parser = parser.add_subparsers(dest='subcommand')
+sub_parser = parser.add_subparsers(dest='subcommand', required=True)
 
 
 def isnumeric(val: str):
