@@ -241,8 +241,8 @@ def get_df(max_count_commits: int, offset: int = 0):
         # Only continue if there are indeed kv pairs and not a kvs column of empty arrays
         # TODO(kaihowl) appears when adding only non-kv measurements, maybe handle earlier?
         if 1 in expanded.columns:
-            df = expanded.pivot_table(columns=0, index='num', values=1, aggfunc='last')
-            df = df.drop(['kvs'], axis=1)
+            pivoted = expanded.pivot_table(columns=0, index='num', values=1, aggfunc='last')
+            df = df.drop(['kvs'], axis=1).join(pivoted)
     return df
 
 
