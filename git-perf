@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-# TODO(kaihowl) check impact of imports on startup performance
 import argparse
 import time
 import subprocess
