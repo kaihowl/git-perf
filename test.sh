@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+PS4='${LINENO}: '
 set -x
 
 # TODO(kaihowl) extend with error code checking and output expectations for error messages
