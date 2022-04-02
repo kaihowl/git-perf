@@ -297,7 +297,11 @@ def audit(measurement: str,
     print(f"std: {std}")
     head_mean, _ = summarize(df_head, group_by, aggregate_by)
     print(f"head_mean: {head_mean}")
-    print(f"is regular: {-sigma * std + mean <= head_mean <= mean + sigma * std}")
+    print(f"sigma: {sigma}")
+    # TODO(kaihowl) double check comparison operators
+    is_regular = -sigma * std + mean < head_mean < mean + sigma * std
+    print(f"is regular: {is_regular}")
+    sys.exit(not is_regular)
 
 
 if __name__ == '__main__':

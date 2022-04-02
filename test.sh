@@ -6,7 +6,6 @@ set -x
 
 shopt -s nocasematch
 
-# TODO(kaihowl) extend with "audit" use cases
 # TODO(kaihowl) add output expectations for report use cases (maybe add csv output)
 
 script_dir=$(pwd)
@@ -77,6 +76,14 @@ function cd_temp_repo() {
   touch b
   git add b
   git commit -m 'second commit'
+
+  touch c
+  git add c
+  git commit -m 'third commit'
+
+  touch d
+  git add d
+  git commit -m 'fourth commit'
 }
 
 
@@ -169,3 +176,23 @@ if [[ -n ${output} ]]; then
   echo "$output"
   exit 1
 fi
+
+# Basic audit tests
+
+cd_temp_repo
+git checkout HEAD~3
+git perf add -m timer 1
+git checkout - && git checkout HEAD~2
+git perf add -m timer 2
+git checkout - && git checkout HEAD~1
+git perf add -m timer 3
+git checkout -
+git perf add -m timer 4
+# mean: 2, std: 1
+git perf audit -m timer -d 4
+git perf audit -m timer -d 3
+git perf audit -m timer -d 2 && exit 1
+git perf audit -m timer -d 1 && exit 1
+
+exit 0
+
