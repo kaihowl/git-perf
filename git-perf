@@ -279,9 +279,11 @@ def filter_df(df, selector: KeyValueList):
 
 
 def summarize(df, group_by: str, aggregate_by: str) -> Tuple[float, float]:
+    import numpy as np
+    if (len(df) == 0):
+        return (np.nan, np.nan)
     group = df.groupby(group_by).val.agg(aggregate_by)
-    # Use ddof=0 to ensure that std(l)==0 if len(l)==1
-    return (group.mean(), group.std(ddof=0))
+    return (group.mean(), group.std())
 
 
 def audit(measurement: str,
@@ -290,34 +292,32 @@ def audit(measurement: str,
           aggregate_by: str,
           selector: KeyValueList,
           sigma: float):
+    import numpy as np
+
     df = get_df(max_count, offset=1)
     df_head = get_df(1)
-
-    if len(df) == 0:
-        print("No historical measurements available")
-        return
-
-    if len(df_head) == 0:
-        print("No current measurements available")
-        return
 
     selector.append(('name', measurement))
     df = filter_df(df, selector)
     df_head = filter_df(df_head, selector)
 
-    # TODO(kaihowl) remove the special casing
-    if len(df) == 0 and len(df_head) != 0:
-        print("No historical measurements after selection available")
-        print("But HEAD values available")
-        return
-
     print(df.to_markdown())
     mean, std = summarize(df, group_by, aggregate_by)
     print(f"mean: {mean}")
     print(f"std: {std}")
+
     head_mean, _ = summarize(df_head, group_by, aggregate_by)
     print(f"head_mean: {head_mean}")
     print(f"sigma: {sigma}")
+
+    if np.isnan(head_mean):
+        print("No matching measurements in HEAD commit", file=sys.stderr)
+        sys.exit(1)
+
+    if np.isnan(std):
+        print("Not enough historical data available", file=sys.stderr)
+        return
+
     is_regular = -sigma * std + mean <= head_mean <= mean + sigma * std
     print(f"is regular: {is_regular}")
     sys.exit(not is_regular)
