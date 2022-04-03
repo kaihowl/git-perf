@@ -26,4 +26,8 @@ jobs:
         shell: bash
         run: |
           ./test.sh
+          export PATH=.
+          git perf measure -m test-measure -kv os=${{matrix.os}}
+          git perf push
+          git perf audit -m test-measure -s os=${{matrix.os}}
 
