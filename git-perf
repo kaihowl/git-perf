@@ -130,7 +130,9 @@ audit_parser.add_argument(
     default='min')
 audit_parser.add_argument(
     '-d', '--sigma',
-    help='Multiple of the stddev after which a outlier is detected',
+    help='Multiple of the stddev after which a outlier is detected. '
+    'If the HEAD measurement is within [mean-<d>*sigma; mean+<d>*sigma], '
+    'it is considered acceptable.',
     type=float,
     default=4)
 
@@ -298,8 +300,7 @@ def audit(measurement: str,
     head_mean, _ = summarize(df_head, group_by, aggregate_by)
     print(f"head_mean: {head_mean}")
     print(f"sigma: {sigma}")
-    # TODO(kaihowl) double check comparison operators
-    is_regular = -sigma * std + mean < head_mean < mean + sigma * std
+    is_regular = -sigma * std + mean <= head_mean <= mean + sigma * std
     print(f"is regular: {is_regular}")
     sys.exit(not is_regular)
 

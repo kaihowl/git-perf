@@ -191,7 +191,8 @@ git perf add -m timer 4
 # mean: 2, std: 1
 git perf audit -m timer -d 4
 git perf audit -m timer -d 3
-git perf audit -m timer -d 2 && exit 1
+git perf audit -m timer -d 2
+git perf audit -m timer -d 1.9999 && exit 1
 git perf audit -m timer -d 1 && exit 1
 
 exit 0
