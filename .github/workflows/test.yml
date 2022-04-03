@@ -21,6 +21,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 40
       - uses: fregante/setup-git-user@v1
       - name: Install and test
         shell: bash
@@ -29,5 +31,5 @@ jobs:
           export PATH=$(pwd):$PATH
           git perf measure -n 10 -m test-measure -kv os=${{matrix.os}} sleep 0.01
           git perf push
-          git perf audit -m test-measure -s os=${{matrix.os}}
+          git perf audit -n 40 -m test-measure -s os=${{matrix.os}}
 
