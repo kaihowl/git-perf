@@ -1,0 +1,12 @@
+echo 1648643996.183372 12075000 mytest=12
+echo 1648643996.225285 5634000 mytest=12
+echo 1648643996.247139 5247000 mytest=12
+echo 1648643996.2685199 4590000 mytest=12
+echo 1648643996.290273 4807000 mytest=12
+echo 1648643996.3106089 4596000 mytest=12
+echo 1648643996.331202 4882000 mytest=12
+echo 1648643996.352303 5275000 mytest=12
+echo 1648643996.373698 4796000 mytest=12
+echo 1648643996.395326 4848000 mytest=12
+mymeasurement 1648642892 5186 github_action=__run github_run_id=2064697118 github_run_number=23 runner_arch=X64 runner_os=Linux runner_name=Hosted Agent
+mymeasurement 1648642985 15345 github_action=__run github_run_id=2064697118 github_run_number=23 runner_arch=X64 runner_os=macOS runner_name=GitHub Actions 2
