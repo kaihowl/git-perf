@@ -18,6 +18,8 @@ jobs:
         os: [ubuntu-20.04, macos-11]
       fail-fast: false
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONOPTIMIZE: TRUE
 
     steps:
       - uses: actions/checkout@v2
