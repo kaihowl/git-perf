@@ -86,6 +86,13 @@ function cd_temp_repo() {
   git commit -m 'fourth commit'
 }
 
+cd_temp_repo
+output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'missing command'* ]]; then
+  echo Missing 'missing command' in output:
+  echo "$output"
+  exit 1
+fi
 
 echo Add invalid measurements
 

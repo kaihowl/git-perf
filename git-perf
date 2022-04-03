@@ -69,7 +69,7 @@ add_measurement_option(measure_parser)
 measure_parser.add_argument(
     '--number', '-n', help='Number of measurements', type=int, default=1)
 measure_parser.add_argument(
-    'command', nargs=argparse.REMAINDER, help='Command to measure')
+    'command', nargs='+', help='Command to measure')
 
 # subcommand: add
 add_parser = sub_parser.add_parser('add', help='Add single measurement')
