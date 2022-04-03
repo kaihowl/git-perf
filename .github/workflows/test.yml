@@ -26,5 +26,5 @@ jobs:
       - name: Install and test
         shell: bash
         run: |
-          git describe HEAD
+          git log -n 1 HEAD
 
