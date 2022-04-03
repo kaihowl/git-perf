@@ -7,6 +7,7 @@ set -x
 shopt -s nocasematch
 
 # TODO(kaihowl) add output expectations for report use cases (maybe add csv output)
+# TODO(kaihowl) add test for kvs if previous commits do not contain this selector
 
 script_dir=$(pwd)
 
