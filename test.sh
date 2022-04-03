@@ -195,5 +195,40 @@ git perf audit -m timer -d 2
 git perf audit -m timer -d 1.9999 && exit 1
 git perf audit -m timer -d 1 && exit 1
 
+cd_temp_repo
+echo No measurements available
+git perf audit -m timer
+echo Only HEAD measurement available
+git perf add -m timer 3
+git perf audit -m timer
+echo Only one historical measurement available
+git checkout HEAD~1
+git perf add -m timer 3
+git checkout -
+git perf audit -m timer
+echo Two historical measurements available
+git checkout HEAD~2
+git perf add -m timer 3
+git checkout -
+git perf audit -m timer
+
+cd_temp_repo
+echo Only one historical measurement available
+git checkout HEAD~1
+git perf add -m timer 3
+git checkout -
+git perf audit -m timer
+
+echo Only measurements for different value available
+cd_temp_repo
+git checkout HEAD~1
+git perf add -m othertimer 3
+git checkout -
+git perf add -m othertimer 3
+git perf audit -m timer && exit 1
+echo New measurement for HEAD but only historical measurements for different measurements
+git perf add -m timer 3
+git perf audit -m timer
+
 exit 0
 
