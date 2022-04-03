@@ -88,8 +88,8 @@ function cd_temp_repo() {
 
 cd_temp_repo
 output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'missing command'* ]]; then
-  echo Missing 'missing command' in output:
+if [[ ${output} != *'following arguments'* ]]; then
+  echo Missing 'following arguments' in output:
   echo "$output"
   exit 1
 fi
