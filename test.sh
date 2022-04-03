@@ -180,10 +180,8 @@ fi
 # Basic audit tests
 
 cd_temp_repo
-git checkout HEAD~3
+git checkout HEAD~2
 git perf add -m timer 1
-git checkout - && git checkout HEAD~2
-git perf add -m timer 2
 git checkout - && git checkout HEAD~1
 git perf add -m timer 3
 git checkout -
