@@ -22,6 +22,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 40
       - uses: fregante/setup-git-user@v1
       - name: Install and test
         shell: bash
