@@ -10,6 +10,8 @@ shopt -s nocasematch
 # TODO(kaihowl) add test case for empty repo and repo with single commit
 # TODO(kaihowl) add warning for shallow repos
 # TODO(kaihowl) add test for kvs if previous commits do not contain this selector
+# TODO(kaihowl) fail if selector for audit fails in HEAD or if selector for report is invalid
+#               but accept missing selectors for historical data in audit
 
 script_dir=$(pwd)
 
