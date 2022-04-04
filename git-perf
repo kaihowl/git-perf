@@ -239,11 +239,15 @@ def get_df(max_count_commits: int, offset: int = 0):
 
     df.index.name = 'num'
     if 'kvs' in df.columns:
-        expanded = df.join(df.kvs.explode().str.split('=', expand=True))
+        expanded = df.kvs.explode().str.split('=', expand=True)
         # Only continue if there are indeed kv pairs and not a kvs column of empty arrays
         # TODO(kaihowl) appears when adding only non-kv measurements, maybe handle earlier?
-        if 1 in expanded.columns:
-            pivoted = expanded.pivot_table(columns=0, index='num', values=1, aggfunc='last')
+        if len(expanded.columns) == 2:
+            # Explicitly rename columns. Using integer column names exposes
+            # broken pivot_table in Pandas 1.4.2
+            expanded.columns = ['key', 'value']
+            pivoted = expanded.pivot_table(columns='key', index='num',
+                                           values='value', aggfunc='last')
             df = df.drop(['kvs'], axis=1).join(pivoted)
     return df
 
