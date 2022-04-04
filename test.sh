@@ -9,7 +9,6 @@ shopt -s nocasematch
 # TODO(kaihowl) add output expectations for report use cases (maybe add csv output)
 # TODO(kaihowl) add test case for empty repo and repo with single commit
 # TODO(kaihowl) add warning for shallow repos
-# TODO(kaihowl) add test for kvs if previous commits do not contain this selector
 # TODO(kaihowl) fail if selector for report is invalid
 
 script_dir=$(pwd)
