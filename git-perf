@@ -276,8 +276,7 @@ def report(max_count: int, output: str):
 def filter_df(df, selector: KeyValueList):
     for (key, value) in selector:
         if key not in df.columns:
-            print(f"Selector '{key}' does not exist", file=sys.stderr)
-            continue
+            raise ValueError(f"Selector '{key}' does not exist")
         df = df[df[key] == value]
     return df
 
@@ -302,7 +301,11 @@ def audit(measurement: str,
     df_head = get_df(1)
 
     selector.append(('name', measurement))
-    df = filter_df(df, selector)
+    # The historical data allows for non-existent filters
+    try:
+        df = filter_df(df, selector)
+    except ValueError as e:
+        print(e, file=sys.stderr)
     df_head = filter_df(df_head, selector)
 
     print(df.to_markdown())

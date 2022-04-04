@@ -10,8 +10,7 @@ shopt -s nocasematch
 # TODO(kaihowl) add test case for empty repo and repo with single commit
 # TODO(kaihowl) add warning for shallow repos
 # TODO(kaihowl) add test for kvs if previous commits do not contain this selector
-# TODO(kaihowl) fail if selector for audit fails in HEAD or if selector for report is invalid
-#               but accept missing selectors for historical data in audit
+# TODO(kaihowl) fail if selector for report is invalid
 
 script_dir=$(pwd)
 
@@ -260,6 +259,37 @@ git perf add -m timer 4
 git checkout -
 git perf add -m timer 5
 git perf audit -m timer
+
+echo New measure with selector, only historical measurements with a different selector
+cd_temp_repo
+git checkout HEAD~1
+git perf add -m timer 4 -kv otherselector=test
+git checkout -
+git perf add -m timer 4 -kv myselector=test
+git perf audit -m timer -s myselector=test
+
+echo New measure with selector, only historical measurements with the same selector but different value
+cd_temp_repo
+git checkout HEAD~1
+git perf add -m timer 4 -kv myselector=other
+git checkout -
+git perf add -m timer 4 -kv myselector=test
+git perf audit -m timer -s myselector=test
+
+echo New non-matching measures, only historical measurements with matching key and value
+cd_temp_repo
+git checkout HEAD~1
+git perf add -m timer 4 -kv myselector=test
+git checkout -
+git perf add -m timer 4
+git perf audit -m timer -s myselector=test && exit 1
+git perf add -m timer 4 -kv otherselector=test
+git perf audit -m timer -s myselector=test && exit 1
+git perf add -m timer 4 -kv myselector=other
+git perf audit -m timer -s myselector=test && exit 1
+git perf add -m timer 4 -kv myselector=test
+git perf audit -m timer -s myselector=test
+
 
 exit 0
 
