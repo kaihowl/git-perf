@@ -23,6 +23,28 @@ export GIT_AUTHOR_NAME="GitHub Actions Test"
 PATH=${script_dir}/:$PATH
 python3 -m pip install -r "${script_dir}/requirements.txt"
 
+function cd_empty_repo() {
+  local tmpgit
+  tmpgit="$(mktemp -d)"
+  pushd "${tmpgit}"
+  git init
+}
+
+function create_commit() {
+  echo "a" >> a
+  git add a
+  git commit -m 'my commit'
+}
+
+function cd_temp_repo() {
+  cd_empty_repo
+  create_commit
+  create_commit
+  create_commit
+  create_commit
+}
+
+
 cd "$(mktemp -d)"
 root=$(pwd)
 
@@ -65,29 +87,6 @@ echo Print from second repo
 cd "$repo2"
 git perf pull
 git perf report -o result.html
-
-
-function cd_temp_repo() {
-  local tmpgit
-  tmpgit="$(mktemp -d)"
-  pushd "${tmpgit}"
-  git init
-  touch a
-  git add a
-  git commit -m 'first commit'
-
-  touch b
-  git add b
-  git commit -m 'second commit'
-
-  touch c
-  git add c
-  git commit -m 'third commit'
-
-  touch d
-  git add d
-  git commit -m 'fourth commit'
-}
 
 cd_temp_repo
 output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
