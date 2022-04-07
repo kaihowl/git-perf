@@ -192,10 +192,12 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
                '--no-pager',
                'log',
                '-n', str(max_count_commits),
+               '--ignore-missing',  # Support empty repos
+               '--skip', str(offset),
                '--no-color',
                '--pretty=-- %H%n%N',
                f"--notes={PERF_REF}",
-               f"HEAD~{offset}"]
+               "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
     print(" ".join(command))
     return subprocess.check_output(command, text=True)
 
