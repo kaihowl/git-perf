@@ -331,8 +331,9 @@ def audit(measurement: str,
         print("Not enough historical data available", file=sys.stderr)
         return
 
-    is_regular = -sigma * std + mean <= head_mean <= mean + sigma * std
-    print(f"is regular: {is_regular}")
+    z = abs(head_mean - mean) / std
+    is_regular = z <= sigma
+    print(f"is regular: {z} <= {sigma} == {is_regular}")
     sys.exit(not is_regular)
 
 
