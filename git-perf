@@ -198,7 +198,8 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
                '--ignore-missing',  # Support empty repos
                '--skip', str(offset),
                '--no-color',
-               '--pretty=-- %H%n%N',
+               '--pretty=--,%H,%D%n%N',
+               '--decorate=full',
                f"--notes={PERF_REF}",
                "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
     print(" ".join(command))
@@ -209,9 +210,14 @@ def get_df(max_count_commits: int, offset: int = 0):
     import pandas as pd  # type: ignore
     records = []
     commit = None
+    commit_is_grafted = False
+    commits_parsed = 0
+
     for line in get_raw_notes(max_count_commits, offset).splitlines():
         if line.startswith('--'):
-            commit = line.split(" ")[1].strip()
+            _, commit, *decorations = line.strip().split(",")
+            commit_is_grafted = 'grafted' in decorations
+            commits_parsed += 1
             continue
         if len(line.strip()) == 0:
             continue
@@ -240,6 +246,12 @@ def get_df(max_count_commits: int, offset: int = 0):
         kvs = items[3:]
         records.append({"commit": commit, "name": name, "time": pd.to_datetime(
             time, unit='s'), "val": float(val), "kvs": kvs})
+    if commits_parsed < max_count_commits and commit_is_grafted:
+        print(f"Found {commits_parsed} commit{'s' if commits_parsed>1 else ''} instead of "
+              f"the desired {max_count_commits} and "
+              "we seem to have hit the boundary of a shallow clone",
+              file=sys.stderr)
+        sys.exit(1)
     df = pd.DataFrame(records)
 
     df.index.name = 'num'

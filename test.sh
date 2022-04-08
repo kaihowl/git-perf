@@ -9,6 +9,8 @@ shopt -s nocasematch
 # TODO(kaihowl) add output expectations for report use cases (maybe add csv output)
 # TODO(kaihowl) add warning for shallow repos
 # TODO(kaihowl) fail if selector for report is invalid
+# TODO(kaihowl) running without a git repo as current working directory
+# TODO(kaihowl) allow pushing to different remotes
 
 script_dir=$(pwd)
 
@@ -329,6 +331,34 @@ fi
 output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'no performance measurements'* ]]; then
   echo Missing 'no performance measurements found' in output:
+  echo "$output"
+  exit 1
+fi
+
+cd_temp_repo
+full_repo=$(pwd)
+for i in $(seq 1 10); do
+  create_commit
+  # Create tags to make git-log decorations for the grafted commit more involved
+  git tag -a -m "$i" "tag_$i"
+  git perf add -m test-measure 5
+done
+git perf report -n 5
+git perf report -n 20
+cd "$(mktemp -d)"
+git clone "file://$full_repo" --depth=2 shallow_clone
+cd shallow_clone
+git perf pull
+git perf report -n 1
+output=$(git perf report -n 10 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'shallow clone'* ]]; then
+  echo Missing warning for 'shallow clone'
+  echo "$output"
+  exit 1
+fi
+output=$(git perf audit -n 10 -m test-measure 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'shallow clone'* ]]; then
+  echo Missing warning for 'shallow clone'
   echo "$output"
   exit 1
 fi
