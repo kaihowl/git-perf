@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# TODO(kaihowl) remove debugging output
+# TODO(kaihowl) allow specifying an annotation that allows a deviation for the current commit
+
 import argparse
 import time
 import subprocess
