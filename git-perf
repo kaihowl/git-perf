@@ -331,7 +331,15 @@ def audit(measurement: str,
         print("Not enough historical data available", file=sys.stderr)
         return
 
-    z = abs(head_mean - mean) / std
+    # If the historical measurements are perfectly stable, stddev == 0,
+    # then z should be positive infinity to always trigger a deviation.
+    # This uses np.float64 objects which have
+    # 0/0 = np.nan(0)
+    # z/0 = np.nan(+inf) if z > 0
+    with np.errstate(divide='ignore'):
+        z = abs(head_mean - mean) / std
+    z = np.nan_to_num(z)
+    print(f"z-score: {z}")
     is_regular = z <= sigma
     print(f"is regular: {z} <= {sigma} == {is_regular}")
     sys.exit(not is_regular)

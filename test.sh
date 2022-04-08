@@ -43,7 +43,6 @@ function cd_temp_repo() {
   create_commit
 }
 
-
 cd "$(mktemp -d)"
 root=$(pwd)
 
@@ -203,6 +202,22 @@ git perf audit -m timer -d 2
 git perf audit -m timer -d 1.9999 && exit 1
 git perf audit -m timer -d 1 && exit 1
 
+echo Stable measurements with zero stddev
+cd_empty_repo
+create_commit
+git perf add -m timer 3
+git perf audit -m timer
+create_commit
+git perf add -m timer 3
+git perf audit -m timer
+create_commit
+git perf add -m timer 3
+git perf audit -m timer
+create_commit
+git perf add -m timer 4
+git perf audit -m timer && exit 1
+
+echo Check audit with different measurements available
 cd_temp_repo
 echo No measurements available
 git perf audit -m timer && exit 1
@@ -211,12 +226,12 @@ git perf add -m timer 3
 git perf audit -m timer
 echo Only one historical measurement available
 git checkout HEAD~1
-git perf add -m timer 3
+git perf add -m timer 4
 git checkout -
 git perf audit -m timer
 echo Two historical measurements available
 git checkout HEAD~2
-git perf add -m timer 3
+git perf add -m timer 3.5
 git checkout -
 git perf audit -m timer
 
