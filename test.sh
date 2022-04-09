@@ -189,25 +189,13 @@ echo Basic audit tests
 
 cd_temp_repo
 git checkout HEAD~3
-git perf add -m timer 1 -kv os=ubuntu
-git perf add -m timer 0.9 -kv os=ubuntu
-git perf add -m timer 1.2 -kv os=mac
-git perf add -m timer 1.1 -kv os=mac
+git perf add -m timer 1
 git checkout - && git checkout HEAD~2
-git perf add -m timer 2.1 -kv os=ubuntu
-git perf add -m timer 2.2 -kv os=ubuntu
-git perf add -m timer 2.1 -kv os=mac
-git perf add -m timer 2.0 -kv os=mac
+git perf add -m timer 2
 git checkout - && git checkout HEAD~1
-git perf add -m timer 3.1 -kv os=ubuntu
-git perf add -m timer 3.2 -kv os=ubuntu
-git perf add -m timer 3.3 -kv os=mac
-git perf add -m timer 3.4 -kv os=mac
+git perf add -m timer 3
 git checkout -
-git perf add -m timer 4 -kv os=ubuntu
-git perf add -m timer 4 -kv os=ubuntu
-git perf add -m timer 4.3 -kv os=mac
-git perf add -m timer 4.3 -kv os=mac
+git perf add -m timer 4
 # mean: 2, std: 1
 git perf audit -m timer -d 4
 git perf audit -m timer -d 3
