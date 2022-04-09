@@ -48,6 +48,7 @@ jobs:
         shell: bash
         run: |
           export PATH=$(pwd):$PATH
+          python3 -m pip install -r requirements.txt
           git perf pull
           git perf report -o report.html
       - name: Archive production artifacts
