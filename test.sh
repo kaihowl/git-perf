@@ -208,7 +208,7 @@ git perf add -m timer 4 -kv os=ubuntu
 git perf add -m timer 4 -kv os=ubuntu
 git perf add -m timer 4.3 -kv os=mac
 git perf add -m timer 4.3 -kv os=mac
-mean: 2, std: 1
+# mean: 2, std: 1
 git perf audit -m timer -d 4
 git perf audit -m timer -d 3
 git perf audit -m timer -d 2
