@@ -47,6 +47,7 @@ jobs:
       - name: report
         shell: bash
         run: |
+          export PATH=$(pwd):$PATH
           git perf pull
           git perf report -o report.html
       - name: Archive production artifacts
