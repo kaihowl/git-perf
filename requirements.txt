@@ -2,3 +2,4 @@ plotly
 pandas
 # Only needed for output to markdown
 tabulate
+icecream
