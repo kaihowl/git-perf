@@ -1,4 +1,4 @@
-name: Test dotfiles
+name: Test git-perf
 
 on:
   push:
