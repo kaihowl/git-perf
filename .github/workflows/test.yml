@@ -36,3 +36,23 @@ jobs:
           git perf push
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
 
+  report:
+    needs: build
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          # TODO(kaihowl) is there an off-by one?
+          fetch-depth: 41
+      - name: report
+        shell: bash
+        run: |
+          git perf pull
+          git perf report -o report.html
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: perf-report
+          path: |
+            report.html
+
