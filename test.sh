@@ -386,9 +386,9 @@ git perf add -m timer 4.3 -kv os=mac
 git perf add -m timer2 2 -kv os=mac
 
 git perf report -o all_result.html
-git perf report -o separated_result.html -s separated_result.html
+git perf report -o separated_result.html -s os
 git perf report -o single_result.html -m timer
-git perf report -o separated_single_result.html -m timer -s separated_single_result.html
+git perf report -o separated_single_result.html -m timer -s os
 
 output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'no performance measurements'* ]]; then

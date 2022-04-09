@@ -287,8 +287,16 @@ def report(measurement: str,
 
     import plotly.express as px  # type: ignore
     df = get_df(max_count)
+
+    # TODO(kaihowl) move check into get_df
+    # TODO(kaihowl) check if perf notes is a valid ref
+    if (len(df) == 0):
+        print("No performance measurements found", file=sys.stderr)
+        sys.exit(1)
+
     if measurement:
         df = filter_df(df, [('name', measurement)])
+
     # TODO(kaihowl) add test for reverse ordering
     df = df[::-1]
     df = df.fillna("n/a")
@@ -315,7 +323,7 @@ def report(measurement: str,
         args['color'] = separate_by
 
     if (len(df) == 0):
-        print("No performance measurements found", file=sys.stderr)
+        print("No performance measurements after filtering found", file=sys.stderr)
         sys.exit(1)
     fig = px.box(df, **args)
     fig.update_yaxes(matches=None)
