@@ -8,7 +8,6 @@ shopt -s nocasematch
 
 # TODO(kaihowl) add output expectations for report use cases (maybe add csv output)
 # TODO(kaihowl) add warning for shallow repos
-# TODO(kaihowl) fail if selector for report is invalid
 # TODO(kaihowl) running without a git repo as current working directory
 # TODO(kaihowl) allow pushing to different remotes
 
@@ -186,18 +185,30 @@ if [[ -n ${output} ]]; then
   exit 1
 fi
 
-# Basic audit tests
+echo Basic audit tests
 
 cd_temp_repo
 git checkout HEAD~3
-git perf add -m timer 1
+git perf add -m timer 1 -kv os=ubuntu
+git perf add -m timer 0.9 -kv os=ubuntu
+git perf add -m timer 1.2 -kv os=mac
+git perf add -m timer 1.1 -kv os=mac
 git checkout - && git checkout HEAD~2
-git perf add -m timer 2
+git perf add -m timer 2.1 -kv os=ubuntu
+git perf add -m timer 2.2 -kv os=ubuntu
+git perf add -m timer 2.1 -kv os=mac
+git perf add -m timer 2.0 -kv os=mac
 git checkout - && git checkout HEAD~1
-git perf add -m timer 3
+git perf add -m timer 3.1 -kv os=ubuntu
+git perf add -m timer 3.2 -kv os=ubuntu
+git perf add -m timer 3.3 -kv os=mac
+git perf add -m timer 3.4 -kv os=mac
 git checkout -
-git perf add -m timer 4
-# mean: 2, std: 1
+git perf add -m timer 4 -kv os=ubuntu
+git perf add -m timer 4 -kv os=ubuntu
+git perf add -m timer 4.3 -kv os=mac
+git perf add -m timer 4.3 -kv os=mac
+mean: 2, std: 1
 git perf audit -m timer -d 4
 git perf audit -m timer -d 3
 git perf audit -m timer -d 2
@@ -362,6 +373,56 @@ if [[ ${output} != *'shallow clone'* ]]; then
   echo "$output"
   exit 1
 fi
+
+cd_empty_repo
+create_commit
+git perf add -m timer 1 -kv os=ubuntu
+git perf add -m timer 0.9 -kv os=ubuntu
+git perf add -m timer 1.2 -kv os=mac
+git perf add -m timer 1.1 -kv os=mac
+create_commit
+git perf add -m timer 2.1 -kv os=ubuntu
+git perf add -m timer 2.2 -kv os=ubuntu
+git perf add -m timer 2.1 -kv os=mac
+git perf add -m timer 2.0 -kv os=mac
+create_commit
+git perf add -m timer 3.1 -kv os=ubuntu
+git perf add -m timer 3.2 -kv os=ubuntu
+git perf add -m timer 3.3 -kv os=mac
+git perf add -m timer 3.4 -kv os=mac
+create_commit
+git perf add -m timer 4 -kv os=ubuntu
+git perf add -m timer 4 -kv os=ubuntu
+git perf add -m timer 4.3 -kv os=mac
+git perf add -m timer 4.3 -kv os=mac
+git perf add -m timer2 2 -kv os=mac
+
+git perf report -o all_result.html
+git perf report -o separated_result.html -s separated_result.html
+git perf report -o single_result.html -m timer
+git perf report -o separated_single_result.html -m timer -s separated_single_result.html
+
+output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'no performance measurements'* ]]; then
+  echo No warning for missing measurements
+  echo "$output"
+  exit 1
+fi
+
+output=$(git perf report -s does-not-exist 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'does-not-exist'* ]]; then
+  echo No warning for invalid separator 'does-not-exist'
+  echo "$output"
+  exit 1
+fi
+
+output=$(git perf report -g does-not-exist 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'does-not-exist'* ]]; then
+  echo No warning for invalid grouper 'does-not-exist'
+  echo "$output"
+  exit 1
+fi
+
 
 exit 0
 

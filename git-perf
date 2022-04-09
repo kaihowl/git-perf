@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 # TODO(kaihowl) allow specifying an annotation that allows a deviation for the current commit
-# TODO(kaihowl) make report usable for single measurement: raw measurements, coloring based on selector
 
 import argparse
 import time
@@ -39,9 +38,9 @@ def numerictype(val):
     return val
 
 
-def add_measurement_option(parser):
+def add_measurement_option(parser, required=True):
     parser.add_argument(
-        '--measurement', '-m', help='Name of measurement', required=True,
+        '--measurement', '-m', help='Name of measurement', required=required, default=None,
         dest='measurement')
 
 
@@ -91,17 +90,25 @@ push_parser = sub_parser.add_parser(
 pull_parser = sub_parser.add_parser(
     'pull', help='Pull performance results from remote')
 
-# TODO(kaihowl) report should have same parameters as audit
 # subcommand: report
 report_parser = sub_parser.add_parser(
     'report', help='Create an HTML performance report')
+add_measurement_option(report_parser, required=False)
 report_parser.add_argument('-o', '--output', help='HTML output file', default='result.html')
+report_parser.add_argument('-s', '--separate-by', help='Create individual plots '
+                           'by grouping with the value of this selector')
+# TODO(kaihowl) repeated with below
 report_parser.add_argument(
     '-n',
     '--max-count',
     help='Limit to the number of previous commits considered',
     type=int,
     default=DEFAULT_MAX_COUNT)
+report_parser.add_argument(
+    '-g',
+    '--group-by',
+    help='What to group the measurements by',
+    default='commit')
 
 # subcommand: audit
 audit_parser = sub_parser.add_parser(
@@ -272,25 +279,47 @@ def get_df(max_count_commits: int, offset: int = 0):
     return df
 
 
-def report(max_count: int, output: str):
+def report(measurement: str,
+           max_count: int,
+           output: str,
+           group_by: str,
+           separate_by: str = None):
+
     import plotly.express as px  # type: ignore
     df = get_df(max_count)
-    if 'os' in df.columns and 'runner_os' in df.columns:
-        df['os'] = df['os'].fillna(df['runner_os'])
+    if measurement:
+        df = filter_df(df, [('name', measurement)])
+    # TODO(kaihowl) add test for reverse ordering
+    df = df[::-1]
     df = df.fillna("n/a")
     ic(df.to_markdown())
+
+    if group_by not in df.columns:
+        print(f"Argument for --group_by invalid: {group_by}",
+              file=sys.stderr)
+        sys.exit(1)
+
     args = {
-        'x': 'time',
+        'x': group_by,
         'y': 'val',
-        'color': 'name',
+        'facet_row': 'name',
+        'points': 'all',
         'hover_data': df.columns,
     }
-    if 'os' in df.columns:
-        args['symbol'] = 'os'
+
+    if separate_by:
+        if separate_by not in df.columns:
+            print(f"Argument for --separate-by invalid: {separate_by} "
+                  "not found in columns", file=sys.stderr)
+            sys.exit(1)
+        args['color'] = separate_by
+
     if (len(df) == 0):
         print("No performance measurements found", file=sys.stderr)
         sys.exit(1)
-    px.scatter(df, **args).write_html(output)
+    fig = px.box(df, **args)
+    fig.update_yaxes(matches=None)
+    fig.write_html(output)
 
 
 def filter_df(df, selector: KeyValueList):
