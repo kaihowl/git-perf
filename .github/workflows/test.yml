@@ -24,7 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: 40
+          # TODO(kaihowl) is there an off-by one?
+          fetch-depth: 41
       - uses: fregante/setup-git-user@v1
       - name: Install and test
         shell: bash
