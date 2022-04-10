@@ -38,6 +38,7 @@ jobs:
 
   report:
     needs: build
+    if: always()
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
