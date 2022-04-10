@@ -327,7 +327,8 @@ def report(measurement: str,
         sys.exit(1)
     fig = px.box(df, **args)
     fig.update_yaxes(matches=None)
-    fig.write_html(output)
+    # TODO(kaihowl) make include_plotlyjs configurable
+    fig.write_html(output, include_plotlyjs=False)
 
 
 def filter_df(df, selector: KeyValueList):

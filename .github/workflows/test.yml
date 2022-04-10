@@ -50,11 +50,14 @@ jobs:
           export PATH=$(pwd):$PATH
           python3 -m pip install -r requirements.txt
           git perf pull
-          git perf report -o report.html
-      - name: Archive production artifacts
-        uses: actions/upload-artifact@v3
+          mkdir reports/
+          git perf report -o reports/{{ github.sha }}.html
+      - name: Deploy to GitHub Pages
+        if: success()
+        uses: crazy-max/ghaction-github-pages@v2
         with:
-          name: perf-report
-          path: |
-            report.html
+          target_branch: gh-pages
+          build_dir: reports/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
