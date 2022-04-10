@@ -51,7 +51,7 @@ jobs:
           python3 -m pip install -r requirements.txt
           git perf pull
           mkdir reports/
-          git perf report -o reports/{{ github.sha }}.html
+          git perf report -o reports/${{ github.sha }}.html
       - name: Deploy to GitHub Pages
         if: success()
         uses: crazy-max/ghaction-github-pages@v2
