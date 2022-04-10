@@ -1,5 +1,7 @@
 name: Test git-perf
 
+# TODO(kaihowl) deeper test with merge-based PR workflow (HEAD == merge commit)
+
 on:
   push:
     branches:
