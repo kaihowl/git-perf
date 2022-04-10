@@ -9,7 +9,7 @@ jobs:
       -
         name: Gen dummy page
         run: |
-          mkdir public
+          mkdir reports
           cat > reports/something.html <<EOL
           <!doctype html>
           <html>
