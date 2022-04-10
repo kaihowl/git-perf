@@ -11,33 +11,33 @@ on:
     - cron: 41 11 * * 0
 jobs:
 
-  build:
-    timeout-minutes: 20
-    strategy:
-      matrix:
-        os: [ubuntu-20.04, macos-11]
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
-    env:
-      PYTHONOPTIMIZE: TRUE
-
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          # TODO(kaihowl) is there an off-by one?
-          fetch-depth: 41
-      - uses: fregante/setup-git-user@v1
-      - name: Install and test
-        shell: bash
-        run: |
-          ./test.sh
-          export PATH=$(pwd):$PATH
-          git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
-          git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
+  # build:
+  #   timeout-minutes: 20
+  #   strategy:
+  #     matrix:
+  #       os: [ubuntu-20.04, macos-11]
+  #     fail-fast: false
+  #   runs-on: ${{ matrix.os }}
+  #   env:
+  #     PYTHONOPTIMIZE: TRUE
+  #
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #       with:
+  #         # TODO(kaihowl) is there an off-by one?
+  #         fetch-depth: 41
+  #     - uses: fregante/setup-git-user@v1
+  #     - name: Install and test
+  #       shell: bash
+  #       run: |
+  #         ./test.sh
+  #         export PATH=$(pwd):$PATH
+  #         git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
+  #         git perf push
+  #         git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
 
   report:
-    needs: build
+    # needs: build
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
