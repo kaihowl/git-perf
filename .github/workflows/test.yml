@@ -46,7 +46,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          # TODO(kaihowl) is there an off-by one?
           fetch-depth: 41
       - name: report
         shell: bash
