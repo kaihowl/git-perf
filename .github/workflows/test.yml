@@ -38,3 +38,37 @@ jobs:
           git perf push
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
 
+  report:
+    needs: build
+    concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 41
+      - name: report
+        shell: bash
+        run: |
+          export PATH=$(pwd):$PATH
+          python3 -m pip install -r requirements.txt
+          git perf pull
+          mkdir reports/
+          git perf report -o reports/${{ github.sha }}.html -s os
+      - name: Publish new perf reports
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          keep_files: true
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⏱  [Performance Results](https://kaihowl.github.io/git-perf/${{github.sha}}.html)'
+              })
+
