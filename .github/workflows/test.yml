@@ -47,6 +47,14 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 41
+      - name: use commit name as report name
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
+      - name: use branch name as report name
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "REPORT_NAME=${{github.ref_name}}" >> $GITHUB_ENV
       - name: report
         shell: bash
         run: |
@@ -54,7 +62,7 @@ jobs:
           python3 -m pip install -r requirements.txt
           git perf pull
           mkdir reports/
-          git perf report -n 40 -o reports/${{ github.sha }}.html -s os
+          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s os
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -66,10 +74,11 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
+            const { REPORT_NAME } = process.env
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⏱  [Performance Results](https://kaihowl.github.io/git-perf/${{github.sha}}.html)'
+              body: `⏱  [Performance Results](https://kaihowl.github.io/git-perf/${REPORT_NAME}.html)`
               })
 
