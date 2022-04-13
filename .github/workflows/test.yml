@@ -54,7 +54,7 @@ jobs:
           python3 -m pip install -r requirements.txt
           git perf pull
           mkdir reports/
-          git perf report -o reports/${{ github.sha }}.html -s os
+          git perf report -n 40 -o reports/${{ github.sha }}.html -s os
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v3
         with:
