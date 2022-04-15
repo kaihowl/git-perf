@@ -389,6 +389,7 @@ git perf report -o all_result.html
 git perf report -o separated_result.html -s os
 git perf report -o single_result.html -m timer
 git perf report -o separated_single_result.html -m timer -s os
+git perf report -o single_result_different_group.html -m timer -g os
 
 output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'no performance measurements'* ]]; then

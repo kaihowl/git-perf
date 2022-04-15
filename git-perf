@@ -2,7 +2,6 @@
 
 # TODO(kaihowl) allow specifying an annotation that allows a deviation for the current commit
 # TODO(kaihowl) show mean/stddev in report
-# TODO(kaihowl) show commits without measurements in report
 
 import argparse
 import time
@@ -261,8 +260,13 @@ def get_df(max_count_commits: int, offset: int = 0):
             assert(False)
             continue
         kvs = items[3:]
-        records.append({"commit": commit, "name": name, "time": pd.to_datetime(
-            time, unit='s'), "val": float(val), "kvs": kvs})
+        records.append({
+            "commit": commit,
+            "nr_commit": len(commits_parsed),
+            "name": name,
+            "time": pd.to_datetime(time, unit='s'),
+            "val": float(val),
+            "kvs": kvs})
     number_commits = len(commits_parsed)
     if number_commits < max_count_commits and commit_is_grafted:
         print(f"Found {number_commits}"
@@ -296,7 +300,8 @@ def report(measurement: str,
            separate_by: str = None):
 
     import plotly.express as px  # type: ignore
-    df, _ = get_df(max_count)
+
+    df, commits_parsed = get_df(max_count)
 
     # TODO(kaihowl) move check into get_df
     # TODO(kaihowl) check if perf notes is a valid ref
@@ -325,6 +330,11 @@ def report(measurement: str,
         'hover_data': df.columns,
     }
 
+    is_group_by_commit = group_by == 'commit'
+
+    if is_group_by_commit:
+        args['x'] = 'nr_commit'
+
     if separate_by:
         if separate_by not in df.columns:
             print(f"Argument for --separate-by invalid: {separate_by} "
@@ -337,6 +347,15 @@ def report(measurement: str,
         sys.exit(1)
     fig = px.box(df, **args)
     fig.update_yaxes(matches=None)
+
+    if is_group_by_commit:
+        fig.update_xaxes(
+            tickvals=list(range(1, len(commits_parsed)-1)),
+            ticktext=commits_parsed,
+            title='',
+            # TODO(kaihowl) this is a double reverse with ::-1 above
+            autorange='reversed')
+
     # TODO(kaihowl) make include_plotlyjs configurable
     fig.write_html(output, include_plotlyjs='cdn')
 
