@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 # TODO(kaihowl) allow specifying an annotation that allows a deviation for the current commit
-# TODO(kaihowl) show mean/stddev in report
+# TODO(kaihowl) show overall mean/stddev in report
+# TODO(kaihowl) hover of commits in report to show 'more' info
 
 import argparse
 import time
