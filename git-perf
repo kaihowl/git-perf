@@ -9,7 +9,7 @@ import time
 import subprocess
 from typing import List, Tuple
 import sys
-from icecream import ic
+from icecream import ic  # type: ignore
 ic.configureOutput(outputFunction=print)
 ic.disable()
 
