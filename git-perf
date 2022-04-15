@@ -233,13 +233,13 @@ def get_df(max_count_commits: int, offset: int = 0):
             continue
         if len(line.strip()) == 0:
             continue
-        if commit is None:
-            print(
-                f"Already have input but commit is unknown: ''", file=sys.stderr)
-            assert(False)
-            continue
         data = line.strip()
         items = data.split()
+        if commit is None:
+            print(
+                f"Already have input but commit is unknown: '{data}'", file=sys.stderr)
+            assert(False)
+            continue
         if len(items) < 3:
             print(
                 f"Too few items for commit in input line: '{data}'", file=sys.stderr)
