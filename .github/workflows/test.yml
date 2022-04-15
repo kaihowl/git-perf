@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - master
+      - build/*
   pull_request:
     branches:
       - master
@@ -21,68 +22,16 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-11]
+        os: [ubuntu-20.04]
       fail-fast: false
     runs-on: ${{ matrix.os }}
-    env:
-      PYTHONOPTIMIZE: TRUE
-
     steps:
       - uses: actions/checkout@v2
         with:
           # TODO(kaihowl) is there an off-by one?
           fetch-depth: 41
-      - uses: fregante/setup-git-user@v1
-      - name: Install and test
+      - name: test
         shell: bash
         run: |
-          ./test.sh
-          export PATH=$(pwd):$PATH
-          git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
-          git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
-
-  report:
-    needs: build
-    concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
-    if: always()
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 41
-      - name: use commit name as report name
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
-      - name: use branch name as report name
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "REPORT_NAME=${{github.ref_name}}" >> $GITHUB_ENV
-      - name: report
-        shell: bash
-        run: |
-          export PATH=$(pwd):$PATH
-          python3 -m pip install -r requirements.txt
-          git perf pull
-          mkdir reports/
-          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s os
-      - name: Publish new perf reports
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports
-          keep_files: true
-      - uses: actions/github-script@v6
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const { REPORT_NAME } = process.env
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `⏱  [Performance Results](https://kaihowl.github.io/git-perf/${REPORT_NAME}.html)`
-              })
+          git show HEAD
 
