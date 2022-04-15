@@ -11,12 +11,13 @@ from typing import List, Tuple
 import sys
 from icecream import ic  # type: ignore
 ic.configureOutput(outputFunction=print)
-ic.disable()
+# ic.disable()
 
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
 GOOD_MARKER = 'GOOD'
+ACCEPT_PERF_TRAILER = 'accept-perf'
 
 KeyValueList = List[Tuple[str, str]]
 
@@ -172,9 +173,12 @@ def measure(measurement: str, number: int, key_value: KeyValueList, command: Lis
         add(measurement, key_value, str(value))
 
 
+def get_formatted_kvs(key_value: KeyValueList) -> str:
+    return ' '.join([f"{key}={value}" for (key, value) in key_value])
+
+
 def add(measurement: str, key_value: KeyValueList, value: str):
-    formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in key_value])
-    formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
+    formatted_measurement = f"{measurement} {time.time()} {value} {get_formatted_kvs(key_value)}"
     ic(formatted_measurement)
 
     notes_call = ['git', 'notes', '--ref', PERF_REF,
@@ -226,6 +230,25 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
                '--decorate=full',
                f"--notes={PERF_REF}",
                "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
+    ic(command)
+    return ic(subprocess.check_output(command, text=True))
+
+
+def get_pending_trailers():
+    """
+    Get all performance trailers in commit messages that are not merged, yet.
+    This will take the total of all trailers found in 'HEAD^..'.
+    If HEAD is a normal commit, only this commit is considered.
+    If HEAD is a merge commit, all commits not merged into the first parent are considered.
+    """
+    command = ['git',
+               '--no-pager',
+               # TODO(kaihowl) common log argument with get_raw_notes
+               'log',
+               '--no-color',
+               f'--format=%(trailers:key={ACCEPT_PERF_TRAILER},valueonly=true)',
+               'HEAD^..'
+               ]
     ic(command)
     return ic(subprocess.check_output(command, text=True))
 
@@ -419,6 +442,7 @@ def audit(measurement: str,
     df_head = filter_df(df_head, selector)
 
     accept_regression = df_head.val.hasnans
+    _ = get_pending_trailers()
 
     ic(df.to_markdown())
     mean, std = summarize(df, group_by, aggregate_by)
@@ -453,9 +477,17 @@ def audit(measurement: str,
     sys.exit(not accepted)
 
 
+# TODO(kaihowl) ensure no duplicated trailers
 def good(measurement: str, key_value: KeyValueList):
-    # TODO(kaihowl) mark 'good' measurements in report?
-    add(measurement, key_value, GOOD_MARKER)
+    command = ['git',
+               '--no-pager',
+               'commit',
+               '--amend',
+               '--no-edit',
+               '--trailer', f"{ACCEPT_PERF_TRAILER}: {measurement} {get_formatted_kvs(key_value)}",
+               ]
+    ic(command)
+    return ic(subprocess.check_output(command, text=True))
 
 
 if __name__ == '__main__':
