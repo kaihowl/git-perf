@@ -121,6 +121,7 @@ audit_parser = sub_parser.add_parser(
     results before comparison.
     """)
 add_measurement_option(audit_parser)
+# TODO(kaihowl) should this by kv as well?
 audit_parser.add_argument(
     '--selector',
     '-s',
