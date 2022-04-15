@@ -220,17 +220,21 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
 
 
 def get_df(max_count_commits: int, offset: int = 0):
+    """
+    Retrieve a pandas dataframe containing the raw measurements.
+    Returns a tuple (df, list_with_parsed_commits_hashes_backwards_order)
+    """
     import pandas as pd  # type: ignore
     records = []
     commit = None
     commit_is_grafted = False
-    commits_parsed = 0
+    commits_parsed = []
 
     for line in get_raw_notes(max_count_commits, offset).splitlines():
         if line.startswith('--'):
             _, commit, *decorations = line.strip().split(",")
             commit_is_grafted = 'grafted' in decorations
-            commits_parsed += 1
+            commits_parsed.append(commit)
             continue
         if len(line.strip()) == 0:
             continue
@@ -259,8 +263,10 @@ def get_df(max_count_commits: int, offset: int = 0):
         kvs = items[3:]
         records.append({"commit": commit, "name": name, "time": pd.to_datetime(
             time, unit='s'), "val": float(val), "kvs": kvs})
-    if commits_parsed < max_count_commits and commit_is_grafted:
-        print(f"Found {commits_parsed} commit{'s' if commits_parsed>1 else ''} instead of "
+    number_commits = len(commits_parsed)
+    if number_commits < max_count_commits and commit_is_grafted:
+        print(f"Found {number_commits}"
+              f"commit{'s' if number_commits > 1 else ''} instead of "
               f"the desired {max_count_commits} and "
               "we seem to have hit the boundary of a shallow clone",
               file=sys.stderr)
@@ -279,7 +285,8 @@ def get_df(max_count_commits: int, offset: int = 0):
             pivoted = expanded.pivot_table(columns='key', index='num',
                                            values='value', aggfunc='last')
             df = df.drop(['kvs'], axis=1).join(pivoted)
-    return df
+
+    return (df, commits_parsed)
 
 
 def report(measurement: str,
@@ -289,7 +296,7 @@ def report(measurement: str,
            separate_by: str = None):
 
     import plotly.express as px  # type: ignore
-    df = get_df(max_count)
+    df, _ = get_df(max_count)
 
     # TODO(kaihowl) move check into get_df
     # TODO(kaihowl) check if perf notes is a valid ref
@@ -358,8 +365,8 @@ def audit(measurement: str,
           sigma: float):
     import numpy as np
 
-    df = get_df(max_count, offset=1)
-    df_head = get_df(1)
+    df, _ = get_df(max_count, offset=1)
+    df_head, _ = get_df(1)
 
     if len(df_head) == 0:
         print("No performance measurements on HEAD commit", file=sys.stderr)
