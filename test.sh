@@ -7,7 +7,6 @@ set -x
 shopt -s nocasematch
 
 # TODO(kaihowl) add output expectations for report use cases (based on markdown?)
-# TODO(kaihowl) add warning for shallow repos
 # TODO(kaihowl) running without a git repo as current working directory
 # TODO(kaihowl) allow pushing to different remotes
 
