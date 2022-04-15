@@ -453,6 +453,7 @@ def audit(measurement: str,
 
 
 def good(measurement: str, key_value: KeyValueList):
+    # TODO(kaihowl) mark 'good' measurements in report?
     add(measurement, key_value, GOOD_MARKER)
 
 
