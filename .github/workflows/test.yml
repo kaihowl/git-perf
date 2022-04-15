@@ -3,7 +3,7 @@ name: Test git-perf
 # TODO(kaihowl) deeper test with merge-based PR workflow (HEAD == merge commit)
 
 concurrency:
-  group: ${{ github.head_ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 on:
