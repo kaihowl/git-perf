@@ -43,6 +43,8 @@ function cd_temp_repo() {
   create_commit
 }
 
+# TODO(kaihowl) Split up tests
+
 cd "$(mktemp -d)"
 root=$(pwd)
 
@@ -452,6 +454,9 @@ git perf add -m test 5000 -kv os=ubuntu
 git perf audit -m test -s os=ubuntu && exit 1
 # Accept regression for other platform
 git perf good -m test -kv os=macOS
+# Commit was changed, must rerun
+# TODO(kaihowl) or should we copy over the measurements??
+git perf add -m test 5000 -kv os=ubuntu
 # Must not accept regression for this platform
 git perf audit -m test -s os=ubuntu && exit 1
 # TODO(kaihowl) Do we need to seperate kvs from mere labels?
@@ -459,6 +464,8 @@ git perf audit -m test -s os=ubuntu && exit 1
 # git perf audit -m test && exit 1
 # Accept regression on this platform
 git perf good -m test -kv os=ubuntu
+# TODO(kaihowl) again rerun
+git perf add -m test 5000 -kv os=ubuntu
 git perf audit -m test -s os=ubuntu
 git perf audit -m test
 create_commit
