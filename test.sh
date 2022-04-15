@@ -442,6 +442,29 @@ create_commit
 git perf add -m timer 2
 git perf audit -m timer && exit 1
 
+cd_empty_repo
+create_commit
+git perf add -m test 2 -kv os=ubuntu
+create_commit
+git perf add -m test 4 -kv os=ubuntu
+create_commit
+git perf add -m test 5000 -kv os=ubuntu
+git perf audit -m test -s os=ubuntu && exit 1
+# Accept regression for other platform
+git perf good -m test -kv os=macOS
+# Must not accept regression for this platform
+git perf audit -m test -s os=ubuntu && exit 1
+# TODO(kaihowl) Do we need to seperate kvs from mere labels?
+# Must not accept regression when no platform specified?
+# git perf audit -m test && exit 1
+# Accept regression on this platform
+git perf good -m test -kv os=ubuntu
+git perf audit -m test -s os=ubuntu
+git perf audit -m test
+create_commit
+git perf add -m test 5010
+git perf audit -m test
+
 
 exit 0
 

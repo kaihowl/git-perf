@@ -15,6 +15,7 @@ ic.disable()
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
+GOOD_MARKER = 'GOOD'
 
 KeyValueList = List[Tuple[str, str]]
 
@@ -35,6 +36,7 @@ def numerictype(val):
     if not isnumeric(val):
         raise argparse.ArgumentTypeError(f"'{val}' is not numeric")
 
+    # TODO(kaihowl) this is not true, this is converted by float in add()
     # Keep as string, this is parsed in Pandas to the most appropriate type
     return val
 
@@ -150,6 +152,14 @@ audit_parser.add_argument(
     type=float,
     default=4)
 
+# subcomand: good
+good_parser = sub_parser.add_parser('good', help="""
+        Accept HEAD commit's measurement for audit, even if outside of range.
+        This is allows to accept expected performance changes.
+        """)
+add_measurement_option(good_parser, required=True)
+add_kv_option(good_parser)
+
 
 def measure(measurement: str, number: int, key_value: KeyValueList, command: List[str]):
     for i in range(number):
@@ -252,20 +262,27 @@ def get_df(max_count_commits: int, offset: int = 0):
         name = items[0]
         time = items[1]
         val = items[2]
-        if not isnumeric(val):
-            print(
-                f"Found non-numeric value '{val}' as measurement "
-                f"for commit {commit} in line: '{data}'",
-                file=sys.stderr)
-            assert(False)
-            continue
+        if isnumeric(val):
+            # TODO(kaihowl) fixed float conversion collides with commend in numerictype()
+            val = float(val)
+        else:  # not isnumeric
+            if val == GOOD_MARKER:
+                val = None
+            else:
+                print(
+                    f"Found non-numeric value '{val}' as measurement "
+                    f"for commit {commit} in line: '{data}'",
+                    file=sys.stderr)
+                assert(False)
+                continue
+
         kvs = items[3:]
         records.append({
             "commit": commit,
             "nr_commit": len(commits_parsed),
             "name": name,
             "time": pd.to_datetime(time, unit='s'),
-            "val": float(val),
+            "val": val,
             "kvs": kvs})
     number_commits = len(commits_parsed)
     if number_commits < max_count_commits and commit_is_grafted:
@@ -399,6 +416,8 @@ def audit(measurement: str,
         print(e, file=sys.stderr)
     df_head = filter_df(df_head, selector)
 
+    accept_regression = df_head.val.hasnans
+
     ic(df.to_markdown())
     mean, std = summarize(df, group_by, aggregate_by)
     print(f"mean: {mean}")
@@ -427,7 +446,13 @@ def audit(measurement: str,
     print(f"z-score: {z}")
     is_regular = z <= sigma
     print(f"is regular: {z} <= {sigma} == {is_regular}")
-    sys.exit(not is_regular)
+    print(f"accept regression: {accept_regression}")
+    accepted = is_regular or accept_regression
+    sys.exit(not accepted)
+
+
+def good(measurement: str, key_value: KeyValueList):
+    add(measurement, key_value, GOOD_MARKER)
 
 
 if __name__ == '__main__':
