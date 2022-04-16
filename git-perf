@@ -16,7 +16,6 @@ ic.disable()
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
-GOOD_MARKER = 'GOOD'
 ACCEPT_PERF_TRAILER = 'accept-perf'
 
 KeyValueList = List[Tuple[str, str]]
