@@ -160,9 +160,12 @@ def measure(measurement: str, number: int, key_value: KeyValueList, command: Lis
         add(measurement, key_value, str(value))
 
 
+def get_formatted_kvs(key_value: KeyValueList) -> str:
+    return ' '.join([f"{key}={value}" for (key, value) in key_value])
+
+
 def add(measurement: str, key_value: KeyValueList, value: str):
-    formatted_kvs = ' '.join([f"{key}={value}" for (key, value) in key_value])
-    formatted_measurement = f"{measurement} {time.time()} {value} {formatted_kvs}"
+    formatted_measurement = f"{measurement} {time.time()} {value} {get_formatted_kvs(key_value)}"
     ic(formatted_measurement)
 
     notes_call = ['git', 'notes', '--ref', PERF_REF,
