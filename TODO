@@ -1,4 +1,2 @@
-- How to deal with merging GOOD markers
-  - TODO(kaihowl) use git-trailer in commit message instead!
 - add git perf prune
 - sigma==0 test?
