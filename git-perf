@@ -555,6 +555,10 @@ def prune():
         print("Refusing to prune in a shallow clone", file=sys.stderr)
         sys.exit(1)
 
+    command = GIT_NOTES_BASE_COMMAND + ['prune']
+    ic(command)
+    ic(subprocess.check_call(command))
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
