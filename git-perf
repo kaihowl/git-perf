@@ -15,6 +15,13 @@ ic.disable()
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
+GIT_NOTES_BASE_COMMAND = ['git', 'notes', '--ref', PERF_REF]
+GIT_LOG_BASE_COMMAND = ['git',
+                        '--no-pager',
+                        'log',
+                        '--no-color',
+                        '--ignore-missing',  # Support empty repo
+                        ]
 
 KeyValueList = List[Tuple[str, str]]
 
@@ -191,29 +198,23 @@ def fetch():
 
 
 def reconcile():
-    subprocess.check_call(['git',
-                           'notes',
-                           '--ref',
-                           PERF_REF,
-                           'merge',
-                           '-s',
-                           'cat_sort_uniq',
-                           'FETCH_HEAD'])
+    command = GIT_NOTES_BASE_COMMAND + [
+        'merge',
+        '-s',
+        'cat_sort_uniq',
+        'FETCH_HEAD']
+    subprocess.check_call(command)
 
 
 def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
-    command = ['git',
-               '--no-pager',
-               'log',
-               '-n', str(max_count_commits),
-               '--ignore-missing',  # Support empty repos
-               '--first-parent',  # only show the main branch history
-               '--skip', str(offset),
-               '--no-color',
-               '--pretty=--,%H,%D%n%N',
-               '--decorate=full',
-               f"--notes={PERF_REF}",
-               "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
+    command = GIT_LOG_BASE_COMMAND + [
+        '-n', str(max_count_commits),
+        '--first-parent',  # only show the main branch history
+        '--skip', str(offset),
+        '--pretty=--,%H,%D%n%N',
+        '--decorate=full',
+        f"--notes={PERF_REF}",
+        "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
     ic(command)
     return ic(subprocess.check_output(command, text=True))
 
