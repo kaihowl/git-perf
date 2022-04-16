@@ -218,6 +218,22 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
     return ic(subprocess.check_output(command, text=True))
 
 
+def expand_kvs(df):
+    df.index.name = 'num'
+    if 'kvs' in df.columns:
+        expanded = df.kvs.explode().str.split('=', expand=True)
+        # Only continue if there are indeed kv pairs and not a kvs column of empty arrays
+        # TODO(kaihowl) appears when adding only non-kv measurements, maybe handle earlier?
+        if len(expanded.columns) == 2:
+            # Explicitly rename columns. Using integer column names exposes
+            # broken pivot_table in Pandas 1.4.2
+            expanded.columns = ['key', 'value']
+            pivoted = expanded.pivot_table(columns='key', index='num',
+                                           values='value', aggfunc='last')
+            df = df.drop(['kvs'], axis=1).join(pivoted)
+    return df
+
+
 def get_df(max_count_commits: int, offset: int = 0):
     """
     Retrieve a pandas dataframe containing the raw measurements.
@@ -277,18 +293,7 @@ def get_df(max_count_commits: int, offset: int = 0):
         sys.exit(1)
     df = pd.DataFrame(records)
 
-    df.index.name = 'num'
-    if 'kvs' in df.columns:
-        expanded = df.kvs.explode().str.split('=', expand=True)
-        # Only continue if there are indeed kv pairs and not a kvs column of empty arrays
-        # TODO(kaihowl) appears when adding only non-kv measurements, maybe handle earlier?
-        if len(expanded.columns) == 2:
-            # Explicitly rename columns. Using integer column names exposes
-            # broken pivot_table in Pandas 1.4.2
-            expanded.columns = ['key', 'value']
-            pivoted = expanded.pivot_table(columns='key', index='num',
-                                           values='value', aggfunc='last')
-            df = df.drop(['kvs'], axis=1).join(pivoted)
+    df = expand_kvs(df)
 
     return (df, commits_parsed)
 
