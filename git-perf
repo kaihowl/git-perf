@@ -158,6 +158,7 @@ audit_parser.add_argument(
 good_parser = sub_parser.add_parser('good', help="""
         Accept HEAD commit's measurement for audit, even if outside of range.
         This is allows to accept expected performance changes.
+        It will copy the current HEAD's measurements to the amended HEAD commit.
         """)
 add_measurement_option(good_parser, required=True)
 add_kv_option(good_parser)
@@ -208,6 +209,7 @@ def fetch():
 def reconcile():
     subprocess.check_call(['git',
                            'notes',
+                           # TODO(kaihowl) duplicated with other commands
                            '--ref',
                            PERF_REF,
                            'merge',
@@ -503,7 +505,7 @@ def audit(measurement: str,
     sys.exit(not accepted)
 
 
-def good(measurement: str, key_value: KeyValueList):
+def mark_as_good(measurement: str, key_value: KeyValueList):
     command = ['git',
                '--no-pager',
                'commit',
@@ -513,6 +515,35 @@ def good(measurement: str, key_value: KeyValueList):
                ]
     ic(command)
     return ic(subprocess.check_output(command, text=True))
+
+
+def copy_measurements_from_prev_head():
+    command = ['git',
+               'notes',
+               '--ref', PERF_REF,
+               'list',
+               'HEAD@{1}',
+               ]
+    ic(command)
+    has_notes = ic(subprocess.call(command, text=True)) == 0
+    if not has_notes:
+        return
+
+    command = ['git',
+               'notes',
+               '--ref', PERF_REF,
+               'copy',
+               '-f',
+               'HEAD@{1}',
+               'HEAD',
+               ]
+    ic(command)
+    return ic(subprocess.check_output(command))
+
+
+def good(measurement: str, key_value: KeyValueList):
+    mark_as_good(measurement, key_value)
+    copy_measurements_from_prev_head()
 
 
 if __name__ == '__main__':
