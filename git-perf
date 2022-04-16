@@ -158,6 +158,13 @@ audit_parser.add_argument(
     default=4)
 
 
+# subcommand: prune
+prune_parser = sub_parser.add_parser('prune', help="""
+        Remove all performance measurements for non-existent/unreachable objects.
+        Will refuse to work if run on a shallow clone.
+        """)
+
+
 def measure(measurement: str, number: int, key_value: KeyValueList, command: List[str]):
     for i in range(number):
         start = time.time_ns()
@@ -436,6 +443,23 @@ def audit(measurement: str,
     is_regular = z <= sigma
     print(f"is regular: {z} <= {sigma} == {is_regular}")
     sys.exit(not is_regular)
+
+
+def is_shallow_repo() -> bool:
+    command = ['git', 'rev-parse', '--is-shallow-repository']
+    ic(command)
+    text = ic(subprocess.check_output(command, text=True))
+    return text.strip() == 'true'
+
+
+def prune():
+    if is_shallow_repo():
+        print("Refusing to prune in a shallow clone", file=sys.stderr)
+        sys.exit(1)
+
+    command = GIT_NOTES_BASE_COMMAND + ['prune']
+    ic(command)
+    ic(subprocess.check_call(command))
 
 
 if __name__ == '__main__':
