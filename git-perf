@@ -234,7 +234,7 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
     return ic(subprocess.check_output(command, text=True))
 
 
-def get_pending_trailers():
+def get_raw_pending_trailers():
     """
     Get all performance trailers in commit messages that are not merged, yet.
     This will take the total of all trailers found in 'HEAD^..'.
@@ -251,6 +251,41 @@ def get_pending_trailers():
                ]
     ic(command)
     return ic(subprocess.check_output(command, text=True))
+
+
+def get_trailer_df():
+    import pandas as pd  # type: ignore
+    records = []
+    for line in get_raw_pending_trailers().splitlines():
+        if len(line.strip()) == 0:
+            continue
+        items = line.split()
+        name = items[0]
+        kvs = items[1:]
+        records.append({
+            'name': name,
+            'kvs': kvs,
+        })
+
+    df = pd.DataFrame(records)
+    df = expand_kvs(df)
+    return df
+
+
+def expand_kvs(df):
+    df.index.name = 'num'
+    if 'kvs' in df.columns:
+        expanded = df.kvs.explode().str.split('=', expand=True)
+        # Only continue if there are indeed kv pairs and not a kvs column of empty arrays
+        # TODO(kaihowl) appears when adding only non-kv measurements, maybe handle earlier?
+        if len(expanded.columns) == 2:
+            # Explicitly rename columns. Using integer column names exposes
+            # broken pivot_table in Pandas 1.4.2
+            expanded.columns = ['key', 'value']
+            pivoted = expanded.pivot_table(columns='key', index='num',
+                                           values='value', aggfunc='last')
+            df = df.drop(['kvs'], axis=1).join(pivoted)
+    return df
 
 
 def get_df(max_count_commits: int, offset: int = 0):
@@ -287,27 +322,21 @@ def get_df(max_count_commits: int, offset: int = 0):
         name = items[0]
         time = items[1]
         val = items[2]
-        if isnumeric(val):
-            # TODO(kaihowl) fixed float conversion collides with commend in numerictype()
-            val = float(val)
-        else:  # not isnumeric
-            if val == GOOD_MARKER:
-                val = None
-            else:
-                print(
-                    f"Found non-numeric value '{val}' as measurement "
-                    f"for commit {commit} in line: '{data}'",
-                    file=sys.stderr)
-                assert(False)
-                continue
-
+        if not isnumeric(val):
+            print(
+                f"Found non-numeric value '{val}' as measurement "
+                f"for commit {commit} in line: '{data}'",
+                file=sys.stderr)
+            assert(False)
+            continue
         kvs = items[3:]
         records.append({
             "commit": commit,
             "nr_commit": len(commits_parsed),
             "name": name,
             "time": pd.to_datetime(time, unit='s'),
-            "val": val,
+            # TODO(kaihowl) fixed float conversion collides with commend in numerictype()
+            "val": float(val),
             "kvs": kvs})
     number_commits = len(commits_parsed)
     if number_commits < max_count_commits and commit_is_grafted:
@@ -319,18 +348,7 @@ def get_df(max_count_commits: int, offset: int = 0):
         sys.exit(1)
     df = pd.DataFrame(records)
 
-    df.index.name = 'num'
-    if 'kvs' in df.columns:
-        expanded = df.kvs.explode().str.split('=', expand=True)
-        # Only continue if there are indeed kv pairs and not a kvs column of empty arrays
-        # TODO(kaihowl) appears when adding only non-kv measurements, maybe handle earlier?
-        if len(expanded.columns) == 2:
-            # Explicitly rename columns. Using integer column names exposes
-            # broken pivot_table in Pandas 1.4.2
-            expanded.columns = ['key', 'value']
-            pivoted = expanded.pivot_table(columns='key', index='num',
-                                           values='value', aggfunc='last')
-            df = df.drop(['kvs'], axis=1).join(pivoted)
+    df = expand_kvs(df)
 
     return (df, commits_parsed)
 
@@ -433,16 +451,24 @@ def audit(measurement: str,
         print("No performance measurements on HEAD commit", file=sys.stderr)
         sys.exit(1)
 
+    trailers = get_trailer_df()
+
     selector.append(('name', measurement))
     # The historical data allows for non-existent filters
     try:
         df = filter_df(df, selector)
     except ValueError as e:
         print(e, file=sys.stderr)
+
+    # The trailers allow for silent non-existent data
+    try:
+        trailers = filter_df(trailers, selector)
+    except ValueError:
+        pass
+
     df_head = filter_df(df_head, selector)
 
-    accept_regression = df_head.val.hasnans
-    _ = get_pending_trailers()
+    accept_regression = len(trailers) > 0
 
     ic(df.to_markdown())
     mean, std = summarize(df, group_by, aggregate_by)
