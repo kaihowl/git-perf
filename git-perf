@@ -17,6 +17,7 @@ PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
 ACCEPT_PERF_TRAILER = 'accept-perf'
+GIT_NOTES_BASE_COMMAND = ['git', 'notes', '--ref', PERF_REF]
 
 KeyValueList = List[Tuple[str, str]]
 
@@ -181,8 +182,7 @@ def add(measurement: str, key_value: KeyValueList, value: str):
     formatted_measurement = f"{measurement} {time.time()} {value} {get_formatted_kvs(key_value)}"
     ic(formatted_measurement)
 
-    notes_call = ['git', 'notes', '--ref', PERF_REF,
-                  'append', '-m', formatted_measurement]
+    notes_call = GIT_NOTES_BASE_COMMAND + ['append', '-m', formatted_measurement]
     subprocess.check_call(notes_call)
 
 
@@ -207,15 +207,12 @@ def fetch():
 
 
 def reconcile():
-    subprocess.check_call(['git',
-                           'notes',
-                           # TODO(kaihowl) duplicated with other commands
-                           '--ref',
-                           PERF_REF,
-                           'merge',
-                           '-s',
-                           'cat_sort_uniq',
-                           'FETCH_HEAD'])
+    command = GIT_NOTES_BASE_COMMAND + [
+        'merge',
+        '-s',
+        'cat_sort_uniq',
+        'FETCH_HEAD']
+    subprocess.check_call(command)
 
 
 def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
@@ -518,25 +515,21 @@ def mark_as_good(measurement: str, key_value: KeyValueList):
 
 
 def copy_measurements_from_prev_head():
-    command = ['git',
-               'notes',
-               '--ref', PERF_REF,
-               'list',
-               'HEAD@{1}',
-               ]
+    command = GIT_NOTES_BASE_COMMAND + [
+        'list',
+        'HEAD@{1}',
+    ]
     ic(command)
     has_notes = ic(subprocess.call(command, text=True)) == 0
     if not has_notes:
         return
 
-    command = ['git',
-               'notes',
-               '--ref', PERF_REF,
-               'copy',
-               '-f',
-               'HEAD@{1}',
-               'HEAD',
-               ]
+    command = GIT_NOTES_BASE_COMMAND + [
+        'copy',
+        '-f',
+        'HEAD@{1}',
+        'HEAD',
+    ]
     ic(command)
     return ic(subprocess.check_output(command))
 
