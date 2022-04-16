@@ -518,5 +518,28 @@ git perf add -m test 10000
 git perf audit -m test
 
 
+# Test for duplicated trailers
+cd_empty_repo
+create_commit
+git perf good -m test-measure
+nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
+if [[ $nr_git_trailers != 1 ]]; then
+  echo "Expected exactly one git trailer 'accept-perf' but found $nr_git_trailers"
+  exit 1
+fi
+# Second invocation for the same git trailer
+nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
+if [[ $nr_git_trailers != 1 ]]; then
+  echo "Expected exactly one git trailer 'accept-perf' but found $nr_git_trailers"
+  exit 1
+fi
+git perf good -m test-measure -kv os=ubuntu
+nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
+if [[ $nr_git_trailers != 2 ]]; then
+  echo "Expected exactly two git trailers 'accept-perf' but found $nr_git_trailers"
+  exit 1
+fi
+
+
 exit 0
 

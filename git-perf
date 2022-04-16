@@ -503,7 +503,6 @@ def audit(measurement: str,
     sys.exit(not accepted)
 
 
-# TODO(kaihowl) ensure no duplicated trailers
 def good(measurement: str, key_value: KeyValueList):
     command = ['git',
                '--no-pager',
