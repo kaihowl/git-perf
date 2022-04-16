@@ -171,6 +171,13 @@ add_measurement_option(good_parser, required=True)
 add_kv_option(good_parser)
 
 
+# subcommand: prune
+prune_parser = sub_parser.add_parser('prune', help="""
+        Remove all performance measurements for non-existent/unreachable objects.
+        Will refuse to work if run on a shallow clone.
+        """)
+
+
 def measure(measurement: str, number: int, key_value: KeyValueList, command: List[str]):
     for i in range(number):
         start = time.time_ns()
@@ -534,6 +541,19 @@ def copy_measurements_from_prev_head():
 def good(measurement: str, key_value: KeyValueList):
     mark_as_good(measurement, key_value)
     copy_measurements_from_prev_head()
+
+
+def is_shallow_repo() -> bool:
+    command = ['git', 'rev-parse', '--is-shallow-repository']
+    ic(command)
+    text = ic(subprocess.check_output(command, text=True))
+    return text.strip() == 'true'
+
+
+def prune():
+    if is_shallow_repo():
+        print("Refusing to prune in a shallow clone", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

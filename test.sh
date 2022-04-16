@@ -531,6 +531,25 @@ if [[ $nr_git_trailers != 2 ]]; then
   exit 1
 fi
 
+## Check git perf prune functionality
+
+# Refuse to run on a shallow clone
+cd_temp_repo
+repo=$(pwd)
+
+create_commit
+create_commit
+create_commit
+cd "$(mktemp -d)"
+git init
+git remote add origin "${repo}"
+git fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 --update-head-ok origin master:master
+output=$(git perf prune 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'shallow'* ]]; then
+  echo No warning for 'shallow' clone
+  echo "$output"
+  exit 1
+fi
 
 exit 0
 
