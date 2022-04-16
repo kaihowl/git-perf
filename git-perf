@@ -11,7 +11,7 @@ from typing import List, Tuple
 import sys
 from icecream import ic  # type: ignore
 ic.configureOutput(outputFunction=print)
-# ic.disable()
+ic.disable()
 
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
