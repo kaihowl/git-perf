@@ -455,9 +455,6 @@ git perf add -m test 5000 -kv os=ubuntu
 git perf audit -m test -s os=ubuntu && exit 1
 # Accept regression for other platform
 git perf good -m test -kv os=macOS
-# Commit was changed, must rerun
-# TODO(kaihowl) or should we copy over the measurements??
-git perf add -m test 5000 -kv os=ubuntu
 # Must not accept regression for this platform
 git perf audit -m test -s os=ubuntu && exit 1
 # TODO(kaihowl) Do we need to seperate kvs from mere labels?
@@ -465,8 +462,6 @@ git perf audit -m test -s os=ubuntu && exit 1
 # git perf audit -m test && exit 1
 # Accept regression on this platform
 git perf good -m test -kv os=ubuntu
-# TODO(kaihowl) again rerun
-git perf add -m test 5000 -kv os=ubuntu
 git perf audit -m test -s os=ubuntu
 git perf audit -m test
 create_commit
@@ -482,14 +477,10 @@ create_commit
 git perf add -m test 3
 # This trailer should not count!
 git perf good -m test
-# TODO(kaihowl) check if perf info should be copied instead
-git perf add -m test 3
 create_commit
 git perf add -m test 10
 git perf audit -m test -d 1 && exit 1
 git perf good -m test
-# TODO(kaihowl) check if perf info should be copied instead
-git perf add -m test 10
 git perf audit -m test -d 1
 
 # Check perf-accept functionality (merge case)
