@@ -175,8 +175,7 @@ def add(measurement: str, key_value: KeyValueList, value: str):
     formatted_measurement = f"{measurement} {time.time()} {value} {get_formatted_kvs(key_value)}"
     ic(formatted_measurement)
 
-    notes_call = ['git', 'notes', '--ref', PERF_REF,
-                  'append', '-m', formatted_measurement]
+    notes_call = GIT_NOTES_BASE_COMMAND + ['append', '-m', formatted_measurement]
     subprocess.check_call(notes_call)
 
 
