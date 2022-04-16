@@ -15,6 +15,7 @@ ic.disable()
 PERF_REF = 'refs/notes/perf'
 MAX_PUSHES = 3
 DEFAULT_MAX_COUNT = 40
+ACCEPT_PERF_TRAILER = 'accept-perf'
 GIT_NOTES_BASE_COMMAND = ['git', 'notes', '--ref', PERF_REF]
 GIT_LOG_BASE_COMMAND = ['git',
                         '--no-pager',
@@ -157,6 +158,15 @@ audit_parser.add_argument(
     type=float,
     default=4)
 
+# subcomand: good
+good_parser = sub_parser.add_parser('good', help="""
+        Accept HEAD commit's measurement for audit, even if outside of range.
+        This is allows to accept expected performance changes.
+        It will copy the current HEAD's measurements to the amended HEAD commit.
+        """)
+add_measurement_option(good_parser, required=True)
+add_kv_option(good_parser)
+
 
 # subcommand: prune
 prune_parser = sub_parser.add_parser('prune', help="""
@@ -226,6 +236,40 @@ def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
         "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
     ic(command)
     return ic(subprocess.check_output(command, text=True))
+
+
+def get_raw_pending_trailers():
+    """
+    Get all performance trailers in commit messages that are not merged, yet.
+    This will take the total of all trailers found in 'HEAD^..'.
+    If HEAD is a normal commit, only this commit is considered.
+    If HEAD is a merge commit, all commits not merged into the first parent are considered.
+    """
+    command = GIT_LOG_BASE_COMMAND + [
+        f'--format=%(trailers:key={ACCEPT_PERF_TRAILER},valueonly=true)',
+        'HEAD^..',
+    ]
+    ic(command)
+    return ic(subprocess.check_output(command, text=True))
+
+
+def get_trailer_df():
+    import pandas as pd  # type: ignore
+    records = []
+    for line in get_raw_pending_trailers().splitlines():
+        if len(line.strip()) == 0:
+            continue
+        items = line.split()
+        name = items[0]
+        kvs = items[1:]
+        records.append({
+            'name': name,
+            'kvs': kvs,
+        })
+
+    df = pd.DataFrame(records)
+    df = expand_kvs(df)
+    return df
 
 
 def expand_kvs(df):
@@ -406,13 +450,24 @@ def audit(measurement: str,
         print("No performance measurements on HEAD commit", file=sys.stderr)
         sys.exit(1)
 
+    trailers = get_trailer_df()
+
     selector.append(('name', measurement))
     # The historical data allows for non-existent filters
     try:
         df = filter_df(df, selector)
     except ValueError as e:
         print(e, file=sys.stderr)
+
+    # The trailers allow for silent non-existent data
+    try:
+        trailers = filter_df(trailers, selector)
+    except ValueError:
+        pass
+
     df_head = filter_df(df_head, selector)
+
+    accept_regression = len(trailers) > 0
 
     ic(df.to_markdown())
     mean, std = summarize(df, group_by, aggregate_by)
@@ -442,7 +497,46 @@ def audit(measurement: str,
     print(f"z-score: {z}")
     is_regular = z <= sigma
     print(f"is regular: {z} <= {sigma} == {is_regular}")
-    sys.exit(not is_regular)
+    print(f"accept regression: {accept_regression}")
+    accepted = is_regular or accept_regression
+    sys.exit(not accepted)
+
+
+def mark_as_good(measurement: str, key_value: KeyValueList):
+    command = ['git',
+               '--no-pager',
+               'commit',
+               '--amend',
+               '--no-edit',
+               '--trailer', f"{ACCEPT_PERF_TRAILER}: {measurement} {get_formatted_kvs(key_value)}",
+               ]
+    ic(command)
+    return ic(subprocess.check_output(command, text=True))
+
+
+def copy_measurements_from_prev_head():
+    command = GIT_NOTES_BASE_COMMAND + [
+        'list',
+        'HEAD@{1}',
+    ]
+    ic(command)
+    has_notes = ic(subprocess.call(command, text=True)) == 0
+    if not has_notes:
+        return
+
+    command = GIT_NOTES_BASE_COMMAND + [
+        'copy',
+        '-f',
+        'HEAD@{1}',
+        'HEAD',
+    ]
+    ic(command)
+    return ic(subprocess.check_output(command))
+
+
+def good(measurement: str, key_value: KeyValueList):
+    mark_as_good(measurement, key_value)
+    copy_measurements_from_prev_head()
 
 
 def is_shallow_repo() -> bool:
