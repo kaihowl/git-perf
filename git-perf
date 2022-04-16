@@ -246,6 +246,7 @@ def get_raw_pending_trailers():
                # TODO(kaihowl) common log argument with get_raw_notes
                'log',
                '--no-color',
+               '--ignore-missing',  # Support empty repos
                f'--format=%(trailers:key={ACCEPT_PERF_TRAILER},valueonly=true)',
                'HEAD^..'
                ]
