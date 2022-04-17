@@ -3,4 +3,5 @@
 - better error message for missing measurements 
 - quoted args for kv?
 - test case for git perf measure and command with args itself
-- only consider perf history from main branch 
+- only consider perf history from main branch
+- add value unit  
