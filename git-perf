@@ -2,6 +2,7 @@
 
 # TODO(kaihowl) show overall mean/stddev in report
 # TODO(kaihowl) hover of commits in report to show 'more' info
+# TODO(kaihowl) error handling for push/pull, e.g., no remote refs/notes/perf
 
 import argparse
 import time
