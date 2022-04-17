@@ -1,4 +1,5 @@
 - sigma==0 test?
-- perf report GitHub variable not hard code 
+- perf report GitHub variable not hard code for GH-pages
 - better error message for missing measurements 
 - quoted args for kv?
+- test case for git perf measure and command with args itself
