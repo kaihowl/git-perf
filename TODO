@@ -5,3 +5,5 @@
 - test case for git perf measure and command with args itself
 - only consider perf history from main branch
 - add value unit  
+- smaller import from pandas
+
