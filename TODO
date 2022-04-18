@@ -5,5 +5,3 @@
 - quoted args for kv?
 - test case for git perf measure and command with args itself
 - add value unit?
-- smaller import from pandas
-
