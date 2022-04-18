@@ -56,7 +56,7 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const { REPORT_NAME } = process.env
-            const { html_url } = gitub.rest.repos.getPages({
+            const { html_url } = github.rest.repos.getPages({
               owner: context.repo.owner,
               repo: context.repo.repo,
             })
