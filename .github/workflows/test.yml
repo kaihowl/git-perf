@@ -65,6 +65,6 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `⏱  [Performance Results](${pages.html_url}/${REPORT_NAME}.html)`
+              body: `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
               })
 
