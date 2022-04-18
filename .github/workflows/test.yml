@@ -82,10 +82,14 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const { REPORT_NAME } = process.env
+            const { html_url } = gitub.rest.repos.getPages({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `⏱  [Performance Results](https://kaihowl.github.io/git-perf/${REPORT_NAME}.html)`
+              body: `⏱  [Performance Results](${html_url}/${REPORT_NAME}.html)`
               })
 
