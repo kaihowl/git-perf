@@ -56,7 +56,7 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const { REPORT_NAME } = process.env
-            const pages = github.rest.repos.getPages({
+            const pages = await github.rest.repos.getPages({
               owner: context.repo.owner,
               repo: context.repo.repo,
             })
