@@ -56,14 +56,15 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const { REPORT_NAME } = process.env
-            const { html_url } = github.rest.repos.getPages({
+            const pages = github.rest.repos.getPages({
               owner: context.repo.owner,
               repo: context.repo.repo,
             })
+            console.log(pages)
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `⏱  [Performance Results](${html_url}/${REPORT_NAME}.html)`
+              body: `⏱  [Performance Results](${pages.html_url}/${REPORT_NAME}.html)`
               })
 
