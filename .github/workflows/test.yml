@@ -56,7 +56,7 @@ jobs:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
             const { REPORT_NAME } = process.env
-            const { pages:data:html_url } = await github.rest.repos.getPages({
+            const pages = await github.rest.repos.getPages({
               owner: context.repo.owner,
               repo: context.repo.repo,
             })
@@ -64,6 +64,6 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `⏱  [Performance Results](${html_url}/${REPORT_NAME}.html)`
+              body: `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
               })
 
