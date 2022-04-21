@@ -11,49 +11,6 @@ script_dir=$(dirname "$0")
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-cd "$(mktemp -d)"
-root=$(pwd)
-
-mkdir orig
-cd orig
-orig=$(pwd)
-
-git init
-
-touch a
-git add a
-git commit -m 'first commit'
-
-touch b
-git add b
-git commit -m 'second commit'
-
-touch c
-git add c
-git commit -m 'third commit'
-
-
-orig=$(pwd)
-cd "$root"
-git clone "$orig" repo1
-git clone "$orig" repo2
-repo1=$(pwd)/repo1
-repo2=$(pwd)/repo2
-
-echo Leave one commit in middle without any notes
-cd "$repo1"
-git checkout master~2
-git perf measure -n 2 -m echo echo test
-git checkout master
-git perf add -m echo 0.5
-
-git perf push
-
-echo Print from second repo
-cd "$repo2"
-git perf pull
-git perf report -o result.html
-
 cd_temp_repo
 output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'following arguments'* ]]; then
