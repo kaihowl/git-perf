@@ -1,49 +1,15 @@
 #!/bin/bash
 
 set -e
-PS4='${LINENO}: '
 set -x
-
-shopt -s nocasematch
 
 # TODO(kaihowl) add output expectations for report use cases (based on markdown?)
 # TODO(kaihowl) running without a git repo as current working directory
 # TODO(kaihowl) allow pushing to different remotes
 
-script_dir=$(pwd)
-
-export PYTHONOPTIMIZE=TRUE
-
-export GIT_COMMITTER_EMAIL="<>"
-export GIT_COMMITTER_NAME="GitHub Actions Test"
-export GIT_AUTHOR_EMAIL="<>"
-export GIT_AUTHOR_NAME="GitHub Actions Test"
-
-PATH=${script_dir}/:$PATH
-python3 -m pip install -r "${script_dir}/requirements.txt"
-
-function cd_empty_repo() {
-  local tmpgit
-  tmpgit="$(mktemp -d)"
-  pushd "${tmpgit}"
-  git init
-}
-
-function create_commit() {
-  echo "a" >> a
-  git add a
-  git commit -m 'my commit'
-}
-
-function cd_temp_repo() {
-  cd_empty_repo
-  create_commit
-  create_commit
-  create_commit
-  create_commit
-}
-
-# TODO(kaihowl) Split up tests
+script_dir=$(dirname "$0")
+# shellcheck source=test/common.sh
+source "$script_dir/common.sh"
 
 cd "$(mktemp -d)"
 root=$(pwd)
@@ -575,6 +541,3 @@ if [[ $nr_notes -ne 0 ]]; then
   echo Expected to have no notes but found "$nr_notes" instead
   exit 1
 fi
-
-exit 0
-
