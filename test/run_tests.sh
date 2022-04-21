@@ -15,16 +15,18 @@ for file in "${script_dir}"/test_*.sh; do
   tests+=("$! $log_file $file")
 done
 
+exit=0
 for test in "${tests[@]}"; do
   IFS=' ' read -r pid logfile file <<< "${test}"
   echo "Waiting for $file..."
   if ! wait "$pid"; then
     echo "Failed."
     cat "$logfile" | while read line; do echo "[$file] $line"; done
+    exit=1
   else
     echo "Success."
   fi
 done
 
-exit 0
+exit $exit
 
