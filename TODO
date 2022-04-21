@@ -1,3 +1,4 @@
+- audit tests run long
 - only consider perf history from main branch
 - sigma==0 test?
 - better error message for missing measurements
