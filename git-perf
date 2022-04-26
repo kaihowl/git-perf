@@ -229,20 +229,14 @@ def reconcile():
 
 
 def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
-    if offset == 0:
-        start = 'HEAD'
-    elif offset == 1:
-        start = 'HEAD^'
-    else:
-        print("TODO(kaihowl) refactor me")
-        sys.exit(1)
     command = GIT_LOG_BASE_COMMAND + [
         '-n', str(max_count_commits),
         '--first-parent',  # only show the main branch history
+        '--skip', str(offset),
         '--pretty=--,%H,%D%n%N',
         '--decorate=full',
         f"--notes={PERF_REF}",
-        start]  # pass in revision to allow using --ignore-missing for empty repos
+        "HEAD"]  # pass in revision to allow using --ignore-missing for empty repos
     ic(command)
     return ic(subprocess.check_output(command, text=True))
 
