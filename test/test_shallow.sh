@@ -21,14 +21,15 @@ cd "$(mktemp -d)"
 git clone "file://$full_repo" --depth=2 shallow_clone
 cd shallow_clone
 git perf pull
-git perf report -n 1
-output=$(git perf report -n 10 2>&1 1>/dev/null) && exit 1
+git perf report -n 2
+git perf audit -n 2 -m test-measure
+output=$(git perf report -n 3 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'shallow clone'* ]]; then
   echo Missing warning for 'shallow clone'
   echo "$output"
   exit 1
 fi
-output=$(git perf audit -n 10 -m test-measure 2>&1 1>/dev/null) && exit 1
+output=$(git perf audit -n 3 -m test-measure 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'shallow clone'* ]]; then
   echo Missing warning for 'shallow clone'
   echo "$output"
