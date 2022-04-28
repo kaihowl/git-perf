@@ -137,7 +137,7 @@ audit_parser.add_argument(
 audit_parser.add_argument(
     '-n',
     '--max-count',
-    help='Limit to the number of previous commits considered',
+    help='Limit to the number of commits considered',
     type=int,
     default=DEFAULT_MAX_COUNT)
 audit_parser.add_argument(
@@ -443,8 +443,17 @@ def audit(measurement: str,
           sigma: float):
     import numpy as np
 
-    df, _ = get_df(max_count, offset=1)
-    df_head, _ = get_df(1)
+    df, commits = get_df(max_count)
+
+    # TODO(kaihowl) test missing
+    if len(df) == 0:
+        print("No performance measurements found", file=sys.stderr)
+        sys.exit(1)
+
+    ic(df.to_markdown())
+
+    df_head = df[df['commit'] == commits[0]]
+    df_tail = df[df['commit'] != commits[0]]
 
     if len(df_head) == 0:
         print("No performance measurements on HEAD commit", file=sys.stderr)
@@ -455,7 +464,7 @@ def audit(measurement: str,
     selector.append(('name', measurement))
     # The historical data allows for non-existent filters
     try:
-        df = filter_df(df, selector)
+        df_tail = filter_df(df_tail, selector)
     except ValueError as e:
         print(e, file=sys.stderr)
 
@@ -469,10 +478,12 @@ def audit(measurement: str,
 
     accept_regression = len(trailers) > 0
 
-    ic(df.to_markdown())
-    mean, std = summarize(df, group_by, aggregate_by)
-    print(f"mean: {mean}")
-    print(f"std: {std}")
+    ic(df_head.to_markdown())
+    ic(df_tail.to_markdown())
+
+    tail_mean, tail_std = summarize(df_tail, group_by, aggregate_by)
+    print(f"mean: {tail_mean}")
+    print(f"std: {tail_std}")
 
     head_mean, _ = summarize(df_head, group_by, aggregate_by)
     print(f"head_mean: {head_mean}")
@@ -482,7 +493,7 @@ def audit(measurement: str,
         print("No matching measurements in HEAD commit", file=sys.stderr)
         sys.exit(1)
 
-    if np.isnan(std):
+    if np.isnan(tail_std):
         print("Not enough historical data available", file=sys.stderr)
         return
 
@@ -492,7 +503,7 @@ def audit(measurement: str,
     # 0/0 = np.nan(0)
     # z/0 = np.nan(+inf) if z > 0
     with np.errstate(divide='ignore'):
-        z = abs(head_mean - mean) / std
+        z = abs(head_mean - tail_mean) / tail_std
     z = np.nan_to_num(z)
     print(f"z-score: {z}")
     is_regular = z <= sigma
