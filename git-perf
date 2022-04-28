@@ -228,11 +228,10 @@ def reconcile():
     subprocess.check_call(command)
 
 
-def get_raw_notes(max_count_commits: int, offset: int = 0) -> str:
+def get_raw_notes(max_count_commits: int) -> str:
     command = GIT_LOG_BASE_COMMAND + [
         '-n', str(max_count_commits),
         '--first-parent',  # only show the main branch history
-        '--skip', str(offset),
         '--pretty=--,%H,%D%n%N',
         '--decorate=full',
         f"--notes={PERF_REF}",
@@ -291,7 +290,7 @@ def expand_kvs(df):
     return df
 
 
-def get_df(max_count_commits: int, offset: int = 0):
+def get_df(max_count_commits: int):
     """
     Retrieve a pandas dataframe containing the raw measurements.
     Returns a tuple (df, list_with_parsed_commits_hashes_backwards_order)
@@ -302,7 +301,7 @@ def get_df(max_count_commits: int, offset: int = 0):
     commit_is_grafted = False
     commits_parsed = []
 
-    for line in get_raw_notes(max_count_commits, offset).splitlines():
+    for line in get_raw_notes(max_count_commits).splitlines():
         if line.startswith('--'):
             _, commit, *decorations = line.strip().split(",")
             commit_is_grafted = 'grafted' in decorations
