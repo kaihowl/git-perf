@@ -14,7 +14,5 @@ jobs:
           # Change reporter level if you need.
           # GitHub Status Check won't become failure with warning.
           level: warning
-          # Change the current directory to run mypy command.
-          # mypy command reads setup.cfg or other settings file in this path.
-          workdir: ./
-
+          fail_on_error: true
+          workdir: "./"
