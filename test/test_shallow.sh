@@ -51,18 +51,14 @@ done
 git checkout -
 git merge --no-ff -
 # Test first-parent fetch-depth behavior even if HEAD is non-merge commit.
-# TODO(kaihowl)
-# create_commit
 commit=$(git rev-parse HEAD)
 # Shallow clone with depth == 10 for main branch
 cd "$(mktemp -d)"
-# TODO(kaihowl)
 git init
 git remote add origin "file://$full_repo"
+# Simulate the behavior of github actions checkout closely
 git fetch origin "$commit:local-ref" --depth=10
 git checkout local-ref
-# git clone "file://$full_repo" --depth=10 shallow_clone
-# cd shallow_clone
 git perf pull
 # Must fail as this expects more history
 output=$(git perf report -n 11 2>&1 1>/dev/null) && exit 1
