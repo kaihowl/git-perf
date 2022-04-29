@@ -20,6 +20,9 @@ git perf audit -m test -s os=ubuntu && exit 1
 git perf good -m test -kv os=macOS
 # Must not accept regression for this platform
 git perf audit -m test -s os=ubuntu && exit 1
+# Must not accept regression when accepting regression for other measurement
+git perf good -m othertest
+git perf audit -m test -s os=ubuntu && exit 1
 # TODO(kaihowl) Do we need to seperate kvs from mere labels?
 # Must not accept regression when no platform specified?
 # git perf audit -m test && exit 1
