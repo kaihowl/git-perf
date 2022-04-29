@@ -1,0 +1,5 @@
+runner:
+  mypy:
+    cmd: mypy --show-column-numbers git-perf || true
+    errorformat:
+      - "%f:%l:%c: %t%*[^:]: %m"
