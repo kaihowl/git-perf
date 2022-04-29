@@ -4,3 +4,4 @@
 - quoted args for kv?
 - test case for git perf measure and command with args itself
 - add value unit?
+- move report logic to github action
