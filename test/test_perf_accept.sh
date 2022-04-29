@@ -11,17 +11,17 @@ source "$script_dir/common.sh"
 cd_empty_repo
 create_commit
 git perf add -m test 2 -kv os=ubuntu
+git perf add -m othertest 2 -kv os=mac
 create_commit
 git perf add -m test 4 -kv os=ubuntu
+git perf add -m othertest 4 -kv os=mac
 create_commit
 git perf add -m test 5000 -kv os=ubuntu
+git perf add -m othertest 5000 -kv os=mac
 git perf audit -m test -s os=ubuntu && exit 1
 # Accept regression for other platform
 git perf good -m test -kv os=macOS
 # Must not accept regression for this platform
-git perf audit -m test -s os=ubuntu && exit 1
-# Must not accept regression when accepting regression for other measurement
-git perf good -m othertest
 git perf audit -m test -s os=ubuntu && exit 1
 # TODO(kaihowl) Do we need to seperate kvs from mere labels?
 # Must not accept regression when no platform specified?
@@ -33,6 +33,22 @@ git perf audit -m test
 create_commit
 git perf add -m test 5010
 git perf audit -m test
+
+# Check when using non-existent selectors for trailers
+cd_empty_repo
+create_commit
+git perf add -m test 2 -kv os=ubuntu
+create_commit
+git perf add -m test 3 -kv os=ubuntu
+create_commit
+git perf add -m test 10 -kv os=ubuntu
+git perf audit -m test -s os=ubuntu && exit 1
+git perf good -m someother
+# This can fail is filtering with "os" on the trailers without any kvs
+# is done incorrectly.
+git perf audit -m test -s os=ubuntu && exit 1
+git perf good -m test
+git perf audit -m test -s os=ubuntu
 
 # Check perf-accept functionality (base case)
 # Only accept performance regressions if non-merge HEAD commit has corresponding trailer

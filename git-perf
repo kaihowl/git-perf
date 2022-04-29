@@ -10,6 +10,7 @@ import subprocess
 from typing import List, Tuple
 import sys
 from icecream import ic  # type: ignore
+from enum import Enum, auto
 ic.configureOutput(outputFunction=print)
 ic.disable()
 
@@ -24,6 +25,13 @@ GIT_LOG_BASE_COMMAND = ['git',
                         '--no-color',
                         '--ignore-missing',  # Support empty repo
                         ]
+
+
+class MissingValuePolicy(Enum):
+    SILENT = auto()
+    WARN = auto()
+    FAIL = auto()
+
 
 KeyValueList = List[Tuple[str, str]]
 
@@ -422,10 +430,18 @@ def report(measurement: str,
     fig.write_html(output, include_plotlyjs='cdn')
 
 
-def filter_df(df, selector: KeyValueList):
+def filter_df(df,
+              selector: KeyValueList,
+              missing: MissingValuePolicy = MissingValuePolicy.FAIL):
     for (key, value) in selector:
         if key not in df.columns:
-            raise ValueError(f"Selector '{key}' does not exist")
+            message = f"Selector '{key}' does not exist"
+            if missing == MissingValuePolicy.SILENT:
+                continue
+            elif missing == MissingValuePolicy.WARN:
+                print(message, file=sys.stderr)
+            else:
+                raise ValueError(message)
         df = df[df[key] == value]
     return df
 
@@ -465,19 +481,9 @@ def audit(measurement: str,
     trailers = get_trailer_df()
 
     selector.append(('name', measurement))
-    # The historical data allows for non-existent filters
-    try:
-        df_tail = filter_df(df_tail, selector)
-    except ValueError as e:
-        print(e, file=sys.stderr)
-
-    # The trailers allow for silent non-existent data
-    try:
-        trailers = filter_df(trailers, selector)
-    except ValueError:
-        pass
-
-    df_head = filter_df(df_head, selector)
+    df_head = filter_df(df_head, selector, missing=MissingValuePolicy.FAIL)
+    df_tail = filter_df(df_tail, selector, missing=MissingValuePolicy.WARN)
+    trailers = filter_df(trailers, selector, missing=MissingValuePolicy.SILENT)
 
     accept_regression = len(trailers) > 0
 
