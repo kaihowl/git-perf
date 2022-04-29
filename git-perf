@@ -290,7 +290,7 @@ def expand_kvs(df):
     return df
 
 
-def get_df(max_count_commits: str):
+def get_df(max_count_commits: int):
     """
     Retrieve a pandas dataframe containing the raw measurements.
     Returns a tuple (df, list_with_parsed_commits_hashes_backwards_order)
