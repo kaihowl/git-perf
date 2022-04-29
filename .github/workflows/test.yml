@@ -17,6 +17,7 @@ on:
     branches:
       - master
 jobs:
+
   build:
     timeout-minutes: 20
     strategy:
