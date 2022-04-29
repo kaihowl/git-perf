@@ -1,4 +1,5 @@
 - sigma==0 test?
+- git bisect support / testing
 - better error message for missing measurements (e.g., warn for pull)
 - quoted args for kv?
 - test case for git perf measure and command with args itself
