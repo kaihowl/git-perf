@@ -1,3 +1,4 @@
+- remove git output in command output
 - sigma==0 test?
 - git bisect support / testing
 - better error message for missing measurements (e.g., warn for pull)
