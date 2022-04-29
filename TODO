@@ -5,3 +5,5 @@
 - test case for git perf measure and command with args itself
 - add value unit?
 - move report logic to github action
+- add minimum number of measurements
+  - bootstrapping with just two values is risky and can make it hard to get more values accepted
