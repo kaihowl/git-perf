@@ -17,3 +17,4 @@ jobs:
           # GitHub Status Check won't become failure with warning.
           level: warning
           target: git-perf
+          filter_mode: nofilter
