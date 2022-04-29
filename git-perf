@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-# TODO(kaihowl) allow specifying an annotation that allows a deviation for the current commit
-# TODO(kaihowl) show mean/stddev in report
+# TODO(kaihowl) show overall mean/stddev in report
+# TODO(kaihowl) hover of commits in report to show 'more' info
+# TODO(kaihowl) error handling for push/pull, e.g., no remote refs/notes/perf
 
 import argparse
 import time
@@ -43,6 +44,7 @@ def numerictype(val):
     if not isnumeric(val):
         raise argparse.ArgumentTypeError(f"'{val}' is not numeric")
 
+    # TODO(kaihowl) this is not true, this is converted by float in add()
     # Keep as string, this is parsed in Pandas to the most appropriate type
     return val
 
@@ -127,6 +129,7 @@ audit_parser = sub_parser.add_parser(
     results before comparison.
     """)
 add_measurement_option(audit_parser)
+# TODO(kaihowl) should this by kv as well?
 audit_parser.add_argument(
     '--selector',
     '-s',
@@ -287,7 +290,7 @@ def expand_kvs(df):
     return df
 
 
-def get_df(max_count_commits: int):
+def get_df(max_count_commits: str):
     """
     Retrieve a pandas dataframe containing the raw measurements.
     Returns a tuple (df, list_with_parsed_commits_hashes_backwards_order)
@@ -334,6 +337,7 @@ def get_df(max_count_commits: int):
             "nr_commit": len(commits_parsed),
             "name": name,
             "time": pd.to_datetime(time, unit='s'),
+            # TODO(kaihowl) fixed float conversion collides with commend in numerictype()
             "val": float(val),
             "kvs": kvs})
     number_commits = len(commits_parsed)
