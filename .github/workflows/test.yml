@@ -41,7 +41,7 @@ jobs:
           export PATH=$(pwd):$PATH
           git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
           git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
+          git perf audit -n 40 -d 6 -m test-measure2 -s os=${{matrix.os}}
 
   report:
     needs: build
