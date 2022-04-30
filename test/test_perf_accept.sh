@@ -11,13 +11,10 @@ source "$script_dir/common.sh"
 cd_empty_repo
 create_commit
 git perf add -m test 2 -kv os=ubuntu
-git perf add -m othertest 2 -kv os=mac
 create_commit
 git perf add -m test 4 -kv os=ubuntu
-git perf add -m othertest 4 -kv os=mac
 create_commit
 git perf add -m test 5000 -kv os=ubuntu
-git perf add -m othertest 5000 -kv os=mac
 git perf audit -m test -s os=ubuntu && exit 1
 # Accept regression for other platform
 git perf good -m test -kv os=macOS
