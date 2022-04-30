@@ -1,3 +1,4 @@
+- setup tools for easier consumption of repo
 - remove git output in command output
 - sigma==0 test?
 - git bisect support / testing
