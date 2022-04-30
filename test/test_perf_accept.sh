@@ -31,6 +31,22 @@ create_commit
 git perf add -m test 5010
 git perf audit -m test
 
+# Check when using non-existent selectors for trailers
+cd_empty_repo
+create_commit
+git perf add -m test 2 -kv os=ubuntu
+create_commit
+git perf add -m test 3 -kv os=ubuntu
+create_commit
+git perf add -m test 10 -kv os=ubuntu
+git perf audit -m test -s os=ubuntu && exit 1
+git perf good -m someother
+# This can fail is filtering with "os" on the trailers without any kvs
+# is done incorrectly.
+git perf audit -m test -s os=ubuntu && exit 1
+git perf good -m test
+git perf audit -m test -s os=ubuntu
+
 # Check perf-accept functionality (base case)
 # Only accept performance regressions if non-merge HEAD commit has corresponding trailer
 cd_empty_repo
