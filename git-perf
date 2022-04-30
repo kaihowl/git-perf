@@ -161,6 +161,7 @@ audit_parser.add_argument(
     '--aggregate-by',
     help='What to aggregate the measurements in each group with',
     default='min')
+# TODO rename to z-value instead?
 audit_parser.add_argument(
     '-d', '--sigma',
     help='Multiple of the stddev after which a outlier is detected. '
