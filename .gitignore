@@ -1,2 +1,4 @@
 /bin/
 /result.html
+/.tox/
+/dist/

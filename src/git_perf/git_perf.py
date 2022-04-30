@@ -577,8 +577,12 @@ def prune():
     ic(subprocess.check_call(command))
 
 
-if __name__ == '__main__':
+def main():
     args = parser.parse_args()
     subcommand = args.subcommand
     del args.subcommand
-    locals()[subcommand](**vars(args))
+    globals()[subcommand](**vars(args))
+
+
+if __name__ == '__main__':
+    main()
