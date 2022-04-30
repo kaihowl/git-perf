@@ -10,3 +10,4 @@
   - rename to git perf accept instead?
 - add minimum number of measurements
   - bootstrapping with just two values is risky and can make it hard to get more values accepted
+- head_mean is confusing as this is the mean of the single min value by default
