@@ -39,7 +39,7 @@ jobs:
           ./test/install.sh
           ./test/run_tests.sh
           export PATH=$(pwd):$PATH
-          git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
+          git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.02
           git perf push
           git perf audit -n 40 -d 6 -m test-measure2 -s os=${{matrix.os}}
 
