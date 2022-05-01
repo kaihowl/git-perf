@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |
           python3 -m pip install tox
-          tox -vvv
+          tox -vvv -e py3
           python3 -m pip install .
           git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
           git perf push
