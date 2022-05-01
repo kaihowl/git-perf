@@ -1,0 +1,15 @@
+echo 1648652689.361054 6868000 mytest=12
+echo 1648652689.4321432 4861000 mytest=12
+echo 1648652689.4519098 4640000 mytest=12
+echo 1648652689.473003 4302000 mytest=12
+echo 1648652689.490288 4105000 mytest=12
+echo 1648652689.508748 4087000 mytest=12
+echo 1648652689.528644 4702000 mytest=12
+echo 1648652689.549715 4988000 mytest=12
+echo 1648652689.570857 5486000 mytest=12
+echo 1648652689.590297 4156000 mytest=12
+mymeasurement 1648652485 30768 github_action=__run github_run_id=2065609145 github_run_number=27 runner_arch=X64 runner_os=Linux runner_name=GitHub Actions 3
+mymeasurement 1648652661 13400 github_action=__run github_run_id=2065609145 github_run_number=27 runner_arch=X64 runner_os=macOS runner_name=GitHub Actions 2
+myothermeasurement 1648652828 12..342
+testval 1648652695.609411 -12334 test=something test2=something2
+testval 1648652732.5030231 12334.12 test=something test2=something2
