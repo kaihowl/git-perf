@@ -35,9 +35,9 @@ jobs:
       - name: Install and test
         shell: bash
         run: |
-          ./test/install.sh
-          ./test/run_tests.sh
-          export PATH=$(pwd):$PATH
+          python3 -m pip install tox
+          tox -vvv -e py3
+          python3 -m pip install .
           git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
           git perf push
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
@@ -64,8 +64,7 @@ jobs:
       - name: report
         shell: bash
         run: |
-          export PATH=$(pwd):$PATH
-          python3 -m pip install -r requirements.txt
+          python3 -m pip install .
           git perf pull
           mkdir reports/
           git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s os
