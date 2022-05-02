@@ -35,7 +35,9 @@ class MissingValuePolicy(Enum):
 
 KeyValueList = List[Tuple[str, str]]
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description="""
+        Track performance measurements in git using git-notes.
+""")
 sub_parser = parser.add_subparsers(dest='subcommand', required=True)
 
 

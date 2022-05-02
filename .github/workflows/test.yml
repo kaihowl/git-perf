@@ -40,8 +40,10 @@ jobs:
           tox -vvv -e py3
           python3 -m pip install .
           git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
+          git perf measure -m report -kv os=${{matrix.os}} git perf report
           git perf push
           git perf audit -n 40 -d 6 -m test-measure2 -s os=${{matrix.os}}
+          git perf audit -n 40 -m report -s os=${{matrix.os}}
 
   report:
     needs: build
