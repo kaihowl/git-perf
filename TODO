@@ -1,3 +1,6 @@
+- add minimum number of measurements
+  - bootstrapping with just two values is risky and can make it hard to get more values accepted
+- allow for one-sided tests (only faster or only slower measurements trigger audit)
 - sigma==0 test?
 - git bisect support / testing
 - better error message for missing measurements (e.g., warn for pull)
@@ -8,6 +11,4 @@
 - change point analysis in report
 - git perf good should offer --amend and pop into the edit (behave like commit)
   - rename to git perf accept instead?
-- add minimum number of measurements
-  - bootstrapping with just two values is risky and can make it hard to get more values accepted
 - head_mean is confusing as this is the mean of the single min value by default
