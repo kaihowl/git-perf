@@ -115,7 +115,7 @@ pull_parser = sub_parser.add_parser(
 report_parser = sub_parser.add_parser(
     'report', help='Create an HTML performance report')
 add_measurement_option(report_parser, required=False)
-report_parser.add_argument('-o', '--output', help='HTML output file', default='result.html')
+report_parser.add_argument('-o', '--output', help='HTML output file', default='report.html')
 report_parser.add_argument('-s', '--separate-by', help='Create individual plots '
                            'by grouping with the value of this selector')
 # TODO(kaihowl) repeated with below
