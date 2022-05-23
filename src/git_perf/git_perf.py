@@ -421,7 +421,7 @@ def report(measurement: str,
     with open(output, 'w') as f:
         f.write('<h1>Performance Measurements</h1>')
         for name in df.name.unique():
-            fig = px.box(df, **args)
+            fig = px.box(df[df.name == name], **args)
             fig.update_yaxes(matches=None)
 
             if is_group_by_commit:
