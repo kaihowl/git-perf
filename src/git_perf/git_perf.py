@@ -393,7 +393,6 @@ def report(measurement: str,
     args = {
         'x': group_by,
         'y': 'val',
-        'facet_row': 'name',
         'points': 'all',
         'hover_data': df.columns,
     }
@@ -413,19 +412,24 @@ def report(measurement: str,
     if (len(df) == 0):
         print("No performance measurements after filtering found", file=sys.stderr)
         sys.exit(1)
-    fig = px.box(df, **args)
-    fig.update_yaxes(matches=None)
 
-    if is_group_by_commit:
-        fig.update_xaxes(
-            tickvals=list(range(1, len(commits_parsed)-1)),
-            ticktext=commits_parsed,
-            title='',
-            # TODO(kaihowl) this is a double reverse with ::-1 above
-            autorange='reversed')
+    with open(output, 'w') as f:
+        f.write('<h1>Performance Measurements</h1>')
+        for name in df.name.unique():
+            fig = px.box(df[df.name == name], **args)
+            fig.update_yaxes(matches=None)
 
-    # TODO(kaihowl) make include_plotlyjs configurable
-    fig.write_html(output, include_plotlyjs='cdn')
+            if is_group_by_commit:
+                fig.update_xaxes(
+                    tickvals=list(range(1, len(commits_parsed)-1)),
+                    ticktext=commits_parsed,
+                    title='',
+                    # TODO(kaihowl) this is a double reverse with ::-1 above
+                    autorange='reversed')
+
+            f.write(f'<h2>{name}</h2>')
+            # TODO(kaihowl) make include_plotlyjs configurable
+            f.write(fig.to_html(include_plotlyjs='cdn', full_html=False))
 
 
 def filter_df(df,
