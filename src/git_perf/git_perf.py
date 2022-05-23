@@ -223,7 +223,7 @@ def push():
 
 
 def push_to_origin() -> int:
-    return subprocess.check_call(['git', 'push', 'origin', PERF_REF])
+    return subprocess.call(['git', 'push', 'origin', PERF_REF])
 
 
 def fetch():
