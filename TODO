@@ -1,3 +1,4 @@
+- multiple times plotly sources in graph html output
 - multiple measurements audited, all failing printed
 - print version
 - add minimum number of measurements
