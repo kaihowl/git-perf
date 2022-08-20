@@ -433,22 +433,28 @@ def report(measurement: str,
             else:
                 groups = [(None, name_df)]
             for separator, trace_df in groups:
-                trace_name = name
+                trace_args = {
+                    'x': trace_df[args['x']],
+                    'y': trace_df[args['y']],
+                    'boxpoints': 'all',
+                    'name': name,
+                    'hovertemplate': hovertemplate,
+                    'customdata': list(trace_df.to_numpy()),
+                }
+
                 if separator:
-                    trace_name += f": {separator}"
+                    trace_args['legendgroup'] = name
+                    trace_args['legendgrouptitle_text'] = name
+                    trace_args['name'] = separator
 
                 # TODO(kaihowl) legend is inversed...
                 # TODO(kaihowl) order of graphs must also be inversed
-                fig.add_trace(go.Box(x=trace_df[args['x']],
-                                     y=trace_df[args['y']],
-                                     boxpoints='all',
-                                     name=trace_name,
-                                     hovertemplate=hovertemplate,
-                                     customdata=list(trace_df.to_numpy())))
+                fig.add_trace(go.Box(**trace_args))
 
             trace_names.append(name)
             fig.update_yaxes(matches=None)
-        fig.update_layout(legend={'orientation': 'h', 'x': 0, 'y': -0.2})
+        fig.update_layout(legend={'groupclick': 'toggleitem',
+                          'orientation': 'h', 'x': 0, 'y': -0.2})
         f.write(fig.to_html(include_plotlyjs='cdn', full_html=False))
 
 
