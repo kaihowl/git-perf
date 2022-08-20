@@ -372,7 +372,7 @@ def report(measurement: str,
            group_by: str,
            separate_by: str = None):
 
-    import plotly.express as px  # type: ignore
+    import plotly.graph_objects as go
 
     df, commits_parsed = get_df(max_count)
 
@@ -385,8 +385,6 @@ def report(measurement: str,
     if measurement:
         df = filter_df(df, [('name', measurement)])
 
-    # TODO(kaihowl) add test for reverse ordering
-    df = df[::-1]
     df = df.fillna("n/a")
     ic(df.to_markdown())
 
@@ -398,8 +396,6 @@ def report(measurement: str,
     args = {
         'x': group_by,
         'y': 'val',
-        'points': 'all',
-        'hover_data': df.columns,
     }
 
     is_group_by_commit = group_by == 'commit'
@@ -412,30 +408,48 @@ def report(measurement: str,
             print(f"Argument for --separate-by invalid: {separate_by} "
                   "not found in columns", file=sys.stderr)
             sys.exit(1)
-        args['color'] = separate_by
-        args['category_orders'] = {separate_by: df[separate_by].unique()}
 
     if (len(df) == 0):
         print("No performance measurements after filtering found", file=sys.stderr)
         sys.exit(1)
 
+    hovertemplate = "<br />".join([f"{name}=%{{customdata[{i}]}}" for i,
+                                  name in enumerate(df.columns)])
+
     with open(output, 'w') as f:
         f.write('<h1>Performance Measurements</h1>')
-        for name in df.name.unique():
-            fig = px.box(df[df.name == name], **args)
+        fig = go.Figure()
+        trace_names = []
+        if is_group_by_commit:
+            fig.update_xaxes(
+                tickvals=list(range(1, len(commits_parsed)+1)),
+                ticktext=[c[:6] for c in commits_parsed],
+                tickfont={'family': 'monospace'},
+                title='',
+                autorange='reversed')
+        for name, name_df in df.groupby('name'):
+            if separate_by:
+                groups = name_df.groupby(separate_by)
+            else:
+                groups = [(None, name_df)]
+            for separator, trace_df in groups:
+                trace_name = name
+                if separator:
+                    trace_name += f": {separator}"
+
+                # TODO(kaihowl) legend is inversed...
+                # TODO(kaihowl) order of graphs must also be inversed
+                fig.add_trace(go.Box(x=trace_df[args['x']],
+                                     y=trace_df[args['y']],
+                                     boxpoints='all',
+                                     name=trace_name,
+                                     hovertemplate=hovertemplate,
+                                     customdata=list(trace_df.to_numpy())))
+
+            trace_names.append(name)
             fig.update_yaxes(matches=None)
-
-            if is_group_by_commit:
-                fig.update_xaxes(
-                    tickvals=list(range(1, len(commits_parsed)-1)),
-                    ticktext=commits_parsed,
-                    title='',
-                    # TODO(kaihowl) this is a double reverse with ::-1 above
-                    autorange='reversed')
-
-            f.write(f'<h2>{name}</h2>')
-            # TODO(kaihowl) make include_plotlyjs configurable
-            f.write(fig.to_html(include_plotlyjs='cdn', full_html=False))
+        fig.update_layout(legend={'orientation': 'h', 'x': 0, 'y': -0.2})
+        f.write(fig.to_html(include_plotlyjs='cdn', full_html=False))
 
 
 def filter_df(df,
