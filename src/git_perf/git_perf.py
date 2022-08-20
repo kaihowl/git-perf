@@ -569,7 +569,7 @@ def copy_measurements_from_prev_head():
     ]
     ic(command)
     has_notes = ic(subprocess.call(command, text=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)) == 0
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)) == 0
     if not has_notes:
         return
 
