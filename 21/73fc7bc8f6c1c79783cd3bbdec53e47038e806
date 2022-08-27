@@ -1,0 +1,9 @@
+testval 1648640113.6514208 12334 test=something test2=something2
+
+testval 1648640302.062033 12334.12 test=something test2=something2
+
+testval 1648640324.668963 -12334.12 test=something test2=something2
+
+testval 1648640334.51498 -12334 test=something test2=something2
+
+testval 1648640347.096469 -12334 test=something test2=something2
