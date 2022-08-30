@@ -408,6 +408,8 @@ def report(measurement: str,
             print(f"Argument for --separate-by invalid: {separate_by} "
                   "not found in columns", file=sys.stderr)
             sys.exit(1)
+        # args['color'] = separate_by
+        args['category_orders'] = {separate_by: df[separate_by].unique()}
 
     if (len(df) == 0):
         print("No performance measurements after filtering found", file=sys.stderr)
