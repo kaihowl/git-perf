@@ -1,0 +1,17 @@
+echo 1648407336.231394 3503000
+echo 1648407336.2608562 3553000
+echo 1648407336.2777689 3950000
+echo 1648407336.294993 3597000
+echo 1648407336.313427 4072000
+echo 1648407336.333645 4880000
+echo 1648407336.354069 4080000
+echo 1648407336.373698 3719000
+echo 1648407336.392247 4207000
+echo 1648407336.409048 3687000
+echo 1648407336.427872 3964000
+echo 1648407336.448289 3817000
+mymeasurement 1648191186 18031 github_action=__run github_run_id=2038576319 github_run_number=15 runner_arch=X64 runner_os=Linux runner_name=GitHub Actions 2
+mymeasurement 1648191193 16149 github_action=__run github_run_id=2038576319 github_run_number=15 runner_arch=X64 runner_os=macOS runner_name=Hosted Agent
+mymeasurement 1648381503 17051 github_action=__run github_run_id=2047641975 github_run_number=16 runner_arch=X64 runner_os=Linux runner_name=GitHub Actions 4
+mymeasurement 1648381583 31274 github_action=__run github_run_id=2047641975 github_run_number=16 runner_arch=X64 runner_os=macOS runner_name=Hosted Agent
+test
