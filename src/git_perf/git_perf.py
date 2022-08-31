@@ -7,7 +7,7 @@
 import argparse
 import time
 import subprocess
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import sys
 from icecream import ic  # type: ignore
 from enum import Enum, auto
@@ -153,6 +153,12 @@ audit_parser.add_argument(
     help='Limit to the number of commits considered',
     type=int,
     default=DEFAULT_MAX_COUNT)
+audit_parser.add_argument(
+    '-min',
+    '--min-measurements',
+    help='Minimum number of measurements needed. If less, pass test and assume '
+         'more measurements are needed.',
+    type=int)
 audit_parser.add_argument(
     '-g',
     '--group-by',
@@ -476,9 +482,12 @@ def filter_df(df,
     return df
 
 
-def summarize(df, group_by: str, aggregate_by: str) -> Tuple[float, float]:
+def summarize(df,
+              group_by: str,
+              aggregate_by: str,
+              min_measurements: Optional[int] = None) -> Tuple[float, float]:
     import numpy as np
-    if (len(df) == 0):
+    if (len(df) == 0 or (min_measurements is not None and len(df) < min_measurements)):
         return (np.nan, np.nan)
     group = df.groupby(group_by).val.agg(aggregate_by)
     return (group.mean(), group.std())
@@ -489,6 +498,8 @@ def audit(measurement: str,
           group_by: str,
           aggregate_by: str,
           selector: KeyValueList,
+          # TODO(kaihowl) inconsistent with `n` argument (not counting HEAD vs counting HEAD)
+          min_measurements: Optional[int],
           sigma: float):
     import numpy as np
 
@@ -520,7 +531,7 @@ def audit(measurement: str,
     ic(df_head.to_markdown())
     ic(df_tail.to_markdown())
 
-    tail_mean, tail_std = summarize(df_tail, group_by, aggregate_by)
+    tail_mean, tail_std = summarize(df_tail, group_by, aggregate_by, min_measurements)
     print(f"mean: {tail_mean}")
     print(f"std: {tail_std}")
 

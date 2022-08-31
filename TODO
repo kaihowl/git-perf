@@ -5,8 +5,6 @@
 - rename measurements
 - measurement hierarchy
 - multiple measurements audited, all failing printed
-- add minimum number of measurements
-  - bootstrapping with just two values is risky and can make it hard to get more values accepted
 - allow for one-sided tests (only faster or only slower measurements trigger audit)
 - sigma==0 test?
 - git bisect support / testing
