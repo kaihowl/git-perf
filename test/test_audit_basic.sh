@@ -44,6 +44,8 @@ git perf add -m timer 30
 git perf audit -m timer -d 3
 git perf audit -m timer -d 2 && exit 1
 git perf audit -m timer -d 2 --min-measurements 10
+git perf audit -m timer -d 2 --min-measurements 4
+git perf audit -m timer -d 2 --min-measurements 3 && exit 1
 
 
 echo Stable measurements with zero stddev
