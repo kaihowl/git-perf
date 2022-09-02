@@ -2,7 +2,7 @@
 - pretty git-log for notes
   - no foxtrott merge
   - clean commit messages, e.g., which job etc added these perf measurements
-- rename measurements
+- rename measurements (see rename.txt)
 - measurement hierarchy
 - multiple measurements audited, all failing printed
 - allow for one-sided tests (only faster or only slower measurements trigger audit)

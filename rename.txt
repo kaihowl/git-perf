@@ -1,0 +1,35 @@
+https://github.com/kaihowl/dotfiles/issues/451#issuecomment-1235886642
+
+import pygit2
+
+repo = pygit2.repository.Repository(".")
+
+perf_notes = repo.references.get('refs/notes/perf')
+
+perf_commit = perf_notes.peel()
+
+perf_commit
+
+perf_tree = perf_commit.tree
+
+idx = pygit2.Index()
+
+# Cheating
+idx._repo = repo
+
+idx.read_tree(perf_tree)
+
+for entry in idx:
+    perfs = repo[entry.oid].read_raw()
+    perfs = perfs.replace(b'os=Linux', b'os=ubuntu-20.04')
+    perfs = perfs.replace(b'os=macOS', b'os=macos-11')
+    new_blob = repo.create_blob(perfs)
+    idx.add(pygit2.IndexEntry(entry.path, new_blob, entry.mode))
+
+new_tree = idx.write_tree()
+
+author=pygit2.Signature(...)
+
+new_commit = repo.create_commit(None, author, author, 'Updating OS names', new_tree, [perf_commit.oid])
+
+repo.references['refs/notes/perf'].set_target(new_commit)
