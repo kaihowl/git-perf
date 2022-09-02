@@ -378,7 +378,7 @@ def report(measurement: str,
            group_by: str,
            separate_by: str = None):
 
-    import plotly.graph_objects as go
+    import plotly.graph_objects as go  # type: ignore
 
     df, commits_parsed = get_df(max_count)
 
@@ -414,8 +414,6 @@ def report(measurement: str,
             print(f"Argument for --separate-by invalid: {separate_by} "
                   "not found in columns", file=sys.stderr)
             sys.exit(1)
-        # args['color'] = separate_by
-        args['category_orders'] = {separate_by: df[separate_by].unique()}
 
     if (len(df) == 0):
         print("No performance measurements after filtering found", file=sys.stderr)
@@ -435,7 +433,7 @@ def report(measurement: str,
                 tickfont={'family': 'monospace'},
                 title='',
                 autorange='reversed')
-        for name, name_df in df.groupby('name'):
+        for name, name_df in df.groupby('name', sort=False):
             if separate_by:
                 groups = name_df.groupby(separate_by)
             else:
@@ -455,8 +453,6 @@ def report(measurement: str,
                     trace_args['legendgrouptitle_text'] = name
                     trace_args['name'] = separator
 
-                # TODO(kaihowl) legend is inversed...
-                # TODO(kaihowl) order of graphs must also be inversed
                 fig.add_trace(go.Box(**trace_args))
 
             trace_names.append(name)
