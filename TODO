@@ -1,4 +1,3 @@
-- print version
 - pretty git-log for notes
   - no foxtrott merge
   - clean commit messages, e.g., which job etc added these perf measurements
