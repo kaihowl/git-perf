@@ -1,7 +1,5 @@
 #!/bin/bash
-
 set -ex
-
 
 if ! git diff-index --quiet --cached HEAD --; then
   echo "There are staged changes. Refusing to continue."
