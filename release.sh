@@ -21,4 +21,5 @@ git add src/git_perf/__version__.py
 git commit -m "Release version $NEXT_TAG"
 git tag -a -m "$NEXT_TAG" "$NEXT_TAG"
 git tag -f "latest"
+git push -f origin "$NEXT_TAG" "latest"
 git checkout master
