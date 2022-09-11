@@ -1,0 +1,2 @@
+mymeasurement 1648640414 3003 github_action=__run github_run_id=2064496578 github_run_number=22 runner_arch=X64 runner_os=Linux runner_name=GitHub Actions 2
+mymeasurement 1648640613 22284 github_action=__run github_run_id=2064496578 github_run_number=22 runner_arch=X64 runner_os=macOS runner_name=Hosted Agent
