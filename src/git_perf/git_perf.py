@@ -621,6 +621,7 @@ def main():
         from . import __version__
         print(__version__.__version__)
         sys.exit(0)
+    del(args.version)
     subcommand = args.subcommand
     del args.subcommand
     globals()[subcommand](**vars(args))
