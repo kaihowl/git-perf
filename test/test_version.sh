@@ -15,7 +15,7 @@ if [[ ${output} != *'are required'* ]]; then
 fi
 
 output=$(git perf --version)
-if ! [[ ${output} =~ \d+\.\d+.\d+ ]]; then
+if ! [[ ${output} =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
     echo Expected version number or placeholder in output.
     echo "$output"
     exit 1
