@@ -1,8 +1,8 @@
 #!/bin/bash
 set -ex
 
-if ! git diff-index --quiet --cached HEAD --; then
-  echo "There are staged changes. Refusing to continue."
+if [[ -n $(git status --porcelain) ]]; then
+  echo "Working tree is dirty. Refusing to continue."
   exit 1
 fi
 
