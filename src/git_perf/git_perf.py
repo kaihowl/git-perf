@@ -484,7 +484,9 @@ def summarize(df,
               aggregate_by: str,
               min_measurements: Optional[int] = None) -> Tuple[float, float]:
     import numpy as np
-    if (len(df) == 0 or (min_measurements is not None and len(df) < min_measurements)):
+    if (len(df) == 0
+            or (min_measurements is not None
+                and len(df.groupby(group_by)) < min_measurements)):
         return (np.nan, np.nan)
     group = df.groupby(group_by).val.agg(aggregate_by)
     return (group.mean(), group.std())

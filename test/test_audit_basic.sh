@@ -35,6 +35,9 @@ create_commit
 git perf add -m timer 10
 create_commit
 git perf add -m timer 15
+# Add second measurement. Due to "min" and "group by commit": No effect.
+# But: Should also not be counted for min-measurements.
+git perf add -m timer 15
 create_commit
 git perf add -m timer 20
 # head commit
