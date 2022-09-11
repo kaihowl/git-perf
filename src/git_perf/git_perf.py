@@ -38,7 +38,8 @@ KeyValueList = List[Tuple[str, str]]
 parser = argparse.ArgumentParser(description="""
         Track performance measurements in git using git-notes.
 """)
-sub_parser = parser.add_subparsers(dest='subcommand', required=True)
+parser.add_argument('--version', action='store_true', help="Print version")
+sub_parser = parser.add_subparsers(dest='subcommand', required='--version' not in sys.argv)
 
 
 def isnumeric(val: str):
@@ -616,6 +617,10 @@ def prune():
 
 def main():
     args = parser.parse_args()
+    if (args.version):
+        from . import __version__
+        print(__version__.__version__)
+        sys.exit(0)
     subcommand = args.subcommand
     del args.subcommand
     globals()[subcommand](**vars(args))
