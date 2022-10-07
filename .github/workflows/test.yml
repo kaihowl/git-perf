@@ -1,4 +1,4 @@
-name: Test git-perf
+name: ci
 
 # TODO(kaihowl) deeper test with merge-based PR workflow (HEAD == merge commit)
 # TODO(kaihowl) clean up old reports / do we want commit based reports anyway?
@@ -10,86 +10,77 @@ concurrency:
 on:
   push:
     branches:
-      - master
-      - build/*
+    - master
+    - build/*
   pull_request:
     branches:
       - master
 jobs:
-
-  build:
-    timeout-minutes: 20
+  test:
+    name: test
+    env:
+      # For some builds, we use cross to test on 32-bit and big-endian
+      # systems.
+      CARGO: cargo
+      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
+      TARGET_FLAGS:
+      # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
+      TARGET_DIR: ./target
+      # Emit backtraces on panics.
+      RUST_BACKTRACE: 1
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-11]
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
-    env:
-      PYTHONOPTIMIZE: TRUE
-
+        build:
+        # We test on a pinned version of Rust, along with the moving
+        # targets of 'stable' and 'beta' for good measure.
+        - pinned
+        - stable
+        - beta
+        include:
+        - build: pinned
+          os: ubuntu-22.04
+          rust: 1.52.1
+        - build: stable
+          os: ubuntu-22.04
+          rust: stable
+        - build: beta
+          os: ubuntu-22.04
+          rust: beta
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 40
-      - uses: fregante/setup-git-user@v1
-      - name: Install and test
-        shell: bash
-        run: |
-          python3 -m pip install tox
-          tox -vvv -e py3
-          python3 -m pip install .
-          git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
-          git perf measure -m report -kv os=${{matrix.os}} git perf report
-          git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
-          git perf audit -n 40 -m report -s os=${{matrix.os}}
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-  report:
-    needs: build
-    concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
-    if: always()
-    runs-on: ubuntu-20.04
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Show command used for Cargo
+      run: |
+        echo "cargo command is: ${{ env.CARGO }}"
+        echo "target flag is: ${{ env.TARGET_FLAGS }}"
+
+    - name: Build git-perf
+      run: ${{ env.CARGO }} build --verbose ${{ env.TARGET_FLAGS }}
+
+    - name: Run tests
+      run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }}
+
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 40
-      - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4
-      - name: use commit name as report name
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
-      - name: use branch name as report name
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "REPORT_NAME=${GITHUB_REF_SLUG}" >> $GITHUB_ENV
-      - name: report
-        shell: bash
-        run: |
-          python3 -m pip install .
-          git perf pull
-          mkdir reports/
-          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s os
-      - name: Publish new perf reports
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports
-          keep_files: true
-      - uses: actions/github-script@v6
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const { REPORT_NAME } = process.env
-            const pages = await github.rest.repos.getPages({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            })
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
-              })
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+        components: rustfmt
+    - name: Check formatting
+      run: cargo fmt --all --check
+
+# TODO(kaihowl) add git perf reporting again
+# TODO(kaihowl) run bash script based e2e tests
 
