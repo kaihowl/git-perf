@@ -62,6 +62,12 @@ jobs:
     - name: Run tests
       run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }}
 
+    - name: Run bash e2e tests
+      run: |
+        export PATH=$(pwd)/target/debug:$PATH
+        bash ./test/install.sh
+        bash ./test/run_tests.sh
+
   rustfmt:
     name: rustfmt
     runs-on: ubuntu-22.04
@@ -77,5 +83,4 @@ jobs:
       run: cargo fmt --all --check
 
 # TODO(kaihowl) add git perf reporting again
-# TODO(kaihowl) run bash script based e2e tests
 
