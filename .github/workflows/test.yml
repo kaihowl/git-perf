@@ -32,15 +32,9 @@ jobs:
     strategy:
       matrix:
         build:
-        # We test on a pinned version of Rust, along with the moving
-        # targets of 'stable' and 'beta' for good measure.
-        - pinned
         - stable
         - beta
         include:
-        - build: pinned
-          os: ubuntu-22.04
-          rust: 1.52.1
         - build: stable
           os: ubuntu-22.04
           rust: stable
