@@ -30,6 +30,7 @@ jobs:
       RUST_BACKTRACE: 1
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         build:
         - stable
