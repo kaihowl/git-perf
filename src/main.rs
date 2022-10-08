@@ -1,59 +1,119 @@
-use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use clap::{Args, Parser, Subcommand};
+use std::{
+    fmt::format,
+    path::{Path, PathBuf},
+};
 
 #[derive(Parser)]
 struct Cli {
-    /// Optional name to operate on
-    name: Option<String>,
-
-    /// Set a custom config file
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
-
-    /// Turn debugging information on
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    debug: u8,
-
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
+}
+
+#[derive(Args)]
+struct CliMeasurement {
+    /// Name of the measurement
+    #[arg(short = 'm', long = "measurement")]
+    name: String,
+
+    /// Key-value pairs separated by '='
+    #[arg(short, long, value_parser=parse_key_value)]
+    key_value: Vec<(String, String)>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Does testing things
-    Test {
-        /// list test values
-        #[arg(short, long)]
-        list: bool,
+    /// Measure the runtime of the supplied command
+    Measure {
+        /// Repetitions
+        #[arg(short = 'n', long, default_value = "1")]
+        repetitions: i32,
+
+        /// Command to measure
+        command: Vec<String>,
+
+        #[command(flatten)]
+        measurement: CliMeasurement,
     },
+
+    /// Add single measurement
+    Add {
+        // TODO(kaihowl) this is missing float values
+        /// Measured value to be added
+        value: i32,
+
+        #[command(flatten)]
+        measurement: CliMeasurement,
+    },
+
+    /// Publish performance results to remote
+    Push {},
+
+    /// Pull performance results from remote
+    Pull {},
+
+    /// Create an HTML performance report
+    Report {
+        /// HTML output file
+        #[arg(short, long, default_value = "output.html")]
+        output: PathBuf,
+
+        // TODO(kaihowl) No check for spaces, etc... Same applies to KV parsing method.
+        /// Create individual traces in the graph by grouping with the value of this selector
+        #[arg(short, long)]
+        separate_by: Option<String>,
+
+        /// Limit the number of previous commits considered
+        #[arg(short = 'n', long, default_value = "40")]
+        max_count: i32,
+
+        // TODO(kaihowl) No check for spaces...
+        /// What to group the measurements by
+        #[arg(short, long, default_value = "commit")]
+        group_by: String,
+    },
+}
+
+fn parse_key_value(s: &str) -> Result<(String, String), String> {
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid key=value: no '=' found in '{}'", s))?;
+    Ok((s[..pos].to_string(), s[pos + 1..].to_string()))
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    if let Some(name) = cli.name.as_deref() {
-        println!("Value for name: {}", name);
-    }
-
-    if let Some(config_path) = cli.config.as_deref() {
-        println!("Value for config: {}", config_path.display());
-    }
-
-    match cli.debug {
-        0 => println!("Debug mode is off"),
-        1 => println!("Debug mode is kind of on"),
-        2 => println!("Debug mode is on"),
-        _ => println!("Don't go crazy"),
-    }
-
-    match &cli.command {
-        Some(Commands::Test { list }) => {
-            if *list {
-                println!("Printing lists");
-            } else {
-                println!("Not printing lists");
-            }
+    match cli.command {
+        Commands::Measure {
+            repetitions,
+            command,
+            measurement,
+        } => {
+            println!(
+                "Measurement: {}, Repetitions: {}, command: {:?}, key-values: {:?}",
+                measurement.name, repetitions, command, measurement.key_value
+            );
         }
-        None => {}
+        Commands::Add { value, measurement } => {
+            println!(
+                "Measurement: {}, value: {}, key-values: {:?}",
+                measurement.name, value, measurement.key_value
+            );
+        }
+        Commands::Push {} => todo!(),
+        Commands::Pull {} => todo!(),
+        Commands::Report {
+            output,
+            separate_by,
+            max_count,
+            group_by,
+        } => todo!(),
     }
+}
+
+#[test]
+fn verify_cli() {
+    use clap::CommandFactory;
+    Cli::command().debug_assert()
 }
