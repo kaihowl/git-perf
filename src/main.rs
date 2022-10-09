@@ -179,27 +179,17 @@ fn report(num_commits: usize) {
         Err(e) => panic!("failed to open: {}", e),
     };
 
-    let head = match find_head_commit(&repo) {
-        Ok(commit) => commit,
-        Err(e) => panic!("Failed to get HEAD: {}", e),
-    };
-
-    println!("print for {} commit", num_commits);
-    println!("name of HEAD: {:?}", head);
-    println!("hash of HEAD: {:?}", head.id());
-
-    if let Err(e) = walk_commits(&repo, &head, num_commits) {
+    if let Err(e) = walk_commits(&repo, num_commits) {
         panic!("Failed to walk tree: {}", e);
     }
 }
 
 fn walk_commits(
     repo: &git2::Repository,
-    commit: &git2::Commit,
-    num_commits: usize,
+        num_commits: usize,
 ) -> Result<(), git2::Error> {
     let mut revwalk = repo.revwalk()?;
-    revwalk.push(commit.id())?;
+    revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
     revwalk
         .take(num_commits)
@@ -209,13 +199,6 @@ fn walk_commits(
             println!("Message: {}", message);
             Ok(())
         })
-}
-
-fn find_head_commit(repo: &git2::Repository) -> Result<git2::Commit, git2::Error> {
-    let head = repo.head();
-    let head = head?.resolve()?.peel_to_commit()?;
-    println!("Result of head: {:?}", head.author().name());
-    Ok(head)
 }
 
 #[cfg(test)]
