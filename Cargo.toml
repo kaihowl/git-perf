@@ -1,6 +1,3 @@
-[alias]
-runhelp = "run -- --help"
-
 [package]
 name = "git-perf"
 version = "0.1.0"
