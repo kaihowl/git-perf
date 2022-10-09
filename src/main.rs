@@ -158,8 +158,8 @@ fn main() {
         Commands::Report {
             output: _,
             separate_by: _,
-            report_history: _,
-        } => todo!(),
+            report_history,
+        } => report(report_history.max_count),
         Commands::Audit {
             report_history: _,
             selector: _,
@@ -170,6 +170,25 @@ fn main() {
         Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => todo!(),
     }
+}
+
+fn report(_num_commits: i32) {
+    use git2::Repository;
+    let repo = match Repository::open(".") {
+        Ok(repo) => repo,
+        Err(e) => panic!("failed to open: {}", e),
+    };
+
+    let head = find_head_commit(&repo);
+
+    println!("name of HEAD: {:?}", head);
+}
+
+fn find_head_commit(repo: &git2::Repository) -> Result<git2::Commit, git2::Error> {
+    let head = repo.head();
+    let head = head?.resolve()?.peel_to_commit()?;
+    println!("Result of head: {:?}", head.author().name());
+    Ok(head)
 }
 
 #[cfg(test)]
