@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::{
     fmt::format,
     path::{Path, PathBuf},
@@ -19,6 +19,18 @@ struct CliMeasurement {
     /// Key-value pairs separated by '='
     #[arg(short, long, value_parser=parse_key_value)]
     key_value: Vec<(String, String)>,
+}
+
+#[derive(Args)]
+struct CliReportHistory {
+    /// Limit the number of previous commits considered
+    #[arg(short = 'n', long, default_value = "40")]
+    max_count: i32,
+
+    // TODO(kaihowl) No check for spaces...
+    /// What to group the measurements by
+    #[arg(short, long, default_value = "commit")]
+    group_by: String,
 }
 
 #[derive(Subcommand)]
@@ -58,20 +70,62 @@ enum Commands {
         #[arg(short, long, default_value = "output.html")]
         output: PathBuf,
 
+        #[command(flatten)]
+        report_history: CliReportHistory,
+
         // TODO(kaihowl) No check for spaces, etc... Same applies to KV parsing method.
         /// Create individual traces in the graph by grouping with the value of this selector
         #[arg(short, long)]
         separate_by: Option<String>,
-
-        /// Limit the number of previous commits considered
-        #[arg(short = 'n', long, default_value = "40")]
-        max_count: i32,
-
-        // TODO(kaihowl) No check for spaces...
-        /// What to group the measurements by
-        #[arg(short, long, default_value = "commit")]
-        group_by: String,
     },
+
+    /// For a given measurement, check perfomance deviations of the HEAD commit
+    /// against <n> previous commits. Group previous results and aggregate their
+    /// results before comparison.
+    Audit {
+        #[command(flatten)]
+        report_history: CliReportHistory,
+
+        /// Key-value pair separated by "=" with no whitespaces to subselect measurements
+        #[arg(short, long, value_parser=parse_key_value)]
+        selector: Vec<(String, String)>,
+
+        /// Minimum number of measurements needed. If less, pass test and assume
+        /// more measurements are needed.
+        #[arg(short, long)]
+        min_measurements: Option<i32>,
+
+        // TODO(hoewelmk) missing short arg
+        /// What to aggregate the measurements in each group with
+        #[arg(short, long, default_value = "min")]
+        aggregate_by: AggregationFunc,
+
+        /// Multiple of the stddev after which a outlier is detected.
+        /// If the HEAD measurement is within [mean-<d>*sigma; mean+<d>*sigma],
+        /// it is considered acceptable.
+        #[arg(short = 'd', long, default_value = "4")]
+        sigma: f32,
+    },
+
+    /// Accept HEAD commit's measurement for audit, even if outside of range.
+    /// This is allows to accept expected performance changes.
+    /// It will copy the current HEAD's measurements to the amended HEAD commit.
+    Good {
+        #[command(flatten)]
+        measurement: CliMeasurement,
+    },
+
+    /// Remove all performance measurements for non-existent/unreachable objects.
+    /// Will refuse to work if run on a shallow clone.
+    Prune {},
+}
+
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+enum AggregationFunc {
+    Min,
+    Max,
+    Median,
+    Average,
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
@@ -106,14 +160,27 @@ fn main() {
         Commands::Report {
             output,
             separate_by,
-            max_count,
-            group_by,
+            report_history,
         } => todo!(),
+        Commands::Audit {
+            report_history,
+            selector,
+            min_measurements,
+            aggregate_by,
+            sigma,
+        } => todo!(),
+        Commands::Good { measurement } => todo!(),
+        Commands::Prune {  } => todo!(),
     }
 }
 
-#[test]
-fn verify_cli() {
-    use clap::CommandFactory;
-    Cli::command().debug_assert()
+#[cfg(test)]
+mod test {
+    use crate::*;
+
+    #[test]
+    fn verify_cli() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert()
+    }
 }
