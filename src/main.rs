@@ -1,8 +1,6 @@
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use std::{
-    fmt::format,
-    path::{Path, PathBuf},
-};
 
 #[derive(Parser)]
 struct Cli {
@@ -158,19 +156,19 @@ fn main() {
         Commands::Push {} => todo!(),
         Commands::Pull {} => todo!(),
         Commands::Report {
-            output,
-            separate_by,
-            report_history,
+            output: _,
+            separate_by: _,
+            report_history: _,
         } => todo!(),
         Commands::Audit {
-            report_history,
-            selector,
-            min_measurements,
-            aggregate_by,
-            sigma,
+            report_history: _,
+            selector: _,
+            min_measurements: _,
+            aggregate_by: _,
+            sigma: _,
         } => todo!(),
-        Commands::Good { measurement } => todo!(),
-        Commands::Prune {  } => todo!(),
+        Commands::Good { measurement: _ } => todo!(),
+        Commands::Prune {} => todo!(),
     }
 }
 
