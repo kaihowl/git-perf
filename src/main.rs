@@ -23,7 +23,7 @@ struct CliMeasurement {
 struct CliReportHistory {
     /// Limit the number of previous commits considered
     #[arg(short = 'n', long, default_value = "40")]
-    max_count: i32,
+    max_count: usize,
 
     // TODO(kaihowl) No check for spaces...
     /// What to group the measurements by
@@ -172,16 +172,40 @@ fn main() {
     }
 }
 
-fn report(_num_commits: i32) {
+fn report(num_commits: usize) {
     use git2::Repository;
     let repo = match Repository::open(".") {
         Ok(repo) => repo,
         Err(e) => panic!("failed to open: {}", e),
     };
 
-    let head = find_head_commit(&repo);
+    let head = match find_head_commit(&repo) {
+        Ok(commit) => commit,
+        Err(e) => panic!("Failed to get HEAD: {}", e),
+    };
 
+    println!("print for {} commit", num_commits);
     println!("name of HEAD: {:?}", head);
+    println!("hash of HEAD: {:?}", head.id());
+
+    if let Err(e) = walk_commits(&repo, &head, num_commits) {
+        panic!("Failed to walk tree: {}", e);
+    }
+}
+
+fn walk_commits(
+    repo: &git2::Repository,
+    commit: &git2::Commit,
+    num_commits: usize,
+) -> Result<(), git2::Error> {
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push(commit.id())?;
+    revwalk.simplify_first_parent()?;
+    revwalk
+        .take(num_commits)
+        .filter_map(|commit| Some(repo.find_commit(commit.ok()?).ok()?.summary()?.to_string()))
+        .for_each(|message| println!("Message: {}", message));
+    Ok(())
 }
 
 fn find_head_commit(repo: &git2::Repository) -> Result<git2::Commit, git2::Error> {
