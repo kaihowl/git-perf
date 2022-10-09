@@ -203,9 +203,12 @@ fn walk_commits(
     revwalk.simplify_first_parent()?;
     revwalk
         .take(num_commits)
-        .filter_map(|commit| Some(repo.find_commit(commit.ok()?).ok()?.summary()?.to_string()))
-        .for_each(|message| println!("Message: {}", message));
-    Ok(())
+        .try_for_each(|commit| -> Result<(), git2::Error> {
+            let commit = repo.find_commit(commit?)?;
+            let message = commit.summary().unwrap_or("");
+            println!("Message: {}", message);
+            Ok(())
+        })
 }
 
 fn find_head_commit(repo: &git2::Repository) -> Result<git2::Commit, git2::Error> {
