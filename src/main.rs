@@ -184,21 +184,15 @@ fn report(num_commits: usize) {
     }
 }
 
-fn walk_commits(
-    repo: &git2::Repository,
-        num_commits: usize,
-) -> Result<(), git2::Error> {
+fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2::Error> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
     revwalk
         .take(num_commits)
-        .try_for_each(|commit| -> Result<(), git2::Error> {
-            let commit = repo.find_commit(commit?)?;
-            let message = commit.summary().unwrap_or("");
-            println!("Message: {}", message);
-            Ok(())
-        })
+        .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok())
+        .for_each(|note| println!("Notes:\n{}", note.message().unwrap()));
+    Ok(())
 }
 
 #[cfg(test)]
