@@ -184,6 +184,12 @@ fn report(num_commits: usize) {
     }
 }
 
+#[derive(Debug)]
+struct Measurement {
+    commit: String,
+    measurement: String,
+}
+
 fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2::Error> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
@@ -191,7 +197,15 @@ fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2:
     revwalk
         .take(num_commits)
         .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok())
-        .for_each(|note| println!("Notes:\n{}", note.message().unwrap()));
+        .flat_map(|note| {
+            let lines = note.message().unwrap_or("");
+            let id = note.id().to_string();
+            lines.lines().map(move |m| Measurement {
+                commit: id.clone(),
+                measurement: m.to_string(),
+            }).collect::<Vec<_>>()
+        })
+        .for_each(|m| println!("m: {:?}", m));
     Ok(())
 }
 
