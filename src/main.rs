@@ -194,18 +194,21 @@ fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2:
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
-    revwalk
+    let notes = revwalk
         .take(num_commits)
-        .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok())
-        .flat_map(|note| {
-            let lines = note.message().unwrap_or("");
-            let id = note.id().to_string();
-            lines.lines().map(move |m| Measurement {
+        .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok());
+
+    for note in notes {
+        let lines = note.message().unwrap_or("");
+        let id = note.id().to_string();
+        for line in lines.lines() {
+            let m = Measurement {
                 commit: id.clone(),
-                measurement: m.to_string(),
-            }).collect::<Vec<_>>()
-        })
-        .for_each(|m| println!("m: {:?}", m));
+                measurement: line.to_string(),
+            };
+            println!("m: {:?}", m);
+        }
+    }
     Ok(())
 }
 
