@@ -259,7 +259,6 @@ fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2:
     for note in notes {
         let lines = note.message().unwrap_or("");
         let commit_id = note.id().to_string();
-        // TODO(kaihowl) maybe split up serialization of MeasurementData
         deserialize(lines, &commit_id)
             .into_iter()
             .for_each(|m| println!("{:?}", m));
