@@ -6,6 +6,8 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use serde::Deserialize;
 
+use average::{self, concatenate, Estimate, Mean, Variance};
+
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
@@ -85,16 +87,19 @@ enum Commands {
     /// against <n> previous commits. Group previous results and aggregate their
     /// results before comparison.
     Audit {
+        #[arg(short, long)]
+        measurement: String,
+
         #[command(flatten)]
         report_history: CliReportHistory,
 
         /// Key-value pair separated by "=" with no whitespaces to subselect measurements
         #[arg(short, long, value_parser=parse_key_value)]
-        selector: Vec<(String, String)>,
+        selectors: Vec<(String, String)>,
 
         /// Minimum number of measurements needed. If less, pass test and assume
         /// more measurements are needed.
-        #[arg(short, long)]
+        #[arg(long)]
         min_measurements: Option<i32>,
 
         // TODO(hoewelmk) missing short arg
@@ -165,33 +170,118 @@ fn main() {
             report_history,
         } => report(report_history.max_count),
         Commands::Audit {
-            report_history: _,
-            selector: _,
+            measurement,
+            report_history,
+            selectors,
+            // TODO(kaihowl)
             min_measurements: _,
-            aggregate_by: _,
-            sigma: _,
-        } => todo!(),
+            aggregate_by,
+            sigma,
+        } => audit(
+            &measurement,
+            report_history,
+            &selectors,
+            aggregate_by,
+            sigma,
+        ),
         Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => todo!(),
     }
 }
 
-fn report(num_commits: usize) {
+// TODO(kaihowl) do not use cli structure?
+fn audit(
+    measurement: &str,
+    report_history: CliReportHistory,
+    selectors: &Vec<(String, String)>,
+    aggregate_by: AggregationFunc,
+    sigma: f32,
+) {
+    let all = retrieve_measurements(report_history.max_count + 1); // include HEAD
+    let head = match all.first() {
+        Some(head) => head,
+        None => {
+            panic!("No measurement for HEAD")
+        }
+    };
+
+    let filter_by = |m: &&MeasurementData| {
+        m.name == measurement && selectors.iter().all(|s| &m.key_values[&s.0] == &s.1)
+    };
+    let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
+    let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
+    println!("head: {:?}, tail: {:?}", head_summary, tail_summary);
+}
+
+#[derive(Debug)]
+struct Stats {
+    mean: f64,
+    stddev: f64,
+}
+
+concatenate!(MeanVariance, [Mean, mean], [Variance, population_variance]);
+
+fn aggregate_measurements<'a, F>(
+    commits: impl Iterator<Item = &'a Commit>,
+    aggregate_by: AggregationFunc,
+    filter_by: &F,
+) -> Stats
+where
+    F: Fn(&&MeasurementData) -> bool,
+{
+    let s: MeanVariance = commits
+        // TODO(kaihowl) configure aggregate_by
+        .filter_map(|c| {
+            println!("{:?}", c.commit);
+            c.measurements
+                .iter()
+                .take_while(filter_by)
+                .inspect(|m| println!("{:?}", m))
+                .map(|m| m.val)
+                .reduce(f64::min)
+        })
+        .inspect(|m| println!("min: {:?}", m))
+        .collect();
+    Stats {
+        mean: s.mean(),
+        stddev: s.population_variance().sqrt(),
+    }
+
+    // measurements
+    //     .iter()
+    //     .enumerate()
+    //     .fold((0, 0), |(old_mean, old_variance), (index, md)| {
+    //         let prevq = old
+    //         let mean = old_mean + (md.val - old_mean) / (index + 1);
+    //         let variance =
+    //     });
+}
+
+fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
     use git2::Repository;
     let repo = match Repository::open(".") {
         Ok(repo) => repo,
         Err(e) => panic!("failed to open: {}", e),
     };
 
-    if let Err(e) = walk_commits(&repo, num_commits) {
-        panic!("Failed to walk tree: {}", e);
+    let measurements = walk_commits(&repo, num_commits);
+
+    match measurements {
+        Err(e) => panic!("Failed to walk tree: {:?}", e),
+        Ok(measurements) => measurements,
     }
 }
 
+fn report(num_commits: usize) {
+    retrieve_measurements(num_commits)
+        .into_iter()
+        .for_each(|m| println!("{:?}", m));
+}
+
 #[derive(Debug, PartialEq)]
-struct Measurement {
+struct Commit {
     commit: String,
-    measurement: MeasurementData,
+    measurements: Vec<MeasurementData>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -200,7 +290,7 @@ struct MeasurementData {
     // TODO(kaihowl) change type
     timestamp: f32,
     // TODO(kaihowl) check size of type
-    val: f32,
+    val: f64,
     #[serde(flatten)]
     key_values: HashMap<String, String>,
 }
@@ -208,6 +298,7 @@ struct MeasurementData {
 #[derive(Debug)]
 enum DeserializationError {
     CsvError(csv::Error),
+    GitError(git2::Error),
 }
 
 impl From<csv::Error> for DeserializationError {
@@ -216,7 +307,13 @@ impl From<csv::Error> for DeserializationError {
     }
 }
 
-fn deserialize(lines: &str, commit_id: &str) -> Result<Vec<Measurement>, DeserializationError> {
+impl From<git2::Error> for DeserializationError {
+    fn from(value: git2::Error) -> Self {
+        DeserializationError::GitError(value)
+    }
+}
+
+fn deserialize(lines: &str) -> Result<Vec<MeasurementData>, DeserializationError> {
     let reader = csv::ReaderBuilder::new()
         .delimiter(b' ')
         .has_headers(false)
@@ -248,32 +345,32 @@ fn deserialize(lines: &str, commit_id: &str) -> Result<Vec<Measurement>, Deseria
                 .unzip();
 
             let md: MeasurementData = values.deserialize(Some(&headers)).unwrap();
-            Ok(Measurement {
-                // TODO(kaihowl) oh man
-                commit: commit_id.to_string(),
-                measurement: md,
-            })
+            Ok(md)
         })
         .try_collect();
     result
 }
 
-fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2::Error> {
+fn walk_commits(
+    repo: &git2::Repository,
+    num_commits: usize,
+) -> Result<Vec<Commit>, DeserializationError> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
-    let notes = revwalk
+    revwalk
         .take(num_commits)
-        .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok());
-
-    for note in notes {
-        let lines = note.message().unwrap_or("");
-        let commit_id = note.id().to_string();
-        deserialize(lines, &commit_id)
-            .into_iter()
-            .for_each(|m| println!("{:?}", m));
-    }
-    Ok(())
+        .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok())
+        .map(|note| {
+            let lines = note.message().unwrap_or("");
+            let commit = note.id().to_string();
+            let measurements = deserialize(lines)?;
+            Ok(Commit {
+                commit,
+                measurements,
+            })
+        })
+        .try_collect()
 }
 
 #[cfg(test)]
@@ -283,20 +380,16 @@ mod test {
     #[test]
     fn key_value_deserialization() {
         let lines = "test 1234 123 key1=value1 key2=value2";
-        let commit_id = "deadbeef";
-        let actual = deserialize(lines, commit_id);
-        let expected = Measurement {
-            commit: commit_id.to_string(),
-            measurement: MeasurementData {
-                name: "test".to_string(),
-                timestamp: 1234.0,
-                val: 123.0,
-                key_values: [
-                    ("key1".to_string(), "value1".to_string()),
-                    ("key2".to_string(), "value2".to_string()),
-                ]
-                .into(),
-            },
+        let actual = deserialize(lines);
+        let expected = MeasurementData {
+            name: "test".to_string(),
+            timestamp: 1234.0,
+            val: 123.0,
+            key_values: [
+                ("key1".to_string(), "value1".to_string()),
+                ("key2".to_string(), "value2".to_string()),
+            ]
+            .into(),
         };
         assert_eq!(actual.as_ref().unwrap().len(), 1);
         assert_eq!(actual.unwrap()[0], expected);

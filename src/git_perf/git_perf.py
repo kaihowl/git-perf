@@ -509,9 +509,9 @@ def audit(measurement: str,
     df_head = df[df['commit'] == commits[0]]
     df_tail = df[df['commit'] != commits[0]]
 
-    if len(df_head) == 0:
-        print("No performance measurements on HEAD commit", file=sys.stderr)
-        sys.exit(1)
+    # if len(df_head) == 0:
+    #     print("No performance measurements on HEAD commit", file=sys.stderr)
+    #     sys.exit(1)
 
     trailers = get_trailer_df()
 
