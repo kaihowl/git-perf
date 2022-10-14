@@ -188,19 +188,19 @@ fn report(num_commits: usize) {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 struct Measurement {
     commit: String,
     measurement: MeasurementData,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct MeasurementData {
     name: String,
     // TODO(kaihowl) change type
-    timestamp: i32,
+    timestamp: f32,
     // TODO(kaihowl) check size of type
-    val: i32,
+    val: f32,
     #[serde(flatten)]
     key_values: HashMap<String, String>,
 }
