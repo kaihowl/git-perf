@@ -206,19 +206,28 @@ struct MeasurementData {
 fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(b' ')
+        .has_headers(false)
         .flexible(true)
         .from_reader(lines.as_bytes());
-    reader.set_headers(csv::StringRecord::from(vec![
-        "name",
-        "timestamp",
-        "val",
-        "key_values",
-    ]));
+
     reader
-        .deserialize()
+        .records()
         .map(|r| {
             // TODO(kaihowl) no unwrap
-            let md: MeasurementData = r.unwrap();
+            let raw = r.unwrap();
+            println!("{:?}", raw);
+            let fixed_headers = vec!["name", "timestamp", "val"];
+            let variable_headers: Vec<&str> = raw
+                .iter()
+                .skip(fixed_headers.len())
+                .map(|val| val.split('=').next().unwrap())
+                .collect();
+            let all_headers: Vec<&str> = fixed_headers
+                .into_iter()
+                .chain(variable_headers.into_iter())
+                .collect();
+            let headers = csv::StringRecord::from(all_headers);
+            let md: MeasurementData = raw.deserialize(Some(&headers)).unwrap();
             Measurement {
                 // TODO(kaihowl) oh man
                 commit: commit_id.to_string(),
