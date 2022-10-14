@@ -205,22 +205,30 @@ struct MeasurementData {
     key_values: HashMap<String, String>,
 }
 
-fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
+#[derive(Debug)]
+enum DeserializationError {
+    CsvError(csv::Error),
+}
+
+impl From<csv::Error> for DeserializationError {
+    fn from(value: csv::Error) -> Self {
+        DeserializationError::CsvError(value)
+    }
+}
+
+fn deserialize(lines: &str, commit_id: &str) -> Result<Vec<Measurement>, DeserializationError> {
     let reader = csv::ReaderBuilder::new()
         .delimiter(b' ')
         .has_headers(false)
         .flexible(true)
         .from_reader(lines.as_bytes());
 
-    reader
+    let result = reader
         .into_records()
         .map(|r| {
-            // TODO(kaihowl) no unwrap
-            let raw = r.unwrap();
-            println!("{:?}", raw);
             let fixed_headers = vec!["name", "timestamp", "val"];
 
-            let (headers, values): (csv::StringRecord, csv::StringRecord) = raw
+            let (headers, values): (csv::StringRecord, csv::StringRecord) = r?
                 .into_iter()
                 .zip_longest(fixed_headers)
                 .map(|pair| match pair {
@@ -240,13 +248,14 @@ fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
                 .unzip();
 
             let md: MeasurementData = values.deserialize(Some(&headers)).unwrap();
-            Measurement {
+            Ok(Measurement {
                 // TODO(kaihowl) oh man
                 commit: commit_id.to_string(),
                 measurement: md,
-            }
+            })
         })
-        .collect()
+        .try_collect();
+    result
 }
 
 fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2::Error> {
@@ -289,8 +298,8 @@ mod test {
                 .into(),
             },
         };
-        assert_eq!(actual.len(), 1);
-        assert_eq!(actual[0], expected);
+        assert_eq!(actual.as_ref().unwrap().len(), 1);
+        assert_eq!(actual.unwrap()[0], expected);
     }
 
     #[test]
