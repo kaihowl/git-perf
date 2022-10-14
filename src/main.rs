@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, str};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
@@ -186,21 +186,46 @@ fn report(num_commits: usize) {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Measurement {
     commit: String,
     measurement: MeasurementData,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 struct MeasurementData {
     name: String,
     // TODO(kaihowl) change type
-    timestamp: f32,
+    timestamp: i32,
     // TODO(kaihowl) check size of type
-    val: f32,
+    val: i32,
     #[serde(flatten)]
     key_values: HashMap<String, String>,
+}
+
+fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b' ')
+        .flexible(true)
+        .from_reader(lines.as_bytes());
+    reader.set_headers(csv::StringRecord::from(vec![
+        "name",
+        "timestamp",
+        "val",
+        "key_values",
+    ]));
+    reader
+        .deserialize()
+        .map(|r| {
+            // TODO(kaihowl) no unwrap
+            let md: MeasurementData = r.unwrap();
+            Measurement {
+                // TODO(kaihowl) oh man
+                commit: commit_id.to_string(),
+                measurement: md,
+            }
+        })
+        .collect()
 }
 
 fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2::Error> {
@@ -213,25 +238,11 @@ fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2:
 
     for note in notes {
         let lines = note.message().unwrap_or("");
-        let id = note.id().to_string();
-        let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b' ')
-            .flexible(true)
-            .from_reader(lines.as_bytes());
-        reader.set_headers(csv::StringRecord::from(vec![
-            "name",
-            "timestamp",
-            "val",
-            "key_values",
-        ]));
-        for result in reader.deserialize() {
-            let md: MeasurementData = result.unwrap();
-            let m = Measurement {
-                commit: id.clone(),
-                measurement: md,
-            };
-            println!("{:?}", m);
-        }
+        let commit_id = note.id().to_string();
+        // TODO(kaihowl) maybe split up serialization of MeasurementData
+        deserialize(lines, &commit_id)
+            .into_iter()
+            .for_each(|m| println!("{:?}", m));
     }
     Ok(())
 }
@@ -239,6 +250,28 @@ fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2:
 #[cfg(test)]
 mod test {
     use crate::*;
+
+    #[test]
+    fn key_value_deserialization() {
+        let lines = "test 1234 123 key1=value1 key2=value2";
+        let commit_id = "deadbeef";
+        let actual = deserialize(lines, commit_id);
+        let expected = Measurement {
+            commit: commit_id.to_string(),
+            measurement: MeasurementData {
+                name: "test".to_string(),
+                timestamp: 1234,
+                val: 123,
+                key_values: [
+                    ("key1".to_string(), "value1".to_string()),
+                    ("key2".to_string(), "value2".to_string()),
+                ]
+                .into(),
+            },
+        };
+        assert_eq!(actual.len(), 1);
+        assert_eq!(actual[0], expected);
+    }
 
     #[test]
     fn verify_cli() {
