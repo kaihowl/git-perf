@@ -206,14 +206,14 @@ struct MeasurementData {
 }
 
 fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
-    let mut reader = csv::ReaderBuilder::new()
+    let reader = csv::ReaderBuilder::new()
         .delimiter(b' ')
         .has_headers(false)
         .flexible(true)
         .from_reader(lines.as_bytes());
 
     reader
-        .records()
+        .into_records()
         .map(|r| {
             // TODO(kaihowl) no unwrap
             let raw = r.unwrap();
@@ -226,18 +226,19 @@ fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
                 .map(|pair| match pair {
                     EitherOrBoth::Both(val, header) => (header, val),
                     EitherOrBoth::Right(_) => {
+                        // TODO(kaihowl) skip the record instead
                         panic!("Too few values");
                     }
                     EitherOrBoth::Left(keyvalue) => match keyvalue.split_once('=') {
                         Some(a) => a,
                         None => {
+                            // TODO(kaihowl) skip the record instead
                             panic!("No equals sign in key value pair");
                         }
                     },
                 })
                 .unzip();
 
-            println!("TODO(kaihowl) headers: {:?}, values: {:?}", headers, values);
             let md: MeasurementData = values.deserialize(Some(&headers)).unwrap();
             Measurement {
                 // TODO(kaihowl) oh man
