@@ -1,5 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, str};
 
+use itertools::{self, EitherOrBoth, Itertools};
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use serde::Deserialize;
@@ -217,17 +219,26 @@ fn deserialize(lines: &str, commit_id: &str) -> Vec<Measurement> {
             let raw = r.unwrap();
             println!("{:?}", raw);
             let fixed_headers = vec!["name", "timestamp", "val"];
-            let variable_headers: Vec<&str> = raw
-                .iter()
-                .skip(fixed_headers.len())
-                .map(|val| val.split('=').next().unwrap())
-                .collect();
-            let all_headers: Vec<&str> = fixed_headers
+
+            let (headers, values): (csv::StringRecord, csv::StringRecord) = raw
                 .into_iter()
-                .chain(variable_headers.into_iter())
-                .collect();
-            let headers = csv::StringRecord::from(all_headers);
-            let md: MeasurementData = raw.deserialize(Some(&headers)).unwrap();
+                .zip_longest(fixed_headers)
+                .map(|pair| match pair {
+                    EitherOrBoth::Both(val, header) => (header, val),
+                    EitherOrBoth::Right(_) => {
+                        panic!("Too few values");
+                    }
+                    EitherOrBoth::Left(keyvalue) => match keyvalue.split_once('=') {
+                        Some(a) => a,
+                        None => {
+                            panic!("No equals sign in key value pair");
+                        }
+                    },
+                })
+                .unzip();
+
+            println!("TODO(kaihowl) headers: {:?}, values: {:?}", headers, values);
+            let md: MeasurementData = values.deserialize(Some(&headers)).unwrap();
             Measurement {
                 // TODO(kaihowl) oh man
                 commit: commit_id.to_string(),
@@ -269,8 +280,8 @@ mod test {
             commit: commit_id.to_string(),
             measurement: MeasurementData {
                 name: "test".to_string(),
-                timestamp: 1234,
-                val: 123,
+                timestamp: 1234.0,
+                val: 123.0,
                 key_values: [
                     ("key1".to_string(), "value1".to_string()),
                     ("key2".to_string(), "value2".to_string()),
