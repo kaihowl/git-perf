@@ -1,6 +1,8 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
+
+use serde::Deserialize;
 
 #[derive(Parser)]
 struct Cli {
@@ -187,7 +189,18 @@ fn report(num_commits: usize) {
 #[derive(Debug)]
 struct Measurement {
     commit: String,
-    measurement: String,
+    measurement: MeasurementData,
+}
+
+#[derive(Debug, Deserialize)]
+struct MeasurementData {
+    name: String,
+    // TODO(kaihowl) change type
+    timestamp: f32,
+    // TODO(kaihowl) check size of type
+    val: f32,
+    #[serde(flatten)]
+    key_values: HashMap<String, String>,
 }
 
 fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2::Error> {
@@ -201,12 +214,23 @@ fn walk_commits(repo: &git2::Repository, num_commits: usize) -> Result<(), git2:
     for note in notes {
         let lines = note.message().unwrap_or("");
         let id = note.id().to_string();
-        for line in lines.lines() {
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(b' ')
+            .flexible(true)
+            .from_reader(lines.as_bytes());
+        reader.set_headers(csv::StringRecord::from(vec![
+            "name",
+            "timestamp",
+            "val",
+            "key_values",
+        ]));
+        for result in reader.deserialize() {
+            let md: MeasurementData = result.unwrap();
             let m = Measurement {
                 commit: id.clone(),
-                measurement: line.to_string(),
+                measurement: md,
             };
-            println!("m: {:?}", m);
+            println!("{:?}", m);
         }
     }
     Ok(())
