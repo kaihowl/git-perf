@@ -401,6 +401,30 @@ mod test {
     }
 
     #[test]
+    fn single_measurement() {
+        let commits = vec![Commit {
+            commit: "deadbeef".into(),
+            measurements: [MeasurementData {
+                name: "mymeasurement".into(),
+                timestamp: 123.0,
+                val: 1.0,
+                key_values: [].into(),
+            }]
+            .into(),
+        }];
+        let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
+        assert_eq!(stats.mean, 1.0);
+        assert_eq!(stats.stddev, 0.0);
+    }
+
+    #[test]
+    fn div_by_zero() {
+        let stddev = 0.0;
+        let z = 50.0 / stddev;
+        assert_eq!(z, f64::INFINITY);
+    }
+
+    #[test]
     fn key_value_deserialization() {
         let lines = "test 1234 123 key1=value1 key2=value2";
         let actual = deserialize(lines);
