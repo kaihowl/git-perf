@@ -219,7 +219,7 @@ struct Stats {
     stddev: f64,
 }
 
-concatenate!(MeanVariance, [Mean, mean], [Variance, population_variance]);
+concatenate!(MeanVariance, [Mean, mean], [Variance, sample_variance]);
 
 fn aggregate_measurements<'a, F>(
     commits: impl Iterator<Item = &'a Commit>,
@@ -244,7 +244,7 @@ where
         .collect();
     Stats {
         mean: s.mean(),
-        stddev: s.population_variance().sqrt(),
+        stddev: s.sample_variance().sqrt(),
     }
 
     // measurements
