@@ -198,12 +198,6 @@ fn audit(
     sigma: f32,
 ) {
     let all = retrieve_measurements(report_history.max_count + 1); // include HEAD
-    let head = match all.first() {
-        Some(head) => head,
-        None => {
-            panic!("No measurement for HEAD")
-        }
-    };
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement && selectors.iter().all(|s| &m.key_values[&s.0] == &s.1)
@@ -211,6 +205,9 @@ fn audit(
     let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
     let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
     println!("head: {:?}, tail: {:?}", head_summary, tail_summary);
+    if head_summary.len == 0 {
+        println!("No measurement for HEAD");
+    }
 }
 
 #[derive(Debug)]
