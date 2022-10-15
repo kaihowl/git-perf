@@ -378,6 +378,28 @@ mod test {
     use crate::*;
 
     #[test]
+    fn no_floating_error() {
+        let commits = (0..100)
+            .map(|_| -> Commit {
+                Commit {
+                    commit: "deadbeef".into(),
+                    measurements: [MeasurementData {
+                        name: "mymeasurement".into(),
+                        timestamp: 120.0,
+                        val: 0.1,
+                        key_values: [].into(),
+                    }]
+                    .into(),
+                }
+            })
+            .collect_vec();
+        let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
+        assert_eq!(stats.mean, 0.1);
+        let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
+        assert_ne!(naive_mean, 0.1);
+    }
+
+    #[test]
     fn key_value_deserialization() {
         let lines = "test 1234 123 key1=value1 key2=value2";
         let actual = deserialize(lines);
