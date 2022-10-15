@@ -217,9 +217,10 @@ fn audit(
 struct Stats {
     mean: f64,
     stddev: f64,
+    len: u64,
 }
 
-concatenate!(MeanVariance, [Mean, mean], [Variance, sample_variance]);
+concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
 
 fn aggregate_measurements<'a, F>(
     commits: impl Iterator<Item = &'a Commit>,
@@ -229,7 +230,7 @@ fn aggregate_measurements<'a, F>(
 where
     F: Fn(&&MeasurementData) -> bool,
 {
-    let s: MeanVariance = commits
+    let s: AggStats = commits
         // TODO(kaihowl) configure aggregate_by
         .filter_map(|c| {
             println!("{:?}", c.commit);
@@ -245,6 +246,7 @@ where
     Stats {
         mean: s.mean(),
         stddev: s.sample_variance().sqrt(),
+        len: s.mean.len(),
     }
 
     // measurements
@@ -360,15 +362,16 @@ fn walk_commits(
     revwalk.simplify_first_parent()?;
     revwalk
         .take(num_commits)
-        // TODO(kaihowl) configure this: for HEAD this should return the HEAD commit still
-        .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok())
-        .map(|note| {
-            let lines = note.message().unwrap_or("");
-            let commit = note.id().to_string();
-            let measurements = deserialize(lines)?;
+        .map(|commit_oid| {
+            let commit_id = commit_oid?;
+            let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
+                // TODO(kaihowl) remove unwrap_or
+                Ok(note) => deserialize(note.message().unwrap_or("")),
+                Err(_) => Ok([].into()),
+            };
             Ok(Commit {
-                commit,
-                measurements,
+                commit: commit_id.to_string(),
+                measurements: measurements?,
             })
         })
         .try_collect()
@@ -396,6 +399,7 @@ mod test {
             .collect_vec();
         let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
         assert_eq!(stats.mean, 0.1);
+        assert_eq!(stats.len, 100);
         let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
         assert_ne!(naive_mean, 0.1);
     }
@@ -413,7 +417,20 @@ mod test {
             .into(),
         }];
         let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
+        assert_eq!(stats.len, 1);
         assert_eq!(stats.mean, 1.0);
+        assert_eq!(stats.stddev, 0.0);
+    }
+
+    #[test]
+    fn no_measurement() {
+        let commits = vec![Commit {
+            commit: "deadbeef".into(),
+            measurements: [].into(),
+        }];
+        let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
+        assert_eq!(stats.len, 0);
+        assert_eq!(stats.mean, 0.0);
         assert_eq!(stats.stddev, 0.0);
     }
 
