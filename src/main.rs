@@ -360,6 +360,7 @@ fn walk_commits(
     revwalk.simplify_first_parent()?;
     revwalk
         .take(num_commits)
+        // TODO(kaihowl) configure this: for HEAD this should return the HEAD commit still
         .filter_map(|commit| repo.find_note(Some("refs/notes/perf"), commit.ok()?).ok())
         .map(|note| {
             let lines = note.message().unwrap_or("");
