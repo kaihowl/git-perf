@@ -432,10 +432,15 @@ mod test {
     }
 
     #[test]
-    fn div_by_zero() {
+    fn z_score_with_zero_stddev() {
         let stddev = 0.0;
-        let z = 50.0 / stddev;
-        assert_eq!(z, f64::INFINITY);
+        let mean = 30.0;
+        let higher_val = 50.0;
+        let lower_val = 10.0;
+        let z_high = ((higher_val - mean) / stddev as f64).abs();
+        let z_low = ((lower_val - mean) / stddev as f64).abs();
+        assert_eq!(z_high, f64::INFINITY);
+        assert_eq!(z_low, f64::INFINITY);
     }
 
     #[test]
