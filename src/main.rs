@@ -30,11 +30,6 @@ struct CliReportHistory {
     /// Limit the number of previous commits considered
     #[arg(short = 'n', long, default_value = "40")]
     max_count: usize,
-
-    // TODO(kaihowl) No check for spaces...
-    /// What to group the measurements by
-    #[arg(short, long, default_value = "commit")]
-    group_by: String,
 }
 
 #[derive(Subcommand)]
