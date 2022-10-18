@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, str};
+use std::{collections::HashMap, path::PathBuf, process::ExitCode, str};
 
 use itertools::{self, EitherOrBoth, Itertools};
 
@@ -94,8 +94,8 @@ enum Commands {
 
         /// Minimum number of measurements needed. If less, pass test and assume
         /// more measurements are needed.
-        #[arg(long)]
-        min_measurements: Option<i32>,
+        #[arg(long, default_value = "40")]
+        min_measurements: usize,
 
         // TODO(hoewelmk) missing short arg
         /// What to aggregate the measurements in each group with
@@ -105,8 +105,8 @@ enum Commands {
         /// Multiple of the stddev after which a outlier is detected.
         /// If the HEAD measurement is within [mean-<d>*sigma; mean+<d>*sigma],
         /// it is considered acceptable.
-        #[arg(short = 'd', long, default_value = "4")]
-        sigma: f32,
+        #[arg(short = 'd', long, default_value = "4.0")]
+        sigma: f64,
     },
 
     /// Accept HEAD commit's measurement for audit, even if outside of range.
@@ -137,7 +137,7 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
     Ok((s[..pos].to_string(), s[pos + 1..].to_string()))
 }
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
 
     match cli.command {
@@ -150,12 +150,14 @@ fn main() {
                 "Measurement: {}, Repetitions: {}, command: {:?}, key-values: {:?}",
                 measurement.name, repetitions, command, measurement.key_value
             );
+            ExitCode::SUCCESS
         }
         Commands::Add { value, measurement } => {
             println!(
                 "Measurement: {}, value: {}, key-values: {:?}",
                 measurement.name, value, measurement.key_value
             );
+            ExitCode::SUCCESS
         }
         Commands::Push {} => todo!(),
         Commands::Pull {} => todo!(),
@@ -163,18 +165,21 @@ fn main() {
             output: _,
             separate_by: _,
             report_history,
-        } => report(report_history.max_count),
+        } => {
+            report(report_history.max_count);
+            ExitCode::SUCCESS
+        }
         Commands::Audit {
             measurement,
             report_history,
             selectors,
-            // TODO(kaihowl)
-            min_measurements: _,
+            min_measurements,
             aggregate_by,
             sigma,
         } => audit(
             &measurement,
-            report_history,
+            report_history.max_count,
+            min_measurements,
             &selectors,
             aggregate_by,
             sigma,
@@ -184,15 +189,15 @@ fn main() {
     }
 }
 
-// TODO(kaihowl) do not use cli structure?
 fn audit(
     measurement: &str,
-    report_history: CliReportHistory,
+    max_count: usize,
+    min_count: usize,
     selectors: &Vec<(String, String)>,
     aggregate_by: AggregationFunc,
-    sigma: f32,
-) {
-    let all = retrieve_measurements(report_history.max_count + 1); // include HEAD
+    sigma: f64,
+) -> ExitCode {
+    let all = retrieve_measurements(max_count + 1); // include HEAD
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement && selectors.iter().all(|s| &m.key_values[&s.0] == &s.1)
@@ -202,14 +207,32 @@ fn audit(
     println!("head: {:?}, tail: {:?}", head_summary, tail_summary);
     if head_summary.len == 0 {
         println!("No measurement for HEAD");
+        return ExitCode::FAILURE;
     }
+    if tail_summary.len < min_count {
+        println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
+        return ExitCode::SUCCESS;
+    }
+    if head_summary.significantly_different_from(&tail_summary, sigma) {
+        println!("Measurements differ significantly");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
 }
 
 #[derive(Debug)]
 struct Stats {
     mean: f64,
     stddev: f64,
-    len: u64,
+    len: usize,
+}
+
+impl Stats {
+    fn significantly_different_from(&self, other: &Stats, sigma: f64) -> bool {
+        assert!(self.len == 1);
+        assert!(other.len >= 1);
+        (self.mean - other.mean).abs() / other.stddev > sigma
+    }
 }
 
 concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
@@ -238,7 +261,7 @@ where
     Stats {
         mean: s.mean(),
         stddev: s.sample_variance().sqrt(),
-        len: s.mean.len(),
+        len: s.mean.len() as usize,
     }
 
     // measurements
