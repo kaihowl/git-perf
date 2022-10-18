@@ -94,8 +94,8 @@ enum Commands {
 
         /// Minimum number of measurements needed. If less, pass test and assume
         /// more measurements are needed.
-        #[arg(long, default_value = "40")]
-        min_measurements: usize,
+        #[arg(long)]
+        min_measurements: Option<usize>,
 
         // TODO(hoewelmk) missing short arg
         /// What to aggregate the measurements in each group with
@@ -192,7 +192,8 @@ fn main() -> ExitCode {
 fn audit(
     measurement: &str,
     max_count: usize,
-    min_count: usize,
+    // TODO(kaihowl) check if this should be mandatory with default parameter
+    min_count: Option<usize>,
     selectors: &Vec<(String, String)>,
     aggregate_by: AggregationFunc,
     sigma: f64,
@@ -202,17 +203,23 @@ fn audit(
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement && selectors.iter().all(|s| &m.key_values[&s.0] == &s.1)
     };
+
     let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
     let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
     println!("head: {:?}, tail: {:?}", head_summary, tail_summary);
+
     if head_summary.len == 0 {
         println!("No measurement for HEAD");
         return ExitCode::FAILURE;
     }
-    if tail_summary.len < min_count {
-        println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
-        return ExitCode::SUCCESS;
+
+    if let Some(min_count) = min_count {
+        if tail_summary.len < min_count {
+            println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
+            return ExitCode::SUCCESS;
+        }
     }
+
     if head_summary.significantly_different_from(&tail_summary, sigma) {
         println!("Measurements differ significantly");
         return ExitCode::FAILURE;
