@@ -25,6 +25,7 @@ struct CliMeasurement {
     key_value: Vec<(String, String)>,
 }
 
+// TODO(kaihowl) check that max_count > min_measurements
 #[derive(Args)]
 struct CliReportHistory {
     /// Limit the number of previous commits considered
@@ -94,8 +95,8 @@ enum Commands {
 
         /// Minimum number of measurements needed. If less, pass test and assume
         /// more measurements are needed.
-        #[arg(long)]
-        min_measurements: Option<usize>,
+        #[arg(long, value_parser=clap::value_parser!(u16).range(1..), default_value="1")]
+        min_measurements: u16,
 
         // TODO(hoewelmk) missing short arg
         /// What to aggregate the measurements in each group with
@@ -139,7 +140,6 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-
     match cli.command {
         Commands::Measure {
             repetitions,
@@ -192,8 +192,7 @@ fn main() -> ExitCode {
 fn audit(
     measurement: &str,
     max_count: usize,
-    // TODO(kaihowl) check if this should be mandatory with default parameter
-    min_count: Option<usize>,
+    min_count: u16,
     selectors: &Vec<(String, String)>,
     aggregate_by: AggregationFunc,
     sigma: f64,
@@ -213,11 +212,9 @@ fn audit(
         return ExitCode::FAILURE;
     }
 
-    if let Some(min_count) = min_count {
-        if tail_summary.len < min_count {
-            println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
-            return ExitCode::SUCCESS;
-        }
+    if tail_summary.len < min_count.into() {
+        println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
+        return ExitCode::SUCCESS;
     }
 
     if head_summary.significantly_different_from(&tail_summary, sigma) {
