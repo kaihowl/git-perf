@@ -2,7 +2,9 @@ use std::{collections::HashMap, path::PathBuf, process::ExitCode, str};
 
 use itertools::{self, EitherOrBoth, Itertools};
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{
+    error::ErrorKind::ArgumentConflict, Args, CommandFactory, Parser, Subcommand, ValueEnum,
+};
 
 use serde::Deserialize;
 
@@ -25,7 +27,6 @@ struct CliMeasurement {
     key_value: Vec<(String, String)>,
 }
 
-// TODO(kaihowl) check that max_count > min_measurements
 #[derive(Args)]
 struct CliReportHistory {
     /// Limit the number of previous commits considered
@@ -176,14 +177,19 @@ fn main() -> ExitCode {
             min_measurements,
             aggregate_by,
             sigma,
-        } => audit(
-            &measurement,
-            report_history.max_count,
-            min_measurements,
-            &selectors,
-            aggregate_by,
-            sigma,
-        ),
+        } => {
+            if report_history.max_count < min_measurements.into() {
+                Cli::command().error(ArgumentConflict, format!("The minimal number of measurements ({}) cannot be more than the maximum number of measurements ({})", min_measurements, report_history.max_count)).exit()
+            }
+            audit(
+                &measurement,
+                report_history.max_count,
+                min_measurements,
+                &selectors,
+                aggregate_by,
+                sigma,
+            )
+        }
         Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => todo!(),
     }
