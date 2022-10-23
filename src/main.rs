@@ -1,4 +1,5 @@
-use std::{collections::HashMap, path::PathBuf, process::ExitCode, str};
+use std::io::Write;
+use std::{collections::HashMap, fs::File, path::PathBuf, process::ExitCode, str};
 
 use itertools::{self, EitherOrBoth, Itertools};
 
@@ -6,6 +7,8 @@ use clap::{
     error::ErrorKind::ArgumentConflict, Args, CommandFactory, Parser, Subcommand, ValueEnum,
 };
 
+use plotly::BoxPlot;
+use plotly::{common::Title, Histogram, Layout, Plot};
 use serde::Deserialize;
 
 use average::{self, concatenate, Estimate, Mean, Variance};
@@ -163,11 +166,11 @@ fn main() -> ExitCode {
         Commands::Push {} => todo!(),
         Commands::Pull {} => todo!(),
         Commands::Report {
-            output: _,
-            separate_by: _,
+            output,
+            separate_by,
             report_history,
         } => {
-            report(report_history.max_count);
+            report(output, separate_by, report_history.max_count);
             ExitCode::SUCCESS
         }
         Commands::Audit {
@@ -299,10 +302,16 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
     }
 }
 
-fn report(num_commits: usize) {
-    retrieve_measurements(num_commits)
-        .into_iter()
-        .for_each(|m| println!("{:?}", m));
+fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
+    let trace1 = BoxPlot::new_xy(vec![1, 1, 2, 2], vec![5, 10, 1, 20]);
+    let layout = Layout::new().title(Title::new("Something, something"));
+    let mut plot = Plot::new();
+    plot.add_trace(trace1);
+    plot.set_layout(layout);
+    File::create(output)
+        .expect("Cannot open file")
+        .write_all(plot.to_html().as_bytes())
+        .expect("Could not write file");
 }
 
 #[derive(Debug, PartialEq)]
