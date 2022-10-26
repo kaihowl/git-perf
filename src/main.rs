@@ -7,6 +7,7 @@ use clap::{
     error::ErrorKind::ArgumentConflict, Args, CommandFactory, Parser, Subcommand, ValueEnum,
 };
 
+use plotly::layout::Axis;
 use plotly::BoxPlot;
 use plotly::{common::Title, Histogram, Layout, Plot};
 use serde::Deserialize;
@@ -304,12 +305,26 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
 
 fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     let measurements = retrieve_measurements(num_commits);
-    let (commit, val): (Vec<_>, Vec<_>) = measurements
+    let (measurements_commit_nrs, measurement_vals): (Vec<_>, Vec<_>) = measurements
         .iter()
-        .flat_map(|c| c.measurements.iter().map(|m| (c.commit.clone(), m.val)))
+        .rev()
+        .enumerate()
+        .flat_map(|(n, c)| c.measurements.iter().map(move |m| (n, m.val)))
         .unzip();
-    let trace1 = BoxPlot::new_xy(commit, val);
-    let layout = Layout::new().title(Title::new("Something, something"));
+
+    let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = measurements
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(n, c)| (n as f64, &c.commit[..6]))
+        .unzip();
+
+    let x_axis = Axis::new().tick_values(commit_nrs).tick_text(short_hashes);
+
+    let trace1 = BoxPlot::new_xy(measurements_commit_nrs, measurement_vals);
+    let layout = Layout::new()
+        .title(Title::new("Something, something"))
+        .x_axis(x_axis);
     let mut plot = Plot::new();
     plot.add_trace(trace1);
     plot.set_layout(layout);
