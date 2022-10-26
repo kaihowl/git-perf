@@ -303,7 +303,12 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
 }
 
 fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
-    let trace1 = BoxPlot::new_xy(vec![1, 1, 2, 2], vec![5, 10, 1, 20]);
+    let measurements = retrieve_measurements(num_commits);
+    let (commit, val): (Vec<_>, Vec<_>) = measurements
+        .iter()
+        .flat_map(|c| c.measurements.iter().map(|m| (c.commit.clone(), m.val)))
+        .unzip();
+    let trace1 = BoxPlot::new_xy(commit, val);
     let layout = Layout::new().title(Title::new("Something, something"));
     let mut plot = Plot::new();
     plot.add_trace(trace1);
