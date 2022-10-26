@@ -8,6 +8,7 @@ use clap::{
     error::ErrorKind::ArgumentConflict, Args, CommandFactory, Parser, Subcommand, ValueEnum,
 };
 
+use plotly::common::Font;
 use plotly::layout::Axis;
 use plotly::BoxPlot;
 use plotly::{common::Title, Histogram, Layout, Plot};
@@ -324,7 +325,10 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     let measurement_groups: HashSet<_> = measurements.iter().map(|m| &m.name).collect();
     println!("{:?}", measurement_groups);
 
-    let x_axis = Axis::new().tick_values(commit_nrs).tick_text(short_hashes);
+    let x_axis = Axis::new()
+        .tick_values(commit_nrs)
+        .tick_text(short_hashes)
+        .tick_font(Font::new().family("monospace"));
     let layout = Layout::new()
         .title(Title::new("Something, something"))
         .x_axis(x_axis);
