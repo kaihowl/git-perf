@@ -9,9 +9,9 @@ use clap::{
 };
 
 use plotly::common::Font;
-use plotly::layout::Axis;
-use plotly::BoxPlot;
+use plotly::layout::{Axis, Legend};
 use plotly::{common::Title, Histogram, Layout, Plot};
+use plotly::{BoxPlot, Scatter3D};
 use serde::Deserialize;
 
 use average::{self, concatenate, Estimate, Mean, Variance};
@@ -306,6 +306,7 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
 }
 
 fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
+    println!("hoewelmk: separate_by: {:?}", separate_by);
     let measurements = retrieve_measurements(num_commits);
 
     let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = measurements
@@ -335,15 +336,40 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     let mut plot = Plot::new();
     plot.set_layout(layout);
 
-    for group in measurement_groups {
-        let (x, y): (Vec<usize>, Vec<f64>) = measurements_commit_nrs
+    for measurement_group in measurement_groups {
+        let filtered_measurements = measurements_commit_nrs
             .iter()
             .zip(measurements.iter())
-            .filter(|(_i, m)| m.name == *group)
-            .map(|(i, m)| (i, m.val))
-            .unzip();
-        let trace = BoxPlot::new_xy(x, y).name(group);
-        plot.add_trace(trace);
+            .filter(|(_i, m)| m.name == *measurement_group);
+        let group_values: HashSet<_>;
+        if let Some(separate_by) = &separate_by {
+            group_values = filtered_measurements
+                .clone()
+                .flat_map(|(_, m)| {
+                    m.key_values
+                        .iter()
+                        .filter(|kv| kv.0 == separate_by)
+                        .map(|kv| kv.1)
+                })
+                .collect();
+        } else {
+            group_values = HashSet::new();
+        }
+
+        // TODO(kaihowl) handle no groups
+        for group_value in group_values {
+            let (x, y): (Vec<usize>, Vec<f64>) = filtered_measurements
+                .clone()
+                // TODO(kaihowl)
+                .filter(|(_, m)| m.key_values["os"] == *group_value)
+                .map(|(i, m)| (i, m.val))
+                .unzip();
+            let trace = BoxPlot::new_xy(x, y)
+                .name(group_value)
+                .legend_group(measurement_group);
+            plot.add_trace(trace);
+        }
+        // TODO(kaihowl) check that separator is valid
     }
     File::create(output)
         .expect("Cannot open file")
