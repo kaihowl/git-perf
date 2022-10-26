@@ -338,7 +338,7 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
             .filter(|(_i, m)| m.name == *group)
             .map(|(i, m)| (i, m.val))
             .unzip();
-        let trace = BoxPlot::new_xy(x, y);
+        let trace = BoxPlot::new_xy(x, y).name(group);
         plot.add_trace(trace);
     }
     File::create(output)
