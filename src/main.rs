@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::io::Write;
 use std::{collections::HashMap, fs::File, path::PathBuf, process::ExitCode, str};
 
@@ -305,29 +306,41 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
 
 fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     let measurements = retrieve_measurements(num_commits);
-    let (measurements_commit_nrs, measurement_vals): (Vec<_>, Vec<_>) = measurements
-        .iter()
-        .rev()
-        .enumerate()
-        .flat_map(|(n, c)| c.measurements.iter().map(move |m| (n, m.val)))
-        .unzip();
 
     let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = measurements
         .iter()
         .rev()
         .enumerate()
-        .map(|(n, c)| (n as f64, &c.commit[..6]))
+        .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
         .unzip();
 
-    let x_axis = Axis::new().tick_values(commit_nrs).tick_text(short_hashes);
+    let (measurements_commit_nrs, measurements): (Vec<_>, Vec<_>) = measurements
+        .into_iter()
+        .rev()
+        .enumerate()
+        .flat_map(|(n, c)| c.measurements.into_iter().map(move |m| (n, m)))
+        .unzip();
 
-    let trace1 = BoxPlot::new_xy(measurements_commit_nrs, measurement_vals);
+    let measurement_groups: HashSet<_> = measurements.iter().map(|m| &m.name).collect();
+    println!("{:?}", measurement_groups);
+
+    let x_axis = Axis::new().tick_values(commit_nrs).tick_text(short_hashes);
     let layout = Layout::new()
         .title(Title::new("Something, something"))
         .x_axis(x_axis);
     let mut plot = Plot::new();
-    plot.add_trace(trace1);
     plot.set_layout(layout);
+
+    for group in measurement_groups {
+        let (x, y): (Vec<usize>, Vec<f64>) = measurements_commit_nrs
+            .iter()
+            .zip(measurements.iter())
+            .filter(|(_i, m)| m.name == *group)
+            .map(|(i, m)| (i, m.val))
+            .unzip();
+        let trace = BoxPlot::new_xy(x, y);
+        plot.add_trace(trace);
+    }
     File::create(output)
         .expect("Cannot open file")
         .write_all(plot.to_html().as_bytes())
