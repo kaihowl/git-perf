@@ -2,16 +2,17 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::{collections::HashMap, fs::File, path::PathBuf, process::ExitCode, str};
 
+use git2::{Remote, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
     error::ErrorKind::ArgumentConflict, Args, CommandFactory, Parser, Subcommand, ValueEnum,
 };
 
-use plotly::common::Font;
-use plotly::layout::{Axis, Legend};
-use plotly::{common::Title, Histogram, Layout, Plot};
-use plotly::{BoxPlot, Scatter3D};
+use plotly::common::{Font, LegendGroupTitle};
+use plotly::layout::Axis;
+use plotly::BoxPlot;
+use plotly::{common::Title, Layout, Plot};
 use serde::Deserialize;
 
 use average::{self, concatenate, Estimate, Mean, Variance};
@@ -318,6 +319,7 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
 fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     println!("hoewelmk: separate_by: {:?}", separate_by);
     let measurements = retrieve_measurements(num_commits);
+    println!("hoewelmk: measurements.len: {:?}", measurements.len());
 
     let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = measurements
         .iter()
@@ -376,7 +378,8 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
                 .unzip();
             let trace = BoxPlot::new_xy(x, y)
                 .name(group_value)
-                .legend_group(measurement_group);
+                .legend_group(measurement_group)
+                .legend_group_title(LegendGroupTitle::new(measurement_group));
             plot.add_trace(trace);
         }
         // TODO(kaihowl) check that separator is valid
