@@ -215,14 +215,14 @@ fn audit(
     measurement: &str,
     max_count: usize,
     min_count: u16,
-    selectors: &Vec<(String, String)>,
+    selectors: &[(String, String)],
     aggregate_by: AggregationFunc,
     sigma: f64,
 ) -> ExitCode {
     let all = retrieve_measurements(max_count + 1); // include HEAD
 
     let filter_by = |m: &&MeasurementData| {
-        m.name == measurement && selectors.iter().all(|s| &m.key_values[&s.0] == &s.1)
+        m.name == measurement && selectors.iter().all(|s| m.key_values[&s.0] == s.1)
     };
 
     let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
@@ -429,7 +429,7 @@ fn deserialize(lines: &str) -> Result<Vec<MeasurementData>, DeserializationError
         .flexible(true)
         .from_reader(lines.as_bytes());
 
-    let result = reader
+    reader
         .into_records()
         .map(|r| {
             let fixed_headers = vec!["name", "timestamp", "val"];
@@ -456,8 +456,7 @@ fn deserialize(lines: &str) -> Result<Vec<MeasurementData>, DeserializationError
             let md: MeasurementData = values.deserialize(Some(&headers)).unwrap();
             Ok(md)
         })
-        .try_collect();
-    result
+        .try_collect()
 }
 
 fn walk_commits(
