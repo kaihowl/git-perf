@@ -166,7 +166,7 @@ fn main() -> ExitCode {
             );
             ExitCode::SUCCESS
         }
-        Commands::Push {} => todo!(),
+        Commands::Push {} => push(),
         Commands::Pull {} => todo!(),
         Commands::Report {
             output,
@@ -199,6 +199,16 @@ fn main() -> ExitCode {
         Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => todo!(),
     }
+}
+
+fn push() -> ExitCode {
+    // TODO(kaihowl)
+    let repo = Repository::open(".").unwrap();
+    let mut remote = repo.find_remote("origin").expect("Did not get remote");
+    remote
+        .push(&[&"refs/heads/header:refs/heads/header"], None)
+        .expect("Failed to push");
+    ExitCode::SUCCESS
 }
 
 fn audit(
