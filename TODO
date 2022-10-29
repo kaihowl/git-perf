@@ -1,0 +1,1 @@
+- rewrite tests with remotes to use a bare repo (libgit2 does not support non-bare repos for pushing)
