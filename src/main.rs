@@ -302,7 +302,6 @@ where
 }
 
 fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
-    use git2::Repository;
     let repo = match Repository::open(".") {
         Ok(repo) => repo,
         Err(e) => panic!("failed to open: {}", e),
@@ -321,22 +320,12 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     let measurements = retrieve_measurements(num_commits);
     println!("hoewelmk: measurements.len: {:?}", measurements.len());
 
-    let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = measurements
-        .iter()
-        .rev()
-        .enumerate()
+    let enumerated_commits = measurements.iter().rev().enumerate();
+
+    let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
+        .clone()
         .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
         .unzip();
-
-    let (measurements_commit_nrs, measurements): (Vec<_>, Vec<_>) = measurements
-        .into_iter()
-        .rev()
-        .enumerate()
-        .flat_map(|(n, c)| c.measurements.into_iter().map(move |m| (n, m)))
-        .unzip();
-
-    let measurement_groups: HashSet<_> = measurements.iter().map(|m| &m.name).collect();
-    println!("{:?}", measurement_groups);
 
     let x_axis = Axis::new()
         .tick_values(commit_nrs)
@@ -348,11 +337,18 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
     let mut plot = Plot::new();
     plot.set_layout(layout);
 
-    for measurement_group in measurement_groups {
-        let filtered_measurements = measurements_commit_nrs
-            .iter()
-            .zip(measurements.iter())
-            .filter(|(_i, m)| m.name == *measurement_group);
+    let indexed_measurements = enumerated_commits
+        .clone()
+        .flat_map(|(n, c)| c.measurements.iter().map(move |m| (n, m)));
+
+    let measurement_groups: HashSet<_> =
+        indexed_measurements.clone().map(|(_, m)| &m.name).collect();
+
+    for group in measurement_groups {
+        let filtered_measurements = indexed_measurements
+            .clone()
+            .filter(|(_i, m)| m.name == *group);
+
         let group_values: HashSet<_>;
         if let Some(separate_by) = &separate_by {
             group_values = filtered_measurements
@@ -378,8 +374,8 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
                 .unzip();
             let trace = BoxPlot::new_xy(x, y)
                 .name(group_value)
-                .legend_group(measurement_group)
-                .legend_group_title(LegendGroupTitle::new(measurement_group));
+                .legend_group(group)
+                .legend_group_title(LegendGroupTitle::new(group));
             plot.add_trace(trace);
         }
         // TODO(kaihowl) check that separator is valid
