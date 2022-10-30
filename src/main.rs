@@ -1,8 +1,7 @@
-use std::collections::HashSet;
 use std::io::Write;
 use std::{collections::HashMap, fs::File, path::PathBuf, process::ExitCode, str};
 
-use git2::{Remote, Repository};
+use git2::Repository;
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -137,6 +136,23 @@ enum AggregationFunc {
     Max,
     Median,
     Average,
+}
+
+trait ReductionFunc {
+    fn to_fun(self) -> fn(f64, f64) -> f64;
+}
+
+impl ReductionFunc for AggregationFunc {
+    fn to_fun(self) -> fn(f64, f64) -> f64 {
+        match self {
+            AggregationFunc::Min => f64::min,
+            AggregationFunc::Max => f64::max,
+            // TODO(kaihowl) does not work... Design flaw
+            // Use streaming math?
+            AggregationFunc::Median => todo!(),
+            AggregationFunc::Average => todo!(),
+        }
+    }
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
@@ -278,7 +294,7 @@ where
                 .take_while(filter_by)
                 .inspect(|m| println!("{:?}", m))
                 .map(|m| m.val)
-                .reduce(f64::min)
+                .reduce(aggregate_by.to_fun())
         })
         .inspect(|m| println!("min: {:?}", m))
         .collect();
