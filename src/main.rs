@@ -173,10 +173,7 @@ fn main() -> ExitCode {
             output,
             separate_by,
             report_history,
-        } => {
-            report(output, separate_by, report_history.max_count);
-            ExitCode::SUCCESS
-        }
+        } => report(output, separate_by, report_history.max_count),
         Commands::Audit {
             measurement,
             report_history,
@@ -315,7 +312,7 @@ fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
     }
 }
 
-fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
+fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) -> ExitCode {
     println!("hoewelmk: separate_by: {:?}", separate_by);
     let measurements = retrieve_measurements(num_commits);
     println!("hoewelmk: measurements.len: {:?}", measurements.len());
@@ -341,17 +338,15 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
         .clone()
         .flat_map(|(n, c)| c.measurements.iter().map(move |m| (n, m)));
 
-    let measurement_groups: HashSet<_> =
-        indexed_measurements.clone().map(|(_, m)| &m.name).collect();
+    let unique_measurement_names = indexed_measurements.clone().map(|(_, m)| &m.name).unique();
 
-    for group in measurement_groups {
+    for measurement_name in unique_measurement_names {
         let filtered_measurements = indexed_measurements
             .clone()
-            .filter(|(_i, m)| m.name == *group);
+            .filter(|(_i, m)| m.name == *measurement_name);
 
-        let group_values: HashSet<_>;
-        if let Some(separate_by) = &separate_by {
-            group_values = filtered_measurements
+        let group_values = if let Some(separate_by) = &separate_by {
+            filtered_measurements
                 .clone()
                 .flat_map(|(_, m)| {
                     m.key_values
@@ -359,23 +354,37 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
                         .filter(|kv| kv.0 == separate_by)
                         .map(|kv| kv.1)
                 })
-                .collect();
+                .unique()
+                .map(|val| (Some(separate_by), Some(val)))
+                .collect_vec()
         } else {
-            group_values = HashSet::new();
+            vec![(None, None)]
+        };
+
+        if group_values.is_empty() {
+            // TODO(kaihowl)
+            return ExitCode::FAILURE;
         }
 
-        // TODO(kaihowl) handle no groups
-        for group_value in group_values {
+        for (group_key, group_value) in group_values {
             let (x, y): (Vec<usize>, Vec<f64>) = filtered_measurements
                 .clone()
-                // TODO(kaihowl)
-                .filter(|(_, m)| m.key_values["os"] == *group_value)
+                .filter(|(_, m)| {
+                    group_key
+                        .map(|key| m.key_values.get(key) == group_value)
+                        .unwrap_or(true)
+                })
                 .map(|(i, m)| (i, m.val))
                 .unzip();
-            let trace = BoxPlot::new_xy(x, y)
-                .name(group_value)
-                .legend_group(group)
-                .legend_group_title(LegendGroupTitle::new(group));
+
+            let trace = if let Some(group_value) = group_value {
+                BoxPlot::new_xy(x, y)
+                    .name(group_value)
+                    .legend_group(measurement_name)
+                    .legend_group_title(LegendGroupTitle::new(measurement_name))
+            } else {
+                BoxPlot::new_xy(x, y).name(measurement_name)
+            };
             plot.add_trace(trace);
         }
         // TODO(kaihowl) check that separator is valid
@@ -384,6 +393,8 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) {
         .expect("Cannot open file")
         .write_all(plot.to_html().as_bytes())
         .expect("Could not write file");
+
+    ExitCode::SUCCESS
 }
 
 #[derive(Debug, PartialEq)]
