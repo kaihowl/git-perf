@@ -45,8 +45,8 @@ enum Commands {
     /// Measure the runtime of the supplied command
     Measure {
         /// Repetitions
-        #[arg(short = 'n', long, default_value = "1")]
-        repetitions: i32,
+        #[arg(short = 'n', long, value_parser=clap::value_parser!(u16).range(1..), default_value = "1")]
+        repetitions: u16,
 
         /// Command to measure
         command: Vec<String>,
