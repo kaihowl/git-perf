@@ -57,9 +57,8 @@ enum Commands {
 
     /// Add single measurement
     Add {
-        // TODO(kaihowl) this is missing float values
         /// Measured value to be added
-        value: i32,
+        value: f64,
 
         #[command(flatten)]
         measurement: CliMeasurement,
