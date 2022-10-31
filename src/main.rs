@@ -25,7 +25,7 @@ struct Cli {
 #[derive(Args)]
 struct CliMeasurement {
     /// Name of the measurement
-    #[arg(short = 'm', long = "measurement")]
+    #[arg(short = 'm', long = "measurement", value_parser=parse_spaceless_string)]
     name: String,
 
     /// Key-value pairs separated by '='
@@ -81,7 +81,7 @@ enum Commands {
 
         // TODO(kaihowl) No check for spaces, etc... Same applies to KV parsing method.
         /// Create individual traces in the graph by grouping with the value of this selector
-        #[arg(short, long)]
+        #[arg(short, long, value_parser=parse_spaceless_string)]
         separate_by: Option<String>,
     },
 
@@ -89,7 +89,7 @@ enum Commands {
     /// against <n> previous commits. Group previous results and aggregate their
     /// results before comparison.
     Audit {
-        #[arg(short, long)]
+        #[arg(short, long, value_parser=parse_spaceless_string)]
         measurement: String,
 
         #[command(flatten)]
@@ -158,7 +158,17 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
     let pos = s
         .find('=')
         .ok_or_else(|| format!("invalid key=value: no '=' found in '{}'", s))?;
-    Ok((s[..pos].to_string(), s[pos + 1..].to_string()))
+    let key = parse_spaceless_string(&s[..pos])?;
+    let value = parse_spaceless_string(&s[pos + 1..])?;
+    Ok((key, value))
+}
+
+fn parse_spaceless_string(s: &str) -> Result<String, String> {
+    if s.split_whitespace().count() > 1 {
+        Err(format!("invalid string/key/value: found space in '{}'", s))
+    } else {
+        Ok(String::from(s))
+    }
 }
 
 fn main() -> ExitCode {
