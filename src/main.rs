@@ -103,7 +103,6 @@ enum Commands {
         #[arg(long, value_parser=clap::value_parser!(u16).range(1..), default_value="1")]
         min_measurements: u16,
 
-        // TODO(hoewelmk) missing short arg
         /// What to aggregate the measurements in each group with
         #[arg(short, long, default_value = "min")]
         aggregate_by: AggregationFunc,
