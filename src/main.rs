@@ -79,7 +79,6 @@ enum Commands {
         #[command(flatten)]
         report_history: CliReportHistory,
 
-        // TODO(kaihowl) No check for spaces, etc... Same applies to KV parsing method.
         /// Create individual traces in the graph by grouping with the value of this selector
         #[arg(short, long, value_parser=parse_spaceless_string)]
         separate_by: Option<String>,
