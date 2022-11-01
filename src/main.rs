@@ -132,25 +132,50 @@ enum AggregationFunc {
     Min,
     Max,
     Median,
-    Average,
+    Mean,
 }
 
-trait ReductionFunc {
-    fn to_fun(self) -> fn(f64, f64) -> f64;
+trait VecAggregation {
+    fn median(&mut self) -> f64;
 }
 
-impl ReductionFunc for AggregationFunc {
-    fn to_fun(self) -> fn(f64, f64) -> f64 {
-        match self {
-            AggregationFunc::Min => f64::min,
-            AggregationFunc::Max => f64::max,
-            // TODO(kaihowl) does not work... Design flaw
-            // Use streaming math?
-            AggregationFunc::Median => todo!(),
-            AggregationFunc::Average => todo!(),
+concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
+
+impl VecAggregation for Vec<f64> {
+    fn median(&mut self) -> f64 {
+        self.sort_by(f64::total_cmp);
+        match self.len() {
+            0 => 0.0,
+            even if even % 2 == 0 => {
+                let left = self[even / 2 - 1];
+                let right = self[even / 2];
+                (left + right) / 2.0
+            }
+            odd => self[odd / 2],
         }
     }
 }
+
+trait ReductionFunc: Iterator<Item = f64> {
+    // fn aggregate_by() {}
+    fn aggregate_by(self, fun: AggregationFunc) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        match fun {
+            AggregationFunc::Min => self.reduce(f64::min),
+            AggregationFunc::Max => self.reduce(f64::max),
+            // TODO(kaihowl) inconsistency for empty vec
+            AggregationFunc::Median => Some(self.collect_vec().median()),
+            AggregationFunc::Mean => {
+                let stats: AggStats = self.collect();
+                Some(stats.mean())
+            }
+        }
+    }
+}
+
+impl<T: ?Sized> ReductionFunc for T where T: Iterator<Item = f64> {}
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
     let pos = s
@@ -282,8 +307,6 @@ impl Stats {
     }
 }
 
-concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
-
 fn aggregate_measurements<'a, F>(
     commits: impl Iterator<Item = &'a Commit>,
     aggregate_by: AggregationFunc,
@@ -293,7 +316,6 @@ where
     F: Fn(&&MeasurementData) -> bool,
 {
     let s: AggStats = commits
-        // TODO(kaihowl) configure aggregate_by
         .filter_map(|c| {
             println!("{:?}", c.commit);
             c.measurements
@@ -301,9 +323,9 @@ where
                 .take_while(filter_by)
                 .inspect(|m| println!("{:?}", m))
                 .map(|m| m.val)
-                .reduce(aggregate_by.to_fun())
+                .aggregate_by(aggregate_by)
         })
-        .inspect(|m| println!("min: {:?}", m))
+        .inspect(|m| println!("aggregated value ({:?}): {:?}", aggregate_by, m))
         .collect();
     Stats {
         mean: s.mean(),
