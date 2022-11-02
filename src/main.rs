@@ -136,22 +136,22 @@ enum AggregationFunc {
 }
 
 trait VecAggregation {
-    fn median(&mut self) -> f64;
+    fn median(&mut self) -> Option<f64>;
 }
 
 concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
 
 impl VecAggregation for Vec<f64> {
-    fn median(&mut self) -> f64 {
+    fn median(&mut self) -> Option<f64> {
         self.sort_by(f64::total_cmp);
         match self.len() {
-            0 => 0.0,
+            0 => None,
             even if even % 2 == 0 => {
                 let left = self[even / 2 - 1];
                 let right = self[even / 2];
-                (left + right) / 2.0
+                Some((left + right) / 2.0)
             }
-            odd => self[odd / 2],
+            odd => Some(self[odd / 2]),
         }
     }
 }
@@ -165,11 +165,14 @@ trait ReductionFunc: Iterator<Item = f64> {
         match fun {
             AggregationFunc::Min => self.reduce(f64::min),
             AggregationFunc::Max => self.reduce(f64::max),
-            // TODO(kaihowl) inconsistency for empty vec
-            AggregationFunc::Median => Some(self.collect_vec().median()),
+            AggregationFunc::Median => self.collect_vec().median(),
             AggregationFunc::Mean => {
                 let stats: AggStats = self.collect();
-                Some(stats.mean())
+                if stats.mean.is_empty() {
+                    None
+                } else {
+                    Some(stats.mean())
+                }
             }
         }
     }
@@ -629,5 +632,26 @@ mod test {
     fn verify_cli() {
         use clap::CommandFactory;
         Cli::command().debug_assert()
+    }
+
+    #[test]
+    fn verify_stats() {
+        let empty_vec = [];
+        assert_eq!(
+            None,
+            empty_vec.into_iter().aggregate_by(AggregationFunc::Min)
+        );
+        assert_eq!(
+            None,
+            empty_vec.into_iter().aggregate_by(AggregationFunc::Max)
+        );
+        assert_eq!(
+            None,
+            empty_vec.into_iter().aggregate_by(AggregationFunc::Median)
+        );
+        assert_eq!(
+            None,
+            empty_vec.into_iter().aggregate_by(AggregationFunc::Mean)
+        );
     }
 }
