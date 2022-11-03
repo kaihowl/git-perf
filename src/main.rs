@@ -653,5 +653,65 @@ mod test {
             None,
             empty_vec.into_iter().aggregate_by(AggregationFunc::Mean)
         );
+
+        let single_el_vec = [3.0];
+        assert_eq!(
+            Some(3.0),
+            single_el_vec.into_iter().aggregate_by(AggregationFunc::Min)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec.into_iter().aggregate_by(AggregationFunc::Max)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec
+                .into_iter()
+                .aggregate_by(AggregationFunc::Median)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec
+                .into_iter()
+                .aggregate_by(AggregationFunc::Mean)
+        );
+
+        let two_el_vec = [3.0, 1.0];
+        assert_eq!(
+            Some(1.0),
+            two_el_vec.into_iter().aggregate_by(AggregationFunc::Min)
+        );
+        assert_eq!(
+            Some(3.0),
+            two_el_vec.into_iter().aggregate_by(AggregationFunc::Max)
+        );
+        assert_eq!(
+            Some(2.0),
+            two_el_vec.into_iter().aggregate_by(AggregationFunc::Median)
+        );
+        assert_eq!(
+            Some(2.0),
+            two_el_vec.into_iter().aggregate_by(AggregationFunc::Mean)
+        );
+
+        let three_el_vec = [2.0, 6.0, 1.0];
+        assert_eq!(
+            Some(1.0),
+            three_el_vec.into_iter().aggregate_by(AggregationFunc::Min)
+        );
+        assert_eq!(
+            Some(6.0),
+            three_el_vec.into_iter().aggregate_by(AggregationFunc::Max)
+        );
+        assert_eq!(
+            Some(2.0),
+            three_el_vec
+                .into_iter()
+                .aggregate_by(AggregationFunc::Median)
+        );
+        assert_eq!(
+            Some(3.0),
+            three_el_vec.into_iter().aggregate_by(AggregationFunc::Mean)
+        );
     }
 }
