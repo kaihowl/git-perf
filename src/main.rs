@@ -1,5 +1,5 @@
 use std::io::Write;
-use std::{collections::HashMap, fs::File, path::PathBuf, process::ExitCode, str};
+use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
 use git2::Repository;
 use itertools::{self, EitherOrBoth, Itertools};
@@ -197,8 +197,34 @@ fn parse_spaceless_string(s: &str) -> Result<String, String> {
     }
 }
 
-fn main() -> ExitCode {
+#[derive(Debug)]
+enum CliError {
+    DeserializationError(DeserializationError),
+    ReportError(ReportError),
+    AuditError(AuditError),
+}
+
+impl From<DeserializationError> for CliError {
+    fn from(e: DeserializationError) -> Self {
+        CliError::DeserializationError(e)
+    }
+}
+
+impl From<ReportError> for CliError {
+    fn from(e: ReportError) -> Self {
+        CliError::ReportError(e)
+    }
+}
+
+impl From<AuditError> for CliError {
+    fn from(e: AuditError) -> Self {
+        CliError::AuditError(e)
+    }
+}
+
+fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
+
     match cli.command {
         Commands::Measure {
             repetitions,
@@ -209,22 +235,22 @@ fn main() -> ExitCode {
                 "Measurement: {}, Repetitions: {}, command: {:?}, key-values: {:?}",
                 measurement.name, repetitions, command, measurement.key_value
             );
-            ExitCode::SUCCESS
+            todo!()
         }
         Commands::Add { value, measurement } => {
             println!(
                 "Measurement: {}, value: {}, key-values: {:?}",
                 measurement.name, value, measurement.key_value
             );
-            ExitCode::SUCCESS
+            todo!()
         }
-        Commands::Push {} => push(),
+        Commands::Push {} => Ok(push()?),
         Commands::Pull {} => todo!(),
         Commands::Report {
             output,
             separate_by,
             report_history,
-        } => report(output, separate_by, report_history.max_count),
+        } => Ok(report(output, separate_by, report_history.max_count)?),
         Commands::Audit {
             measurement,
             report_history,
@@ -236,28 +262,40 @@ fn main() -> ExitCode {
             if report_history.max_count < min_measurements.into() {
                 Cli::command().error(ArgumentConflict, format!("The minimal number of measurements ({}) cannot be more than the maximum number of measurements ({})", min_measurements, report_history.max_count)).exit()
             }
-            audit(
+            Ok(audit(
                 &measurement,
                 report_history.max_count,
                 min_measurements,
                 &selectors,
                 aggregate_by,
                 sigma,
-            )
+            )?)
         }
         Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => todo!(),
     }
 }
 
-fn push() -> ExitCode {
-    // TODO(kaihowl)
-    let repo = Repository::open(".").unwrap();
+// TODO(kaihowl) use anyhow / thiserror for error propagation
+
+fn push() -> Result<(), DeserializationError> {
+    let repo = Repository::open(".")?;
     let mut remote = repo.find_remote("origin").expect("Did not get remote");
-    remote
-        .push(&[&"refs/heads/header:refs/heads/header"], None)
-        .expect("Failed to push");
-    ExitCode::SUCCESS
+    remote.push(&[&"refs/heads/header:refs/heads/header"], None)?;
+    Ok(())
+}
+
+#[derive(Debug)]
+enum AuditError {
+    DeserializationError(DeserializationError),
+    NoMeasurementForHead,
+    SignificantDifference,
+}
+
+impl From<DeserializationError> for AuditError {
+    fn from(e: DeserializationError) -> Self {
+        AuditError::DeserializationError(e)
+    }
 }
 
 fn audit(
@@ -267,8 +305,8 @@ fn audit(
     selectors: &[(String, String)],
     aggregate_by: AggregationFunc,
     sigma: f64,
-) -> ExitCode {
-    let all = retrieve_measurements(max_count + 1); // include HEAD
+) -> Result<(), AuditError> {
+    let all = retrieve_measurements(max_count + 1)?; // include HEAD
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement && selectors.iter().all(|s| m.key_values[&s.0] == s.1)
@@ -279,20 +317,22 @@ fn audit(
     println!("head: {:?}, tail: {:?}", head_summary, tail_summary);
 
     if head_summary.len == 0 {
-        println!("No measurement for HEAD");
-        return ExitCode::FAILURE;
+        return Err(AuditError::NoMeasurementForHead);
     }
 
     if tail_summary.len < min_count.into() {
+        // TODO(kaihowl) handle with explicit return? Print text somewhere else?
         println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
-        return ExitCode::SUCCESS;
+        return Ok(());
     }
 
     if head_summary.significantly_different_from(&tail_summary, sigma) {
         println!("Measurements differ significantly");
-        return ExitCode::FAILURE;
+        // TODO(kaihowl) print details
+        return Err(AuditError::SignificantDifference);
     }
-    ExitCode::SUCCESS
+
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -346,23 +386,31 @@ where
     //     });
 }
 
-fn retrieve_measurements(num_commits: usize) -> Vec<Commit> {
-    let repo = match Repository::open(".") {
-        Ok(repo) => repo,
-        Err(e) => panic!("failed to open: {}", e),
-    };
+fn retrieve_measurements(num_commits: usize) -> Result<Vec<Commit>, DeserializationError> {
+    let repo = Repository::open(".")?;
+    walk_commits(&repo, num_commits)
+}
 
-    let measurements = walk_commits(&repo, num_commits);
+// TODO(kaihowl) make all of these pretty printed for `main`
+#[derive(Debug)]
+enum ReportError {
+    DeserializationError(DeserializationError),
+    InvalidSeparateBy,
+}
 
-    match measurements {
-        Err(e) => panic!("Failed to walk tree: {:?}", e),
-        Ok(measurements) => measurements,
+impl From<DeserializationError> for ReportError {
+    fn from(e: DeserializationError) -> Self {
+        ReportError::DeserializationError(e)
     }
 }
 
-fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) -> ExitCode {
+fn report(
+    output: PathBuf,
+    separate_by: Option<String>,
+    num_commits: usize,
+) -> Result<(), ReportError> {
     println!("hoewelmk: separate_by: {:?}", separate_by);
-    let measurements = retrieve_measurements(num_commits);
+    let measurements = retrieve_measurements(num_commits)?;
     println!("hoewelmk: measurements.len: {:?}", measurements.len());
 
     let enumerated_commits = measurements.iter().rev().enumerate();
@@ -410,8 +458,7 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) -> E
         };
 
         if group_values.is_empty() {
-            // TODO(kaihowl)
-            return ExitCode::FAILURE;
+            return Err(ReportError::InvalidSeparateBy);
         }
 
         for (group_key, group_value) in group_values {
@@ -442,7 +489,7 @@ fn report(output: PathBuf, separate_by: Option<String>, num_commits: usize) -> E
         .write_all(plot.to_html().as_bytes())
         .expect("Could not write file");
 
-    ExitCode::SUCCESS
+    Ok(())
 }
 
 #[derive(Debug, PartialEq)]
