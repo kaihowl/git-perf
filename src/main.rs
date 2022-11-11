@@ -12,7 +12,8 @@ use plotly::common::{Font, LegendGroupTitle};
 use plotly::layout::Axis;
 use plotly::BoxPlot;
 use plotly::{common::Title, Layout, Plot};
-use serde::Deserialize;
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Serialize, Serializer};
 
 use average::{self, concatenate, Estimate, Mean, Variance};
 
@@ -238,11 +239,7 @@ fn main() -> Result<(), CliError> {
             todo!()
         }
         Commands::Add { value, measurement } => {
-            println!(
-                "Measurement: {}, value: {}, key-values: {:?}",
-                measurement.name, value, measurement.key_value
-            );
-            todo!()
+            Ok(add(&measurement.name, value, &measurement.key_value)?)
         }
         Commands::Push {} => Ok(push()?),
         Commands::Pull {} => todo!(),
@@ -277,6 +274,18 @@ fn main() -> Result<(), CliError> {
 }
 
 // TODO(kaihowl) use anyhow / thiserror for error propagation
+
+fn add(
+    measurement: &str,
+    value: f64,
+    key_values: &[(String, String)],
+) -> Result<(), DeserializationError> {
+    println!(
+        "Measurement: {}, value: {}, key-values: {:?}",
+        measurement, value, key_values
+    );
+    Ok(())
+}
 
 fn push() -> Result<(), DeserializationError> {
     let repo = Repository::open(".")?;
@@ -498,15 +507,41 @@ struct Commit {
     measurements: Vec<MeasurementData>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 struct MeasurementData {
     name: String,
     // TODO(kaihowl) change type
     timestamp: f32,
     // TODO(kaihowl) check size of type
     val: f64,
-    #[serde(flatten)]
+    #[serde(flatten, serialize_with = "key_value_serialization")]
     key_values: HashMap<String, String>,
+}
+
+// TODO(kaihowl) serialization with flatten and custom function does not work
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
+struct MeasurementData2 {
+    name: String,
+    // TODO(kaihowl) change type
+    timestamp: f32,
+    // TODO(kaihowl) check size of type
+    val: f64,
+    #[serde(serialize_with = "key_value_serialization")]
+    key_values: HashMap<String, String>,
+}
+
+fn key_value_serialization<S>(
+    key_values: &HashMap<String, String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(key_values.len()))?;
+    for (k, v) in key_values {
+        seq.serialize_element(&format!("{}={}", k, v))?
+    }
+    seq.end()
 }
 
 #[derive(Debug)]
@@ -525,6 +560,19 @@ impl From<git2::Error> for DeserializationError {
     fn from(value: git2::Error) -> Self {
         DeserializationError::GitError(value)
     }
+}
+
+fn serialize_single(measurement_data: &MeasurementData2) -> String {
+    let mut writer = csv::WriterBuilder::new()
+        .delimiter(b' ')
+        .has_headers(false)
+        .flexible(true)
+        .from_writer(vec![]);
+
+    writer
+        .serialize(measurement_data)
+        .expect("TODO(kaihowl) fix me");
+    String::from_utf8(writer.into_inner().unwrap()).unwrap()
 }
 
 fn deserialize(lines: &str) -> Result<Vec<MeasurementData>, DeserializationError> {
@@ -760,5 +808,17 @@ mod test {
             Some(3.0),
             three_el_vec.into_iter().aggregate_by(AggregationFunc::Mean)
         );
+    }
+
+    #[test]
+    fn test_serialize_single() {
+        let md = MeasurementData2 {
+            name: "Mymeasurement".into(),
+            timestamp: 1234567.0,
+            val: 42.0,
+            key_values: [("mykey".to_string(), "myvalue".to_string())].into(),
+        };
+        let serialized = serialize_single(&md);
+        assert_eq!(serialized, "Mymeasurement 1234567.0 42.0 mykey=myvalue\n");
     }
 }
