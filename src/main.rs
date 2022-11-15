@@ -507,27 +507,45 @@ struct Commit {
     measurements: Vec<MeasurementData>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct MeasurementData {
     name: String,
     // TODO(kaihowl) change type
     timestamp: f32,
     // TODO(kaihowl) check size of type
     val: f64,
-    #[serde(flatten, serialize_with = "key_value_serialization")]
+    #[serde(flatten)]
     key_values: HashMap<String, String>,
 }
 
 // TODO(kaihowl) serialization with flatten and custom function does not work
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
-struct MeasurementData2 {
-    name: String,
-    // TODO(kaihowl) change type
+#[derive(Debug, PartialEq, Serialize)]
+struct SerializeMeasurementData<'a> {
+    name: &'a str,
     timestamp: f32,
-    // TODO(kaihowl) check size of type
     val: f64,
     #[serde(serialize_with = "key_value_serialization")]
-    key_values: HashMap<String, String>,
+    key_values: &'a HashMap<String, String>,
+}
+
+impl Serialize for MeasurementData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializeMeasurementData::from(self).serialize(serializer)
+    }
+}
+
+impl<'a> From<&'a MeasurementData> for SerializeMeasurementData<'a> {
+    fn from(md: &'a MeasurementData) -> Self {
+        SerializeMeasurementData {
+            name: md.name.as_str(),
+            timestamp: md.timestamp,
+            val: md.val,
+            key_values: &md.key_values,
+        }
+    }
 }
 
 fn key_value_serialization<S>(
@@ -562,7 +580,7 @@ impl From<git2::Error> for DeserializationError {
     }
 }
 
-fn serialize_single(measurement_data: &MeasurementData2) -> String {
+fn serialize_single(measurement_data: &MeasurementData) -> String {
     let mut writer = csv::WriterBuilder::new()
         .delimiter(b' ')
         .has_headers(false)
@@ -812,7 +830,7 @@ mod test {
 
     #[test]
     fn test_serialize_single() {
-        let md = MeasurementData2 {
+        let md = MeasurementData {
             name: "Mymeasurement".into(),
             timestamp: 1234567.0,
             val: 42.0,
