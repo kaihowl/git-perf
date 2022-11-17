@@ -200,26 +200,26 @@ fn parse_spaceless_string(s: &str) -> Result<String, String> {
 
 #[derive(Debug)]
 enum CliError {
-    DeserializationError(DeserializationError),
-    ReportError(ReportError),
-    AuditError(AuditError),
+    Deserialization(DeserializationError),
+    Report(ReportError),
+    Audit(AuditError),
 }
 
 impl From<DeserializationError> for CliError {
     fn from(e: DeserializationError) -> Self {
-        CliError::DeserializationError(e)
+        CliError::Deserialization(e)
     }
 }
 
 impl From<ReportError> for CliError {
     fn from(e: ReportError) -> Self {
-        CliError::ReportError(e)
+        CliError::Report(e)
     }
 }
 
 impl From<AuditError> for CliError {
     fn from(e: AuditError) -> Self {
-        CliError::AuditError(e)
+        CliError::Audit(e)
     }
 }
 
