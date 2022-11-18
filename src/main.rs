@@ -299,6 +299,7 @@ fn add(
 
     let serialized: String = serialize_single(&md);
 
+    // TODO(kaihowl) append missing
     repo.note(
         &author,
         &author,
