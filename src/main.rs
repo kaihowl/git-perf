@@ -288,7 +288,7 @@ fn add(
     let author = repo.signature()?;
     // TODO(kaihowl) configure
     let timestamp = author.when().seconds() as f32;
-    let key_values: HashMap<_, _> = key_values.to_vec().into_iter().collect();
+    let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
 
     let md = MeasurementData {
         name: measurement.to_owned(),
