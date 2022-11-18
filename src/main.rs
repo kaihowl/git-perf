@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use std::io::Write;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
@@ -280,10 +281,34 @@ fn add(
     value: f64,
     key_values: &[(String, String)],
 ) -> Result<(), DeserializationError> {
-    println!(
-        "Measurement: {}, value: {}, key-values: {:?}",
-        measurement, value, key_values
-    );
+    // TODO(kaihowl) configure path
+    let repo = Repository::open(".")?;
+    let head = repo.head()?;
+    let head = head.peel_to_commit()?;
+    let author = repo.signature()?;
+    // TODO(kaihowl) configure
+    let timestamp = author.when().seconds() as f32;
+    let key_values: HashMap<_, _> = key_values.to_vec().into_iter().collect();
+
+    let md = MeasurementData {
+        name: measurement.to_owned(),
+        timestamp,
+        val: value,
+        key_values,
+    };
+
+    let serialized: String = serialize_single(&md);
+
+    repo.note(
+        &author,
+        &author,
+        Some("refs/notes/perf"),
+        head.id(),
+        &serialized,
+        false,
+    )
+    .expect("TODO(kaihowl) note failed");
+
     Ok(())
 }
 
