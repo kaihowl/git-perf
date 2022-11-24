@@ -735,7 +735,9 @@ checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
 name = "plotly"
-version = "0.8.1"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12cfb78886077c9ac24cd942d39154e43ace1625d577169ce888b4411c55606b"
 dependencies = [
  "askama",
  "dyn-clone",
@@ -743,7 +745,6 @@ dependencies = [
  "once_cell",
  "plotly_derive",
  "rand",
- "rand_distr",
  "serde",
  "serde_json",
  "serde_repr",
@@ -752,7 +753,9 @@ dependencies = [
 
 [[package]]
 name = "plotly_derive"
-version = "0.8.1"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d0cf27f6a32fc7aca3e140057229b1f8625570af6a81d4e339453a26edc0950"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -836,16 +839,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
-]
-
-[[package]]
-name = "rand_distr"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
-dependencies = [
- "num-traits",
- "rand",
 ]
 
 [[package]]
