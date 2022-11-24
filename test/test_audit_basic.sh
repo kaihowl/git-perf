@@ -7,7 +7,7 @@ script_dir=$(dirname "$0")
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-export PATH="$HOME/.virtualenvs/git-perf/bin:$PATH"
+export PATH="$(pwd)/target/debug:$PATH"
 which git-perf
 
 echo Basic audit tests
@@ -24,11 +24,11 @@ git perf add -m timer 3
 git checkout -
 git perf add -m timer 4
 # measure
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 4
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 3
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 2
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 1.9999 && exit 1
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 1 && exit 1
+git perf audit -m timer -d 4
+git perf audit -m timer -d 3
+git perf audit -m timer -d 2
+git perf audit -m timer -d 1.9999 && exit 1
+git perf audit -m timer -d 1 && exit 1
 
 
 echo Initial measurements with too few data points
@@ -47,26 +47,26 @@ git perf add -m timer 20
 create_commit
 git perf add -m timer 30
 # measure
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 3
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 2 && exit 1
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 2 --min-measurements 10
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 2 --min-measurements 4
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer -d 2 --min-measurements 3 && exit 1
+git perf audit -m timer -d 3
+git perf audit -m timer -d 2 && exit 1
+git perf audit -m timer -d 2 --min-measurements 10
+git perf audit -m timer -d 2 --min-measurements 4
+git perf audit -m timer -d 2 --min-measurements 3 && exit 1
 
 
 echo Stable measurements with zero stddev
 cd_empty_repo
 create_commit
 git perf add -m timer 3
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer
+git perf audit -m timer
 create_commit
 git perf add -m timer 3
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer
+git perf audit -m timer
 create_commit
 git perf add -m timer 3
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer
+git perf audit -m timer
 create_commit
 git perf add -m timer 4
-/Users/kaihowl/Documents/repos/git-perf/target/debug/git-perf audit -m timer && exit 1
+git perf audit -m timer && exit 1
 
 exit 0
