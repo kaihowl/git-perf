@@ -296,7 +296,17 @@ fn add(
         key_values,
     };
 
-    let serialized: String = serialize_single(&md);
+    let serialized = serialize_single(&md);
+    let body;
+
+    if let Ok(existing_note) = repo.find_note(Some("refs/notes/perf"), head.id()) {
+        // TODO(kaihowl) check empty / not-utf8
+        let existing_measurements = existing_note.message().expect("Message is not utf-8");
+        // TODO(kaihowl) what about missing trailing new lines?
+        body = format!("{}{}", existing_measurements, serialized);
+    } else {
+        body = serialized;
+    }
 
     // TODO(kaihowl) append missing
     repo.note(
@@ -304,8 +314,8 @@ fn add(
         &author,
         Some("refs/notes/perf"),
         head.id(),
-        &serialized,
-        false,
+        &body,
+        true,
     )
     .expect("TODO(kaihowl) note failed");
 
