@@ -59,6 +59,8 @@ jobs:
     - name: Build git-perf
       run: ${{ env.CARGO }} build --verbose ${{ env.TARGET_FLAGS }}
 
+    - uses: fregante/setup-git-user@v1
+
     - name: Run tests
       run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }}
 
