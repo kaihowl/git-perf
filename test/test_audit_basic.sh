@@ -7,9 +7,6 @@ script_dir=$(dirname "$0")
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-export PATH="$(pwd)/target/debug:$PATH"
-which git-perf
-
 echo Basic audit tests
 
 cd_temp_repo
