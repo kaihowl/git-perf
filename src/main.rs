@@ -377,7 +377,6 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
         body = serialized;
     }
 
-    // TODO(kaihowl) append missing
     repo.note(
         &author,
         &author,
