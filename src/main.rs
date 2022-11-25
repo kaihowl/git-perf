@@ -478,6 +478,7 @@ impl From<DeserializationError> for ReportError {
     }
 }
 
+// TODO(kaihowl) needs more fine grained output e2e tests
 fn report(
     output: PathBuf,
     separate_by: Option<String>,
@@ -507,7 +508,7 @@ fn report(
     plot.set_layout(layout);
 
     let relevant = |m: &MeasurementData| {
-        if !measurements.is_empty() && !measurement_names.contains(&m.name) {
+        if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
         }
         // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
