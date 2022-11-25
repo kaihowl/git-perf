@@ -10,21 +10,21 @@ source "$script_dir/common.sh"
 # Check perf-accept functionality
 cd_empty_repo
 create_commit
-git perf add -m test 2 -kv os=ubuntu
+git perf add -m test 2 -k os=ubuntu
 create_commit
-git perf add -m test 4 -kv os=ubuntu
+git perf add -m test 4 -k os=ubuntu
 create_commit
-git perf add -m test 5000 -kv os=ubuntu
+git perf add -m test 5000 -k os=ubuntu
 git perf audit -m test -s os=ubuntu && exit 1
 # Accept regression for other platform
-git perf good -m test -kv os=macOS
+git perf good -m test -k os=macOS
 # Must not accept regression for this platform
 git perf audit -m test -s os=ubuntu && exit 1
 # TODO(kaihowl) Do we need to seperate kvs from mere labels?
 # Must not accept regression when no platform specified?
 # git perf audit -m test && exit 1
 # Accept regression on this platform
-git perf good -m test -kv os=ubuntu
+git perf good -m test -k os=ubuntu
 git perf audit -m test -s os=ubuntu
 git perf audit -m test
 create_commit
@@ -34,11 +34,11 @@ git perf audit -m test
 # Check when using non-existent selectors for trailers
 cd_empty_repo
 create_commit
-git perf add -m test 2 -kv os=ubuntu
+git perf add -m test 2 -k os=ubuntu
 create_commit
-git perf add -m test 3 -kv os=ubuntu
+git perf add -m test 3 -k os=ubuntu
 create_commit
-git perf add -m test 10 -kv os=ubuntu
+git perf add -m test 10 -k os=ubuntu
 git perf audit -m test -s os=ubuntu && exit 1
 git perf good -m someother
 # This can fail is filtering with "os" on the trailers without any kvs
@@ -103,7 +103,7 @@ if [[ $nr_git_trailers != 1 ]]; then
   echo "Expected exactly one git trailer 'accept-perf' but found $nr_git_trailers"
   exit 1
 fi
-git perf good -m test-measure -kv os=ubuntu
+git perf good -m test-measure -k os=ubuntu
 nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
 if [[ $nr_git_trailers != 2 ]]; then
   echo "Expected exactly two git trailers 'accept-perf' but found $nr_git_trailers"
