@@ -353,7 +353,10 @@ fn audit(
     let all = retrieve_measurements(max_count + 1)?; // include HEAD
 
     let filter_by = |m: &&MeasurementData| {
-        m.name == measurement && selectors.iter().all(|s| m.key_values[&s.0] == s.1)
+        m.name == measurement
+            && selectors
+                .iter()
+                .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
     };
 
     let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
@@ -407,7 +410,7 @@ where
             println!("{:?}", c.commit);
             c.measurements
                 .iter()
-                .take_while(filter_by)
+                .filter(filter_by)
                 .inspect(|m| println!("{:?}", m))
                 .map(|m| m.val)
                 .aggregate_by(aggregate_by)
