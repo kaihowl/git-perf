@@ -14,7 +14,12 @@ mkdir orig
 cd orig
 orig=$(pwd)
 
-git init
+git init --bare
+
+cd "$(mktemp -d)"
+git clone "$orig" myworkrepo
+
+cd myworkrepo
 
 touch a
 git add a
@@ -28,8 +33,8 @@ touch c
 git add c
 git commit -m 'third commit'
 
+git push
 
-orig=$(pwd)
 cd "$root"
 git clone "$orig" repo1
 git clone "$orig" repo2
