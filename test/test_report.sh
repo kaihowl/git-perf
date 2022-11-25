@@ -45,7 +45,7 @@ if [[ ${output} != *'no performance measurements'* ]]; then
 fi
 
 output=$(git perf report -s does-not-exist 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'does-not-exist'* ]]; then
+if [[ ${output} != *'invalid separator'* ]]; then
   echo No warning for invalid separator 'does-not-exist'
   echo "$output"
   exit 1
