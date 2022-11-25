@@ -8,14 +8,14 @@ script_dir=$(dirname "$0")
 source "$script_dir/common.sh"
 
 output=$(git perf 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'are required'* ]]; then
+if [[ ${output} != *'--help'* ]]; then
   echo No warning for missing arguments
   echo "$output"
   exit 1
 fi
 
 output=$(git perf --version)
-if ! [[ ${output} =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
+if ! [[ ${output} =~ ^(git-perf )?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo Expected version number or placeholder in output.
     echo "$output"
     exit 1

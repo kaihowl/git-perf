@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use average::{self, concatenate, Estimate, Mean, Variance};
 
 #[derive(Parser)]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
