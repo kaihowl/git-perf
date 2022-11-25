@@ -1,4 +1,6 @@
+use std::fmt::Display;
 use std::io::Write;
+use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
 use git2::Repository;
@@ -213,14 +215,26 @@ fn parse_spaceless_string(s: &str) -> Result<String, String> {
 
 #[derive(Debug)]
 enum CliError {
-    Deserialization(DeserializationError),
+    Add(AddError),
+    PushPull(PushPullError),
     Report(ReportError),
     Audit(AuditError),
 }
 
-impl From<DeserializationError> for CliError {
-    fn from(e: DeserializationError) -> Self {
-        CliError::Deserialization(e)
+impl Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CliError::Add(e) => write!(f, "During add: {e}"),
+            CliError::PushPull(e) => write!(f, "During push/pull: {e}"),
+            CliError::Report(e) => write!(f, "During report: {e}"),
+            CliError::Audit(e) => write!(f, "During audit: {e}"),
+        }
+    }
+}
+
+impl From<AddError> for CliError {
+    fn from(e: AddError) -> Self {
+        CliError::Add(e)
     }
 }
 
@@ -236,7 +250,13 @@ impl From<AuditError> for CliError {
     }
 }
 
-fn main() -> Result<(), CliError> {
+impl From<PushPullError> for CliError {
+    fn from(e: PushPullError) -> Self {
+        CliError::PushPull(e)
+    }
+}
+
+fn handle_calls() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -298,13 +318,37 @@ fn main() -> Result<(), CliError> {
     }
 }
 
-// TODO(kaihowl) use anyhow / thiserror for error propagation
+fn main() -> ExitCode {
+    match handle_calls() {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("Failed: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
 
-fn add(
-    measurement: &str,
-    value: f64,
-    key_values: &[(String, String)],
-) -> Result<(), DeserializationError> {
+// TODO(kaihowl) use anyhow / thiserror for error propagation
+#[derive(Debug)]
+enum AddError {
+    Git(git2::Error),
+}
+
+impl Display for AddError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AddError::Git(e) => write!(f, "git error, {e}"),
+        }
+    }
+}
+
+impl From<git2::Error> for AddError {
+    fn from(e: git2::Error) -> Self {
+        AddError::Git(e)
+    }
+}
+
+fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
     // TODO(kaihowl) configure path
     let repo = Repository::open(".")?;
     let head = repo.head()?;
@@ -347,7 +391,27 @@ fn add(
     Ok(())
 }
 
-fn pull() -> Result<(), DeserializationError> {
+#[derive(Debug)]
+enum PushPullError {
+    Git(git2::Error),
+}
+
+// TODO(kaihowl) code repetition with other git-only errors
+impl Display for PushPullError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PushPullError::Git(e) => write!(f, "git error, {e}"),
+        }
+    }
+}
+
+impl From<git2::Error> for PushPullError {
+    fn from(e: git2::Error) -> Self {
+        PushPullError::Git(e)
+    }
+}
+
+fn pull() -> Result<(), PushPullError> {
     let repo = Repository::open(".")?;
     let mut remote = repo
         .find_remote("origin")
@@ -356,7 +420,7 @@ fn pull() -> Result<(), DeserializationError> {
     Ok(())
 }
 
-fn push() -> Result<(), DeserializationError> {
+fn push() -> Result<(), PushPullError> {
     let repo = Repository::open(".")?;
     // TODO(kaihowl) configure remote?
     let mut remote = repo
@@ -371,6 +435,18 @@ enum AuditError {
     DeserializationError(DeserializationError),
     NoMeasurementForHead,
     SignificantDifference,
+}
+
+impl Display for AuditError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AuditError::DeserializationError(e) => write!(f, "failed to read, {e}"),
+            AuditError::NoMeasurementForHead => write!(f, "no measurement for HEAD"),
+            AuditError::SignificantDifference => {
+                write!(f, "HEAD differs significantly from tail measurements")
+            }
+        }
+    }
 }
 
 impl From<DeserializationError> for AuditError {
@@ -482,6 +558,18 @@ fn retrieve_measurements_by_commit(
 enum ReportError {
     DeserializationError(DeserializationError),
     InvalidSeparateBy,
+    // Report would not contain any measurements
+    NoMeasurements,
+}
+
+impl Display for ReportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReportError::DeserializationError(e) => write!(f, "failed to read, {e}"),
+            ReportError::InvalidSeparateBy => write!(f, "invalid separator supplied"),
+            ReportError::NoMeasurements => write!(f, "no performance measurements found"),
+        }
+    }
 }
 
 impl From<DeserializationError> for ReportError {
@@ -659,6 +747,15 @@ where
 enum DeserializationError {
     CsvError(csv::Error),
     GitError(git2::Error),
+}
+
+impl Display for DeserializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeserializationError::CsvError(e) => write!(f, "csv error, {e}"),
+            DeserializationError::GitError(e) => write!(f, "git error, {e}"),
+        }
+    }
 }
 
 impl From<csv::Error> for DeserializationError {
