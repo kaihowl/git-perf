@@ -134,6 +134,10 @@ enum Commands {
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
+
+    /// Generate the manpage content
+    #[command(hide = true)]
+    Manpage {},
 }
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
@@ -286,6 +290,10 @@ fn main() -> Result<(), CliError> {
         }
         Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => todo!(),
+        Commands::Manpage {} => {
+            generate_manpage().expect("Man page generation failed");
+            Ok(())
+        }
     }
 }
 
@@ -723,6 +731,22 @@ fn walk_commits(
             })
         })
         .try_collect()
+}
+
+fn generate_manpage() -> Result<(), std::io::Error> {
+    let man = clap_mangen::Man::new(Cli::command());
+    man.render(&mut std::io::stdout())?;
+
+    // TODO(kaihowl) this does not look very nice. Fix it.
+    for command in Cli::command()
+        .get_subcommands()
+        .filter(|c| !c.is_hide_set())
+    {
+        let man = clap_mangen::Man::new(command.clone());
+        man.render(&mut std::io::stdout())?
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

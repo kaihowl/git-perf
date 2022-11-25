@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 average = "0.13.1"
 clap = { version="4", features=["derive", "wrap_help"] }
+clap_mangen = "0.2.5"
 csv = "1.1.6"
 git2 = "0.15.0"
 itertools = "0.10.5"
 plotly = "0.8.3"
 serde = { version = "1.0.145", features = ["derive"] }
+
