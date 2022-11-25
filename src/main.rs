@@ -411,6 +411,7 @@ impl From<git2::Error> for PushPullError {
 }
 
 fn pull() -> Result<(), PushPullError> {
+    // TODO(kaihowl) missing conflict resolution
     let repo = Repository::open(".")?;
     let mut remote = repo
         .find_remote("origin")
