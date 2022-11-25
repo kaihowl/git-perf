@@ -255,7 +255,7 @@ fn main() -> Result<(), CliError> {
             Ok(add(&measurement.name, value, &measurement.key_value)?)
         }
         Commands::Push {} => Ok(push()?),
-        Commands::Pull {} => todo!(),
+        Commands::Pull {} => Ok(pull()?),
         Commands::Report {
             output,
             separate_by,
@@ -347,10 +347,22 @@ fn add(
     Ok(())
 }
 
+fn pull() -> Result<(), DeserializationError> {
+    let repo = Repository::open(".")?;
+    let mut remote = repo
+        .find_remote("origin")
+        .expect("Did not find remote 'origin'");
+    remote.fetch(&[&"refs/notes/perf:refs/notes/perf"], None, None)?;
+    Ok(())
+}
+
 fn push() -> Result<(), DeserializationError> {
     let repo = Repository::open(".")?;
-    let mut remote = repo.find_remote("origin").expect("Did not get remote");
-    remote.push(&[&"refs/heads/header:refs/heads/header"], None)?;
+    // TODO(kaihowl) configure remote?
+    let mut remote = repo
+        .find_remote("origin")
+        .expect("Did not find remote 'origin'");
+    remote.push(&[&"refs/notes/perf:refs/notes/perf"], None)?;
     Ok(())
 }
 
