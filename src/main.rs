@@ -80,6 +80,14 @@ enum Commands {
         #[command(flatten)]
         report_history: CliReportHistory,
 
+        /// Select an individual measurements instead of all
+        #[arg(short, long)]
+        measurement: Vec<String>,
+
+        /// Key-value pairs separated by '=', select only matching measurements
+        #[arg(short, long, value_parser=parse_key_value)]
+        key_value: Vec<(String, String)>,
+
         /// Create individual traces in the graph by grouping with the value of this selector
         #[arg(short, long, value_parser=parse_spaceless_string)]
         separate_by: Option<String>,
@@ -247,7 +255,15 @@ fn main() -> Result<(), CliError> {
             output,
             separate_by,
             report_history,
-        } => Ok(report(output, separate_by, report_history.max_count)?),
+            measurement,
+            key_value,
+        } => Ok(report(
+            output,
+            separate_by,
+            report_history.max_count,
+            &measurement,
+            &key_value,
+        )?),
         Commands::Audit {
             measurement,
             report_history,
@@ -350,7 +366,7 @@ fn audit(
     aggregate_by: AggregationFunc,
     sigma: f64,
 ) -> Result<(), AuditError> {
-    let all = retrieve_measurements(max_count + 1)?; // include HEAD
+    let all = retrieve_measurements_by_commit(max_count + 1)?; // include HEAD
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement
@@ -433,7 +449,9 @@ where
     //     });
 }
 
-fn retrieve_measurements(num_commits: usize) -> Result<Vec<Commit>, DeserializationError> {
+fn retrieve_measurements_by_commit(
+    num_commits: usize,
+) -> Result<Vec<Commit>, DeserializationError> {
     let repo = Repository::open(".")?;
     walk_commits(&repo, num_commits)
 }
@@ -455,9 +473,11 @@ fn report(
     output: PathBuf,
     separate_by: Option<String>,
     num_commits: usize,
+    measurement_names: &[String],
+    key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
     println!("hoewelmk: separate_by: {:?}", separate_by);
-    let measurements = retrieve_measurements(num_commits)?;
+    let measurements = retrieve_measurements_by_commit(num_commits)?;
     println!("hoewelmk: measurements.len: {:?}", measurements.len());
 
     let enumerated_commits = measurements.iter().rev().enumerate();
@@ -477,9 +497,22 @@ fn report(
     let mut plot = Plot::new();
     plot.set_layout(layout);
 
-    let indexed_measurements = enumerated_commits
-        .clone()
-        .flat_map(|(n, c)| c.measurements.iter().map(move |m| (n, m)));
+    let relevant = |m: &MeasurementData| {
+        if !measurements.is_empty() && !measurement_names.contains(&m.name) {
+            return false;
+        }
+        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
+        key_values
+            .iter()
+            .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
+    };
+
+    let indexed_measurements = enumerated_commits.clone().flat_map(|(n, c)| {
+        c.measurements
+            .iter()
+            .map(move |m| (n, m))
+            .filter(|(_, m)| relevant(m))
+    });
 
     let unique_measurement_names = indexed_measurements.clone().map(|(_, m)| &m.name).unique();
 
