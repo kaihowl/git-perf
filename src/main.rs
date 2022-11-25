@@ -623,7 +623,15 @@ fn report(
             .filter(|(_, m)| relevant(m))
     });
 
-    let unique_measurement_names = indexed_measurements.clone().map(|(_, m)| &m.name).unique();
+    let unique_measurement_names: Vec<_> = indexed_measurements
+        .clone()
+        .map(|(_, m)| &m.name)
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        return Err(ReportError::NoMeasurements);
+    }
 
     for measurement_name in unique_measurement_names {
         let filtered_measurements = indexed_measurements
