@@ -39,7 +39,8 @@ repo2=$(pwd)/repo2
 echo Leave one commit in middle without any notes
 cd "$repo1"
 git checkout master~2
-git perf measure -n 2 -m echo echo test
+git perf add -m echo 0.5
+git perf add -m echo 0.5
 git checkout master
 git perf add -m echo 0.5
 
