@@ -729,6 +729,9 @@ fn report(
         }
     }
 
+    // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
+    // python)
+
     File::create(output)
         .expect("Cannot open file")
         .write_all(&plot.as_bytes())
