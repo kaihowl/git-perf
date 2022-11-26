@@ -578,6 +578,76 @@ impl From<DeserializationError> for ReportError {
     }
 }
 
+trait Reporter {
+    fn add_commits<'a>(&mut self, hashes: impl IntoIterator<Item = &'a Commit>);
+    fn add_trace<'a>(
+        &mut self,
+        indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
+        group_value: Option<impl AsRef<str>>,
+    );
+    fn as_bytes(&self) -> Vec<u8>;
+}
+
+struct PlotlyReporter {
+    plot: Plot,
+}
+
+impl PlotlyReporter {
+    fn new() -> PlotlyReporter {
+        PlotlyReporter { plot: Plot::new() }
+    }
+}
+
+impl Reporter for PlotlyReporter {
+    fn add_commits<'a>(&mut self, commits: impl IntoIterator<Item = &'a Commit>) {
+        let enumerated_commits = commits.into_iter().enumerate();
+
+        let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
+            .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
+            .unzip();
+        let x_axis = Axis::new()
+            .tick_values(commit_nrs)
+            .tick_text(short_hashes)
+            .tick_font(Font::new().family("monospace"));
+        let layout = Layout::new()
+            .title(Title::new("Something, something"))
+            .x_axis(x_axis);
+        self.plot.set_layout(layout);
+    }
+
+    fn add_trace<'a>(
+        &mut self,
+        indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
+        group_value: Option<impl AsRef<str>>,
+    ) {
+        let mut measurement_name = None;
+        let (x, y): (Vec<usize>, Vec<f64>) = indexed_measurements
+            .into_iter()
+            .inspect(|(_, md)| {
+                // TODO(kaihowl)
+                assert!(true);
+                measurement_name = Some(&md.name);
+            })
+            .map(|(i, m)| (i, m.val))
+            .unzip();
+
+        let measurement_name = measurement_name.expect("No measurements supplied for trace");
+        let trace = if let Some(group_value) = group_value {
+            BoxPlot::new_xy(x, y)
+                .name(group_value)
+                .legend_group(measurement_name)
+                .legend_group_title(LegendGroupTitle::new(measurement_name))
+        } else {
+            BoxPlot::new_xy(x, y).name(measurement_name)
+        };
+        self.plot.add_trace(trace);
+    }
+
+    fn as_bytes(&self) -> Vec<u8> {
+        self.plot.to_html().as_bytes().to_vec()
+    }
+}
+
 // TODO(kaihowl) needs more fine grained output e2e tests
 fn report(
     output: PathBuf,
@@ -586,26 +656,15 @@ fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
+    let mut plot = PlotlyReporter::new();
+
     println!("hoewelmk: separate_by: {:?}", separate_by);
-    let measurements = retrieve_measurements_by_commit(num_commits)?;
-    println!("hoewelmk: measurements.len: {:?}", measurements.len());
+    let mut commits = retrieve_measurements_by_commit(num_commits)?;
+    commits.reverse();
 
-    let enumerated_commits = measurements.iter().rev().enumerate();
+    println!("hoewelmk: measurements.len: {:?}", commits.len());
 
-    let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
-        .clone()
-        .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
-        .unzip();
-
-    let x_axis = Axis::new()
-        .tick_values(commit_nrs)
-        .tick_text(short_hashes)
-        .tick_font(Font::new().family("monospace"));
-    let layout = Layout::new()
-        .title(Title::new("Something, something"))
-        .x_axis(x_axis);
-    let mut plot = Plot::new();
-    plot.set_layout(layout);
+    plot.add_commits(&commits);
 
     let relevant = |m: &MeasurementData| {
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
@@ -617,10 +676,11 @@ fn report(
             .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
     };
 
-    let indexed_measurements = enumerated_commits.clone().flat_map(|(n, c)| {
-        c.measurements
+    let indexed_measurements = commits.iter().enumerate().flat_map(|(index, commit)| {
+        commit
+            .measurements
             .iter()
-            .map(move |m| (n, m))
+            .map(move |m| (index, m))
             .filter(|(_, m)| relevant(m))
     });
 
@@ -660,31 +720,18 @@ fn report(
         }
 
         for (group_key, group_value) in group_values {
-            let (x, y): (Vec<usize>, Vec<f64>) = filtered_measurements
-                .clone()
-                .filter(|(_, m)| {
-                    group_key
-                        .map(|key| m.key_values.get(key) == group_value)
-                        .unwrap_or(true)
-                })
-                .map(|(i, m)| (i, m.val))
-                .unzip();
-
-            let trace = if let Some(group_value) = group_value {
-                BoxPlot::new_xy(x, y)
-                    .name(group_value)
-                    .legend_group(measurement_name)
-                    .legend_group_title(LegendGroupTitle::new(measurement_name))
-            } else {
-                BoxPlot::new_xy(x, y).name(measurement_name)
-            };
-            plot.add_trace(trace);
+            let trace_measurements = filtered_measurements.clone().filter(|(_, m)| {
+                group_key
+                    .map(|key| m.key_values.get(key) == group_value)
+                    .unwrap_or(true)
+            });
+            plot.add_trace(trace_measurements, group_value);
         }
-        // TODO(kaihowl) check that separator is valid
     }
+
     File::create(output)
         .expect("Cannot open file")
-        .write_all(plot.to_html().as_bytes())
+        .write_all(&plot.as_bytes())
         .expect("Could not write file");
 
     Ok(())
