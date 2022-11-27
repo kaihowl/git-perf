@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::io::Write;
+use std::path::Path;
 use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
@@ -579,11 +580,11 @@ impl From<DeserializationError> for ReportError {
 }
 
 trait Reporter<'a> {
-    fn add_commits(&mut self, hashes: impl IntoIterator<Item = &'a Commit>);
+    fn add_commits(&mut self, hashes: &'a [Commit]);
     fn add_trace(
         &mut self,
-        indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
-        group_value: Option<impl AsRef<str>>,
+        indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        group_value: Option<&String>,
     );
     fn as_bytes(&self) -> Vec<u8>;
 }
@@ -599,8 +600,8 @@ impl PlotlyReporter {
 }
 
 impl<'a> Reporter<'a> for PlotlyReporter {
-    fn add_commits(&mut self, commits: impl IntoIterator<Item = &'a Commit>) {
-        let enumerated_commits = commits.into_iter().enumerate();
+    fn add_commits(&mut self, commits: &'a [Commit]) {
+        let enumerated_commits = commits.iter().enumerate();
 
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
             .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
@@ -617,8 +618,8 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
     fn add_trace(
         &mut self,
-        indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
-        group_value: Option<impl AsRef<str>>,
+        indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        group_value: Option<&String>,
     ) {
         let mut measurement_name = None;
         let (x, y): (Vec<usize>, Vec<f64>) = indexed_measurements
@@ -662,6 +663,21 @@ impl CsvReporter<'_> {
     }
 }
 
+struct ReporterFactory {}
+
+impl ReporterFactory {
+    fn from_file_name(path: &Path) -> Option<Box<dyn Reporter>> {
+        todo!()
+        // path.extension()
+        //     .map(|ext| match ext {
+        //         "html" => Some(PlotlyReporter::new()),
+        //         "csv" => Some(CsvReporter::new()),
+        //         default => None,
+        //     })
+        //     .flatten()
+    }
+}
+
 #[derive(Serialize)]
 struct HashAndMeasurement<'a> {
     commit: &'a str,
@@ -670,16 +686,16 @@ struct HashAndMeasurement<'a> {
 }
 
 impl<'a> Reporter<'a> for CsvReporter<'a> {
-    fn add_commits(&mut self, hashes: impl IntoIterator<Item = &'a Commit>) {
-        self.hashes = hashes.into_iter().map(|c| c.commit.to_owned()).collect();
+    fn add_commits(&mut self, hashes: &'a [Commit]) {
+        self.hashes = hashes.iter().map(|c| c.commit.to_owned()).collect();
     }
 
     fn add_trace(
         &mut self,
-        indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
-        _group_value: Option<impl AsRef<str>>,
+        indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        _group_value: Option<&String>,
     ) {
-        self.indexed_measurements = indexed_measurements.into_iter().collect();
+        self.indexed_measurements = indexed_measurements.to_vec();
     }
 
     fn as_bytes(&self) -> Vec<u8> {
@@ -771,11 +787,14 @@ fn report(
         }
 
         for (group_key, group_value) in group_values {
-            let trace_measurements = filtered_measurements.clone().filter(|(_, m)| {
-                group_key
-                    .map(|key| m.key_values.get(key) == group_value)
-                    .unwrap_or(true)
-            });
+            let trace_measurements: Vec<_> = filtered_measurements
+                .clone()
+                .filter(|(_, m)| {
+                    group_key
+                        .map(|key| m.key_values.get(key) == group_value)
+                        .unwrap_or(true)
+                })
+                .collect();
             plot.add_trace(trace_measurements, group_value);
         }
     }
