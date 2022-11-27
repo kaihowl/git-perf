@@ -685,7 +685,6 @@ impl ReporterFactory {
 #[derive(Serialize)]
 struct HashAndMeasurement<'a> {
     commit: &'a str,
-    #[serde(flatten)]
     measurement: &'a MeasurementData,
 }
 
@@ -699,12 +698,17 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
         _group_value: Option<&String>,
     ) {
-        self.indexed_measurements = indexed_measurements.to_vec();
+        self.indexed_measurements
+            .extend_from_slice(indexed_measurements.as_slice());
     }
 
     fn as_bytes(&self) -> Vec<u8> {
         // TODO(kaihowl) write to path directly instead?
-        let mut writer = csv::WriterBuilder::new().from_writer(vec![]);
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(false)
+            .flexible(true)
+            .from_writer(vec![]);
+
         for (index, measurement_data) in &self.indexed_measurements {
             writer
                 .serialize(HashAndMeasurement {
