@@ -578,9 +578,9 @@ impl From<DeserializationError> for ReportError {
     }
 }
 
-trait Reporter {
-    fn add_commits<'a>(&mut self, hashes: impl IntoIterator<Item = &'a Commit>);
-    fn add_trace<'a>(
+trait Reporter<'a> {
+    fn add_commits(&mut self, hashes: impl IntoIterator<Item = &'a Commit>);
+    fn add_trace(
         &mut self,
         indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
         group_value: Option<impl AsRef<str>>,
@@ -598,8 +598,8 @@ impl PlotlyReporter {
     }
 }
 
-impl Reporter for PlotlyReporter {
-    fn add_commits<'a>(&mut self, commits: impl IntoIterator<Item = &'a Commit>) {
+impl<'a> Reporter<'a> for PlotlyReporter {
+    fn add_commits(&mut self, commits: impl IntoIterator<Item = &'a Commit>) {
         let enumerated_commits = commits.into_iter().enumerate();
 
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
@@ -615,7 +615,7 @@ impl Reporter for PlotlyReporter {
         self.plot.set_layout(layout);
     }
 
-    fn add_trace<'a>(
+    fn add_trace(
         &mut self,
         indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
         group_value: Option<impl AsRef<str>>,
@@ -645,6 +645,57 @@ impl Reporter for PlotlyReporter {
 
     fn as_bytes(&self) -> Vec<u8> {
         self.plot.to_html().as_bytes().to_vec()
+    }
+}
+
+struct CsvReporter<'a> {
+    hashes: Vec<String>,
+    indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+}
+
+impl CsvReporter<'_> {
+    fn new() -> Self {
+        CsvReporter {
+            hashes: Vec::new(),
+            indexed_measurements: Vec::new(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct HashAndMeasurement<'a> {
+    commit: &'a str,
+    #[serde(flatten)]
+    measurement: &'a MeasurementData,
+}
+
+impl<'a> Reporter<'a> for CsvReporter<'a> {
+    fn add_commits(&mut self, hashes: impl IntoIterator<Item = &'a Commit>) {
+        self.hashes = hashes.into_iter().map(|c| c.commit.to_owned()).collect();
+    }
+
+    fn add_trace(
+        &mut self,
+        indexed_measurements: impl IntoIterator<Item = (usize, &'a MeasurementData)>,
+        _group_value: Option<impl AsRef<str>>,
+    ) {
+        self.indexed_measurements = indexed_measurements.into_iter().collect();
+    }
+
+    fn as_bytes(&self) -> Vec<u8> {
+        // TODO(kaihowl) write to path directly instead?
+        let mut writer = csv::WriterBuilder::new().from_writer(vec![]);
+        for (index, measurement_data) in &self.indexed_measurements {
+            writer
+                .serialize(HashAndMeasurement {
+                    commit: &self.hashes[*index],
+                    measurement: measurement_data,
+                })
+                .expect("inner serialization error TODO(kaihowl)")
+        }
+        writer
+            .into_inner()
+            .expect("serialization error TODO(kaihowl)")
     }
 }
 
