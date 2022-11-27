@@ -561,6 +561,7 @@ enum ReportError {
     InvalidSeparateBy,
     // Report would not contain any measurements
     NoMeasurements,
+    InvalidOutputFormat,
 }
 
 impl Display for ReportError {
@@ -569,6 +570,7 @@ impl Display for ReportError {
             ReportError::DeserializationError(e) => write!(f, "failed to read, {e}"),
             ReportError::InvalidSeparateBy => write!(f, "invalid separator supplied"),
             ReportError::NoMeasurements => write!(f, "no performance measurements found"),
+            ReportError::InvalidOutputFormat => write!(f, "could not infer output format"),
         }
     }
 }
@@ -666,15 +668,17 @@ impl CsvReporter<'_> {
 struct ReporterFactory {}
 
 impl ReporterFactory {
-    fn from_file_name(path: &Path) -> Option<Box<dyn Reporter>> {
-        todo!()
-        // path.extension()
-        //     .map(|ext| match ext {
-        //         "html" => Some(PlotlyReporter::new()),
-        //         "csv" => Some(CsvReporter::new()),
-        //         default => None,
-        //     })
-        //     .flatten()
+    fn from_file_name<'a, 'b: 'a>(path: &'b Path) -> Option<Box<dyn Reporter + 'a>> {
+        let mut res = None;
+        if let Some(ext) = path.extension() {
+            let extension = ext.to_ascii_lowercase().into_string().unwrap();
+            res = match extension.as_str() {
+                "html" => Some(Box::new(PlotlyReporter::new()) as Box<dyn Reporter>),
+                "csv" => Some(Box::new(CsvReporter::new()) as Box<dyn Reporter + 'a>),
+                _ => None,
+            }
+        }
+        res
     }
 }
 
@@ -723,11 +727,12 @@ fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
-    let mut plot = PlotlyReporter::new();
-
     println!("hoewelmk: separate_by: {:?}", separate_by);
     let mut commits = retrieve_measurements_by_commit(num_commits)?;
     commits.reverse();
+
+    let mut plot =
+        ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
 
     println!("hoewelmk: measurements.len: {:?}", commits.len());
 
@@ -802,7 +807,7 @@ fn report(
     // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
     // python)
 
-    File::create(output)
+    File::create(&output)
         .expect("Cannot open file")
         .write_all(&plot.as_bytes())
         .expect("Could not write file");
