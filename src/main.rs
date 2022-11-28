@@ -417,6 +417,8 @@ fn pull() -> Result<(), PushPullError> {
     let mut remote = repo
         .find_remote("origin")
         .expect("Did not find remote 'origin'");
+    // TODO(kaihowl) missing ssh support
+    // TODO(kaihowl) silently fails to update the local ref
     remote.fetch(&[&"refs/notes/perf:refs/notes/perf"], None, None)?;
     Ok(())
 }
