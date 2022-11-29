@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
@@ -765,6 +765,9 @@ struct ReporterFactory {}
 
 impl ReporterFactory {
     fn from_file_name<'a, 'b: 'a>(path: &'b Path) -> Option<Box<dyn Reporter + 'a>> {
+        if path == Path::new("-") {
+            return Some(Box::new(CsvReporter::new()) as Box<dyn Reporter + 'a>);
+        }
         let mut res = None;
         if let Some(ext) = path.extension() {
             let extension = ext.to_ascii_lowercase().into_string().unwrap();
@@ -907,10 +910,16 @@ fn report(
     // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
     // python)
 
-    File::create(&output)
-        .expect("Cannot open file")
-        .write_all(&plot.as_bytes())
-        .expect("Could not write file");
+    if output == Path::new("-") {
+        io::stdout()
+            .write_all(&plot.as_bytes())
+            .expect("Could not write to stdout");
+    } else {
+        File::create(&output)
+            .expect("Cannot open file")
+            .write_all(&plot.as_bytes())
+            .expect("Could not write file");
+    }
 
     Ok(())
 }
