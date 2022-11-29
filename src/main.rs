@@ -1,11 +1,10 @@
-use std::convert::identity;
 use std::fmt::Display;
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
-use git2::{Index, IndexEntry, IndexEntryExtendedFlag, MergeOptions, Repository};
+use git2::{Index, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -438,10 +437,6 @@ fn pull() -> Result<(), PushPullError> {
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
     let fetch_head = fetch_head.peel_to_commit()?;
     let index = repo.merge_commits(&notes, &fetch_head, None)?;
-    let index_paths = index
-        .iter()
-        .map(|i| String::from_utf8(i.path).unwrap())
-        .collect_vec();
 
     let mut out_index = Index::new()?;
     let mut conflict_entries = Vec::new();
