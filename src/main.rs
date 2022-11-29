@@ -1,3 +1,4 @@
+use std::convert::identity;
 use std::fmt::Display;
 use std::io::Write;
 use std::path::Path;
@@ -411,6 +412,18 @@ impl From<git2::Error> for PushPullError {
     }
 }
 
+/// Resolve conflicts between two measurement runs on the same commit by
+/// sorting and deduplicating lines.
+/// This emulates the cat_sort_uniq merge strategy for git notes.
+fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
+    ours.as_ref()
+        .lines()
+        .chain(theirs.as_ref().lines())
+        .sorted()
+        .dedup()
+        .join("\n")
+}
+
 fn pull() -> Result<(), PushPullError> {
     // TODO(kaihowl) missing conflict resolution
     let repo = Repository::open(".")?;
@@ -429,48 +442,54 @@ fn pull() -> Result<(), PushPullError> {
         .iter()
         .map(|i| String::from_utf8(i.path).unwrap())
         .collect_vec();
-    println!("TODO(kaihowl) index paths: {:?}", index_paths);
+
     let mut out_index = Index::new()?;
     let mut conflict_entries = Vec::new();
-    println!(
-        "TODO(kaihowl) index has_conflicts: {} and size: {}",
-        index.has_conflicts(),
-        index.len()
-    );
+
     if let Ok(conflicts) = index.conflicts() {
-        for conflict in conflicts {
-            let conflict = conflict.unwrap();
-            let our = conflict.our.unwrap();
-            let our_oid = our.id;
-            let our_content = String::from_utf8(repo.find_blob(our_oid)?.content().to_vec());
-            println!("ours: {:?}", our_content);
-            let their_oid = conflict.their.unwrap().id;
-            let our_content = String::from_utf8(repo.find_blob(their_oid)?.content().to_vec());
-            println!("theirs: {:?}", our_content);
-            conflict_entries.push(our);
-            // index.add(&our);
-        }
+        conflict_entries = conflicts.try_collect()?;
     }
+
     for entry in index.iter() {
-        if conflict_entries.iter().any(|c| c.path == entry.path) {
+        if conflict_entries.iter().any(|c| {
+            // TODO(kaihowl) think harder about this
+            let conflict_entry = if let Some(our) = &c.our {
+                our
+            } else {
+                c.their.as_ref().expect("Both our and their unset")
+            };
+
+            conflict_entry.path == entry.path
+        }) {
             continue;
         }
         out_index.add(&entry).expect("failing entry in new index");
     }
     for conflict in conflict_entries {
+        // TODO(kaihowl) no support for deleted / pruned measurements
+        let our = conflict.our.unwrap();
+        let our_oid = our.id;
+        let our_content = String::from_utf8(repo.find_blob(our_oid)?.content().to_vec())
+            .expect("UTF-8 error for our content");
+        let their_oid = conflict.their.unwrap().id;
+        let their_content = String::from_utf8(repo.find_blob(their_oid)?.content().to_vec())
+            .expect("UTF-8 error for their content");
+        let resolved_content = resolve_conflicts(&our_content, &their_content);
+        // TODO(kaihowl) what should this be set to instead of copied from?
+        let blob = repo.blob(resolved_content.as_bytes())?;
         let entry = IndexEntry {
-            ctime: conflict.ctime,
-            mtime: conflict.mtime,
-            dev: conflict.dev,
-            ino: conflict.ino,
-            mode: conflict.mode,
-            uid: conflict.uid,
-            gid: conflict.gid,
-            file_size: conflict.file_size,
-            id: conflict.id,
+            ctime: our.ctime,
+            mtime: our.mtime,
+            dev: our.dev,
+            ino: our.ino,
+            mode: our.mode,
+            uid: our.uid,
+            gid: our.gid,
+            file_size: 0, // TODO(kaihowl)
+            id: blob,
             flags: 0,
             flags_extended: 0,
-            path: conflict.path,
+            path: our.path,
         };
         out_index.add(&entry).expect("Could not add");
     }
@@ -1259,5 +1278,29 @@ mod test {
         };
         let serialized = serialize_single(&md);
         assert_eq!(serialized, "Mymeasurement 1234567.0 42.0 mykey=myvalue\n");
+    }
+
+    #[test]
+    fn test_resolve_conflicts() {
+        let a = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234567.0 42.0\n";
+        let b = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234890.0 22.0\n";
+
+        let resolved = resolve_conflicts(a, b);
+        assert!(resolved.contains("mymeasurement 1234567.0 23.0 key=value"));
+        assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
+        assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
+        assert_eq!(3, resolved.lines().count());
+    }
+
+    #[test]
+    fn test_resolve_conflicts_no_trailing_newline() {
+        let a = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234567.0 42.0";
+        let b = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234890.0 22.0";
+
+        let resolved = resolve_conflicts(a, b);
+        assert!(resolved.contains("mymeasurement 1234567.0 23.0 key=value"));
+        assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
+        assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
+        assert_eq!(3, resolved.lines().count());
     }
 }
