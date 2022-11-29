@@ -419,7 +419,7 @@ fn pull() -> Result<(), PushPullError> {
         .expect("Did not find remote 'origin'");
     // TODO(kaihowl) missing ssh support
     // TODO(kaihowl) silently fails to update the local ref
-    remote.fetch(&[&"refs/notes/perf"], None, None)?;
+    remote.fetch(&[&"refs/notes/perf:refs/notes/perf"], None, None)?;
     let notes = repo.find_reference("refs/notes/perf")?;
     let notes = notes.peel_to_commit()?;
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
