@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
-use git2::{Index, Repository};
+use git2::{Cred, Index, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -431,7 +431,19 @@ fn pull() -> Result<(), PushPullError> {
         .expect("Did not find remote 'origin'");
     // TODO(kaihowl) missing ssh support
     // TODO(kaihowl) silently fails to update the local ref
-    remote.fetch(&[&"refs/notes/perf:refs/notes/perf"], None, None)?;
+    let mut options = git2::FetchOptions::default();
+    let mut callbacks = git2::RemoteCallbacks::new();
+    callbacks.credentials(|_url, username_from_url, _allowed_types| {
+        Cred::ssh_key_from_agent(username_from_url.unwrap())
+    });
+    options.remote_callbacks(callbacks);
+
+    remote.fetch(
+        &[&"refs/notes/perf:refs/notes/perf"],
+        Some(&mut options),
+        None,
+    )?;
+
     let notes = repo.find_reference("refs/notes/perf")?;
     let notes = notes.peel_to_commit()?;
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
