@@ -477,20 +477,12 @@ fn pull() -> Result<(), PushPullError> {
         let resolved_content = resolve_conflicts(&our_content, &their_content);
         // TODO(kaihowl) what should this be set to instead of copied from?
         let blob = repo.blob(resolved_content.as_bytes())?;
-        let entry = IndexEntry {
-            ctime: our.ctime,
-            mtime: our.mtime,
-            dev: our.dev,
-            ino: our.ino,
-            mode: our.mode,
-            uid: our.uid,
-            gid: our.gid,
-            file_size: 0, // TODO(kaihowl)
-            id: blob,
-            flags: 0,
-            flags_extended: 0,
-            path: our.path,
-        };
+        let mut entry = our;
+        // Missing bindings for resolving conflict in libgit2-rs. Therefore, manually overwrite.
+        entry.flags = 0;
+        entry.flags_extended = 0;
+        entry.id = blob;
+
         out_index.add(&entry).expect("Could not add");
     }
     let out_index_paths = out_index
