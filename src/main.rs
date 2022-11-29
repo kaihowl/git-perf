@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
-use git2::Repository;
+use git2::{Index, IndexEntry, IndexEntryExtendedFlag, MergeOptions, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -419,7 +419,83 @@ fn pull() -> Result<(), PushPullError> {
         .expect("Did not find remote 'origin'");
     // TODO(kaihowl) missing ssh support
     // TODO(kaihowl) silently fails to update the local ref
-    remote.fetch(&[&"refs/notes/perf:refs/notes/perf"], None, None)?;
+    remote.fetch(&[&"refs/notes/perf"], None, None)?;
+    let notes = repo.find_reference("refs/notes/perf")?;
+    let notes = notes.peel_to_commit()?;
+    let fetch_head = repo.find_reference("FETCH_HEAD")?;
+    let fetch_head = fetch_head.peel_to_commit()?;
+    let index = repo.merge_commits(&notes, &fetch_head, None)?;
+    let index_paths = index
+        .iter()
+        .map(|i| String::from_utf8(i.path).unwrap())
+        .collect_vec();
+    println!("TODO(kaihowl) index paths: {:?}", index_paths);
+    let mut out_index = Index::new()?;
+    let mut conflict_entries = Vec::new();
+    println!(
+        "TODO(kaihowl) index has_conflicts: {} and size: {}",
+        index.has_conflicts(),
+        index.len()
+    );
+    if let Ok(conflicts) = index.conflicts() {
+        for conflict in conflicts {
+            let conflict = conflict.unwrap();
+            let our = conflict.our.unwrap();
+            let our_oid = our.id;
+            let our_content = String::from_utf8(repo.find_blob(our_oid)?.content().to_vec());
+            println!("ours: {:?}", our_content);
+            let their_oid = conflict.their.unwrap().id;
+            let our_content = String::from_utf8(repo.find_blob(their_oid)?.content().to_vec());
+            println!("theirs: {:?}", our_content);
+            conflict_entries.push(our);
+            // index.add(&our);
+        }
+    }
+    for entry in index.iter() {
+        if conflict_entries.iter().any(|c| c.path == entry.path) {
+            continue;
+        }
+        out_index.add(&entry).expect("failing entry in new index");
+    }
+    for conflict in conflict_entries {
+        let entry = IndexEntry {
+            ctime: conflict.ctime,
+            mtime: conflict.mtime,
+            dev: conflict.dev,
+            ino: conflict.ino,
+            mode: conflict.mode,
+            uid: conflict.uid,
+            gid: conflict.gid,
+            file_size: conflict.file_size,
+            id: conflict.id,
+            flags: 0,
+            flags_extended: 0,
+            path: conflict.path,
+        };
+        out_index.add(&entry).expect("Could not add");
+    }
+    let out_index_paths = out_index
+        .iter()
+        .map(|i| String::from_utf8(i.path).unwrap())
+        .collect_vec();
+    println!("TODO(kaihowl) out_index paths: {:?}", out_index_paths);
+    println!(
+        "TODO(kaihowl) out_index has_conflicts: {} and size: {}",
+        out_index.has_conflicts(),
+        out_index.len()
+    );
+    let merged_tree = repo.find_tree(out_index.write_tree_to(&repo)?)?;
+    // TODO(kaihowl) make this conditional on the conflicts.
+    let signature = repo.signature()?;
+    repo.commit(
+        Some("refs/notes/perf"),
+        &signature,
+        &signature,
+        "Merge it",
+        &merged_tree,
+        &[&notes, &fetch_head],
+    )?;
+    // repo.merge
     Ok(())
 }
 
