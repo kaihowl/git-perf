@@ -1,7 +1,6 @@
 #!/bin/bash
 
-set -e
-set -x
+set -euxo pipefail
 
 script_dir=$(dirname "$0")
 # shellcheck source=test/common.sh
@@ -37,7 +36,7 @@ git pull
 popd
 
 
-echo In first working copy, add a perf measurement and push it
+echo In first working copy, add a perf measurement, but do not push it
 pushd repo1
 git perf pull
 git perf add -m echo 0.5 -k repo=first
@@ -57,16 +56,20 @@ popd
 echo Pushing in second working copy should fail and require a pull first
 pushd repo2
 git perf push && exit 1
-out=$(mktemp).csv && git perf report -o "$out" && cat "$out"
+git perf report -o -
+num_measurements=$(git perf report -o - | wc -l)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 git perf pull
-out=$(mktemp).csv && git perf report -o "$out" && cat "$out"
+num_measurements=$(git perf report -o - | wc -l)
+[[ ${num_measurements} -eq 3 ]] || exit 1
 git perf push
 popd
 
 echo In the first working copy, we should see all three measurements now
 pushd repo1
 git perf pull
-out=$(mktemp).csv && git perf report -o "$out" && cat "$out"
+num_measurements=$(git perf report -o - | wc -l)
+[[ ${num_measurements} -eq 3 ]] || exit 1
 popd
 
 echo ---- Test case 2: No conflicts but merge needed.
@@ -87,12 +90,14 @@ pushd repo2
 git pull
 create_commit
 git perf add -m echo 0.5 -k repo=second
-out=$(mktemp).csv && git perf report -o "$out" && cat "$out"
+num_measurements=$(git perf report -o - | wc -l)
+[[ ${num_measurements} -eq 1 ]] || exit 1
 git push
 # There is a conflict, we must pull first
 git perf push && exit 1
 git perf pull
-out=$(mktemp).csv && git perf report -o "$out" && cat "$out"
+num_measurements=$(git perf report -o - | wc -l)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 git perf push
 popd
 
@@ -100,7 +105,8 @@ echo In the first working copy, we should also see both measurements on separate
 pushd repo1
 git pull
 git perf pull
-out=$(mktemp).csv && git perf report -o "$out" && cat "$out"
+num_measurements=$(git perf report -o - | wc -l)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 popd
 
 

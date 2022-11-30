@@ -266,7 +266,7 @@ fn handle_calls() -> Result<(), CliError> {
             command,
             measurement,
         } => {
-            println!(
+            eprintln!(
                 "Measurement: {}, Repetitions: {}, command: {:?}, key-values: {:?}",
                 measurement.name, repetitions, command, measurement.key_value
             );
@@ -496,8 +496,8 @@ fn pull() -> Result<(), PushPullError> {
         .iter()
         .map(|i| String::from_utf8(i.path).unwrap())
         .collect_vec();
-    println!("TODO(kaihowl) out_index paths: {:?}", out_index_paths);
-    println!(
+    eprintln!("TODO(kaihowl) out_index paths: {:?}", out_index_paths);
+    eprintln!(
         "TODO(kaihowl) out_index has_conflicts: {} and size: {}",
         out_index.has_conflicts(),
         out_index.len()
@@ -571,7 +571,7 @@ fn audit(
 
     let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
     let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
-    println!("head: {:?}, tail: {:?}", head_summary, tail_summary);
+    eprintln!("head: {:?}, tail: {:?}", head_summary, tail_summary);
 
     if head_summary.len == 0 {
         return Err(AuditError::NoMeasurementForHead);
@@ -579,12 +579,12 @@ fn audit(
 
     if tail_summary.len < min_count.into() {
         // TODO(kaihowl) handle with explicit return? Print text somewhere else?
-        println!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
+        eprintln!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
         return Ok(());
     }
 
     if head_summary.significantly_different_from(&tail_summary, sigma) {
-        println!("Measurements differ significantly");
+        eprintln!("Measurements differ significantly");
         // TODO(kaihowl) print details
         return Err(AuditError::SignificantDifference);
     }
@@ -617,15 +617,15 @@ where
 {
     let s: AggStats = commits
         .filter_map(|c| {
-            println!("{:?}", c.commit);
+            eprintln!("{:?}", c.commit);
             c.measurements
                 .iter()
                 .filter(filter_by)
-                .inspect(|m| println!("{:?}", m))
+                .inspect(|m| eprintln!("{:?}", m))
                 .map(|m| m.val)
                 .aggregate_by(aggregate_by)
         })
-        .inspect(|m| println!("aggregated value ({:?}): {:?}", aggregate_by, m))
+        .inspect(|m| eprintln!("aggregated value ({:?}): {:?}", aggregate_by, m))
         .collect();
     Stats {
         mean: s.mean(),
@@ -830,14 +830,14 @@ fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
-    println!("hoewelmk: separate_by: {:?}", separate_by);
+    eprintln!("hoewelmk: separate_by: {:?}", separate_by);
     let mut commits = retrieve_measurements_by_commit(num_commits)?;
     commits.reverse();
 
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
 
-    println!("hoewelmk: measurements.len: {:?}", commits.len());
+    eprintln!("hoewelmk: measurements.len: {:?}", commits.len());
 
     plot.add_commits(&commits);
 
