@@ -1055,7 +1055,7 @@ fn serialize_single(measurement_data: &MeasurementData) -> String {
     String::from_utf8(writer.into_inner().unwrap()).unwrap()
 }
 
-fn deserialize(lines: &str) -> Result<Vec<MeasurementData>, DeserializationError> {
+fn deserialize(lines: &str) -> Vec<MeasurementData> {
     let reader = csv::ReaderBuilder::new()
         .delimiter(b' ')
         .has_headers(false)
@@ -1064,32 +1064,48 @@ fn deserialize(lines: &str) -> Result<Vec<MeasurementData>, DeserializationError
 
     reader
         .into_records()
-        .map(|r| {
+        .filter_map(|r| {
+            if let Err(e) = &r {
+                eprintln!("{e}, skipping record.");
+            }
+            let record = r.ok()?;
             let fixed_headers = vec!["name", "timestamp", "val"];
 
-            let (headers, values): (csv::StringRecord, csv::StringRecord) = r?
+            let mut skip_record = false;
+            let (headers, values): (csv::StringRecord, csv::StringRecord) = record
                 .into_iter()
                 .zip_longest(fixed_headers)
-                .map(|pair| match pair {
-                    EitherOrBoth::Both(val, header) => (header, val),
+                .filter_map(|pair| match pair {
+                    EitherOrBoth::Both(val, header) => Some((header, val)),
                     EitherOrBoth::Right(_) => {
-                        // TODO(kaihowl) skip the record instead
-                        panic!("Too few values");
+                        eprintln!("Too few items, skipping record");
+                        skip_record = true;
+                        None
                     }
                     EitherOrBoth::Left(keyvalue) => match keyvalue.split_once('=') {
-                        Some(a) => a,
+                        Some(a) => Some(a),
                         None => {
-                            // TODO(kaihowl) skip the record instead
-                            panic!("No equals sign in key value pair");
+                            eprintln!("No equals sign in key value pair, skipping record");
+                            skip_record = true;
+                            None
                         }
                     },
                 })
                 .unzip();
 
-            let md: MeasurementData = values.deserialize(Some(&headers)).unwrap();
-            Ok(md)
+            if skip_record {
+                None
+            } else {
+                match values.deserialize(Some(&headers)) {
+                    Ok(md) => Some(md),
+                    Err(e) => {
+                        eprintln!("{e}, skipping record");
+                        None
+                    }
+                }
+            }
         })
-        .try_collect()
+        .collect()
 }
 
 fn walk_commits(
@@ -1106,11 +1122,11 @@ fn walk_commits(
             let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
                 // TODO(kaihowl) remove unwrap_or
                 Ok(note) => deserialize(note.message().unwrap_or("")),
-                Err(_) => Ok([].into()),
+                Err(_) => [].into(),
             };
             Ok(Commit {
                 commit: commit_id.to_string(),
-                measurements: measurements?,
+                measurements,
             })
         })
         .try_collect()
@@ -1215,8 +1231,8 @@ mod test {
             ]
             .into(),
         };
-        assert_eq!(actual.as_ref().unwrap().len(), 1);
-        assert_eq!(actual.unwrap()[0], expected);
+        assert_eq!(actual.len(), 1);
+        assert_eq!(actual[0], expected);
     }
 
     #[test]
