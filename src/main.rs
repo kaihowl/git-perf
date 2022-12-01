@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
+use std::{os, process};
 
 use git2::{Cred, Index, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
@@ -53,11 +54,12 @@ enum Commands {
         #[arg(short = 'n', long, value_parser=clap::value_parser!(u16).range(1..), default_value = "1")]
         repetitions: u16,
 
-        /// Command to measure
-        command: Vec<String>,
-
         #[command(flatten)]
         measurement: CliMeasurement,
+
+        /// Command to measure
+        #[arg(required(true), last(true))]
+        command: Vec<String>,
     },
 
     /// Add single measurement
@@ -266,11 +268,12 @@ fn handle_calls() -> Result<(), CliError> {
             command,
             measurement,
         } => {
-            eprintln!(
-                "Measurement: {}, Repetitions: {}, command: {:?}, key-values: {:?}",
-                measurement.name, repetitions, command, measurement.key_value
+            measure(
+                &measurement.name,
+                repetitions,
+                &command,
+                &measurement.key_value,
             );
-            todo!()
         }
         Commands::Add { value, measurement } => {
             Ok(add(&measurement.name, value, &measurement.key_value)?)
@@ -389,6 +392,19 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
     .expect("TODO(kaihowl) note failed");
 
     Ok(())
+}
+
+fn measure(
+    measurement: &str,
+    repetitions: u16,
+    command: &[String],
+    key_values: &[(String, String)],
+) -> Result<(), AddError> {
+    // for i in 0..repetitions {
+    //     process::Command
+    // }
+    dbg!(command);
+    todo!()
 }
 
 #[derive(Debug)]
