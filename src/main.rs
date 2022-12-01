@@ -409,7 +409,15 @@ fn measure(
         let mut process = process::Command::new(exe);
         process.args(args);
         let start = Instant::now();
-        let _ = process.output().expect("Command failed TODO(kaihowl)");
+        let output = process
+            .output()
+            .expect("Command failed to spawn TODO(kaihowl)");
+        output
+            .status
+            .success()
+            .then_some(())
+            .ok_or("TODO(kaihowl) running error")
+            .expect("TODO(kaihowl)");
         let duration = start.elapsed();
         let duration_usec = duration.as_micros() as f64;
         add(measurement, duration_usec, key_values)?;
