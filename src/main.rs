@@ -864,14 +864,11 @@ fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
-    eprintln!("hoewelmk: separate_by: {:?}", separate_by);
     let mut commits = retrieve_measurements_by_commit(num_commits)?;
     commits.reverse();
 
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
-
-    eprintln!("hoewelmk: measurements.len: {:?}", commits.len());
 
     plot.add_commits(&commits);
 
