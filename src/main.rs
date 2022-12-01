@@ -949,8 +949,7 @@ struct Commit {
 #[derive(Debug, Deserialize, PartialEq)]
 struct MeasurementData {
     name: String,
-    // TODO(kaihowl) change type
-    timestamp: f32,
+    timestamp: f64,
     // TODO(kaihowl) check size of type
     val: f64,
     #[serde(flatten)]
@@ -961,7 +960,7 @@ struct MeasurementData {
 #[derive(Debug, PartialEq, Serialize)]
 struct SerializeMeasurementData<'a> {
     name: &'a str,
-    timestamp: f32,
+    timestamp: f64,
     val: f64,
     #[serde(serialize_with = "key_value_serialization")]
     key_values: &'a HashMap<String, String>,
