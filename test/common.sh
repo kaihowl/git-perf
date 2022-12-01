@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-PS4='${LINENO}: '
+PS4='${BASH_SOURCE}:${LINENO}: '
 set -x
 
 shopt -s nocasematch
