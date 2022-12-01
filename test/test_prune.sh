@@ -38,13 +38,13 @@ git perf add -m test 5
 git perf prune
 nr_notes=$(git notes --ref=perf list | wc -l)
 if [[ $nr_notes -ne 1 ]]; then
-  echo Expected to have 1 note but found "$nr_notes" instead
+  echo "Expected to have 1 note but found '$nr_notes' instead"
   exit 1
 fi
 git reset --hard HEAD~1
 nr_notes=$(git notes --ref=perf list | wc -l)
 if [[ $nr_notes -ne 1 ]]; then
-  echo Expected to have 1 note but found "$nr_notes" instead
+  echo "Expected to have 1 note but found '$nr_notes' instead"
   exit 1
 fi
 git reflog expire --expire-unreachable=now --all
@@ -52,6 +52,6 @@ git prune --expire=now
 git perf prune
 nr_notes=$(git notes --ref=perf list | wc -l)
 if [[ $nr_notes -ne 0 ]]; then
-  echo Expected to have no notes but found "$nr_notes" instead
+  echo "Expected to have no notes but found '$nr_notes' instead"
   exit 1
 fi
