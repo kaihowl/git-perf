@@ -1018,22 +1018,14 @@ where
 
 #[derive(Debug)]
 enum DeserializationError {
-    CsvError(csv::Error),
     GitError(git2::Error),
 }
 
 impl Display for DeserializationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeserializationError::CsvError(e) => write!(f, "csv error, {e}"),
             DeserializationError::GitError(e) => write!(f, "git error, {e}"),
         }
-    }
-}
-
-impl From<csv::Error> for DeserializationError {
-    fn from(value: csv::Error) -> Self {
-        DeserializationError::CsvError(value)
     }
 }
 
@@ -1117,7 +1109,9 @@ fn walk_commits(
     num_commits: usize,
 ) -> Result<Vec<Commit>, DeserializationError> {
     let mut revwalk = repo.revwalk()?;
-    revwalk.push_head()?;
+    if revwalk.push_head().is_err() {
+        return Ok(Vec::new());
+    }
     revwalk.simplify_first_parent()?;
     revwalk
         .take(num_commits)
