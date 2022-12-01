@@ -1,9 +1,10 @@
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::path::Path;
+use std::process;
 use std::process::ExitCode;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
-use std::{os, process};
 
 use git2::{Cred, Index, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
@@ -357,7 +358,11 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
     let head = head.peel_to_commit()?;
     let author = repo.signature()?;
     // TODO(kaihowl) configure
-    let timestamp = author.when().seconds() as f32;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("TODO(kaihowl)");
+
+    let timestamp = timestamp.as_secs_f64();
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
 
     let md = MeasurementData {
@@ -398,11 +403,18 @@ fn measure(
     command: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), AddError> {
-    // for i in 0..repetitions {
-    //     process::Command
-    // }
-    dbg!(command);
-    todo!()
+    let exe = command.first().unwrap();
+    let args = &command[1..];
+    for _ in 0..repetitions {
+        let mut process = process::Command::new(exe);
+        process.args(args);
+        let start = Instant::now();
+        let _ = process.output().expect("Command failed TODO(kaihowl)");
+        let duration = start.elapsed();
+        let duration_usec = duration.as_micros() as f64;
+        add(measurement, duration_usec, key_values)?;
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
