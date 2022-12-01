@@ -51,6 +51,7 @@ if [[ ${output} != *'invalid separator'* ]]; then
   exit 1
 fi
 
+# TODO(kaihowl) reactivate / check
 # output=$(git perf report -g does-not-exist 2>&1 1>/dev/null) && exit 1
 # if [[ ${output} != *'does-not-exist'* ]]; then
 #   echo No warning for invalid grouper 'does-not-exist'
