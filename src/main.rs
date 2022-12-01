@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
+use csv::StringRecord;
 use git2::{Cred, Index, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
@@ -1069,6 +1070,9 @@ fn deserialize(lines: &str) -> Vec<MeasurementData> {
                 eprintln!("{e}, skipping record.");
             }
             let record = r.ok()?;
+            // Filter empty record fields: Repeated whitespace in records does not count as
+            // a field separator.
+            let record: StringRecord = record.into_iter().filter(|f| !f.is_empty()).collect();
             let fixed_headers = vec!["name", "timestamp", "val"];
 
             let mut skip_record = false;
@@ -1233,6 +1237,29 @@ mod test {
         };
         assert_eq!(actual.len(), 1);
         assert_eq!(actual[0], expected);
+    }
+
+    #[test]
+    fn key_value_invalid_pair() {
+        // Missing equals sign in first line, should be skipped
+        let lines = "test 1234 123 key1 value1\n\
+                     test2 4567 890 key2=value2";
+
+        let expected = [MeasurementData {
+            name: "test2".to_string(),
+            timestamp: 4567.0,
+            val: 890.0,
+            key_values: [("key2".to_string(), "value2".to_string())].into(),
+        }];
+        let actual = deserialize(lines);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn additional_whitespace_deserialization() {
+        let lines = "test   1234     123";
+        let actual = deserialize(lines);
+        assert_eq!(1, actual.len());
     }
 
     #[test]
