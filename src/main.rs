@@ -267,14 +267,12 @@ fn handle_calls() -> Result<(), CliError> {
             repetitions,
             command,
             measurement,
-        } => {
-            measure(
-                &measurement.name,
-                repetitions,
-                &command,
-                &measurement.key_value,
-            );
-        }
+        } => Ok(measure(
+            &measurement.name,
+            repetitions,
+            &command,
+            &measurement.key_value,
+        )?),
         Commands::Add { value, measurement } => {
             Ok(add(&measurement.name, value, &measurement.key_value)?)
         }
