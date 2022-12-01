@@ -36,8 +36,8 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "myothermeasurement $RANDOM key=value"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ ${output} != *'found non-numeric value'* ]]; then
-  echo Missing 'found non-numeric value' in output:
+if [[ ${output} != *'skipping'* ]]; then
+  echo Missing 'skipping' in output:
   echo "$output"
   exit 1
 fi
@@ -58,9 +58,8 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "myothermeasurement $(date +%s) $RANDOM test othertest stuff"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ -n ${output} ]]; then
-  echo There should be no output in stderr but instead there is:
-  echo "$output"
+if [[ -z ${output} ]]; then
+  echo There should be output in stderr but instead it is empty
   exit 1
 fi
 
