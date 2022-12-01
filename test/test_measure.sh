@@ -9,7 +9,8 @@ source "$script_dir/common.sh"
 
 cd_temp_repo
 output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'following arguments'* ]]; then
+re=".*following (required )?arguments.*"
+if [[ ! ${output} =~ $re ]]; then
   echo Missing 'following arguments' in output:
   echo "$output"
   exit 1
