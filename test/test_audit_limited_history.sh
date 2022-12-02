@@ -16,7 +16,7 @@ git perf add -m timer 3
 git perf audit -m timer
 echo Only one historical measurement available
 git checkout HEAD~1
-git perf add -m timer 4
+git perf add -m timer 3
 git checkout -
 git perf audit -m timer
 echo Two historical measurements available
@@ -43,23 +43,15 @@ echo New measurement for HEAD but only historical measurements for different mea
 git perf add -m timer 3
 git perf audit -m timer
 
-echo Only single historical measurement available, should accept new measurement
+echo New measurement not acceptable, but min_measurements not reached, therefore accept
 cd_temp_repo
 git checkout HEAD~1
-git perf add -m timer 3
+git perf add -m timer 2
 git checkout -
-git perf add -m timer 4
-git perf audit -m timer
+git perf add -m timer 3
+git perf audit -m timer && exit 1
+git perf audit -m timer --min-measurements 1 && exit 1
+git perf audit -m timer --min-measurements 2
 
-echo Two historical measurements available, and acceptable new measurement
-cd_temp_repo
-git checkout HEAD~2
-git perf add -m timer 3
-git checkout -
-git checkout HEAD~1
-git perf add -m timer 4
-git checkout -
-git perf add -m timer 5
-git perf audit -m timer
 
 exit 0
