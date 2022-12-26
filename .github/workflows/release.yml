@@ -106,6 +106,12 @@ jobs:
       run: |
         echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
         echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
+
+    - name: Use static OpenSSL
+      shell: bash
+      run: |
+        echo "TARGET_FLAGS=${{ env.TARGET_FLAGS }} --features vendored-openssl" >> $GITHUB_ENV
+
     - name: Show command used for Cargo
       run: |
         echo "cargo command is: ${{ env.CARGO }}"

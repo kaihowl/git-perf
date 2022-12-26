@@ -14,4 +14,8 @@ git2 = "0.15.0"
 itertools = "0.10.5"
 plotly = "0.8.3"
 serde = { version = "1.0.145", features = ["derive"] }
+# Only there to allow setting a static openssl for musl
+openssl = { version = '0.10', optional = true }
 
+[features]
+vendored-openssl = ["openssl?/vendored"]
