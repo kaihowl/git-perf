@@ -59,8 +59,6 @@ jobs:
     needs: ['create-release']
     runs-on: ${{ matrix.os }}
     env:
-      # For some builds, we use cross to test on 32-bit and big-endian
-      # systems.
       CARGO: cargo
       # When CARGO is set to CROSS, this is set to `--target matrix.target`.
       TARGET_FLAGS: ""
@@ -103,11 +101,9 @@ jobs:
         toolchain: ${{ matrix.rust }}
         target: ${{ matrix.target }}
 
-    - name: Use Cross
+    - name: Setup environment
       shell: bash
       run: |
-        cargo install cross
-        echo "CARGO=cross" >> $GITHUB_ENV
         echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
         echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
     - name: Show command used for Cargo
