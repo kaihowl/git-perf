@@ -51,6 +51,7 @@ jobs:
         with:
           tag_name: ${{ env.PERF_VERSION }}
           release_name: ${{ env.PERF_VERSION }}
+          prerelease: true
 
   build-release:
     name: build-release
