@@ -7,7 +7,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
 use csv::StringRecord;
-use git2::{Cred, Index, Repository};
+use git2::{Cred, Index, PushOptions, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -558,7 +558,13 @@ fn push() -> Result<(), PushPullError> {
     let mut remote = repo
         .find_remote("origin")
         .expect("Did not find remote 'origin'");
-    remote.push(&[&"refs/notes/perf:refs/notes/perf"], None)?;
+    let mut options = PushOptions::new();
+    let mut callbacks = git2::RemoteCallbacks::new();
+    callbacks.credentials(|_url, username_from_url, _allowed_types| {
+        Cred::ssh_key_from_agent(username_from_url.unwrap())
+    });
+    options.remote_callbacks(callbacks);
+    remote.push(&[&"refs/notes/perf:refs/notes/perf"], Some(&mut options))?;
     Ok(())
 }
 
