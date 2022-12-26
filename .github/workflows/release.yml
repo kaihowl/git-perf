@@ -88,7 +88,11 @@ jobs:
     - name: Install packages (Ubuntu)
       if: matrix.os == 'ubuntu-22.04'
       run: |
-        sudo apt-get install libssl-dev pkg-config musl-tools
+        sudo apt-get install -y libssl-dev pkg-config musl-tools
+        sudo apt-get install -y --no-install-recommends \
+          asciidoctor \
+          zsh xz-utils liblz4-tool musl-tools \
+          brotli zstd
     # - name: Install packages (macOS)
     #   if: matrix.os == 'macos-12'
     #   run: |
