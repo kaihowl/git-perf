@@ -137,7 +137,7 @@ jobs:
     - name: Build archive
       shell: bash
       run: |
-        outdir="$(ci/cargo-out-dir "${{ env.TARGET_DIR }}")"
+        outdir="${{ env.TARGET_DIR }}/release"
         staging="gitperf-${{ needs.create-release.outputs.perf_version }}-${{ matrix.target }}"
         mkdir -p "$staging"/{complete,doc}
         # TODO(kaihowl)
