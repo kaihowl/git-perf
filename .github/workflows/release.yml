@@ -151,8 +151,8 @@ jobs:
         #   # The man page is only generated on Unix systems. ¯\_(ツ)_/¯
         #   cp "$outdir"/rg.1 "$staging/doc/"
         cp "target/${{ matrix.target }}/release/git-perf" "$staging/"
-        #   tar czf "$staging.tar.gz" "$staging"
-        #   echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
+        tar czf "$staging.tar.gz" "$staging"
+        echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
         # fi
     - name: Upload release archive
       uses: actions/upload-release-asset@v1.0.2
