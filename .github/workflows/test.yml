@@ -7,14 +7,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-on:
-  push:
-    branches:
-    - master
-    - build/*
-  pull_request:
-    branches:
-      - master
+on: []
 jobs:
   test:
     name: test
