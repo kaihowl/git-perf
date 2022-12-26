@@ -17,13 +17,11 @@
 name: release
 on:
   push:
-    branches:
-      - build/rust-slab
     # Enable when testing release infrastructure on a branch.
     # branches:
     # - ag/work
-    # tags:
-    # - "[0-9]+.[0-9]+.[0-9]+"
+    tags:
+    - "[0-9]+.[0-9]+.[0-9]+"
 jobs:
   create-release:
     # TODO(kaihowl) use supported release action. E.g., please-release
@@ -33,7 +31,7 @@ jobs:
       # Set to force version number, e.g., when no tag exists.
       # PERF_VERSION: TEST-0.0.0
     outputs:
-      # upload_url: ${{ steps.release.outputs.upload_url }}
+      upload_url: ${{ steps.release.outputs.upload_url }}
       PERF_VERSION: ${{ env.PERF_VERSION }}
     steps:
       - name: Get the release version from the tag
@@ -45,14 +43,14 @@ jobs:
           # See: https://github.community/t5/GitHub-Actions/How-to-get-just-the-tag-name/m-p/32167/highlight/true#M1027
           echo "PERF_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           echo "version is: ${{ env.PERF_VERSION }}"
-      # - name: Create GitHub release
-      #   id: release
-      #   uses: actions/create-release@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     tag_name: ${{ env.PERF_VERSION }}
-      #     release_name: ${{ env.PERF_VERSION }}
+      - name: Create GitHub release
+        id: release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.PERF_VERSION }}
+          release_name: ${{ env.PERF_VERSION }}
 
   build-release:
     name: build-release
@@ -156,12 +154,12 @@ jobs:
         #   tar czf "$staging.tar.gz" "$staging"
         #   echo "ASSET=$staging.tar.gz" >> $GITHUB_ENV
         # fi
-    # - name: Upload release archive
-    #   uses: actions/upload-release-asset@v1.0.2
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   with:
-    #     upload_url: ${{ needs.create-release.outputs.upload_url }}
-    #     asset_path: ${{ env.ASSET }}
-    #     asset_name: ${{ env.ASSET }}
-    #     asset_content_type: application/octet-stream
+    - name: Upload release archive
+      uses: actions/upload-release-asset@v1.0.2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ${{ env.ASSET }}
+        asset_name: ${{ env.ASSET }}
+        asset_content_type: application/octet-stream
