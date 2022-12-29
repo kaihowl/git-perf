@@ -18,7 +18,6 @@ serde = { version = "1.0.145", features = ["derive"] }
 [dev-dependencies]
 tempfile = "3.3.0"
 httptest = "0.15.4"
-rstest = "0.16.0"
 
 [features]
 vendored-openssl = ["git2/vendored-openssl"]
