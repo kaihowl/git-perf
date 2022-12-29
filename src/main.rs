@@ -1154,7 +1154,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
-    use std::env::set_current_dir;
+    use std::{env::set_current_dir, fs::read_to_string};
 
     use httptest::{
         http::header::AUTHORIZATION,
@@ -1422,10 +1422,17 @@ mod test {
         let url = server.url_str("");
         repo.remote("origin", &url).expect("Failed to add remote");
 
+        let mut config = repo.config().expect("Failed to get config");
+        let config_key = format!("http.{}.extraHeader", url);
+        let extra_header = "AUTHORIZATION: sometoken";
+        config
+            .set_str(&config_key, extra_header)
+            .expect("Failed to set config value");
+
         server.expect(
             Expectation::matching(request::headers(matchers::contains((
                 AUTHORIZATION.as_str(),
-                matchers::any(),
+                "sometoken",
             ))))
             .respond_with(status_code(200)),
         );
