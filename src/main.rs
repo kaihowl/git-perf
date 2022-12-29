@@ -1434,6 +1434,7 @@ mod test {
                 AUTHORIZATION.as_str(),
                 "sometoken",
             ))))
+            .times(1..)
             .respond_with(status_code(200)),
         );
 
