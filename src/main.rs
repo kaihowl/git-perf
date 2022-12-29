@@ -1144,7 +1144,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
-    use std::env::set_current_dir;
+    use std::{env::set_current_dir, fs::read_to_string};
 
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
@@ -1387,6 +1387,9 @@ mod test {
 
     fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
         let tempdir = tempdir().unwrap();
+        dbg!(&tempdir);
+        dbg!(&extra_header);
+        dbg!(&origin_url);
 
         let url = origin_url.to_string();
 
@@ -1398,6 +1401,9 @@ mod test {
         config
             .set_str(&config_key, extra_header)
             .expect("Failed to set config value");
+
+        let stuff = read_to_string(tempdir.path().join(".git/config")).expect("No config");
+        eprintln!("config:\n{}", stuff);
 
         tempdir
     }
