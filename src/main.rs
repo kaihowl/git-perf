@@ -1154,6 +1154,16 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
+    use std::env::set_current_dir;
+
+    use httptest::{
+        http::header::AUTHORIZATION,
+        matchers::{self, any, contains, request},
+        responders::status_code,
+        Expectation, Server,
+    };
+    use tempfile::tempdir;
+
     use crate::*;
 
     #[test]
@@ -1383,5 +1393,46 @@ mod test {
         assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
         assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
         assert_eq!(3, resolved.lines().count());
+    }
+
+    // struct PrintingResponder {}
+    //
+    // impl Responder for PrintingResponder {
+    //     fn respond<'a>(
+    //         &mut self,
+    //         req: &'a httptest::http::Request<httptest::bytes::Bytes>,
+    //     ) -> std::pin::Pin<
+    //         Box<
+    //             dyn std::future::Future<Output = httptest::http::Response<hyper::Body>> + Send + 'a,
+    //         >,
+    //     > {
+    //         println!("{:?}", req);
+    //         status_code(200).respond(req)
+    //     }
+    // }
+
+    #[test]
+    fn test_customheader_push() {
+        let tempdir = tempdir().unwrap();
+        let repo = git2::Repository::init(&tempdir).expect("Failed to create repo");
+        set_current_dir(&tempdir).expect("Failed to change dir");
+
+        let server = Server::run();
+
+        let url = server.url_str("");
+        repo.remote("origin", &url).expect("Failed to add remote");
+
+        server.expect(
+            Expectation::matching(request::headers(matchers::contains((
+                AUTHORIZATION.as_str(),
+                matchers::any(),
+            ))))
+            .respond_with(status_code(200)),
+        );
+
+        // TODO(kaihowl) not so great test as this fails with/without authorization
+        // We only want to verify that a call on the server with the authorization header was
+        // received.
+        pull().expect_err("We have no valid git http server setup -> should fail");
     }
 }
