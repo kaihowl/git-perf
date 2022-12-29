@@ -1,8 +1,9 @@
+use std::env::current_dir;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::path::Path;
-use std::process;
 use std::process::ExitCode;
+use std::process::{self, Command};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
@@ -278,8 +279,8 @@ fn handle_calls() -> Result<(), CliError> {
         Commands::Add { value, measurement } => {
             Ok(add(&measurement.name, value, &measurement.key_value)?)
         }
-        Commands::Push {} => Ok(push()?),
-        Commands::Pull {} => Ok(pull()?),
+        Commands::Push {} => Ok(push(None)?),
+        Commands::Pull {} => Ok(pull(None)?),
         Commands::Report {
             output,
             separate_by,
@@ -458,10 +459,16 @@ fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
         .join("\n")
 }
 
-fn pull() -> Result<(), PushPullError> {
+fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+    let work_dir = match work_dir {
+        Some(dir) => dir.to_path_buf(),
+        None => current_dir().expect("Could not determine current working directory"),
+    };
+
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
     process::Command::new("git")
         .args(["pull", "origin", "refs/notes/perf:refs/notes/perf"])
+        .current_dir(work_dir)
         .spawn()
         .expect("TODO(kaihowl) handle me")
         .wait()
@@ -542,19 +549,20 @@ fn pull() -> Result<(), PushPullError> {
     Ok(())
 }
 
-fn push() -> Result<(), PushPullError> {
-    let repo = Repository::open(".")?;
+fn push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+    let work_dir = match work_dir {
+        Some(dir) => dir.to_path_buf(),
+        None => current_dir().expect("Could not determine current working directory"),
+    };
     // TODO(kaihowl) configure remote?
-    let mut remote = repo
-        .find_remote("origin")
-        .expect("Did not find remote 'origin'");
-    let mut options = PushOptions::new();
-    let mut callbacks = git2::RemoteCallbacks::new();
-    callbacks.credentials(|_url, username_from_url, _allowed_types| {
-        Cred::ssh_key_from_agent(username_from_url.unwrap())
-    });
-    options.remote_callbacks(callbacks);
-    remote.push(&[&"refs/notes/perf:refs/notes/perf"], Some(&mut options))?;
+    // TODO(kaihowl) factor into constants
+    Command::new("git")
+        .args(["push", "origin", "refs/notes/perf:refs/notes/perf"])
+        .current_dir(work_dir)
+        .spawn()
+        .expect("TODO(kaihowl) handle me")
+        .wait()
+        .expect("TODO(kaihowl) handle me");
     Ok(())
 }
 
@@ -1146,6 +1154,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 mod test {
     use std::{env::set_current_dir, fs::read_to_string};
 
+    use git2::Signature;
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
         matchers::{self, request},
@@ -1385,6 +1394,32 @@ mod test {
         assert_eq!(3, resolved.lines().count());
     }
 
+    fn init_repo(dir: &Path) -> Repository {
+        let repo = git2::Repository::init(dir).expect("Failed to create repo");
+        {
+            let tree_oid = repo
+                .treebuilder(None)
+                .expect("Failed to create tree")
+                .write()
+                .expect("Failed to write tree");
+            let tree = &repo
+                .find_tree(tree_oid)
+                .expect("Could not find written tree");
+            let signature = Signature::now("fake", "fake@example.com").expect("No signature");
+            repo.commit(
+                Some("refs/notes/perf"),
+                &signature,
+                &signature,
+                "Initial commit",
+                tree,
+                &[],
+            )
+            .expect("Failed to create first commit");
+        }
+
+        repo
+    }
+
     fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
         let tempdir = tempdir().unwrap();
         dbg!(&tempdir);
@@ -1393,7 +1428,8 @@ mod test {
 
         let url = origin_url.to_string();
 
-        let repo = git2::Repository::init(&tempdir).expect("Failed to create repo");
+        let repo = init_repo(tempdir.path());
+
         repo.remote("origin", &url).expect("Failed to add remote");
 
         let mut config = repo.config().expect("Failed to get config");
@@ -1414,8 +1450,6 @@ mod test {
         let repo_dir =
             dir_with_repo_and_customheader(test_server.url(""), "AUTHORIZATION: sometoken");
 
-        set_current_dir(&repo_dir).expect("Failed to change dir");
-
         test_server.expect(
             Expectation::matching(request::headers(matchers::contains((
                 AUTHORIZATION.as_str(),
@@ -1428,7 +1462,8 @@ mod test {
         // TODO(kaihowl) not so great test as this fails with/without authorization
         // We only want to verify that a call on the server with the authorization header was
         // received.
-        pull().expect_err("We have no valid git http server setup -> should fail");
+        pull(Some(repo_dir.path()))
+            .expect_err("We have no valid git http server setup -> should fail");
     }
 
     #[test]
@@ -1448,6 +1483,7 @@ mod test {
             .respond_with(status_code(200)),
         );
 
-        push().expect_err("We have no valid git http sever setup -> should fail");
+        push(Some(repo_dir.path()))
+            .expect_err("We have no valid git http sever setup -> should fail");
     }
 }
