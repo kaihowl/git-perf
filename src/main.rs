@@ -1144,7 +1144,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
-    use std::{env::set_current_dir,};
+    use std::env::set_current_dir;
 
     use httptest::{
         http::header::AUTHORIZATION,
@@ -1384,22 +1384,6 @@ mod test {
         assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
         assert_eq!(3, resolved.lines().count());
     }
-
-    // struct PrintingResponder {}
-    //
-    // impl Responder for PrintingResponder {
-    //     fn respond<'a>(
-    //         &mut self,
-    //         req: &'a httptest::http::Request<httptest::bytes::Bytes>,
-    //     ) -> std::pin::Pin<
-    //         Box<
-    //             dyn std::future::Future<Output = httptest::http::Response<hyper::Body>> + Send + 'a,
-    //         >,
-    //     > {
-    //         println!("{:?}", req);
-    //         status_code(200).respond(req)
-    //     }
-    // }
 
     #[test]
     fn test_customheader_push() {
