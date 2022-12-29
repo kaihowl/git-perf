@@ -1385,7 +1385,7 @@ mod test {
         assert_eq!(3, resolved.lines().count());
     }
 
-    fn dir_with_repo_and_customheader(origin_url: Uri) -> TempDir {
+    fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
         let tempdir = tempdir().unwrap();
 
         let url = origin_url.to_string();
@@ -1395,7 +1395,6 @@ mod test {
 
         let mut config = repo.config().expect("Failed to get config");
         let config_key = format!("http.{}.extraHeader", url);
-        let extra_header = "AUTHORIZATION: sometoken";
         config
             .set_str(&config_key, extra_header)
             .expect("Failed to set config value");
@@ -1406,7 +1405,8 @@ mod test {
     #[test]
     fn test_customheader_push() {
         let test_server = Server::run();
-        let repo_dir = dir_with_repo_and_customheader(test_server.url(""));
+        let repo_dir =
+            dir_with_repo_and_customheader(test_server.url(""), "AUTHORIZATION: sometoken");
 
         set_current_dir(&repo_dir).expect("Failed to change dir");
 
@@ -1423,5 +1423,25 @@ mod test {
         // We only want to verify that a call on the server with the authorization header was
         // received.
         pull().expect_err("We have no valid git http server setup -> should fail");
+    }
+
+    #[test]
+    fn test_customheader_pull() {
+        let test_server = Server::run();
+        let repo_dir =
+            dir_with_repo_and_customheader(test_server.url(""), "AUTHORIZATION: someothertoken");
+
+        set_current_dir(&repo_dir).expect("Failed to change dir");
+
+        test_server.expect(
+            Expectation::matching(request::headers(matchers::contains((
+                AUTHORIZATION.as_str(),
+                "someothertoken",
+            ))))
+            .times(1..)
+            .respond_with(status_code(200)),
+        );
+
+        push().expect_err("We have no valid git http sever setup -> should fail");
     }
 }
