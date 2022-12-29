@@ -1144,11 +1144,11 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
-    use std::{env::set_current_dir, fs::read_to_string};
+    use std::{env::set_current_dir,};
 
     use httptest::{
         http::header::AUTHORIZATION,
-        matchers::{self, any, contains, request},
+        matchers::{self, request},
         responders::status_code,
         Expectation, Server,
     };
