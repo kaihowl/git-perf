@@ -1147,12 +1147,12 @@ mod test {
     use std::env::set_current_dir;
 
     use httptest::{
-        http::header::AUTHORIZATION,
+        http::{header::AUTHORIZATION, Uri},
         matchers::{self, request},
         responders::status_code,
         Expectation, Server,
     };
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
 
     use crate::*;
 
@@ -1385,15 +1385,12 @@ mod test {
         assert_eq!(3, resolved.lines().count());
     }
 
-    #[test]
-    fn test_customheader_push() {
+    fn dir_with_repo_and_customheader(origin_url: Uri) -> TempDir {
         let tempdir = tempdir().unwrap();
+
+        let url = origin_url.to_string();
+
         let repo = git2::Repository::init(&tempdir).expect("Failed to create repo");
-        set_current_dir(&tempdir).expect("Failed to change dir");
-
-        let server = Server::run();
-
-        let url = server.url_str("");
         repo.remote("origin", &url).expect("Failed to add remote");
 
         let mut config = repo.config().expect("Failed to get config");
@@ -1403,7 +1400,17 @@ mod test {
             .set_str(&config_key, extra_header)
             .expect("Failed to set config value");
 
-        server.expect(
+        tempdir
+    }
+
+    #[test]
+    fn test_customheader_push() {
+        let test_server = Server::run();
+        let repo_dir = dir_with_repo_and_customheader(test_server.url(""));
+
+        set_current_dir(&repo_dir).expect("Failed to change dir");
+
+        test_server.expect(
             Expectation::matching(request::headers(matchers::contains((
                 AUTHORIZATION.as_str(),
                 "sometoken",
