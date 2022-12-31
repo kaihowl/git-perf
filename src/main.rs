@@ -44,7 +44,8 @@ struct CliMeasurement {
 
 #[derive(Args)]
 struct CliReportHistory {
-    /// Limit the number of previous commits considered
+    /// Limit the number of previous commits considered.
+    /// HEAD is included in this count.
     #[arg(short = 'n', long, default_value = "40")]
     max_count: usize,
 }
@@ -650,7 +651,7 @@ fn audit(
     aggregate_by: AggregationFunc,
     sigma: f64,
 ) -> Result<(), AuditError> {
-    let all = retrieve_measurements_by_commit(max_count + 1)?; // include HEAD
+    let all = retrieve_measurements_by_commit(max_count)?; // include HEAD
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement
