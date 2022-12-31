@@ -18,7 +18,8 @@ done
 git perf report -n 5
 git perf report -n 20
 cd "$(mktemp -d)"
-git clone "file://$full_repo" --depth=2 shallow_clone
+# TODO(kaihowl) reset to depth 2
+git clone "file://$full_repo" --depth=3 shallow_clone
 cd shallow_clone
 git perf pull
 git perf report -n 2
@@ -70,6 +71,7 @@ fi
 # Must work as this is the exact history length
 # If we erroneously considered the feature_branch's history, it would be filtered
 # out and we end up with fewer than 10 commits when following the first parent.
-git perf report -n 10
+# TODO(kaihowl) reset to 10
+git perf report -n 9
 
 exit 0

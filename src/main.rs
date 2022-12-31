@@ -1080,7 +1080,9 @@ enum DeserializationError {
 impl Display for DeserializationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeserializationError::GitError(e) => write!(f, "git error, {e}"),
+            DeserializationError::GitError(e) => {
+                write!(f, "git error (maybe shallow clone not deep enough?), {e}")
+            }
         }
     }
 }
@@ -1183,6 +1185,10 @@ fn walk_commits(
                 measurements,
             })
         })
+        // When this fails it is due to a shallow clone.
+        // TODO(kaihowl) proper shallow clone support
+        // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
+        // last commit because the parent cannot be loooked up.
         .try_collect()
 }
 
