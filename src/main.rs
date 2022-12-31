@@ -467,7 +467,7 @@ fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
         .join("\n")
 }
 
-fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+fn fetch(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     let work_dir = match work_dir {
         Some(dir) => dir.to_path_buf(),
         None => current_dir().expect("Could not determine current working directory"),
@@ -475,20 +475,35 @@ fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
 
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
     let status = process::Command::new("git")
-        .args(["pull", "origin", "refs/notes/perf:refs/notes/perf"])
+        .args(["fetch", "origin", "refs/notes/perf"])
         .current_dir(work_dir)
         .status()?;
 
-    if status.code() != Some(0) {
-        return Err(PushPullError::RawGitError);
+    match status.code() {
+        Some(0) => Ok(()),
+        _ => Err(PushPullError::RawGitError),
     }
+}
 
-    // TODO(kaihowl) missing conflict resolution
+fn reconcile() -> Result<(), PushPullError> {
     let repo = Repository::open(".")?;
-    let notes = repo.find_reference("refs/notes/perf")?;
-    let notes = notes.peel_to_commit()?;
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
     let fetch_head = fetch_head.peel_to_commit()?;
+
+    let notes = match repo.find_reference("refs/notes/perf") {
+        Ok(reference) => reference,
+        Err(_) => {
+            repo.reference(
+                "refs/notes/perf",
+                fetch_head.id(),
+                false, /* this should never fail */
+                "init perf notes",
+            )?;
+            return Ok(());
+        }
+    };
+
+    let notes = notes.peel_to_commit()?;
     let index = repo.merge_commits(&notes, &fetch_head, None)?;
 
     let mut out_index = Index::new()?;
@@ -556,6 +571,11 @@ fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     )?;
     // repo.merge
     Ok(())
+}
+
+fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+    fetch(work_dir)?;
+    reconcile()
 }
 
 fn push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
