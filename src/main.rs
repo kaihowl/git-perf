@@ -8,7 +8,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
 use csv::StringRecord;
-use git2::{Cred, Index, PushOptions, Repository};
+use git2::{Index, Repository};
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -430,13 +430,15 @@ fn measure(
 #[derive(Debug)]
 enum PushPullError {
     Git(git2::Error),
+    RawGitError,
 }
 
 // TODO(kaihowl) code repetition with other git-only errors
 impl Display for PushPullError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PushPullError::Git(e) => write!(f, "git error, {e}"),
+            PushPullError::Git(e) => write!(f, "libgit2 error, {e}"),
+            PushPullError::RawGitError => write!(f, "git error"),
         }
     }
 }
@@ -444,6 +446,12 @@ impl Display for PushPullError {
 impl From<git2::Error> for PushPullError {
     fn from(e: git2::Error) -> Self {
         PushPullError::Git(e)
+    }
+}
+
+impl From<io::Error> for PushPullError {
+    fn from(_: io::Error) -> Self {
+        PushPullError::RawGitError
     }
 }
 
@@ -466,13 +474,14 @@ fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     };
 
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    process::Command::new("git")
+    let status = process::Command::new("git")
         .args(["pull", "origin", "refs/notes/perf:refs/notes/perf"])
         .current_dir(work_dir)
-        .spawn()
-        .expect("TODO(kaihowl) handle me")
-        .wait()
-        .expect("TODO(kaihowl) handle this as well");
+        .status()?;
+
+    if status.code() != Some(0) {
+        return Err(PushPullError::RawGitError);
+    }
 
     // TODO(kaihowl) missing conflict resolution
     let repo = Repository::open(".")?;
@@ -556,14 +565,16 @@ fn push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     };
     // TODO(kaihowl) configure remote?
     // TODO(kaihowl) factor into constants
-    Command::new("git")
+    // TODO(kaihowl) capture output
+    let status = Command::new("git")
         .args(["push", "origin", "refs/notes/perf:refs/notes/perf"])
         .current_dir(work_dir)
-        .spawn()
-        .expect("TODO(kaihowl) handle me")
-        .wait()
-        .expect("TODO(kaihowl) handle me");
-    Ok(())
+        .status()?;
+
+    match status.code() {
+        Some(0) => Ok(()),
+        _ => Err(PushPullError::RawGitError),
+    }
 }
 
 #[derive(Debug)]
