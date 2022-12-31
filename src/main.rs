@@ -431,6 +431,7 @@ fn measure(
 enum PushPullError {
     Git(git2::Error),
     RawGitError,
+    RetriesExceeded,
 }
 
 // TODO(kaihowl) code repetition with other git-only errors
@@ -439,6 +440,7 @@ impl Display for PushPullError {
         match self {
             PushPullError::Git(e) => write!(f, "libgit2 error, {e}"),
             PushPullError::RawGitError => write!(f, "git error"),
+            PushPullError::RetriesExceeded => write!(f, "retries exceeded"),
         }
     }
 }
@@ -579,6 +581,24 @@ fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
 }
 
 fn push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+    let mut retries = 3;
+
+    // TODO(kaihowl) do actual, random backoff
+    // TODO(kaihowl) check transient/permanent error
+    while retries > 0 {
+        match raw_push(work_dir) {
+            Ok(_) => return Ok(()),
+            Err(_) => {
+                retries -= 1;
+                pull(work_dir)?;
+            }
+        }
+    }
+
+    Err(PushPullError::RetriesExceeded)
+}
+
+fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     let work_dir = match work_dir {
         Some(dir) => dir.to_path_buf(),
         None => current_dir().expect("Could not determine current working directory"),

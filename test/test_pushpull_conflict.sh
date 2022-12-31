@@ -53,16 +53,12 @@ pushd repo1
 git perf push
 popd
 
-echo Pushing in second working copy should fail and require a pull first
+echo Pushing in second working copy should automatically pull and reconcile
 pushd repo2
-git perf push && exit 1
+git perf push
 git perf report -o -
 num_measurements=$(git perf report -o - | wc -l)
-[[ ${num_measurements} -eq 2 ]] || exit 1
-git perf pull
-num_measurements=$(git perf report -o - | wc -l)
 [[ ${num_measurements} -eq 3 ]] || exit 1
-git perf push
 popd
 
 echo In the first working copy, we should see all three measurements now
@@ -93,12 +89,10 @@ git perf add -m echo 0.5 -k repo=second
 num_measurements=$(git perf report -o - | wc -l)
 [[ ${num_measurements} -eq 1 ]] || exit 1
 git push
-# There is a conflict, we must pull first
-git perf push && exit 1
-git perf pull
+# There is a conflict, it should automatically pull first
+git perf push
 num_measurements=$(git perf report -o - | wc -l)
 [[ ${num_measurements} -eq 2 ]] || exit 1
-git perf push
 popd
 
 echo In the first working copy, we should also see both measurements on separate commits now
