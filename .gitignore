@@ -2,6 +2,8 @@
 /.tox/
 /dist/
 
+test.txt
+
 
 # Added by cargo
 
