@@ -12,12 +12,11 @@ cd deep
 
 git init
 
-# TODO(kaihowl) increase range
-for _i in $(seq 1 3); do
+for _i in $(seq 1 100); do
   echo a >> a
   git add a
   git commit -m 'test' -q
-  ${script_dir}/perf_test.py
+  "${script_dir}/perf_test.py"
   git notes --ref=perf add -F test.txt
 done
 
