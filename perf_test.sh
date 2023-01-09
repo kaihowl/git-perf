@@ -34,9 +34,12 @@ git fetch origin master --depth=1
 git checkout -b test-branch origin/master
 
 # TODO(kaihowl) debug
-export PATH=~/Documents/repos/git-perf/target/Debug:$PATH
+export PATH=~/Documents/repos/git-perf/target/Release:$PATH
 
-git perf add -m test -k os=something 12.0
+gtime -v git perf add -m test -k os=something 12.0
+
+# Prefetch to avoid spending the push time mostly on fetching
+gtime -v git fetch origin refs/notes/perf
 
 gtime -v git perf push
 
