@@ -555,13 +555,12 @@ fn reconcile() -> Result<(), PushPullError> {
         .iter()
         .map(|i| String::from_utf8(i.path).unwrap())
         .collect_vec();
-    eprintln!("TODO(kaihowl) out_index paths: {:?}", out_index_paths);
-    eprintln!(
-        "TODO(kaihowl) out_index has_conflicts: {} and size: {}",
-        out_index.has_conflicts(),
-        out_index.len()
-    );
+
+    dbg!(&out_index_paths);
+    dbg!(out_index.has_conflicts());
+    dbg!(out_index.len());
     let merged_tree = repo.find_tree(out_index.write_tree_to(&repo)?)?;
+
     // TODO(kaihowl) make this conditional on the conflicts.
     let signature = repo.signature()?;
     repo.commit(
@@ -662,7 +661,9 @@ fn audit(
 
     let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
     let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
-    eprintln!("head: {:?}, tail: {:?}", head_summary, tail_summary);
+    // TODO(kaihowl) user proper logging tools
+    dbg!(&head_summary);
+    dbg!(&tail_summary);
 
     if head_summary.len == 0 {
         return Err(AuditError::NoMeasurementForHead);
@@ -708,15 +709,20 @@ where
 {
     let s: AggStats = commits
         .filter_map(|c| {
-            eprintln!("{:?}", c.commit);
+            dbg!(&c.commit);
             c.measurements
                 .iter()
                 .filter(filter_by)
-                .inspect(|m| eprintln!("{:?}", m))
+                .inspect(|m| {
+                    dbg!(m);
+                })
                 .map(|m| m.val)
                 .aggregate_by(aggregate_by)
         })
-        .inspect(|m| eprintln!("aggregated value ({:?}): {:?}", aggregate_by, m))
+        .inspect(|m| {
+            dbg!(aggregate_by);
+            dbg!(m);
+        })
         .collect();
     Stats {
         mean: s.mean(),
