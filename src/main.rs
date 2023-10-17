@@ -628,6 +628,7 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
 
 #[derive(Debug)]
 enum PruneError {
+    ShallowRepo,
     RawGitError,
 }
 
@@ -641,14 +642,21 @@ impl Display for PruneError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PruneError::RawGitError => write!(f, "git error"),
+            PruneError::ShallowRepo => write!(f, "shallow repo"),
         }
     }
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
 fn prune() -> Result<(), PruneError> {
+    match is_shallow_repo() {
+        Some(true) => return Err(PruneError::ShallowRepo),
+        None => return Err(PruneError::RawGitError),
+        _ => {}
+    }
+
     let status = process::Command::new("git")
-        .args(["notes", "prune", "--ref", "refs/notes/perf"])
+        .args(["notes", "--ref", "refs/notes/perf", "prune"])
         .status()?;
 
     match status.code() {
@@ -1236,6 +1244,19 @@ fn walk_commits(
         // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
         // last commit because the parent cannot be loooked up.
         .try_collect()
+}
+
+fn is_shallow_repo() -> Option<bool> {
+    match process::Command::new("git")
+        .args(["ref-parse", "--is-shallow-repository"])
+        .output()
+    {
+        Ok(out) => match std::str::from_utf8(&out.stdout) {
+            Ok(out) => Some(out.starts_with("true")),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    }
 }
 
 fn generate_manpage() -> Result<(), std::io::Error> {
