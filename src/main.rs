@@ -224,6 +224,7 @@ fn parse_spaceless_string(s: &str) -> Result<String, String> {
 enum CliError {
     Add(AddError),
     PushPull(PushPullError),
+    Prune(PruneError),
     Report(ReportError),
     Audit(AuditError),
 }
@@ -235,6 +236,7 @@ impl Display for CliError {
             CliError::PushPull(e) => write!(f, "During push/pull: {e}"),
             CliError::Report(e) => write!(f, "During report: {e}"),
             CliError::Audit(e) => write!(f, "During audit: {e}"),
+            CliError::Prune(e) => write!(f, "During prune: {e}"),
         }
     }
 }
@@ -260,6 +262,12 @@ impl From<AuditError> for CliError {
 impl From<PushPullError> for CliError {
     fn from(e: PushPullError) -> Self {
         CliError::PushPull(e)
+    }
+}
+
+impl From<PruneError> for CliError {
+    fn from(e: PruneError) -> Self {
+        CliError::Prune(e)
     }
 }
 
@@ -316,7 +324,7 @@ fn handle_calls() -> Result<(), CliError> {
             )?)
         }
         Commands::Good { measurement: _ } => todo!(),
-        Commands::Prune {} => todo!(),
+        Commands::Prune {} => Ok(prune()?),
         Commands::Manpage {} => {
             generate_manpage().expect("Man page generation failed");
             Ok(())
@@ -497,6 +505,7 @@ fn reconcile() -> Result<(), PushPullError> {
         Ok(reference) => reference,
         Err(_) => {
             repo.reference(
+                // TODO(kaihowl) pull into constant / configuration
                 "refs/notes/perf",
                 fetch_head.id(),
                 false, /* this should never fail */
@@ -614,6 +623,37 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     match status.code() {
         Some(0) => Ok(()),
         _ => Err(PushPullError::RawGitError),
+    }
+}
+
+#[derive(Debug)]
+enum PruneError {
+    RawGitError,
+}
+
+impl From<io::Error> for PruneError {
+    fn from(_: io::Error) -> Self {
+        PruneError::RawGitError
+    }
+}
+
+impl Display for PruneError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PruneError::RawGitError => write!(f, "git error"),
+        }
+    }
+}
+
+// TODO(kaihowl) what happens with a git dir supplied with -C?
+fn prune() -> Result<(), PruneError> {
+    let status = process::Command::new("git")
+        .args(["notes", "prune", "--ref", "refs/notes/perf"])
+        .status()?;
+
+    match status.code() {
+        Some(0) => Ok(()),
+        _ => Err(PruneError::RawGitError),
     }
 }
 
