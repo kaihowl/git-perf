@@ -15,9 +15,6 @@ export GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.co
 export GIT_AUTHOR_NAME="github-actions[bot]"
 export GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
 
-PATH=${script_dir}/..:$PATH
-export PATH
-
 function cd_empty_repo() {
   local tmpgit
   tmpgit="$(mktemp -d)"
