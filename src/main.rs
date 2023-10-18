@@ -133,14 +133,6 @@ enum Commands {
         sigma: f64,
     },
 
-    /// Accept HEAD commit's measurement for audit, even if outside of range.
-    /// This is allows to accept expected performance changes.
-    /// It will copy the current HEAD's measurements to the amended HEAD commit.
-    Good {
-        #[command(flatten)]
-        measurement: CliMeasurement,
-    },
-
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
@@ -323,7 +315,6 @@ fn handle_calls() -> Result<(), CliError> {
                 sigma,
             )?)
         }
-        Commands::Good { measurement: _ } => todo!(),
         Commands::Prune {} => Ok(prune()?),
         Commands::Manpage {} => {
             generate_manpage().expect("Man page generation failed");
