@@ -490,10 +490,11 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), PushPullError> {
         .current_dir(work_dir)
         .status()?;
 
-    match status.code() {
-        Some(0) => Ok(()),
-        _ => Err(PushPullError::RawGitError),
+    if !status.success() {
+        return Err(PushPullError::RawGitError);
     }
+
+    Ok(())
 }
 
 fn reconcile() -> Result<(), PushPullError> {
@@ -659,10 +660,11 @@ fn prune() -> Result<(), PruneError> {
         .args(["notes", "--ref", "refs/notes/perf", "prune"])
         .status()?;
 
-    match status.code() {
-        Some(0) => Ok(()),
-        _ => Err(PruneError::RawGitError),
+    if !status.success() {
+        return Err(PruneError::RawGitError);
     }
+
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -1251,11 +1253,11 @@ fn is_shallow_repo() -> Option<bool> {
         .args(["ref-parse", "--is-shallow-repository"])
         .output()
     {
-        Ok(out) => match std::str::from_utf8(&out.stdout) {
+        Ok(out) if out.status.success() => match std::str::from_utf8(&out.stdout) {
             Ok(out) => Some(out.starts_with("true")),
             Err(_) => None,
         },
-        Err(_) => None,
+        _ => None,
     }
 }
 
