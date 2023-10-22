@@ -368,6 +368,8 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
 
     let md = MeasurementData {
+        // TODO(hoewelmk)
+        epoch: 0,
         name: measurement.to_owned(),
         timestamp,
         val: value,
@@ -1067,6 +1069,7 @@ struct Commit {
 
 #[derive(Debug, Deserialize, PartialEq)]
 struct MeasurementData {
+    epoch: i32,
     name: String,
     timestamp: f64,
     // TODO(kaihowl) check size of type
@@ -1078,6 +1081,7 @@ struct MeasurementData {
 // TODO(kaihowl) serialization with flatten and custom function does not work
 #[derive(Debug, PartialEq, Serialize)]
 struct SerializeMeasurementData<'a> {
+    epoch: i32,
     name: &'a str,
     timestamp: f64,
     val: f64,
@@ -1097,6 +1101,7 @@ impl Serialize for MeasurementData {
 impl<'a> From<&'a MeasurementData> for SerializeMeasurementData<'a> {
     fn from(md: &'a MeasurementData) -> Self {
         SerializeMeasurementData {
+            epoch: md.epoch,
             name: md.name.as_str(),
             timestamp: md.timestamp,
             val: md.val,
@@ -1150,7 +1155,9 @@ fn serialize_single(measurement_data: &MeasurementData) -> String {
     writer
         .serialize(measurement_data)
         .expect("TODO(kaihowl) fix me");
-    String::from_utf8(writer.into_inner().unwrap()).unwrap()
+    let result = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+    println!("My result: {}", result);
+    result
 }
 
 fn deserialize(lines: &str) -> Vec<MeasurementData> {
@@ -1170,7 +1177,7 @@ fn deserialize(lines: &str) -> Vec<MeasurementData> {
             // Filter empty record fields: Repeated whitespace in records does not count as
             // a field separator.
             let record: StringRecord = record.into_iter().filter(|f| !f.is_empty()).collect();
-            let fixed_headers = vec!["name", "timestamp", "val"];
+            let fixed_headers = vec!["epoch", "name", "timestamp", "val"];
 
             let mut skip_record = false;
             let (headers, values): (csv::StringRecord, csv::StringRecord) = record
@@ -1209,6 +1216,7 @@ fn deserialize(lines: &str) -> Vec<MeasurementData> {
         .collect()
 }
 
+// TODO(hoewelmk) copies all measurements, expensive...
 fn walk_commits(
     repo: &git2::Repository,
     num_commits: usize,
@@ -1290,6 +1298,7 @@ mod test {
                 Commit {
                     commit: "deadbeef".into(),
                     measurements: [MeasurementData {
+                        epoch: 0,
                         name: "mymeasurement".into(),
                         timestamp: 120.0,
                         val: 0.1,
@@ -1311,6 +1320,7 @@ mod test {
         let commits = vec![Commit {
             commit: "deadbeef".into(),
             measurements: [MeasurementData {
+                epoch: 0,
                 name: "mymeasurement".into(),
                 timestamp: 123.0,
                 val: 1.0,
@@ -1350,9 +1360,10 @@ mod test {
 
     #[test]
     fn key_value_deserialization() {
-        let lines = "test 1234 123 key1=value1 key2=value2";
+        let lines = "0 test 1234 123 key1=value1 key2=value2";
         let actual = deserialize(lines);
         let expected = MeasurementData {
+            epoch: 0,
             name: "test".to_string(),
             timestamp: 1234.0,
             val: 123.0,
@@ -1369,10 +1380,11 @@ mod test {
     #[test]
     fn key_value_invalid_pair() {
         // Missing equals sign in first line, should be skipped
-        let lines = "test 1234 123 key1 value1\n\
-                     test2 4567 890 key2=value2";
+        let lines = "0 test 1234 123 key1 value1\n\
+                     0 test2 4567 890 key2=value2";
 
         let expected = [MeasurementData {
+            epoch: 0,
             name: "test2".to_string(),
             timestamp: 4567.0,
             val: 890.0,
@@ -1384,7 +1396,7 @@ mod test {
 
     #[test]
     fn additional_whitespace_deserialization() {
-        let lines = "test   1234     123";
+        let lines = "0     test     1234     123";
         let actual = deserialize(lines);
         assert_eq!(1, actual.len());
     }
@@ -1479,13 +1491,14 @@ mod test {
     #[test]
     fn test_serialize_single() {
         let md = MeasurementData {
+            epoch: 3,
             name: "Mymeasurement".into(),
             timestamp: 1234567.0,
             val: 42.0,
             key_values: [("mykey".to_string(), "myvalue".to_string())].into(),
         };
         let serialized = serialize_single(&md);
-        assert_eq!(serialized, "Mymeasurement 1234567.0 42.0 mykey=myvalue\n");
+        assert_eq!(serialized, "3 Mymeasurement 1234567.0 42.0 mykey=myvalue\n");
     }
 
     #[test]
