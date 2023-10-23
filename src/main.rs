@@ -136,10 +136,13 @@ enum Commands {
 
     /// Accept HEAD commit's measurement for audit, even if outside of range.
     /// This is allows to accept expected performance changes.
-    /// It will copy the current HEAD's measurements to the amended HEAD commit.
-    Good {
-        #[command(flatten)]
-        measurement: CliMeasurement,
+    /// This is accomplished by starting a new epoch for the given measurement.
+    /// The epoch is configured in the git perf config file.
+    /// A change to the epoch therefore has to be committed and will result in a new HEAD for which
+    /// new measurements have to be taken.
+    BumpEpoch {
+        #[arg(short = 'm', long = "measurement", value_parser=parse_spaceless_string)]
+        measurement: String,
     },
 
     /// Remove all performance measurements for non-existent/unreachable objects.
@@ -228,6 +231,7 @@ enum CliError {
     Prune(PruneError),
     Report(ReportError),
     Audit(AuditError),
+    BumpError(BumpError),
 }
 
 impl Display for CliError {
@@ -238,6 +242,7 @@ impl Display for CliError {
             CliError::Report(e) => write!(f, "During report: {e}"),
             CliError::Audit(e) => write!(f, "During audit: {e}"),
             CliError::Prune(e) => write!(f, "During prune: {e}"),
+            CliError::BumpError(e) => write!(f, "During bumping of epoch: {e}"),
         }
     }
 }
@@ -269,6 +274,12 @@ impl From<PushPullError> for CliError {
 impl From<PruneError> for CliError {
     fn from(e: PruneError) -> Self {
         CliError::Prune(e)
+    }
+}
+
+impl From<BumpError> for CliError {
+    fn from(e: BumpError) -> Self {
+        CliError::BumpError(e)
     }
 }
 
@@ -324,7 +335,7 @@ fn handle_calls() -> Result<(), CliError> {
                 sigma,
             )?)
         }
-        Commands::Good { measurement: _ } => todo!(),
+        Commands::BumpEpoch { measurement } => Ok(bump_epoch(&measurement)?),
         Commands::Prune {} => Ok(prune()?),
         Commands::Manpage {} => {
             generate_manpage().expect("Man page generation failed");
@@ -383,6 +394,19 @@ fn determine_epoch_from_file(measurement: &str, file: &str) -> Option<i32> {
         }
     }
     None
+}
+
+#[derive(Debug)]
+enum BumpError {}
+
+impl Display for BumpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unspecified bumping error")
+    }
+}
+
+fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
+    todo!()
 }
 
 fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
