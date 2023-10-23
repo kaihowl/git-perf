@@ -9,6 +9,7 @@ use std::{collections::HashMap, fs::File, path::PathBuf, str};
 
 use csv::StringRecord;
 use git2::{Index, Repository};
+use ini::Ini;
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -353,6 +354,28 @@ impl From<git2::Error> for AddError {
     }
 }
 
+fn determine_epoch(measurement: &str) -> i32 {
+    // TODO(hoewelmk) configure path, use different working directory than repo root
+    determine_epoch_from_file(measurement, ".gitperfconfig").unwrap_or(0)
+}
+
+fn determine_epoch_from_file(measurement: &str, file: &str) -> Option<i32> {
+    let config = Ini::load_from_file(file).ok()?;
+    for (section, properties) in config.iter() {
+        if section != Some("epochs") {
+            continue;
+        }
+
+        for (key, value) in properties.iter() {
+            // TODO(hoewelmk) always prefers the first found
+            if key == measurement {
+                return i32::from_str_radix(value, 16).ok();
+            }
+        }
+    }
+    None
+}
+
 fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
     // TODO(kaihowl) configure path
     let repo = Repository::open(".")?;
@@ -369,7 +392,7 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
 
     let md = MeasurementData {
         // TODO(hoewelmk)
-        epoch: 0,
+        epoch: determine_epoch(measurement),
         name: measurement.to_owned(),
         timestamp,
         val: value,
