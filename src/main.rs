@@ -1334,7 +1334,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
-    use std::{env::set_current_dir, fs::read_to_string};
+    use std::{env::set_current_dir, fs::read_to_string, io::BufWriter};
 
     use git2::Signature;
     use httptest::{
@@ -1672,5 +1672,25 @@ mod test {
 
         push(Some(repo_dir.path()))
             .expect_err("We have no valid git http sever setup -> should fail");
+    }
+
+    #[test]
+    fn test_roundtrip_configfile() {
+        let configfile = "[epochs]
+mymeasurement.something=a3deadbeef212
+somethingelse=34567898
+";
+        // TODO(hoewelmk) comment does not work
+
+        let ini = Ini::load_from_str(configfile).expect("Could not load from string");
+
+        let mut actual = Vec::new();
+        {
+            let mut buf = BufWriter::new(&mut actual);
+            ini.write_to(&mut buf).expect("Failed to write to string");
+        }
+
+        let actual = String::from_utf8(actual).expect("Failed to convert");
+        assert_eq!(configfile, actual);
     }
 }
