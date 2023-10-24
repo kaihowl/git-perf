@@ -1678,10 +1678,16 @@ mod test {
     #[test]
     fn test_roundtrip_configfile() {
         // TODO(hoewelmk) order unspecified in serialization...
-        let configfile = r#"[epochs]
+        let configfile = r#"[measurement."something"]
 #My comment
-somethingelse=34567898
-mymeasurement.something="a3deadbeef212"
+epoch="34567898"
+
+[measurement."somethingelse"]
+epoch="a3deadbeef212"
+
+[measurement]
+# General performance regression
+epoch="12344555"
 "#;
         // TODO(hoewelmk) comment does not work
 
