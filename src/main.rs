@@ -22,7 +22,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 
 use average::{self, concatenate, Estimate, Mean, Variance};
-use toml_edit::{Document, Item};
+use toml_edit::{value, Document, Item};
 
 #[derive(Parser)]
 #[command(version)]
@@ -373,15 +373,28 @@ impl From<git2::Error> for AddError {
     }
 }
 
-fn determine_epoch_from_config(measurement: &str) -> i32 {
-    // TODO(hoewelmk) configure path, use different working directory than repo root
-    determine_epoch_from_file(measurement, ".gitperfconfig").unwrap_or(0)
+// TODO(kaihowl) proper error handling
+fn write_config(conf: &str) {
+    let mut f = File::open(".gitperfconfig").expect("open file failed");
+    f.write(conf.as_bytes()).expect("failed to write");
 }
 
-fn determine_epoch_from_file(measurement: &str, file: &str) -> Option<i32> {
+fn read_config() -> Option<String> {
+    read_config_from_file(".gitperfconfig")
+}
+
+// TODO(kaihowl) proper error handling
+// TODO(kaihowl) proper file type
+fn read_config_from_file(file: &str) -> Option<String> {
     let mut conf_str = String::new();
     File::open(file).ok()?.read_to_string(&mut conf_str).ok()?;
-    determine_epoch(measurement, &conf_str)
+    Some(conf_str)
+}
+
+fn determine_epoch_from_config(measurement: &str) -> Option<i32> {
+    // TODO(hoewelmk) configure path, use different working directory than repo root
+    let conf = read_config()?;
+    determine_epoch(measurement, &conf)
 }
 
 fn determine_epoch(measurement: &str, conf_str: &str) -> Option<i32> {
@@ -421,8 +434,20 @@ impl Display for BumpError {
     }
 }
 
+fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
+    let mut conf = conf_str
+        .parse::<Document>()
+        .expect("failed to parse config");
+    conf["measurement"][measurement]["epoch"] = value("1234");
+    *conf_str = conf.to_string();
+}
+
+// TODO(kaihowl) proper error handling
 fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
-    todo!()
+    let mut conf_str = read_config().expect("failed to read config file");
+    bump_epoch_in_conf(measurement, &mut conf_str);
+    write_config(&conf_str);
+    Ok(())
 }
 
 fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
@@ -441,7 +466,7 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
 
     let md = MeasurementData {
         // TODO(hoewelmk)
-        epoch: determine_epoch_from_config(measurement),
+        epoch: determine_epoch_from_config(measurement).unwrap_or(0),
         name: measurement.to_owned(),
         timestamp,
         val: value,
@@ -1692,7 +1717,7 @@ mod test {
     }
 
     #[test]
-    fn test_roundtrip_configfile() {
+    fn test_read_epochs() {
         // TODO(hoewelmk) order unspecified in serialization...
         let configfile = r#"[measurement."something"]
 #My comment
@@ -1714,5 +1739,23 @@ epoch="12344555"
 
         let epoch = determine_epoch("unspecified", configfile);
         assert_eq!(epoch, Some(0x12344555));
+    }
+
+    #[test]
+    fn test_bump_epochs() {
+        let configfile = r#"[measurement."something"]
+#My comment
+epoch = "34567898"
+"#;
+
+        let mut actual = String::from(configfile);
+        bump_epoch_in_conf("something", &mut actual);
+
+        let expected = r#"[measurement."something"]
+#My comment
+epoch = "1234"
+"#;
+
+        assert_eq!(actual, expected);
     }
 }
