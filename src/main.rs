@@ -1,4 +1,3 @@
-use configparser::ini::Ini;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -378,22 +377,22 @@ fn determine_epoch(measurement: &str) -> i32 {
     determine_epoch_from_file(measurement, ".gitperfconfig").unwrap_or(0)
 }
 
-fn determine_epoch_from_file(measurement: &str, file: &str) -> Option<i32> {
-    let mut config = Ini::new();
-    config.load(file).ok()?;
-    for section in config.sections() {
-        if section != "epochs" {
-            continue;
-        }
-
-        // TODO(hoewelmk)
-        // for (key, value) in properties.iter() {
-        //     // TODO(hoewelmk) always prefers the first found
-        //     if key == measurement {
-        //         return i32::from_str_radix(value, 16).ok();
-        //     }
-        // }
-    }
+fn determine_epoch_from_file(_measurement: &str, _file: &str) -> Option<i32> {
+    // let mut config = Ini::new();
+    // config.load(file).ok()?;
+    // for section in config.sections() {
+    //     if section != "epochs" {
+    //         continue;
+    //     }
+    //
+    //     // TODO(hoewelmk)
+    //     // for (key, value) in properties.iter() {
+    //     //     // TODO(hoewelmk) always prefers the first found
+    //     //     if key == measurement {
+    //     //         return i32::from_str_radix(value, 16).ok();
+    //     //     }
+    //     // }
+    // }
     None
 }
 
@@ -1345,6 +1344,7 @@ mod test {
         Expectation, Server,
     };
     use tempfile::{tempdir, TempDir};
+    use toml_edit::Document;
 
     use crate::*;
 
@@ -1678,19 +1678,15 @@ mod test {
     #[test]
     fn test_roundtrip_configfile() {
         // TODO(hoewelmk) order unspecified in serialization...
-        let configfile = "[epochs]
+        let configfile = r#"[epochs]
 #My comment
 somethingelse=34567898
-mymeasurement.something=a3deadbeef212
-";
+mymeasurement.something="a3deadbeef212"
+"#;
         // TODO(hoewelmk) comment does not work
 
-        let mut ini = Ini::new();
-        ini.read(String::from(configfile))
-            .expect("Could not read config");
+        let ini = configfile.parse::<Document>().expect("invalid doc");
 
-        let actual = ini.writes();
-
-        assert_eq!(configfile, actual);
+        assert_eq!(configfile, ini.to_string());
     }
 }
