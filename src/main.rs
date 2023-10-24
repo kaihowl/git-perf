@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, BufReader, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::process::{self, Command};
@@ -22,6 +22,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 
 use average::{self, concatenate, Estimate, Mean, Variance};
+use toml_edit::{Document, Item};
 
 #[derive(Parser)]
 #[command(version)]
@@ -372,28 +373,43 @@ impl From<git2::Error> for AddError {
     }
 }
 
-fn determine_epoch(measurement: &str) -> i32 {
+fn determine_epoch_from_config(measurement: &str) -> i32 {
     // TODO(hoewelmk) configure path, use different working directory than repo root
     determine_epoch_from_file(measurement, ".gitperfconfig").unwrap_or(0)
 }
 
-fn determine_epoch_from_file(_measurement: &str, _file: &str) -> Option<i32> {
-    // let mut config = Ini::new();
-    // config.load(file).ok()?;
-    // for section in config.sections() {
-    //     if section != "epochs" {
-    //         continue;
-    //     }
-    //
-    //     // TODO(hoewelmk)
-    //     // for (key, value) in properties.iter() {
-    //     //     // TODO(hoewelmk) always prefers the first found
-    //     //     if key == measurement {
-    //     //         return i32::from_str_radix(value, 16).ok();
-    //     //     }
-    //     // }
-    // }
-    None
+fn determine_epoch_from_file(measurement: &str, file: &str) -> Option<i32> {
+    let mut conf_str = String::new();
+    File::open(file).ok()?.read_to_string(&mut conf_str).ok()?;
+    determine_epoch(measurement, &conf_str)
+}
+
+fn determine_epoch(measurement: &str, conf_str: &str) -> Option<i32> {
+    // TODO(kaihowl) buffered reading?
+    let config = conf_str.parse::<Document>().ok()?;
+
+    let epoch = None;
+
+    for (section, item) in config.iter() {
+        if section != "measurement" || !item.is_table_like() {
+            continue;
+        }
+
+        // TODO(kaihowl) duplication
+        for (section, item) in item.as_table().expect("expected table") {
+            if item.is_table_like() && section == measurement {
+                if let Some(n) = item["epoch"].as_value().and_then(|n| n.as_str()) {
+                    return i32::from_str_radix(n, 16).ok();
+                }
+            } else if item.is_value() && section == "epoch" {
+                if let Some(n) = item.as_value().and_then(|n| n.as_str()) {
+                    return i32::from_str_radix(n, 16).ok();
+                }
+            }
+        }
+    }
+
+    epoch
 }
 
 #[derive(Debug)]
@@ -425,7 +441,7 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
 
     let md = MeasurementData {
         // TODO(hoewelmk)
-        epoch: determine_epoch(measurement),
+        epoch: determine_epoch_from_config(measurement),
         name: measurement.to_owned(),
         timestamp,
         val: value,
@@ -1683,16 +1699,20 @@ mod test {
 epoch="34567898"
 
 [measurement."somethingelse"]
-epoch="a3deadbeef212"
+epoch="a3dead"
 
 [measurement]
 # General performance regression
 epoch="12344555"
 "#;
-        // TODO(hoewelmk) comment does not work
 
-        let ini = configfile.parse::<Document>().expect("invalid doc");
+        let epoch = determine_epoch("something", configfile);
+        assert_eq!(epoch, Some(0x34567898));
 
-        assert_eq!(configfile, ini.to_string());
+        let epoch = determine_epoch("somethingelse", configfile);
+        assert_eq!(epoch, Some(0xa3dead));
+
+        let epoch = determine_epoch("unspecified", configfile);
+        assert_eq!(epoch, Some(0x12344555));
     }
 }
