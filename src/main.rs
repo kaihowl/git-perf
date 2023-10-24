@@ -434,11 +434,24 @@ impl Display for BumpError {
     }
 }
 
+fn get_head_revision() -> String {
+    let comm = process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .expect("failed to parse head");
+
+    // TODO(kaihowl) check status
+    String::from_utf8(comm.stdout)
+        .expect("oh no")
+        .trim()
+        .to_string()
+}
+
 fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
     let mut conf = conf_str
         .parse::<Document>()
         .expect("failed to parse config");
-    conf["measurement"][measurement]["epoch"] = value("1234");
+    conf["measurement"][measurement]["epoch"] = value(get_head_revision());
     *conf_str = conf.to_string();
 }
 
@@ -1751,11 +1764,24 @@ epoch = "34567898"
         let mut actual = String::from(configfile);
         bump_epoch_in_conf("something", &mut actual);
 
-        let expected = r#"[measurement."something"]
+        let expected = format!(
+            r#"[measurement."something"]
 #My comment
-epoch = "1234"
-"#;
+epoch = "{}"
+"#,
+            get_head_revision(),
+        );
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_get_head_revision() {
+        let revision = get_head_revision();
+        assert!(
+            revision.chars().all(|c| c.is_ascii_alphanumeric()),
+            "'{}' contained non alphanumeric or non ASCII characters",
+            revision
+        )
     }
 }
