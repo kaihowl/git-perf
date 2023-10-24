@@ -1,15 +1,14 @@
-use std::env::current_dir;
-use std::fmt::Display;
+use configparser::ini::Ini;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::process::{self, Command};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs::File, path::PathBuf, str};
+use std::{env::current_dir, fmt::Display};
 
 use csv::StringRecord;
 use git2::{Index, Repository};
-use ini::Ini;
 use itertools::{self, EitherOrBoth, Itertools};
 
 use clap::{
@@ -380,18 +379,20 @@ fn determine_epoch(measurement: &str) -> i32 {
 }
 
 fn determine_epoch_from_file(measurement: &str, file: &str) -> Option<i32> {
-    let config = Ini::load_from_file(file).ok()?;
-    for (section, properties) in config.iter() {
-        if section != Some("epochs") {
+    let mut config = Ini::new();
+    config.load(file).ok()?;
+    for section in config.sections() {
+        if section != "epochs" {
             continue;
         }
 
-        for (key, value) in properties.iter() {
-            // TODO(hoewelmk) always prefers the first found
-            if key == measurement {
-                return i32::from_str_radix(value, 16).ok();
-            }
-        }
+        // TODO(hoewelmk)
+        // for (key, value) in properties.iter() {
+        //     // TODO(hoewelmk) always prefers the first found
+        //     if key == measurement {
+        //         return i32::from_str_radix(value, 16).ok();
+        //     }
+        // }
     }
     None
 }
@@ -1676,21 +1677,20 @@ mod test {
 
     #[test]
     fn test_roundtrip_configfile() {
+        // TODO(hoewelmk) order unspecified in serialization...
         let configfile = "[epochs]
-mymeasurement.something=a3deadbeef212
+#My comment
 somethingelse=34567898
+mymeasurement.something=a3deadbeef212
 ";
         // TODO(hoewelmk) comment does not work
 
-        let ini = Ini::load_from_str(configfile).expect("Could not load from string");
+        let mut ini = Ini::new();
+        ini.read(String::from(configfile))
+            .expect("Could not read config");
 
-        let mut actual = Vec::new();
-        {
-            let mut buf = BufWriter::new(&mut actual);
-            ini.write_to(&mut buf).expect("Failed to write to string");
-        }
+        let actual = ini.writes();
 
-        let actual = String::from_utf8(actual).expect("Failed to convert");
         assert_eq!(configfile, actual);
     }
 }
