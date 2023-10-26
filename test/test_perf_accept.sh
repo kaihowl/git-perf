@@ -16,15 +16,8 @@ git perf add -m test 4 -k os=ubuntu
 create_commit
 git perf add -m test 5000 -k os=ubuntu
 git perf audit -m test -s os=ubuntu && exit 1
-# Accept regression for other platform
-git perf good -m test -k os=macOS
-# Must not accept regression for this platform
-git perf audit -m test -s os=ubuntu && exit 1
-# TODO(kaihowl) Do we need to seperate kvs from mere labels?
-# Must not accept regression when no platform specified?
-# git perf audit -m test && exit 1
 # Accept regression on this platform
-git perf good -m test -k os=ubuntu
+git perf bump-epoch -m test
 git perf audit -m test -s os=ubuntu
 git perf audit -m test
 create_commit
