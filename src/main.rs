@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::io::{self, BufReader, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -182,12 +183,40 @@ impl VecAggregation for Vec<f64> {
     }
 }
 
+#[derive(Debug)]
+struct EpochMeasurement {
+    epoch: i32,
+    measurement: f64,
+}
+
+// TODO(kaihowl) oh god naming
+trait AggregationFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
+    fn reduce_by(&mut self, fun: AggregationFunc) -> Option<EpochMeasurement>;
+}
+
+impl<'a, T> AggregationFuncIterator<'a> for T
+where
+    T: Iterator<Item = &'a MeasurementData>,
+{
+    fn reduce_by(&mut self, fun: AggregationFunc) -> Option<EpochMeasurement> {
+        let mut peekable = self.peekable();
+        let expected_epoch = peekable.peek().map(|m| m.epoch);
+        let mut vals = peekable.map(|m| {
+            debug_assert_eq!(Some(m.epoch), expected_epoch);
+            m.val
+        });
+
+        let aggregate_val = vals.aggregate_by(fun);
+
+        Some(EpochMeasurement {
+            epoch: expected_epoch?,
+            measurement: aggregate_val?,
+        })
+    }
+}
+
 trait ReductionFunc: Iterator<Item = f64> {
-    // fn aggregate_by() {}
-    fn aggregate_by(self, fun: AggregationFunc) -> Option<Self::Item>
-    where
-        Self: Sized,
-    {
+    fn aggregate_by(&mut self, fun: AggregationFunc) -> Option<Self::Item> {
         match fun {
             AggregationFunc::Min => self.reduce(f64::min),
             AggregationFunc::Max => self.reduce(f64::max),
@@ -204,7 +233,7 @@ trait ReductionFunc: Iterator<Item = f64> {
     }
 }
 
-impl<T: ?Sized> ReductionFunc for T where T: Iterator<Item = f64> {}
+impl<T> ReductionFunc for T where T: Iterator<Item = f64> {}
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
     let pos = s
@@ -376,7 +405,7 @@ impl From<git2::Error> for AddError {
 // TODO(kaihowl) proper error handling
 fn write_config(conf: &str) {
     let mut f = File::open(".gitperfconfig").expect("open file failed");
-    f.write(conf.as_bytes()).expect("failed to write");
+    f.write_all(conf.as_bytes()).expect("failed to write");
 }
 
 fn read_config() -> Option<String> {
@@ -860,18 +889,35 @@ fn aggregate_measurements<'a, F>(
 where
     F: Fn(&&MeasurementData) -> bool,
 {
-    let s: AggStats = commits
-        .filter_map(|c| {
-            dbg!(&c.commit);
-            c.measurements
-                .iter()
-                .filter(filter_by)
-                .inspect(|m| {
-                    dbg!(m);
-                })
-                .map(|m| m.val)
-                .aggregate_by(aggregate_by)
-        })
+    // let s: AggStats = commits
+    //     .filter_map(|c| {
+    //         dbg!(&c.commit);
+    //         c.measurements
+    //             .iter()
+    //             .filter(filter_by)
+    //             .inspect(|m| {
+    //                 dbg!(m);
+    //             })
+    //             .map(|m| m.val)
+    //             .aggregate_by(aggregate_by)
+    //     })
+    //     .inspect(|m| {
+    //         dbg!(aggregate_by);
+    //         dbg!(m);
+    //     })
+    //     .collect();
+    let measurements = commits.filter_map(|c| {
+        dbg!(&c.commit);
+        c.measurements
+            .iter()
+            .filter(filter_by)
+            .inspect(|m| {
+                dbg!(m);
+            })
+            .reduce_by(aggregate_by)
+    });
+
+    let s: AggStats = measurements
         .inspect(|m| {
             dbg!(aggregate_by);
             dbg!(m);
@@ -1398,7 +1444,6 @@ mod test {
         Expectation, Server,
     };
     use tempfile::{tempdir, TempDir};
-    use toml_edit::Document;
 
     use crate::*;
 
