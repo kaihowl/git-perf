@@ -917,11 +917,19 @@ where
             .reduce_by(aggregate_by)
     });
 
+    let mut first_epoch = None;
+
     let s: AggStats = measurements
         .inspect(|m| {
             dbg!(aggregate_by);
             dbg!(m);
         })
+        .take_while(|m| {
+            let prev_epoch = first_epoch;
+            first_epoch = Some(m.epoch);
+            prev_epoch.unwrap_or(m.epoch) == m.epoch
+        })
+        .map(|m| m.measurement)
         .collect();
     Stats {
         mean: s.mean(),
