@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::io::{self, BufReader, Read, Write};
+use std::ops::IndexMut;
 use std::path::Path;
 use std::process::ExitCode;
 use std::process::{self, Command};
@@ -23,7 +24,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 
 use average::{self, concatenate, Estimate, Mean, Variance};
-use toml_edit::{value, Document, Item};
+use toml_edit::{table, value, Document, Item, Table};
 
 #[derive(Parser)]
 #[command(version)]
@@ -404,7 +405,7 @@ impl From<git2::Error> for AddError {
 
 // TODO(kaihowl) proper error handling
 fn write_config(conf: &str) {
-    let mut f = File::open(".gitperfconfig").expect("open file failed");
+    let mut f = File::create(".gitperfconfig").expect("open file for writing failed");
     f.write_all(conf.as_bytes()).expect("failed to write");
 }
 
@@ -480,13 +481,28 @@ fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
     let mut conf = conf_str
         .parse::<Document>()
         .expect("failed to parse config");
+
+    // let new_epoch = value(get_head_revision());
+    // let mut& prop = match conf["measurement"].index_mut(measurement) {
+    //     Item::None => Table::default(),
+    //     Item::Table(e) => e,
+    //     _ => panic!("Unexpected");
+    // };
+    // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
     conf["measurement"][measurement]["epoch"] = value(get_head_revision());
+
+    let table = &conf["measurement"][measurement];
+    if table.is_inline_table() {
+        let table = table.as_inline_table().unwrap();
+        let converted = table.clone().into_table();
+        conf["measurement"][measurement] = toml_edit::Item::Table(converted);
+    }
     *conf_str = conf.to_string();
 }
 
 // TODO(kaihowl) proper error handling
 fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
-    let mut conf_str = read_config().expect("failed to read config file");
+    let mut conf_str = read_config().unwrap_or_default();
     bump_epoch_in_conf(measurement, &mut conf_str);
     write_config(&conf_str);
     Ok(())
