@@ -24,7 +24,8 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 
 use average::{self, concatenate, Estimate, Mean, Variance};
-use toml_edit::{table, value, Document, Item, Table};
+use toml::Table;
+use toml_edit::{value, Document};
 
 #[derive(Parser)]
 #[command(version)]
@@ -186,7 +187,7 @@ impl VecAggregation for Vec<f64> {
 
 #[derive(Debug)]
 struct EpochMeasurement {
-    epoch: i32,
+    epoch: u32,
     measurement: f64,
 }
 
@@ -421,38 +422,28 @@ fn read_config_from_file(file: &str) -> Option<String> {
     Some(conf_str)
 }
 
-fn determine_epoch_from_config(measurement: &str) -> Option<i32> {
+fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
     // TODO(hoewelmk) configure path, use different working directory than repo root
     let conf = read_config()?;
     determine_epoch(measurement, &conf)
 }
 
-fn determine_epoch(measurement: &str, conf_str: &str) -> Option<i32> {
+fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
     // TODO(kaihowl) buffered reading?
-    let config = conf_str.parse::<Document>().ok()?;
+    let config = conf_str
+        .parse::<Document>()
+        .expect("Failed to parse config");
 
-    let epoch = None;
+    let get_epoch = |section: &str| {
+        let s = config
+            .get("measurement")?
+            .get(section)?
+            .get("epoch")?
+            .as_str()?;
+        u32::from_str_radix(s, 16).ok()
+    };
 
-    for (section, item) in config.iter() {
-        if section != "measurement" || !item.is_table_like() {
-            continue;
-        }
-
-        // TODO(kaihowl) duplication
-        for (section, item) in item.as_table().expect("expected table") {
-            if item.is_table_like() && section == measurement {
-                if let Some(n) = item["epoch"].as_value().and_then(|n| n.as_str()) {
-                    return i32::from_str_radix(n, 16).ok();
-                }
-            } else if item.is_value() && section == "epoch" {
-                if let Some(n) = item.as_value().and_then(|n| n.as_str()) {
-                    return i32::from_str_radix(n, 16).ok();
-                }
-            }
-        }
-    }
-
-    epoch
+    get_epoch(measurement).or_else(|| get_epoch("*"))
 }
 
 #[derive(Debug)]
@@ -482,21 +473,8 @@ fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
         .parse::<Document>()
         .expect("failed to parse config");
 
-    // let new_epoch = value(get_head_revision());
-    // let mut& prop = match conf["measurement"].index_mut(measurement) {
-    //     Item::None => Table::default(),
-    //     Item::Table(e) => e,
-    //     _ => panic!("Unexpected");
-    // };
     // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
-    conf["measurement"][measurement]["epoch"] = value(get_head_revision());
-
-    let table = &conf["measurement"][measurement];
-    if table.is_inline_table() {
-        let table = table.as_inline_table().unwrap();
-        let converted = table.clone().into_table();
-        conf["measurement"][measurement] = toml_edit::Item::Table(converted);
-    }
+    conf["measurement"][measurement]["epoch"] = value(&get_head_revision()[0..8]);
     *conf_str = conf.to_string();
 }
 
@@ -1249,7 +1227,7 @@ struct Commit {
 
 #[derive(Debug, Deserialize, PartialEq)]
 struct MeasurementData {
-    epoch: i32,
+    epoch: u32,
     name: String,
     timestamp: f64,
     // TODO(kaihowl) check size of type
@@ -1261,7 +1239,7 @@ struct MeasurementData {
 // TODO(kaihowl) serialization with flatten and custom function does not work
 #[derive(Debug, PartialEq, Serialize)]
 struct SerializeMeasurementData<'a> {
-    epoch: i32,
+    epoch: u32,
     name: &'a str,
     timestamp: f64,
     val: f64,
@@ -1808,7 +1786,7 @@ epoch="34567898"
 [measurement."somethingelse"]
 epoch="a3dead"
 
-[measurement]
+[measurement."*"]
 # General performance regression
 epoch="12344555"
 "#;
@@ -1838,7 +1816,7 @@ epoch = "34567898"
 #My comment
 epoch = "{}"
 "#,
-            get_head_revision(),
+            &get_head_revision()[0..8],
         );
 
         assert_eq!(actual, expected);
@@ -1852,5 +1830,34 @@ epoch = "{}"
             "'{}' contained non alphanumeric or non ASCII characters",
             revision
         )
+    }
+
+    #[test]
+    fn test_bump_new_epoch_and_read_it() {
+        let mut conf = String::new();
+        bump_epoch_in_conf("mymeasurement", &mut conf);
+        let epoch = determine_epoch("mymeasurement", &conf);
+        dbg!(&conf);
+        assert!(epoch.is_some());
+    }
+
+    #[test]
+    fn test_parsing() {
+        let toml_str = r#"
+        measurement = { test2 = { epoch = "834ae670e2ecd5c87020fde23378b890832d6076" } }
+    "#;
+
+        let doc = toml_str.parse::<Document>().expect("sfdfdf");
+
+        let measurement = "test";
+
+        if let Some(e) = doc
+            .get("measurement")
+            .and_then(|m| m.get(measurement))
+            .and_then(|m| m.get("epoch"))
+        {
+            println!("YAY: {}", e);
+            panic!("stuff");
+        }
     }
 }
