@@ -1,6 +1,4 @@
-use std::borrow::BorrowMut;
-use std::io::{self, BufReader, Read, Write};
-use std::ops::IndexMut;
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::process::{self, Command};
@@ -24,7 +22,6 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 
 use average::{self, concatenate, Estimate, Mean, Variance};
-use toml::Table;
 use toml_edit::{value, Document};
 
 #[derive(Parser)]
@@ -818,6 +815,12 @@ impl From<DeserializationError> for AuditError {
     }
 }
 
+impl From<git2::Error> for AuditError {
+    fn from(e: git2::Error) -> Self {
+        AuditError::DeserializationError(DeserializationError::GitError(e))
+    }
+}
+
 fn audit(
     measurement: &str,
     max_count: usize,
@@ -826,7 +829,8 @@ fn audit(
     aggregate_by: AggregationFunc,
     sigma: f64,
 ) -> Result<(), AuditError> {
-    let all = retrieve_measurements_by_commit(max_count)?; // include HEAD
+    let repo = Repository::open(".")?;
+    let all = walk_commits(&repo, max_count)?;
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement
@@ -835,28 +839,41 @@ fn audit(
                 .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
     };
 
-    let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
-    let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
-    // TODO(kaihowl) user proper logging tools
-    dbg!(&head_summary);
-    dbg!(&tail_summary);
+    dbg!("Initial measurement hello TODO(kaihowl)");
+    let a: f64 = all
+        .map(|f| {
+            dbg!("TODO(kaihowl) in sum");
+            let sum: f64 = f.measurements.iter().map(|f| f.val).sum();
+            sum
+        })
+        .sum();
 
-    if head_summary.len == 0 {
-        return Err(AuditError::NoMeasurementForHead);
-    }
+    dbg!(a);
 
-    if tail_summary.len < min_count.into() {
-        // TODO(kaihowl) handle with explicit return? Print text somewhere else?
-        eprintln!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
-        return Ok(());
-    }
-
-    if head_summary.significantly_different_from(&tail_summary, sigma) {
-        eprintln!("Measurements differ significantly");
-        // TODO(kaihowl) print details
-        return Err(AuditError::SignificantDifference);
-    }
-
+    //
+    //
+    // let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
+    // let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
+    // // TODO(kaihowl) user proper logging tools
+    // dbg!(&head_summary);
+    // dbg!(&tail_summary);
+    //
+    // if head_summary.len == 0 {
+    //     return Err(AuditError::NoMeasurementForHead);
+    // }
+    //
+    // if tail_summary.len < min_count.into() {
+    //     // TODO(kaihowl) handle with explicit return? Print text somewhere else?
+    //     eprintln!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
+    //     return Ok(());
+    // }
+    //
+    // if head_summary.significantly_different_from(&tail_summary, sigma) {
+    //     eprintln!("Measurements differ significantly");
+    //     // TODO(kaihowl) print details
+    //     return Err(AuditError::SignificantDifference);
+    // }
+    //
     Ok(())
 }
 
@@ -941,12 +958,12 @@ where
     //     });
 }
 
-fn retrieve_measurements_by_commit(
-    num_commits: usize,
-) -> Result<Vec<Commit>, DeserializationError> {
-    let repo = Repository::open(".")?;
-    walk_commits(&repo, num_commits)
-}
+// fn retrieve_measurements_by_commit(
+//     num_commits: usize,
+// ) -> Result<Vec<Commit>, DeserializationError> {
+//     let repo = Repository::open(".")?;
+//     walk_commits(&repo, num_commits)
+// }
 
 // TODO(kaihowl) make all of these pretty printed for `main`
 #[derive(Debug)]
@@ -1128,93 +1145,93 @@ fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
-    let mut commits = retrieve_measurements_by_commit(num_commits)?;
-    commits.reverse();
-
-    let mut plot =
-        ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
-
-    plot.add_commits(&commits);
-
-    let relevant = |m: &MeasurementData| {
-        if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
-            return false;
-        }
-        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
-        key_values
-            .iter()
-            .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
-    };
-
-    let indexed_measurements = commits.iter().enumerate().flat_map(|(index, commit)| {
-        commit
-            .measurements
-            .iter()
-            .map(move |m| (index, m))
-            .filter(|(_, m)| relevant(m))
-    });
-
-    let unique_measurement_names: Vec<_> = indexed_measurements
-        .clone()
-        .map(|(_, m)| &m.name)
-        .unique()
-        .collect();
-
-    if unique_measurement_names.is_empty() {
-        return Err(ReportError::NoMeasurements);
-    }
-
-    for measurement_name in unique_measurement_names {
-        let filtered_measurements = indexed_measurements
-            .clone()
-            .filter(|(_i, m)| m.name == *measurement_name);
-
-        let group_values = if let Some(separate_by) = &separate_by {
-            filtered_measurements
-                .clone()
-                .flat_map(|(_, m)| {
-                    m.key_values
-                        .iter()
-                        .filter(|kv| kv.0 == separate_by)
-                        .map(|kv| kv.1)
-                })
-                .unique()
-                .map(|val| (Some(separate_by), Some(val)))
-                .collect_vec()
-        } else {
-            vec![(None, None)]
-        };
-
-        if group_values.is_empty() {
-            return Err(ReportError::InvalidSeparateBy);
-        }
-
-        for (group_key, group_value) in group_values {
-            let trace_measurements: Vec<_> = filtered_measurements
-                .clone()
-                .filter(|(_, m)| {
-                    group_key
-                        .map(|key| m.key_values.get(key) == group_value)
-                        .unwrap_or(true)
-                })
-                .collect();
-            plot.add_trace(trace_measurements, group_value);
-        }
-    }
-
-    // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
-    // python)
-
-    if output == Path::new("-") {
-        io::stdout()
-            .write_all(&plot.as_bytes())
-            .expect("Could not write to stdout");
-    } else {
-        File::create(&output)
-            .expect("Cannot open file")
-            .write_all(&plot.as_bytes())
-            .expect("Could not write file");
-    }
+    // let mut commits = retrieve_measurements_by_commit(num_commits)?;
+    // commits.reverse();
+    //
+    // let mut plot =
+    //     ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
+    //
+    // plot.add_commits(&commits);
+    //
+    // let relevant = |m: &MeasurementData| {
+    //     if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
+    //         return false;
+    //     }
+    //     // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
+    //     key_values
+    //         .iter()
+    //         .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
+    // };
+    //
+    // let indexed_measurements = commits.iter().enumerate().flat_map(|(index, commit)| {
+    //     commit
+    //         .measurements
+    //         .iter()
+    //         .map(move |m| (index, m))
+    //         .filter(|(_, m)| relevant(m))
+    // });
+    //
+    // let unique_measurement_names: Vec<_> = indexed_measurements
+    //     .clone()
+    //     .map(|(_, m)| &m.name)
+    //     .unique()
+    //     .collect();
+    //
+    // if unique_measurement_names.is_empty() {
+    //     return Err(ReportError::NoMeasurements);
+    // }
+    //
+    // for measurement_name in unique_measurement_names {
+    //     let filtered_measurements = indexed_measurements
+    //         .clone()
+    //         .filter(|(_i, m)| m.name == *measurement_name);
+    //
+    //     let group_values = if let Some(separate_by) = &separate_by {
+    //         filtered_measurements
+    //             .clone()
+    //             .flat_map(|(_, m)| {
+    //                 m.key_values
+    //                     .iter()
+    //                     .filter(|kv| kv.0 == separate_by)
+    //                     .map(|kv| kv.1)
+    //             })
+    //             .unique()
+    //             .map(|val| (Some(separate_by), Some(val)))
+    //             .collect_vec()
+    //     } else {
+    //         vec![(None, None)]
+    //     };
+    //
+    //     if group_values.is_empty() {
+    //         return Err(ReportError::InvalidSeparateBy);
+    //     }
+    //
+    //     for (group_key, group_value) in group_values {
+    //         let trace_measurements: Vec<_> = filtered_measurements
+    //             .clone()
+    //             .filter(|(_, m)| {
+    //                 group_key
+    //                     .map(|key| m.key_values.get(key) == group_value)
+    //                     .unwrap_or(true)
+    //             })
+    //             .collect();
+    //         plot.add_trace(trace_measurements, group_value);
+    //     }
+    // }
+    //
+    // // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
+    // // python)
+    //
+    // if output == Path::new("-") {
+    //     io::stdout()
+    //         .write_all(&plot.as_bytes())
+    //         .expect("Could not write to stdout");
+    // } else {
+    //     File::create(&output)
+    //         .expect("Cannot open file")
+    //         .write_all(&plot.as_bytes())
+    //         .expect("Could not write file");
+    // }
 
     Ok(())
 }
@@ -1378,31 +1395,41 @@ fn deserialize(lines: &str) -> Vec<MeasurementData> {
 fn walk_commits(
     repo: &git2::Repository,
     num_commits: usize,
-) -> Result<Vec<Commit>, DeserializationError> {
+) -> Result<impl Iterator<Item = Commit> + '_, DeserializationError> {
+    dbg!("TODO(kaihowl) walk_commit", &num_commits);
     let mut revwalk = repo.revwalk()?;
-    if revwalk.push_head().is_err() {
-        return Ok(Vec::new());
-    }
+    // if revwalk.push_head().is_err() {
+    //     return Ok(Ok(Vec::new()));
+    // }
     revwalk.simplify_first_parent()?;
-    revwalk
+    dbg!("TODO(kaihowl) before revwalk");
+    Ok(revwalk
         .take(num_commits)
-        .map(|commit_oid| {
+        .map(|commit_oid| -> Result<Commit, DeserializationError> {
             let commit_id = commit_oid?;
+            dbg!("TODO(kaihowl) before find_note");
             let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
                 // TODO(kaihowl) remove unwrap_or
                 Ok(note) => deserialize(note.message().unwrap_or("")),
                 Err(_) => [].into(),
             };
+            dbg!("TODO(kaihowl)", &measurements);
             Ok(Commit {
                 commit: commit_id.to_string(),
                 measurements,
             })
         })
-        // When this fails it is due to a shallow clone.
-        // TODO(kaihowl) proper shallow clone support
-        // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
-        // last commit because the parent cannot be loooked up.
-        .try_collect()
+        .filter_map(|res| match res {
+            Ok(r) => Some(r),
+            Err(e) => {
+                dbg!("Skipping record due to error: {}", e);
+                None
+            }
+        }))
+    // When this fails it is due to a shallow clone.
+    // TODO(kaihowl) proper shallow clone support
+    // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
+    // last commit because the parent cannot be loooked up.
 }
 
 fn is_shallow_repo() -> Option<bool> {
@@ -1436,7 +1463,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
 
 #[cfg(test)]
 mod test {
-    use std::{env::set_current_dir, fs::read_to_string, io::BufWriter};
+    use std::{env::set_current_dir, fs::read_to_string};
 
     use git2::Signature;
     use httptest::{

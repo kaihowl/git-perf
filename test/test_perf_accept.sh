@@ -18,6 +18,10 @@ git perf add -m test 5000 -k os=ubuntu
 git perf audit -m test -s os=ubuntu && exit 1
 # Accept regression on this platform
 git perf bump-epoch -m test
+git add .gitperfconfig
+less .gitperfconfig
+git commit --amend --no-edit
+git perf add -m test 5000 -k os=ubuntu
 git perf audit -m test -s os=ubuntu
 git perf audit -m test
 create_commit
