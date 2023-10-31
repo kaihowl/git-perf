@@ -1398,9 +1398,7 @@ fn walk_commits(
 ) -> Result<impl Iterator<Item = Commit> + '_, DeserializationError> {
     dbg!("TODO(kaihowl) walk_commit", &num_commits);
     let mut revwalk = repo.revwalk()?;
-    // if revwalk.push_head().is_err() {
-    //     return Ok(Ok(Vec::new()));
-    // }
+    revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
     dbg!("TODO(kaihowl) before revwalk");
     Ok(revwalk
