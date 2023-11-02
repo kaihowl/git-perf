@@ -1456,26 +1456,17 @@ mod test {
     #[test]
     fn no_floating_error() {
         let commits = (0..100)
-            .map(|_| -> Commit {
-                Commit {
-                    commit: "deadbeef".into(),
-                    measurements: [MeasurementData {
-                        epoch: 0,
-                        name: "mymeasurement".into(),
-                        timestamp: 120.0,
-                        val: 0.1,
-                        key_values: [].into(),
-                    }]
-                    .into(),
-                }
+            .map(|_| EpochMeasurement {
+                epoch: 123,
+                measurement: 0.1,
             })
             .collect_vec();
-        let stats = aggregate_measurements(commits.into_iter(), &AggregationFunc::Min, &|_| true);
+        let stats = summarize_measurements(commits.into_iter());
         // TODO(kaihowl)
-        // assert_eq!(stats.mean, 0.1);
-        // assert_eq!(stats.len, 100);
-        // let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
-        // assert_ne!(naive_mean, 0.1);
+        assert_eq!(stats.mean, 0.1);
+        assert_eq!(stats.len, 100);
+        let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
+        assert_ne!(naive_mean, 0.1);
     }
 
     #[test]
