@@ -1110,6 +1110,12 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     }
 }
 
+impl From<git2::Error> for ReportError {
+    fn from(value: git2::Error) -> Self {
+        ReportError::DeserializationError(DeserializationError::GitError(value))
+    }
+}
+
 // TODO(kaihowl) needs more fine grained output e2e tests
 fn report(
     output: PathBuf,
@@ -1118,93 +1124,93 @@ fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
-    // let mut commits = retrieve_measurements_by_commit(num_commits)?;
-    // commits.reverse();
-    //
-    // let mut plot =
-    //     ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
-    //
-    // plot.add_commits(&commits);
-    //
-    // let relevant = |m: &MeasurementData| {
-    //     if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
-    //         return false;
-    //     }
-    //     // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
-    //     key_values
-    //         .iter()
-    //         .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
-    // };
-    //
-    // let indexed_measurements = commits.iter().enumerate().flat_map(|(index, commit)| {
-    //     commit
-    //         .measurements
-    //         .iter()
-    //         .map(move |m| (index, m))
-    //         .filter(|(_, m)| relevant(m))
-    // });
-    //
-    // let unique_measurement_names: Vec<_> = indexed_measurements
-    //     .clone()
-    //     .map(|(_, m)| &m.name)
-    //     .unique()
-    //     .collect();
-    //
-    // if unique_measurement_names.is_empty() {
-    //     return Err(ReportError::NoMeasurements);
-    // }
-    //
-    // for measurement_name in unique_measurement_names {
-    //     let filtered_measurements = indexed_measurements
-    //         .clone()
-    //         .filter(|(_i, m)| m.name == *measurement_name);
-    //
-    //     let group_values = if let Some(separate_by) = &separate_by {
-    //         filtered_measurements
-    //             .clone()
-    //             .flat_map(|(_, m)| {
-    //                 m.key_values
-    //                     .iter()
-    //                     .filter(|kv| kv.0 == separate_by)
-    //                     .map(|kv| kv.1)
-    //             })
-    //             .unique()
-    //             .map(|val| (Some(separate_by), Some(val)))
-    //             .collect_vec()
-    //     } else {
-    //         vec![(None, None)]
-    //     };
-    //
-    //     if group_values.is_empty() {
-    //         return Err(ReportError::InvalidSeparateBy);
-    //     }
-    //
-    //     for (group_key, group_value) in group_values {
-    //         let trace_measurements: Vec<_> = filtered_measurements
-    //             .clone()
-    //             .filter(|(_, m)| {
-    //                 group_key
-    //                     .map(|key| m.key_values.get(key) == group_value)
-    //                     .unwrap_or(true)
-    //             })
-    //             .collect();
-    //         plot.add_trace(trace_measurements, group_value);
-    //     }
-    // }
-    //
-    // // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
-    // // python)
-    //
-    // if output == Path::new("-") {
-    //     io::stdout()
-    //         .write_all(&plot.as_bytes())
-    //         .expect("Could not write to stdout");
-    // } else {
-    //     File::create(&output)
-    //         .expect("Cannot open file")
-    //         .write_all(&plot.as_bytes())
-    //         .expect("Could not write file");
-    // }
+    let repo = Repository::open(".")?;
+    let commits: Vec<Commit> = walk_commits(&repo, num_commits)?.collect();
+
+    let mut plot =
+        ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
+
+    plot.add_commits(&commits);
+
+    let relevant = |m: &MeasurementData| {
+        if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
+            return false;
+        }
+        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
+        key_values
+            .iter()
+            .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
+    };
+
+    let indexed_measurements = commits.iter().enumerate().flat_map(|(index, commit)| {
+        commit
+            .measurements
+            .iter()
+            .map(move |m| (index, m))
+            .filter(|(_, m)| relevant(m))
+    });
+
+    let unique_measurement_names: Vec<_> = indexed_measurements
+        .clone()
+        .map(|(_, m)| &m.name)
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        return Err(ReportError::NoMeasurements);
+    }
+
+    for measurement_name in unique_measurement_names {
+        let filtered_measurements = indexed_measurements
+            .clone()
+            .filter(|(_i, m)| m.name == *measurement_name);
+
+        let group_values = if let Some(separate_by) = &separate_by {
+            filtered_measurements
+                .clone()
+                .flat_map(|(_, m)| {
+                    m.key_values
+                        .iter()
+                        .filter(|kv| kv.0 == separate_by)
+                        .map(|kv| kv.1)
+                })
+                .unique()
+                .map(|val| (Some(separate_by), Some(val)))
+                .collect_vec()
+        } else {
+            vec![(None, None)]
+        };
+
+        if group_values.is_empty() {
+            return Err(ReportError::InvalidSeparateBy);
+        }
+
+        for (group_key, group_value) in group_values {
+            let trace_measurements: Vec<_> = filtered_measurements
+                .clone()
+                .filter(|(_, m)| {
+                    group_key
+                        .map(|key| m.key_values.get(key) == group_value)
+                        .unwrap_or(true)
+                })
+                .collect();
+            plot.add_trace(trace_measurements, group_value);
+        }
+    }
+
+    // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
+    // python)
+
+    if output == Path::new("-") {
+        io::stdout()
+            .write_all(&plot.as_bytes())
+            .expect("Could not write to stdout");
+    } else {
+        File::create(&output)
+            .expect("Cannot open file")
+            .write_all(&plot.as_bytes())
+            .expect("Could not write file");
+    }
 
     Ok(())
 }
