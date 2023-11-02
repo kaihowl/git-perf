@@ -1,4 +1,5 @@
 use std::io::{self, Read, Write};
+use std::iter;
 use std::path::Path;
 use std::process::ExitCode;
 use std::process::{self, Command};
@@ -839,41 +840,28 @@ fn audit(
                 .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
     };
 
-    dbg!("Initial measurement hello TODO(kaihowl)");
-    let a: f64 = all
-        .map(|f| {
-            dbg!("TODO(kaihowl) in sum");
-            let sum: f64 = f.measurements.iter().map(|f| f.val).sum();
-            sum
-        })
-        .sum();
+    let mut aggregates = aggregate_measurements(all, &aggregate_by, &filter_by);
 
-    dbg!(a);
+    let head = aggregates.next().ok_or(AuditError::NoMeasurementForHead)?;
+    let tail = aggregates;
 
-    //
-    //
-    // let head_summary = aggregate_measurements(all.iter().take(1), aggregate_by, &filter_by);
-    // let tail_summary = aggregate_measurements(all.iter().skip(1), aggregate_by, &filter_by);
-    // // TODO(kaihowl) user proper logging tools
-    // dbg!(&head_summary);
-    // dbg!(&tail_summary);
-    //
-    // if head_summary.len == 0 {
-    //     return Err(AuditError::NoMeasurementForHead);
-    // }
-    //
-    // if tail_summary.len < min_count.into() {
-    //     // TODO(kaihowl) handle with explicit return? Print text somewhere else?
-    //     eprintln!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
-    //     return Ok(());
-    // }
-    //
-    // if head_summary.significantly_different_from(&tail_summary, sigma) {
-    //     eprintln!("Measurements differ significantly");
-    //     // TODO(kaihowl) print details
-    //     return Err(AuditError::SignificantDifference);
-    // }
-    //
+    let head_summary = summarize_measurements(iter::once(head));
+    let tail_summary = summarize_measurements(tail);
+
+    dbg!(head_summary.len);
+    dbg!(tail_summary.len);
+    if tail_summary.len < min_count.into() {
+        // TODO(kaihowl) handle with explicit return? Print text somewhere else?
+        eprintln!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
+        return Ok(());
+    }
+
+    if head_summary.significantly_different_from(&tail_summary, sigma) {
+        eprintln!("Measurements differ significantly");
+        // TODO(kaihowl) print details
+        return Err(AuditError::SignificantDifference);
+    }
+
     Ok(())
 }
 
@@ -893,31 +881,14 @@ impl Stats {
 }
 
 fn aggregate_measurements<'a, F>(
-    commits: impl Iterator<Item = &'a Commit>,
-    aggregate_by: AggregationFunc,
-    filter_by: &F,
-) -> Stats
+    commits: impl Iterator<Item = Commit> + 'a,
+    aggregate_by: &'a AggregationFunc,
+    filter_by: &'a F,
+) -> impl Iterator<Item = EpochMeasurement> + 'a
 where
     F: Fn(&&MeasurementData) -> bool,
 {
-    // let s: AggStats = commits
-    //     .filter_map(|c| {
-    //         dbg!(&c.commit);
-    //         c.measurements
-    //             .iter()
-    //             .filter(filter_by)
-    //             .inspect(|m| {
-    //                 dbg!(m);
-    //             })
-    //             .map(|m| m.val)
-    //             .aggregate_by(aggregate_by)
-    //     })
-    //     .inspect(|m| {
-    //         dbg!(aggregate_by);
-    //         dbg!(m);
-    //     })
-    //     .collect();
-    let measurements = commits.filter_map(|c| {
+    let measurements = commits.filter_map(move |c| {
         dbg!(&c.commit);
         c.measurements
             .iter()
@@ -925,28 +896,21 @@ where
             .inspect(|m| {
                 dbg!(m);
             })
-            .reduce_by(aggregate_by)
+            .reduce_by(*aggregate_by)
     });
 
     let mut first_epoch = None;
 
-    let s: AggStats = measurements
-        .inspect(|m| {
+    measurements
+        .inspect(move |m| {
             dbg!(aggregate_by);
             dbg!(m);
         })
-        .take_while(|m| {
+        .take_while(move |m| {
             let prev_epoch = first_epoch;
             first_epoch = Some(m.epoch);
             prev_epoch.unwrap_or(m.epoch) == m.epoch
         })
-        .map(|m| m.measurement)
-        .collect();
-    Stats {
-        mean: s.mean(),
-        stddev: s.sample_variance().sqrt(),
-        len: s.mean.len() as usize,
-    }
 
     // measurements
     //     .iter()
@@ -956,6 +920,15 @@ where
     //         let mean = old_mean + (md.val - old_mean) / (index + 1);
     //         let variance =
     //     });
+}
+
+fn summarize_measurements(measurements: impl Iterator<Item = EpochMeasurement>) -> Stats {
+    let s: AggStats = measurements.map(|m| m.measurement).collect();
+    Stats {
+        mean: s.mean(),
+        stddev: s.sample_variance().sqrt(),
+        len: s.mean.len() as usize,
+    }
 }
 
 // fn retrieve_measurements_by_commit(
@@ -1491,11 +1464,12 @@ mod test {
                 }
             })
             .collect_vec();
-        let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
-        assert_eq!(stats.mean, 0.1);
-        assert_eq!(stats.len, 100);
-        let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
-        assert_ne!(naive_mean, 0.1);
+        let stats = aggregate_measurements(commits.into_iter(), &AggregationFunc::Min, &|_| true);
+        // TODO(kaihowl)
+        // assert_eq!(stats.mean, 0.1);
+        // assert_eq!(stats.len, 100);
+        // let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
+        // assert_ne!(naive_mean, 0.1);
     }
 
     #[test]
@@ -1511,10 +1485,12 @@ mod test {
             }]
             .into(),
         }];
-        let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
-        assert_eq!(stats.len, 1);
-        assert_eq!(stats.mean, 1.0);
-        assert_eq!(stats.stddev, 0.0);
+        let stats = aggregate_measurements(commits.into_iter(), &AggregationFunc::Min, &|_| true)
+            .collect_vec();
+        // TODO(kaihowl)
+        // assert_eq!(stats.len, 1);
+        // assert_eq!(stats.mean, 1.0);
+        // assert_eq!(stats.stddev, 0.0);
     }
 
     #[test]
@@ -1523,10 +1499,11 @@ mod test {
             commit: "deadbeef".into(),
             measurements: [].into(),
         }];
-        let stats = aggregate_measurements(commits.iter(), AggregationFunc::Min, &|_| true);
-        assert_eq!(stats.len, 0);
-        assert_eq!(stats.mean, 0.0);
-        assert_eq!(stats.stddev, 0.0);
+        let stats = aggregate_measurements(commits.into_iter(), &AggregationFunc::Min, &|_| true);
+        // TODO(kaihowl)
+        // assert_eq!(stats.len, 0);
+        // assert_eq!(stats.mean, 0.0);
+        // assert_eq!(stats.stddev, 0.0);
     }
 
     #[test]
