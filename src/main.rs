@@ -1375,22 +1375,18 @@ fn walk_commits(
     repo: &git2::Repository,
     num_commits: usize,
 ) -> Result<impl Iterator<Item = Commit> + '_, DeserializationError> {
-    dbg!("TODO(kaihowl) walk_commit", &num_commits);
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
-    dbg!("TODO(kaihowl) before revwalk");
     Ok(revwalk
         .take(num_commits)
         .map(|commit_oid| -> Result<Commit, DeserializationError> {
             let commit_id = commit_oid?;
-            dbg!("TODO(kaihowl) before find_note");
             let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
                 // TODO(kaihowl) remove unwrap_or
                 Ok(note) => deserialize(note.message().unwrap_or("")),
                 Err(_) => [].into(),
             };
-            dbg!("TODO(kaihowl)", &measurements);
             Ok(Commit {
                 commit: commit_id.to_string(),
                 measurements,
