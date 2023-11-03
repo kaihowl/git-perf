@@ -845,8 +845,8 @@ fn audit(
     let head = aggregates.next().ok_or(AuditError::NoMeasurementForHead)?;
     let tail = aggregates;
 
-    let head_summary = summarize_measurements(iter::once(head));
-    let tail_summary = summarize_measurements(tail);
+    let head_summary = summarize_measurements(iter::once(head.measurement));
+    let tail_summary = summarize_measurements(tail.map(|f| f.measurement));
 
     dbg!(head_summary.len);
     dbg!(tail_summary.len);
@@ -922,8 +922,8 @@ where
     //     });
 }
 
-fn summarize_measurements(measurements: impl Iterator<Item = EpochMeasurement>) -> Stats {
-    let s: AggStats = measurements.map(|m| m.measurement).collect();
+fn summarize_measurements(measurements: impl Iterator<Item = f64>) -> Stats {
+    let s: AggStats = measurements.collect();
     Stats {
         mean: s.mean(),
         stddev: s.sample_variance().sqrt(),
@@ -1455,13 +1455,8 @@ mod test {
 
     #[test]
     fn no_floating_error() {
-        let commits = (0..100)
-            .map(|_| EpochMeasurement {
-                epoch: 123,
-                measurement: 0.1,
-            })
-            .collect_vec();
-        let stats = summarize_measurements(commits.into_iter());
+        let measurements = (0..100).map(|_| 0.1).collect_vec();
+        let stats = summarize_measurements(measurements.into_iter());
         // TODO(kaihowl)
         assert_eq!(stats.mean, 0.1);
         assert_eq!(stats.len, 100);
@@ -1471,36 +1466,20 @@ mod test {
 
     #[test]
     fn single_measurement() {
-        let commits = vec![Commit {
-            commit: "deadbeef".into(),
-            measurements: [MeasurementData {
-                epoch: 0,
-                name: "mymeasurement".into(),
-                timestamp: 123.0,
-                val: 1.0,
-                key_values: [].into(),
-            }]
-            .into(),
-        }];
-        let stats = aggregate_measurements(commits.into_iter(), &AggregationFunc::Min, &|_| true)
-            .collect_vec();
-        // TODO(kaihowl)
-        // assert_eq!(stats.len, 1);
-        // assert_eq!(stats.mean, 1.0);
-        // assert_eq!(stats.stddev, 0.0);
+        let measurements = vec![1.0];
+        let stats = summarize_measurements(measurements.into_iter());
+        assert_eq!(stats.len, 1);
+        assert_eq!(stats.mean, 1.0);
+        assert_eq!(stats.stddev, 0.0);
     }
 
     #[test]
     fn no_measurement() {
-        let commits = vec![Commit {
-            commit: "deadbeef".into(),
-            measurements: [].into(),
-        }];
-        let stats = aggregate_measurements(commits.into_iter(), &AggregationFunc::Min, &|_| true);
-        // TODO(kaihowl)
-        // assert_eq!(stats.len, 0);
-        // assert_eq!(stats.mean, 0.0);
-        // assert_eq!(stats.stddev, 0.0);
+        let measurements = vec![];
+        let stats = summarize_measurements(measurements.into_iter());
+        assert_eq!(stats.len, 0);
+        assert_eq!(stats.mean, 0.0);
+        assert_eq!(stats.stddev, 0.0);
     }
 
     #[test]
