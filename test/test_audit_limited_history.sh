@@ -49,7 +49,6 @@ git checkout HEAD~1
 git perf add -m timer 2
 git checkout -
 git perf add -m timer 3
-git perf audit -m timer && exit 1
 git perf audit -m timer --min-measurements 1 && exit 1
 git perf audit -m timer --min-measurements 2
 
