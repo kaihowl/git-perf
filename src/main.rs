@@ -1426,7 +1426,7 @@ fn walk_commits(
         .filter_map(|res| match res {
             Ok(r) => Some(r),
             Err(e) => {
-                dbg!("Skipping record due to error: {}", e);
+                eprintln!("Skipping record due to error: {}", e);
                 None
             }
         }))
