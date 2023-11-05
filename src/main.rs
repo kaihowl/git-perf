@@ -125,7 +125,7 @@ enum Commands {
 
         /// What to aggregate the measurements in each group with
         #[arg(short, long, default_value = "min")]
-        aggregate_by: AggregationFunc,
+        aggregate_by: ReductionFunc,
 
         /// Multiple of the stddev after which a outlier is detected.
         /// If the HEAD measurement is within [mean-<d>*sigma; mean+<d>*sigma],
@@ -155,7 +155,7 @@ enum Commands {
 }
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-enum AggregationFunc {
+enum ReductionFunc {
     Min,
     Max,
     Median,
@@ -184,21 +184,27 @@ impl VecAggregation for Vec<f64> {
 }
 
 #[derive(Debug)]
-struct EpochMeasurement {
+struct MeasurementSummary {
     epoch: u32,
-    measurement: f64,
+    val: f64,
+}
+
+#[derive(Debug)]
+struct CommitSummary {
+    commit: String,
+    measurement: Option<MeasurementSummary>,
 }
 
 // TODO(kaihowl) oh god naming
-trait AggregationFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
-    fn reduce_by(&mut self, fun: AggregationFunc) -> Option<EpochMeasurement>;
+trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
+    fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary>;
 }
 
-impl<'a, T> AggregationFuncIterator<'a> for T
+impl<'a, T> ReductionFuncIterator<'a> for T
 where
     T: Iterator<Item = &'a MeasurementData>,
 {
-    fn reduce_by(&mut self, fun: AggregationFunc) -> Option<EpochMeasurement> {
+    fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary> {
         let mut peekable = self.peekable();
         let expected_epoch = peekable.peek().map(|m| m.epoch);
         let mut vals = peekable.map(|m| {
@@ -208,20 +214,20 @@ where
 
         let aggregate_val = vals.aggregate_by(fun);
 
-        Some(EpochMeasurement {
+        Some(MeasurementSummary {
             epoch: expected_epoch?,
-            measurement: aggregate_val?,
+            val: aggregate_val?,
         })
     }
 }
 
-trait ReductionFunc: Iterator<Item = f64> {
-    fn aggregate_by(&mut self, fun: AggregationFunc) -> Option<Self::Item> {
+trait NumericReductionFunc: Iterator<Item = f64> {
+    fn aggregate_by(&mut self, fun: ReductionFunc) -> Option<Self::Item> {
         match fun {
-            AggregationFunc::Min => self.reduce(f64::min),
-            AggregationFunc::Max => self.reduce(f64::max),
-            AggregationFunc::Median => self.collect_vec().median(),
-            AggregationFunc::Mean => {
+            ReductionFunc::Min => self.reduce(f64::min),
+            ReductionFunc::Max => self.reduce(f64::max),
+            ReductionFunc::Median => self.collect_vec().median(),
+            ReductionFunc::Mean => {
                 let stats: AggStats = self.collect();
                 if stats.mean.is_empty() {
                     None
@@ -233,7 +239,7 @@ trait ReductionFunc: Iterator<Item = f64> {
     }
 }
 
-impl<T> ReductionFunc for T where T: Iterator<Item = f64> {}
+impl<T> NumericReductionFunc for T where T: Iterator<Item = f64> {}
 
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
     let pos = s
@@ -827,7 +833,7 @@ fn audit(
     max_count: usize,
     min_count: u16,
     selectors: &[(String, String)],
-    aggregate_by: AggregationFunc,
+    summarize_by: ReductionFunc,
     sigma: f64,
 ) -> Result<(), AuditError> {
     let repo = Repository::open(".")?;
@@ -840,16 +846,26 @@ fn audit(
                 .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
     };
 
-    let mut aggregates = aggregate_measurements(all, &aggregate_by, &filter_by);
+    let mut aggregates = summarize_measurements(all, &summarize_by, &filter_by);
 
-    let head = aggregates.next().ok_or(AuditError::NoMeasurementForHead)?;
+    let head = aggregates
+        .next()
+        .and_then(|s| {
+            eprintln!("Head measurement is: {s:?}");
+            s.measurement
+        })
+        .ok_or(AuditError::NoMeasurementForHead)?;
+
     let tail = aggregates;
 
-    let head_summary = summarize_measurements(iter::once(head.measurement));
-    let tail_summary = summarize_measurements(tail.map(|f| f.measurement));
+    let head_summary = aggregate_measurements(iter::once(head.val));
+    let tail_summary = aggregate_measurements(tail.flat_map(|cs| {
+        eprintln!("Observed measurement in tail: {cs:?}");
+        cs.measurement.map(|ms| ms.val)
+    }));
 
-    dbg!(head_summary.len);
-    dbg!(tail_summary.len);
+    dbg!(&head_summary);
+    dbg!(&tail_summary);
     if tail_summary.len < min_count.into() {
         // TODO(kaihowl) handle with explicit return? Print text somewhere else?
         eprintln!("Only {} measurements found. Less than requested min_measurements of {}. Skipping test.", tail_summary.len, min_count);
@@ -880,36 +896,46 @@ impl Stats {
     }
 }
 
-fn aggregate_measurements<'a, F>(
+fn summarize_measurements<'a, F>(
     commits: impl Iterator<Item = Commit> + 'a,
-    aggregate_by: &'a AggregationFunc,
+    summarize_by: &'a ReductionFunc,
     filter_by: &'a F,
-) -> impl Iterator<Item = EpochMeasurement> + 'a
+) -> impl Iterator<Item = CommitSummary> + 'a
 where
     F: Fn(&&MeasurementData) -> bool,
 {
-    let measurements = commits.filter_map(move |c| {
+    let measurements = commits.map(move |c| {
         dbg!(&c.commit);
-        c.measurements
+        let measurement = c
+            .measurements
             .iter()
             .filter(filter_by)
             .inspect(|m| {
                 dbg!(m);
             })
-            .reduce_by(*aggregate_by)
+            .reduce_by(*summarize_by);
+
+        CommitSummary {
+            commit: c.commit,
+            measurement,
+        }
     });
 
     let mut first_epoch = None;
 
+    // TODO(kaihowl) this is a second repsonsibility, move out? "EpochClearing"
     measurements
         .inspect(move |m| {
-            dbg!(aggregate_by);
+            dbg!(summarize_by);
             dbg!(m);
         })
-        .take_while(move |m| {
-            let prev_epoch = first_epoch;
-            first_epoch = Some(m.epoch);
-            prev_epoch.unwrap_or(m.epoch) == m.epoch
+        .take_while(move |m| match &m.measurement {
+            Some(m) => {
+                let prev_epoch = first_epoch;
+                first_epoch = Some(m.epoch);
+                prev_epoch.unwrap_or(m.epoch) == m.epoch
+            }
+            None => true,
         })
 
     // measurements
@@ -922,7 +948,7 @@ where
     //     });
 }
 
-fn summarize_measurements(measurements: impl Iterator<Item = f64>) -> Stats {
+fn aggregate_measurements(measurements: impl Iterator<Item = f64>) -> Stats {
     let s: AggStats = measurements.collect();
     Stats {
         mean: s.mean(),
@@ -1452,7 +1478,7 @@ mod test {
     #[test]
     fn no_floating_error() {
         let measurements = (0..100).map(|_| 0.1).collect_vec();
-        let stats = summarize_measurements(measurements.into_iter());
+        let stats = aggregate_measurements(measurements.into_iter());
         // TODO(kaihowl)
         assert_eq!(stats.mean, 0.1);
         assert_eq!(stats.len, 100);
@@ -1463,7 +1489,7 @@ mod test {
     #[test]
     fn single_measurement() {
         let measurements = vec![1.0];
-        let stats = summarize_measurements(measurements.into_iter());
+        let stats = aggregate_measurements(measurements.into_iter());
         assert_eq!(stats.len, 1);
         assert_eq!(stats.mean, 1.0);
         assert_eq!(stats.stddev, 0.0);
@@ -1472,7 +1498,7 @@ mod test {
     #[test]
     fn no_measurement() {
         let measurements = vec![];
-        let stats = summarize_measurements(measurements.into_iter());
+        let stats = aggregate_measurements(measurements.into_iter());
         assert_eq!(stats.len, 0);
         assert_eq!(stats.mean, 0.0);
         assert_eq!(stats.stddev, 0.0);
@@ -1542,81 +1568,71 @@ mod test {
     #[test]
     fn verify_stats() {
         let empty_vec = [];
+        assert_eq!(None, empty_vec.into_iter().aggregate_by(ReductionFunc::Min));
+        assert_eq!(None, empty_vec.into_iter().aggregate_by(ReductionFunc::Max));
         assert_eq!(
             None,
-            empty_vec.into_iter().aggregate_by(AggregationFunc::Min)
+            empty_vec.into_iter().aggregate_by(ReductionFunc::Median)
         );
         assert_eq!(
             None,
-            empty_vec.into_iter().aggregate_by(AggregationFunc::Max)
-        );
-        assert_eq!(
-            None,
-            empty_vec.into_iter().aggregate_by(AggregationFunc::Median)
-        );
-        assert_eq!(
-            None,
-            empty_vec.into_iter().aggregate_by(AggregationFunc::Mean)
+            empty_vec.into_iter().aggregate_by(ReductionFunc::Mean)
         );
 
         let single_el_vec = [3.0];
         assert_eq!(
             Some(3.0),
-            single_el_vec.into_iter().aggregate_by(AggregationFunc::Min)
+            single_el_vec.into_iter().aggregate_by(ReductionFunc::Min)
         );
         assert_eq!(
             Some(3.0),
-            single_el_vec.into_iter().aggregate_by(AggregationFunc::Max)
-        );
-        assert_eq!(
-            Some(3.0),
-            single_el_vec
-                .into_iter()
-                .aggregate_by(AggregationFunc::Median)
+            single_el_vec.into_iter().aggregate_by(ReductionFunc::Max)
         );
         assert_eq!(
             Some(3.0),
             single_el_vec
                 .into_iter()
-                .aggregate_by(AggregationFunc::Mean)
+                .aggregate_by(ReductionFunc::Median)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec.into_iter().aggregate_by(ReductionFunc::Mean)
         );
 
         let two_el_vec = [3.0, 1.0];
         assert_eq!(
             Some(1.0),
-            two_el_vec.into_iter().aggregate_by(AggregationFunc::Min)
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Min)
         );
         assert_eq!(
             Some(3.0),
-            two_el_vec.into_iter().aggregate_by(AggregationFunc::Max)
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Max)
         );
         assert_eq!(
             Some(2.0),
-            two_el_vec.into_iter().aggregate_by(AggregationFunc::Median)
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Median)
         );
         assert_eq!(
             Some(2.0),
-            two_el_vec.into_iter().aggregate_by(AggregationFunc::Mean)
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Mean)
         );
 
         let three_el_vec = [2.0, 6.0, 1.0];
         assert_eq!(
             Some(1.0),
-            three_el_vec.into_iter().aggregate_by(AggregationFunc::Min)
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Min)
         );
         assert_eq!(
             Some(6.0),
-            three_el_vec.into_iter().aggregate_by(AggregationFunc::Max)
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Max)
         );
         assert_eq!(
             Some(2.0),
-            three_el_vec
-                .into_iter()
-                .aggregate_by(AggregationFunc::Median)
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Median)
         );
         assert_eq!(
             Some(3.0),
-            three_el_vec.into_iter().aggregate_by(AggregationFunc::Mean)
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Mean)
         );
     }
 
