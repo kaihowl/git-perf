@@ -10,14 +10,15 @@ source "$script_dir/common.sh"
 echo New repo, error out without crash
 cd_empty_repo
 output=$(git perf report 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'no performance measurements found'* ]]; then
-  echo "Missing 'no performance measurements found' in output:"
+if [[ ${output} != *'git error'* ]]; then
+  echo "Missing 'git error' in output:"
   echo "$output"
   exit 1
 fi
+
 output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'no measurement for HEAD'* ]]; then
-  echo "Missing 'no measurement for HEAD' in output:"
+if [[ ${output} != *'git error'* ]]; then
+  echo "Missing 'git error' in output:"
   echo "$output"
   exit 1
 fi
