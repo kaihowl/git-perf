@@ -831,7 +831,7 @@ fn audit(
     sigma: f64,
 ) -> Result<(), AuditError> {
     let repo = Repository::open(".")?;
-    let mut all = walk_commits(&repo, max_count)?;
+    let all = walk_commits(&repo, max_count)?;
 
     let filter_by = |m: &&MeasurementData| {
         m.name == measurement
@@ -840,13 +840,12 @@ fn audit(
                 .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
     };
 
-    // TODO(kaihowl) cannot be distinguished to second case
-    let first = all.next().ok_or(AuditError::NoMeasurementForHead)?;
+    let mut aggregates = aggregate_measurements(all, &aggregate_by, &filter_by);
 
-    let head = aggregate_measurements(iter::once(first), &aggregate_by, &filter_by);
-    let tail = aggregate_measurements(all, &aggregate_by, &filter_by);
+    let head = aggregates.next().ok_or(AuditError::NoMeasurementForHead)?;
+    let tail = aggregates;
 
-    let head_summary = summarize_measurements(head.map(|f| f.measurement));
+    let head_summary = summarize_measurements(iter::once(head.measurement));
     let tail_summary = summarize_measurements(tail.map(|f| f.measurement));
 
     dbg!(head_summary.len);
