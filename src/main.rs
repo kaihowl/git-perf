@@ -853,19 +853,26 @@ fn audit(
 
     let head = aggregates
         .next()
+        .ok_or(AuditError::NoMeasurementForHead)
         .and_then(|s| {
             eprintln!("Head measurement is: {s:?}");
-            s.measurement
-        })
-        .ok_or(AuditError::NoMeasurementForHead)?;
+            match s {
+                Ok(cs) => match cs.measurement {
+                    Some(m) => Ok(m.val),
+                    _ => Err(AuditError::NoMeasurementForHead),
+                },
+                // TODO(kaihowl) more specific error?
+                _ => Err(AuditError::NoMeasurementForHead),
+            }
+        })?;
 
-    let tail = aggregates;
+    let tail: Vec<_> = aggregates
+        .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
+        .take(min_count.into())
+        .try_collect()?;
 
-    let head_summary = aggregate_measurements(iter::once(head.val));
-    let tail_summary = aggregate_measurements(tail.flat_map(|cs| {
-        eprintln!("Observed measurement in tail: {cs:?}");
-        cs.measurement.map(|ms| ms.val)
-    }));
+    let head_summary = aggregate_measurements(iter::once(head));
+    let tail_summary = aggregate_measurements(tail.into_iter());
 
     dbg!(&head_summary);
     dbg!(&tail_summary);
@@ -902,28 +909,30 @@ impl Stats {
 }
 
 fn summarize_measurements<'a, F>(
-    commits: impl Iterator<Item = Commit> + 'a,
+    commits: impl Iterator<Item = Result<Commit, DeserializationError>> + 'a,
     summarize_by: &'a ReductionFunc,
     filter_by: &'a F,
-) -> impl Iterator<Item = CommitSummary> + 'a
+) -> impl Iterator<Item = Result<CommitSummary, DeserializationError>> + 'a
 where
     F: Fn(&&MeasurementData) -> bool,
 {
     let measurements = commits.map(move |c| {
-        dbg!(&c.commit);
-        let measurement = c
-            .measurements
-            .iter()
-            .filter(filter_by)
-            .inspect(|m| {
-                dbg!(m);
-            })
-            .reduce_by(*summarize_by);
+        c.map(|c| {
+            dbg!(&c.commit);
+            let measurement = c
+                .measurements
+                .iter()
+                .filter(filter_by)
+                .inspect(|m| {
+                    dbg!(m);
+                })
+                .reduce_by(*summarize_by);
 
-        CommitSummary {
-            commit: c.commit,
-            measurement,
-        }
+            CommitSummary {
+                commit: c.commit,
+                measurement,
+            }
+        })
     });
 
     let mut first_epoch = None;
@@ -934,13 +943,16 @@ where
             dbg!(summarize_by);
             dbg!(m);
         })
-        .take_while(move |m| match &m.measurement {
-            Some(m) => {
+        .take_while(move |m| match &m {
+            Ok(CommitSummary {
+                measurement: Some(m),
+                ..
+            }) => {
                 let prev_epoch = first_epoch;
                 first_epoch = Some(m.epoch);
                 prev_epoch.unwrap_or(m.epoch) == m.epoch
             }
-            None => true,
+            _ => true,
         })
 
     // measurements
@@ -1156,7 +1168,7 @@ fn report(
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
     let repo = Repository::open(".")?;
-    let commits: Vec<Commit> = walk_commits(&repo, num_commits)?.collect();
+    let commits: Vec<Commit> = walk_commits(&repo, num_commits)?.try_collect()?;
 
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
@@ -1405,7 +1417,7 @@ fn deserialize(lines: &str) -> Vec<MeasurementData> {
 fn walk_commits(
     repo: &git2::Repository,
     num_commits: usize,
-) -> Result<impl Iterator<Item = Commit> + '_, DeserializationError> {
+) -> Result<impl Iterator<Item = Result<Commit, DeserializationError>> + '_, DeserializationError> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
@@ -1422,13 +1434,6 @@ fn walk_commits(
                 commit: commit_id.to_string(),
                 measurements,
             })
-        })
-        .filter_map(|res| match res {
-            Ok(r) => Some(r),
-            Err(e) => {
-                eprintln!("Skipping record due to error: {}", e);
-                None
-            }
         }))
     // When this fails it is due to a shallow clone.
     // TODO(kaihowl) proper shallow clone support
