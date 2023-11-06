@@ -868,7 +868,7 @@ fn audit(
 
     let tail: Vec<_> = aggregates
         .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
-        .take(min_count.into())
+        .take(max_count.into())
         .try_collect()?;
 
     let head_summary = aggregate_measurements(iter::once(head));
