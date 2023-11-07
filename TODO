@@ -1,3 +1,2 @@
 - rewrite tests with remotes to use a bare repo (libgit2 does not support non-bare repos for pushing)
 - allow using different git / root folder than pwd
-- introduce .gitperfconfig
