@@ -1443,7 +1443,7 @@ fn walk_commits(
 
 fn is_shallow_repo() -> Option<bool> {
     match process::Command::new("git")
-        .args(["ref-parse", "--is-shallow-repository"])
+        .args(["rev-parse", "--is-shallow-repository"])
         .output()
     {
         Ok(out) if out.status.success() => match std::str::from_utf8(&out.stdout) {
