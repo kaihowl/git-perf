@@ -6,6 +6,17 @@ script_dir=$(dirname "$0")
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
+function set_author_name() {
+  local repo
+  repo=$1
+  pushd "$repo"
+  # TODO(kaihowl)
+  # Only setting the values with envvars fails for libgit2 git_signature_default
+  git config user.name "$GIT_COMMITTER_NAME"
+  git config user.email "$GIT_COMMITTER_EMAIL"
+  popd
+}
+
 # When run, creates and changes into a temp folder with the following structure:
 # - original/  # bare, upstream repo
 # - repo1/     # First working copy
@@ -18,7 +29,10 @@ function bare_repo_and_two_clones() {
   cd ..
 
   git clone original repo1
+  set_author_name repo1
+
   git clone original repo2
+  set_author_name repo2
 }
 
 echo ---- Test case 1: Conflicting on single commit.
