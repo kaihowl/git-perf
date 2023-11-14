@@ -71,27 +71,71 @@ git merge --no-ff -
 git perf add -m test 10000
 git perf audit -m test
 
+# Check perf-accept functionality (merge case 2)
+# Accept performance regression on epoch bump (from main branch)
+cd_empty_repo
+# On main branch
+create_commit
+git perf add -m test 2
+create_commit
+git rev-parse HEAD
+git perf add -m test 3
+# Feature branch
+git checkout -b feature
+create_commit
+git rev-parse HEAD
+git perf add -m test 2
+# Back to main branch, add out-of-range measurement
+git checkout -
+# TODO(kaihowl) introduce random into create_commit
+sleep 1
+create_commit
+git rev-parse HEAD
+git perf add -m test 10000
+git perf audit -m test && exit 1
+# Go to feature branch
+git checkout -
+git merge --no-ff -
+git perf add -m test 10000
+git perf audit -m test && exit 1
+# Undo merge
+git reset --hard HEAD~1
+# Back to main branch and bump epoch
+git checkout -
+git perf bump-epoch -m test
+git add .gitperfconfig
+git commit --amend --no-edit
+# To feature branch
+git checkout -
+git merge --no-ff -
+git perf add -m test 1000
+git perf audit -m test
 
-# # Test for duplicated trailers
-# cd_empty_repo
-# create_commit
-# git perf good -m test-measure
-# nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
-# if [[ $nr_git_trailers != 1 ]]; then
-#   echo "Expected exactly one git trailer 'accept-perf' but found $nr_git_trailers"
-#   exit 1
-# fi
-# # Second invocation for the same git trailer
-# nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
-# if [[ $nr_git_trailers != 1 ]]; then
-#   echo "Expected exactly one git trailer 'accept-perf' but found $nr_git_trailers"
-#   exit 1
-# fi
-# git perf good -m test-measure -k os=ubuntu
-# nr_git_trailers=$(git show HEAD | grep -c 'accept-perf')
-# if [[ $nr_git_trailers != 2 ]]; then
-#   echo "Expected exactly two git trailers 'accept-perf' but found $nr_git_trailers"
-#   exit 1
-# fi
+# Check perf-accept functionality (merge conflict case)
+# Ensure that there is a conflict if the merge branch and the feature branch both force an epoch bump
+cd_empty_repo
+# On main branch
+create_commit
+git perf add -m test 2
+create_commit
+git perf add -m test 3
+# Feature branch
+git checkout -b feature
+create_commit
+create_commit
+git perf add -m test 10000
+git perf audit -m test && exit 1
+git perf bump-epoch -m test
+git add .gitperfconfig
+git commit --amend --no-edit
+# Back to main branch, bump epoch
+git checkout -
+git perf bump-epoch -m test
+git add .gitperfconfig
+git perf add -m test 10000
+git commit --amend --no-edit
+# On main branch
+# This has to result in a conflict
+git merge --no-ff - && exit 1
 
 exit 0
