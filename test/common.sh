@@ -27,8 +27,12 @@ function cd_empty_repo() {
 }
 
 function create_commit() {
-  echo "a" >> a
-  git add a
+  # Since some of the commits are added in the same instant with the same content, they result in the same hash.
+  # Instead, use random files such that there is a very small chance in collision.
+  local file
+  file=$RANDOM
+  touch "$file"
+  git add "$file"
   git commit -m 'my commit'
 }
 

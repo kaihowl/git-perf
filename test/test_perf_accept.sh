@@ -87,8 +87,6 @@ git rev-parse HEAD
 git perf add -m test 2
 # Back to main branch, add out-of-range measurement
 git checkout -
-# TODO(kaihowl) introduce random into create_commit
-sleep 1
 create_commit
 git rev-parse HEAD
 git perf add -m test 10000
