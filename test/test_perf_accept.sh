@@ -40,8 +40,6 @@ git perf bump-epoch -m someother
 git add .gitperfconfig
 git commit --amend --no-edit
 
-# TODO(kaihowl) needs complete rework. no longer valid.
-
 # Check perf-accept functionality (merge case)
 # Accept performance regression on epoch bump (from feature branch)
 cd_empty_repo
