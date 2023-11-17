@@ -49,7 +49,7 @@ git checkout -b feature_branch
 for i in $(seq 1 5); do
   create_commit
 done
-git checkout -
+git checkout master
 git merge --no-ff -
 # Test first-parent fetch-depth behavior even if HEAD is non-merge commit.
 commit=$(git rev-parse HEAD)

@@ -19,7 +19,7 @@ function cd_empty_repo() {
   local tmpgit
   tmpgit="$(mktemp -d)"
   pushd "${tmpgit}"
-  git init
+  git init --initial-branch=master
   # TODO(kaihowl)
   # Only setting the values with envvars fails for libgit2 git_signature_default
   git config user.name "$GIT_COMMITTER_NAME"

@@ -1,4 +1,3 @@
-- git checkout - / remove
 - create migration script and use different git notes branch for v2
 - allow using different git / root folder than pwd
 - take std variance per epoch to allow catching staggered performance regressions?

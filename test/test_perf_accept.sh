@@ -53,18 +53,18 @@ git checkout -b feature
 create_commit
 create_commit
 # Attempt to merge to main
-git checkout -
+git checkout master
 git merge --no-ff -
 git perf add -m test 10000
 git perf audit -m test && exit 1
 # Undo merge, back to feature branch, bump epoch
 git reset --hard HEAD~1
-git checkout -
+git checkout feature
 git perf bump-epoch -m test
 git add .gitperfconfig
 git commit --amend --no-edit
-# Back to main branch
-git checkout -
+# Back to master branch
+git checkout master
 git merge --no-ff -
 git perf add -m test 10000
 git perf audit -m test
@@ -83,26 +83,26 @@ git checkout -b feature
 create_commit
 git rev-parse HEAD
 git perf add -m test 2
-# Back to main branch, add out-of-range measurement
-git checkout -
+# Back to master branch, add out-of-range measurement
+git checkout master
 create_commit
 git rev-parse HEAD
 git perf add -m test 10000
 git perf audit -m test && exit 1
 # Go to feature branch
-git checkout -
+git checkout feature
 git merge --no-ff -
 git perf add -m test 10000
 git perf audit -m test && exit 1
 # Undo merge
 git reset --hard HEAD~1
-# Back to main branch and bump epoch
-git checkout -
+# Back to master branch and bump epoch
+git checkout master
 git perf bump-epoch -m test
 git add .gitperfconfig
 git commit --amend --no-edit
 # To feature branch
-git checkout -
+git checkout feature
 git merge --no-ff -
 git perf add -m test 1000
 git perf audit -m test
@@ -124,8 +124,8 @@ git perf audit -m test && exit 1
 git perf bump-epoch -m test
 git add .gitperfconfig
 git commit --amend --no-edit
-# Back to main branch, bump epoch
-git checkout -
+# Back to master branch, bump epoch
+git checkout master
 git perf bump-epoch -m test
 git add .gitperfconfig
 git perf add -m test 10000
