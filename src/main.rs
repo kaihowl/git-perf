@@ -446,46 +446,128 @@ impl From<git2::Error> for AddError {
     }
 }
 
-// TODO(kaihowl) proper error handling
-fn write_config(conf: &str) {
-    let mut f = File::create(".gitperfconfig").expect("open file for writing failed");
-    f.write_all(conf.as_bytes()).expect("failed to write");
-}
-
-fn read_config() -> Option<String> {
-    read_config_from_file(".gitperfconfig")
-}
-
-// TODO(kaihowl) proper error handling
-// TODO(kaihowl) proper file type
-fn read_config_from_file(file: &str) -> Option<String> {
-    let mut conf_str = String::new();
-    File::open(file).ok()?.read_to_string(&mut conf_str).ok()?;
-    Some(conf_str)
-}
-
-fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
-    // TODO(hoewelmk) configure path, use different working directory than repo root
-    let conf = read_config()?;
-    determine_epoch(measurement, &conf)
-}
-
-fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
-    // TODO(kaihowl) buffered reading?
-    let config = conf_str
-        .parse::<Document>()
-        .expect("Failed to parse config");
-
-    let get_epoch = |section: &str| {
-        let s = config
-            .get("measurement")?
-            .get(section)?
-            .get("epoch")?
-            .as_str()?;
-        u32::from_str_radix(s, 16).ok()
+mod config {
+    use std::{
+        fs::File,
+        io::{Read, Write},
     };
 
-    get_epoch(measurement).or_else(|| get_epoch("*"))
+    use toml_edit::{value, Document};
+
+    use crate::get_head_revision;
+
+    // TODO(kaihowl) proper error handling
+    pub fn write_config(conf: &str) {
+        let mut f = File::create(".gitperfconfig").expect("open file for writing failed");
+        f.write_all(conf.as_bytes()).expect("failed to write");
+    }
+
+    pub fn read_config() -> Option<String> {
+        read_config_from_file(".gitperfconfig")
+    }
+
+    // TODO(kaihowl) proper error handling
+    // TODO(kaihowl) proper file type
+    fn read_config_from_file(file: &str) -> Option<String> {
+        let mut conf_str = String::new();
+        File::open(file).ok()?.read_to_string(&mut conf_str).ok()?;
+        Some(conf_str)
+    }
+
+    pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
+        // TODO(hoewelmk) configure path, use different working directory than repo root
+        let conf = read_config()?;
+        determine_epoch(measurement, &conf)
+    }
+
+    fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
+        // TODO(kaihowl) buffered reading?
+        let config = conf_str
+            .parse::<Document>()
+            .expect("Failed to parse config");
+
+        let get_epoch = |section: &str| {
+            let s = config
+                .get("measurement")?
+                .get(section)?
+                .get("epoch")?
+                .as_str()?;
+            u32::from_str_radix(s, 16).ok()
+        };
+
+        get_epoch(measurement).or_else(|| get_epoch("*"))
+    }
+
+    pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
+        let mut conf = conf_str
+            .parse::<Document>()
+            .expect("failed to parse config");
+
+        // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
+        conf["measurement"][measurement]["epoch"] = value(&get_head_revision()[0..8]);
+        *conf_str = conf.to_string();
+    }
+
+    mod test {
+        use crate::get_head_revision;
+
+        use super::*;
+
+        #[test]
+        fn test_read_epochs() {
+            // TODO(hoewelmk) order unspecified in serialization...
+            let configfile = r#"[measurement."something"]
+#My comment
+epoch="34567898"
+
+[measurement."somethingelse"]
+epoch="a3dead"
+
+[measurement."*"]
+# General performance regression
+epoch="12344555"
+"#;
+
+            let epoch = determine_epoch("something", configfile);
+            assert_eq!(epoch, Some(0x34567898));
+
+            let epoch = determine_epoch("somethingelse", configfile);
+            assert_eq!(epoch, Some(0xa3dead));
+
+            let epoch = determine_epoch("unspecified", configfile);
+            assert_eq!(epoch, Some(0x12344555));
+        }
+
+        #[test]
+        fn test_bump_epochs() {
+            let configfile = r#"[measurement."something"]
+#My comment
+epoch = "34567898"
+"#;
+
+            let mut actual = String::from(configfile);
+            bump_epoch_in_conf("something", &mut actual);
+
+            let expected = format!(
+                r#"[measurement."something"]
+#My comment
+epoch = "{}"
+"#,
+                &get_head_revision()[0..8],
+            );
+
+            assert_eq!(actual, expected);
+        }
+
+        #[test]
+        fn test_bump_new_epoch_and_read_it() {
+            let mut conf = String::new();
+            bump_epoch_in_conf("mymeasurement", &mut conf);
+            let epoch = determine_epoch("mymeasurement", &conf);
+            dbg!(&conf);
+            assert!(epoch.is_some());
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -510,21 +592,11 @@ fn get_head_revision() -> String {
         .to_string()
 }
 
-fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
-    let mut conf = conf_str
-        .parse::<Document>()
-        .expect("failed to parse config");
-
-    // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
-    conf["measurement"][measurement]["epoch"] = value(&get_head_revision()[0..8]);
-    *conf_str = conf.to_string();
-}
-
 // TODO(kaihowl) proper error handling
 fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
-    let mut conf_str = read_config().unwrap_or_default();
-    bump_epoch_in_conf(measurement, &mut conf_str);
-    write_config(&conf_str);
+    let mut conf_str = config::read_config().unwrap_or_default();
+    config::bump_epoch_in_conf(measurement, &mut conf_str);
+    config::write_config(&conf_str);
     Ok(())
 }
 
@@ -544,7 +616,7 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
 
     let md = MeasurementData {
         // TODO(hoewelmk)
-        epoch: determine_epoch_from_config(measurement).unwrap_or(0),
+        epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
         name: measurement.to_owned(),
         timestamp,
         val: value,
@@ -1790,52 +1862,6 @@ mod test {
     }
 
     #[test]
-    fn test_read_epochs() {
-        // TODO(hoewelmk) order unspecified in serialization...
-        let configfile = r#"[measurement."something"]
-#My comment
-epoch="34567898"
-
-[measurement."somethingelse"]
-epoch="a3dead"
-
-[measurement."*"]
-# General performance regression
-epoch="12344555"
-"#;
-
-        let epoch = determine_epoch("something", configfile);
-        assert_eq!(epoch, Some(0x34567898));
-
-        let epoch = determine_epoch("somethingelse", configfile);
-        assert_eq!(epoch, Some(0xa3dead));
-
-        let epoch = determine_epoch("unspecified", configfile);
-        assert_eq!(epoch, Some(0x12344555));
-    }
-
-    #[test]
-    fn test_bump_epochs() {
-        let configfile = r#"[measurement."something"]
-#My comment
-epoch = "34567898"
-"#;
-
-        let mut actual = String::from(configfile);
-        bump_epoch_in_conf("something", &mut actual);
-
-        let expected = format!(
-            r#"[measurement."something"]
-#My comment
-epoch = "{}"
-"#,
-            &get_head_revision()[0..8],
-        );
-
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
     fn test_get_head_revision() {
         let revision = get_head_revision();
         assert!(
@@ -1843,15 +1869,6 @@ epoch = "{}"
             "'{}' contained non alphanumeric or non ASCII characters",
             revision
         )
-    }
-
-    #[test]
-    fn test_bump_new_epoch_and_read_it() {
-        let mut conf = String::new();
-        bump_epoch_in_conf("mymeasurement", &mut conf);
-        let epoch = determine_epoch("mymeasurement", &conf);
-        dbg!(&conf);
-        assert!(epoch.is_some());
     }
 
     #[test]
