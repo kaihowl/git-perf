@@ -89,7 +89,7 @@ enum Commands {
     },
 
     /// For a given measurement, check perfomance deviations of the HEAD commit
-    /// against <n> previous commits. Group previous results and aggregate their
+    /// against `<n>` previous commits. Group previous results and aggregate their
     /// results before comparison.
     Audit {
         #[arg(short, long, value_parser=parse_spaceless_string)]
@@ -115,7 +115,7 @@ enum Commands {
         aggregate_by: ReductionFunc,
 
         /// Multiple of the stddev after which a outlier is detected.
-        /// If the HEAD measurement is within [mean-<d>*sigma; mean+<d>*sigma],
+        /// If the HEAD measurement is within `[mean-<d>*sigma; mean+<d>*sigma]`,
         /// it is considered acceptable.
         #[arg(short = 'd', long, default_value = "4.0")]
         sigma: f64,
