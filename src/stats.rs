@@ -68,6 +68,7 @@ pub trait NumericReductionFunc: Iterator<Item = f64> {
 
 impl<T> NumericReductionFunc for T where T: Iterator<Item = f64> {}
 
+#[cfg(test)]
 mod test {
     use super::*;
 

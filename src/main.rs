@@ -1,4 +1,4 @@
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::iter;
 use std::path::Path;
 use std::process::ExitCode;
@@ -222,9 +222,8 @@ mod config {
         *conf_str = conf.to_string();
     }
 
+    #[cfg(test)]
     mod test {
-        use itertools::Itertools;
-
         use crate::get_head_revision;
 
         use super::*;

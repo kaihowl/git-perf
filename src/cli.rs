@@ -235,6 +235,7 @@ fn generate_manpage() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
