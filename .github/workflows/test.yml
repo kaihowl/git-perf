@@ -67,7 +67,6 @@ jobs:
     - name: Run bash e2e tests
       run: |
         export PATH=$(pwd)/target/debug:$PATH
-        bash ./test/install.sh
         bash ./test/run_tests.sh
 
   rustfmt:
