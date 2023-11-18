@@ -83,5 +83,21 @@ jobs:
     - name: Check formatting
       run: cargo fmt --all --check
 
+  rustfmt:
+    name: rust doc
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+        components: rustfmt
+    - name: Check docs
+      run: |
+        export RUSTDOCFLAGS="-D warnings"
+        cargo doc --no-deps
+
 # TODO(kaihowl) add git perf reporting again
 

@@ -8,4 +8,3 @@
 - allow using different git / root folder than pwd
 - create migration script and use different git notes branch for v2
 - take std variance per epoch to allow catching staggered performance regressions?
-- check warnings on generated docs in CI
