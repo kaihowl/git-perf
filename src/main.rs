@@ -781,23 +781,7 @@ where
             }
             _ => true,
         })
-
-    // measurements
-    //     .iter()
-    //     .enumerate()
-    //     .fold((0, 0), |(old_mean, old_variance), (index, md)| {
-    //         let prevq = old
-    //         let mean = old_mean + (md.val - old_mean) / (index + 1);
-    //         let variance =
-    //     });
 }
-
-// fn retrieve_measurements_by_commit(
-//     num_commits: usize,
-// ) -> Result<Vec<Commit>, DeserializationError> {
-//     let repo = Repository::open(".")?;
-//     walk_commits(&repo, num_commits)
-// }
 
 // TODO(kaihowl) make all of these pretty printed for `main`
 #[derive(Debug)]
