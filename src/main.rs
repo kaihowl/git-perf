@@ -19,8 +19,7 @@ use plotly::{common::Title, Layout, Plot};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 
-use average::{self, concatenate, Estimate, Mean, Variance};
-use toml_edit::{value, Document};
+use stats::NumericReductionFunc;
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 enum ReductionFunc {
@@ -288,23 +287,119 @@ mod cli {
     }
 }
 
-trait VecAggregation {
-    fn median(&mut self) -> Option<f64>;
-}
+mod stats {
+    use average::{self, concatenate, Estimate, Mean, Variance};
+    use itertools::Itertools;
 
-concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
+    use crate::ReductionFunc;
 
-impl VecAggregation for Vec<f64> {
-    fn median(&mut self) -> Option<f64> {
-        self.sort_by(f64::total_cmp);
-        match self.len() {
-            0 => None,
-            even if even % 2 == 0 => {
-                let left = self[even / 2 - 1];
-                let right = self[even / 2];
-                Some((left + right) / 2.0)
+    pub trait VecAggregation {
+        fn median(&mut self) -> Option<f64>;
+    }
+
+    concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
+
+    pub fn aggregate_measurements(measurements: impl Iterator<Item = f64>) -> Stats {
+        let s: AggStats = measurements.collect();
+        Stats {
+            mean: s.mean(),
+            stddev: s.sample_variance().sqrt(),
+            len: s.mean.len() as usize,
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Stats {
+        pub mean: f64,
+        pub stddev: f64,
+        pub len: usize,
+    }
+
+    impl Stats {
+        pub fn significantly_different_from(&self, other: &Stats, sigma: f64) -> bool {
+            assert!(self.len == 1);
+            assert!(other.len >= 1);
+            (self.mean - other.mean).abs() / other.stddev > sigma
+        }
+    }
+
+    impl VecAggregation for Vec<f64> {
+        fn median(&mut self) -> Option<f64> {
+            self.sort_by(f64::total_cmp);
+            match self.len() {
+                0 => None,
+                even if even % 2 == 0 => {
+                    let left = self[even / 2 - 1];
+                    let right = self[even / 2];
+                    Some((left + right) / 2.0)
+                }
+                odd => Some(self[odd / 2]),
             }
-            odd => Some(self[odd / 2]),
+        }
+    }
+
+    pub trait NumericReductionFunc: Iterator<Item = f64> {
+        fn aggregate_by(&mut self, fun: ReductionFunc) -> Option<Self::Item> {
+            match fun {
+                ReductionFunc::Min => self.reduce(f64::min),
+                ReductionFunc::Max => self.reduce(f64::max),
+                ReductionFunc::Median => self.collect_vec().median(),
+                ReductionFunc::Mean => {
+                    let stats: AggStats = self.collect();
+                    if stats.mean.is_empty() {
+                        None
+                    } else {
+                        Some(stats.mean())
+                    }
+                }
+            }
+        }
+    }
+
+    impl<T> NumericReductionFunc for T where T: Iterator<Item = f64> {}
+
+    mod test {
+        use super::*;
+
+        #[test]
+        fn no_floating_error() {
+            let measurements = (0..100).map(|_| 0.1).collect_vec();
+            let stats = aggregate_measurements(measurements.into_iter());
+            // TODO(kaihowl)
+            assert_eq!(stats.mean, 0.1);
+            assert_eq!(stats.len, 100);
+            let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
+            assert_ne!(naive_mean, 0.1);
+        }
+
+        #[test]
+        fn single_measurement() {
+            let measurements = vec![1.0];
+            let stats = aggregate_measurements(measurements.into_iter());
+            assert_eq!(stats.len, 1);
+            assert_eq!(stats.mean, 1.0);
+            assert_eq!(stats.stddev, 0.0);
+        }
+
+        #[test]
+        fn no_measurement() {
+            let measurements = vec![];
+            let stats = aggregate_measurements(measurements.into_iter());
+            assert_eq!(stats.len, 0);
+            assert_eq!(stats.mean, 0.0);
+            assert_eq!(stats.stddev, 0.0);
+        }
+
+        #[test]
+        fn z_score_with_zero_stddev() {
+            let stddev = 0.0;
+            let mean = 30.0;
+            let higher_val = 50.0;
+            let lower_val = 10.0;
+            let z_high = ((higher_val - mean) / stddev as f64).abs();
+            let z_low = ((lower_val - mean) / stddev as f64).abs();
+            assert_eq!(z_high, f64::INFINITY);
+            assert_eq!(z_low, f64::INFINITY);
         }
     }
 }
@@ -346,26 +441,6 @@ where
         })
     }
 }
-
-trait NumericReductionFunc: Iterator<Item = f64> {
-    fn aggregate_by(&mut self, fun: ReductionFunc) -> Option<Self::Item> {
-        match fun {
-            ReductionFunc::Min => self.reduce(f64::min),
-            ReductionFunc::Max => self.reduce(f64::max),
-            ReductionFunc::Median => self.collect_vec().median(),
-            ReductionFunc::Mean => {
-                let stats: AggStats = self.collect();
-                if stats.mean.is_empty() {
-                    None
-                } else {
-                    Some(stats.mean())
-                }
-            }
-        }
-    }
-}
-
-impl<T> NumericReductionFunc for T where T: Iterator<Item = f64> {}
 
 impl Display for CliError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -509,6 +584,8 @@ mod config {
     }
 
     mod test {
+        use itertools::Itertools;
+
         use crate::get_head_revision;
 
         use super::*;
@@ -566,6 +643,26 @@ epoch = "{}"
             let epoch = determine_epoch("mymeasurement", &conf);
             dbg!(&conf);
             assert!(epoch.is_some());
+        }
+
+        #[test]
+        fn test_parsing() {
+            let toml_str = r#"
+        measurement = { test2 = { epoch = "834ae670e2ecd5c87020fde23378b890832d6076" } }
+    "#;
+
+            let doc = toml_str.parse::<Document>().expect("sfdfdf");
+
+            let measurement = "test";
+
+            if let Some(e) = doc
+                .get("measurement")
+                .and_then(|m| m.get(measurement))
+                .and_then(|m| m.get("epoch"))
+            {
+                println!("YAY: {}", e);
+                panic!("stuff");
+            }
         }
     }
 }
@@ -978,8 +1075,8 @@ fn audit(
         .take(max_count.into())
         .try_collect()?;
 
-    let head_summary = aggregate_measurements(iter::once(head));
-    let tail_summary = aggregate_measurements(tail.into_iter());
+    let head_summary = stats::aggregate_measurements(iter::once(head));
+    let tail_summary = stats::aggregate_measurements(tail.into_iter());
 
     dbg!(&head_summary);
     dbg!(&tail_summary);
@@ -998,21 +1095,6 @@ fn audit(
     }
 
     Ok(())
-}
-
-#[derive(Debug)]
-struct Stats {
-    mean: f64,
-    stddev: f64,
-    len: usize,
-}
-
-impl Stats {
-    fn significantly_different_from(&self, other: &Stats, sigma: f64) -> bool {
-        assert!(self.len == 1);
-        assert!(other.len >= 1);
-        (self.mean - other.mean).abs() / other.stddev > sigma
-    }
 }
 
 fn summarize_measurements<'a, F>(
@@ -1070,15 +1152,6 @@ where
     //         let mean = old_mean + (md.val - old_mean) / (index + 1);
     //         let variance =
     //     });
-}
-
-fn aggregate_measurements(measurements: impl Iterator<Item = f64>) -> Stats {
-    let s: AggStats = measurements.collect();
-    Stats {
-        mean: s.mean(),
-        stddev: s.sample_variance().sqrt(),
-        len: s.mean.len() as usize,
-    }
 }
 
 // fn retrieve_measurements_by_commit(
@@ -1577,47 +1650,6 @@ mod test {
     use crate::*;
 
     #[test]
-    fn no_floating_error() {
-        let measurements = (0..100).map(|_| 0.1).collect_vec();
-        let stats = aggregate_measurements(measurements.into_iter());
-        // TODO(kaihowl)
-        assert_eq!(stats.mean, 0.1);
-        assert_eq!(stats.len, 100);
-        let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
-        assert_ne!(naive_mean, 0.1);
-    }
-
-    #[test]
-    fn single_measurement() {
-        let measurements = vec![1.0];
-        let stats = aggregate_measurements(measurements.into_iter());
-        assert_eq!(stats.len, 1);
-        assert_eq!(stats.mean, 1.0);
-        assert_eq!(stats.stddev, 0.0);
-    }
-
-    #[test]
-    fn no_measurement() {
-        let measurements = vec![];
-        let stats = aggregate_measurements(measurements.into_iter());
-        assert_eq!(stats.len, 0);
-        assert_eq!(stats.mean, 0.0);
-        assert_eq!(stats.stddev, 0.0);
-    }
-
-    #[test]
-    fn z_score_with_zero_stddev() {
-        let stddev = 0.0;
-        let mean = 30.0;
-        let higher_val = 50.0;
-        let lower_val = 10.0;
-        let z_high = ((higher_val - mean) / stddev as f64).abs();
-        let z_low = ((lower_val - mean) / stddev as f64).abs();
-        assert_eq!(z_high, f64::INFINITY);
-        assert_eq!(z_low, f64::INFINITY);
-    }
-
-    #[test]
     fn key_value_deserialization() {
         let lines = "0 test 1234 123 key1=value1 key2=value2";
         let actual = deserialize(lines);
@@ -1869,25 +1901,5 @@ mod test {
             "'{}' contained non alphanumeric or non ASCII characters",
             revision
         )
-    }
-
-    #[test]
-    fn test_parsing() {
-        let toml_str = r#"
-        measurement = { test2 = { epoch = "834ae670e2ecd5c87020fde23378b890832d6076" } }
-    "#;
-
-        let doc = toml_str.parse::<Document>().expect("sfdfdf");
-
-        let measurement = "test";
-
-        if let Some(e) = doc
-            .get("measurement")
-            .and_then(|m| m.get(measurement))
-            .and_then(|m| m.get("epoch"))
-        {
-            println!("YAY: {}", e);
-            panic!("stuff");
-        }
     }
 }
