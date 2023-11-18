@@ -113,4 +113,3 @@ mod test {
         assert_eq!(z_low, f64::INFINITY);
     }
 }
-
