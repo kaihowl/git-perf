@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use stats::NumericReductionFunc;
 
+mod cli;
+mod config;
 mod stats;
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
@@ -40,8 +42,6 @@ enum CliError {
     Audit(AuditError),
     BumpError(BumpError),
 }
-
-mod cli;
 
 #[derive(Debug)]
 struct MeasurementSummary {
@@ -159,8 +159,6 @@ impl From<git2::Error> for AddError {
         AddError::Git(e)
     }
 }
-
-mod config;
 
 #[derive(Debug)]
 enum BumpError {}
