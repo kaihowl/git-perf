@@ -115,7 +115,7 @@ enum Commands {
         aggregate_by: ReductionFunc,
 
         /// Multiple of the stddev after which a outlier is detected.
-        /// If the HEAD measurement is within [mean-<d>*sigma; mean+<d>*sigma],
+        /// If the HEAD measurement is within `[mean-<d>*sigma; mean+<d>*sigma]`,
         /// it is considered acceptable.
         #[arg(short = 'd', long, default_value = "4.0")]
         sigma: f64,
