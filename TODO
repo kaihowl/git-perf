@@ -1,5 +1,10 @@
 - clean up source / separate modules
+  - git interop
+  - measurement serialization / deserialization
+  - reporting
+  - perf impl
 - use Any for error handling
+- drop usage of libgit2 altogether?
 - allow using different git / root folder than pwd
 - create migration script and use different git notes branch for v2
 - take std variance per epoch to allow catching staggered performance regressions?
