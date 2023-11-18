@@ -83,7 +83,7 @@ jobs:
     - name: Check formatting
       run: cargo fmt --all --check
 
-  rustfmt:
+  rustdoc:
     name: rust doc
     runs-on: ubuntu-22.04
     steps:
