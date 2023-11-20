@@ -5,7 +5,7 @@ use std::{
 
 use toml_edit::{value, Document};
 
-use crate::get_head_revision;
+use crate::git::get_head_revision;
 
 // TODO(kaihowl) proper error handling
 pub fn write_config(conf: &str) {
@@ -61,8 +61,6 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
 
 #[cfg(test)]
 mod test {
-    use crate::get_head_revision;
-
     use super::*;
 
     #[test]
