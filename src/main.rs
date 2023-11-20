@@ -1,6 +1,6 @@
 use clap::ValueEnum;
 use csv::StringRecord;
-use git::{fetch, raw_push, reconcile, PruneError, PushPullError};
+use git::{add_note_line_to_head, fetch, raw_push, reconcile, PruneError, PushPullError};
 use git2::Repository;
 use itertools::{self, EitherOrBoth, Itertools};
 use plotly::{
@@ -177,10 +177,6 @@ fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
 
 fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
     // TODO(kaihowl) configure path
-    let repo = Repository::open(".")?;
-    let head = repo.head()?;
-    let head = head.peel_to_commit()?;
-    let author = repo.signature()?;
     // TODO(kaihowl) configure
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -199,27 +195,8 @@ fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result
     };
 
     let serialized = serialize_single(&md);
-    let body;
 
-    // TODO(kaihowl) move into separate git module / separate concerns
-    if let Ok(existing_note) = repo.find_note(Some("refs/notes/perf"), head.id()) {
-        // TODO(kaihowl) check empty / not-utf8
-        let existing_measurements = existing_note.message().expect("Message is not utf-8");
-        // TODO(kaihowl) what about missing trailing new lines?
-        body = format!("{}{}", existing_measurements, serialized);
-    } else {
-        body = serialized;
-    }
-
-    repo.note(
-        &author,
-        &author,
-        Some("refs/notes/perf"),
-        head.id(),
-        &body,
-        true,
-    )
-    .expect("TODO(kaihowl) note failed");
+    add_note_line_to_head(&serialized)?;
 
     Ok(())
 }

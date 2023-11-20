@@ -9,6 +9,37 @@ use std::{
 use git2::{Index, Repository};
 use itertools::Itertools;
 
+pub fn add_note_line_to_head(line: &str) -> Result<(), git2::Error> {
+    let repo = Repository::open(".")?;
+    let author = repo.signature()?;
+    let head = repo.head()?;
+    let head = head.peel_to_commit()?;
+
+    let body;
+
+    if let Ok(existing_note) = repo.find_note(Some("refs/notes/perf"), head.id()) {
+        // TODO(kaihowl) check empty / not-utf8
+        let existing_measurements = existing_note.message().expect("Message is not utf-8");
+        // TODO(kaihowl) what about missing trailing new lines?
+        // TODO(kaihowl) is there a more memory efficient way?
+        body = format!("{}{}", existing_measurements, line);
+    } else {
+        body = line.to_string();
+    }
+
+    repo.note(
+        &author,
+        &author,
+        Some("refs/notes/perf"),
+        head.id(),
+        &body,
+        true,
+    )
+    .expect("TODO(kaihowl) note failed");
+
+    Ok(())
+}
+
 pub fn get_head_revision() -> String {
     let comm = process::Command::new("git")
         .args(["rev-parse", "HEAD"])
