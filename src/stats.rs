@@ -112,4 +112,75 @@ mod test {
         assert_eq!(z_high, f64::INFINITY);
         assert_eq!(z_low, f64::INFINITY);
     }
+
+    #[test]
+    fn verify_stats() {
+        let empty_vec = [];
+        assert_eq!(None, empty_vec.into_iter().aggregate_by(ReductionFunc::Min));
+        assert_eq!(None, empty_vec.into_iter().aggregate_by(ReductionFunc::Max));
+        assert_eq!(
+            None,
+            empty_vec.into_iter().aggregate_by(ReductionFunc::Median)
+        );
+        assert_eq!(
+            None,
+            empty_vec.into_iter().aggregate_by(ReductionFunc::Mean)
+        );
+
+        let single_el_vec = [3.0];
+        assert_eq!(
+            Some(3.0),
+            single_el_vec.into_iter().aggregate_by(ReductionFunc::Min)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec.into_iter().aggregate_by(ReductionFunc::Max)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec
+                .into_iter()
+                .aggregate_by(ReductionFunc::Median)
+        );
+        assert_eq!(
+            Some(3.0),
+            single_el_vec.into_iter().aggregate_by(ReductionFunc::Mean)
+        );
+
+        let two_el_vec = [3.0, 1.0];
+        assert_eq!(
+            Some(1.0),
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Min)
+        );
+        assert_eq!(
+            Some(3.0),
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Max)
+        );
+        assert_eq!(
+            Some(2.0),
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Median)
+        );
+        assert_eq!(
+            Some(2.0),
+            two_el_vec.into_iter().aggregate_by(ReductionFunc::Mean)
+        );
+
+        let three_el_vec = [2.0, 6.0, 1.0];
+        assert_eq!(
+            Some(1.0),
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Min)
+        );
+        assert_eq!(
+            Some(6.0),
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Max)
+        );
+        assert_eq!(
+            Some(2.0),
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Median)
+        );
+        assert_eq!(
+            Some(3.0),
+            three_el_vec.into_iter().aggregate_by(ReductionFunc::Mean)
+        );
+    }
 }
