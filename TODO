@@ -1,5 +1,6 @@
 - clean up source / separate modules
   - git interop
+  - retrieval of measurements stream
   - measurement serialization / deserialization
   - reporting
   - perf impl
