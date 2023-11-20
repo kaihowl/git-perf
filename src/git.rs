@@ -1,0 +1,268 @@
+use std::{
+    env::current_dir,
+    fmt::Display,
+    io,
+    path::Path,
+    process::{self, Command},
+};
+
+use git2::{Index, Repository};
+use itertools::Itertools;
+
+pub fn get_head_revision() -> String {
+    let comm = process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .expect("failed to parse head");
+
+    // TODO(kaihowl) check status
+    String::from_utf8(comm.stdout)
+        .expect("oh no")
+        .trim()
+        .to_string()
+}
+
+/// Resolve conflicts between two measurement runs on the same commit by
+/// sorting and deduplicating lines.
+/// This emulates the cat_sort_uniq merge strategy for git notes.
+fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
+    ours.as_ref()
+        .lines()
+        .chain(theirs.as_ref().lines())
+        .sorted()
+        .dedup()
+        .join("\n")
+}
+
+pub fn fetch(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+    let work_dir = match work_dir {
+        Some(dir) => dir.to_path_buf(),
+        None => current_dir().expect("Could not determine current working directory"),
+    };
+
+    // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
+    let status = process::Command::new("git")
+        .args(["fetch", "origin", "refs/notes/perf"])
+        .current_dir(work_dir)
+        .status()?;
+
+    if !status.success() {
+        return Err(PushPullError::RawGitError);
+    }
+
+    Ok(())
+}
+
+pub fn reconcile() -> Result<(), PushPullError> {
+    let repo = Repository::open(".")?;
+    let fetch_head = repo.find_reference("FETCH_HEAD")?;
+    let fetch_head = fetch_head.peel_to_commit()?;
+
+    let notes = match repo.find_reference("refs/notes/perf") {
+        Ok(reference) => reference,
+        Err(_) => {
+            repo.reference(
+                // TODO(kaihowl) pull into constant / configuration
+                "refs/notes/perf",
+                fetch_head.id(),
+                false, /* this should never fail */
+                "init perf notes",
+            )?;
+            return Ok(());
+        }
+    };
+
+    let notes = notes.peel_to_commit()?;
+    let index = repo.merge_commits(&notes, &fetch_head, None)?;
+
+    let mut out_index = Index::new()?;
+    let mut conflict_entries = Vec::new();
+
+    if let Ok(conflicts) = index.conflicts() {
+        conflict_entries = conflicts.try_collect()?;
+    }
+
+    for entry in index.iter() {
+        if conflict_entries.iter().any(|c| {
+            // TODO(kaihowl) think harder about this
+            let conflict_entry = if let Some(our) = &c.our {
+                our
+            } else {
+                c.their.as_ref().expect("Both our and their unset")
+            };
+
+            conflict_entry.path == entry.path
+        }) {
+            continue;
+        }
+        out_index.add(&entry).expect("failing entry in new index");
+    }
+    for conflict in conflict_entries {
+        // TODO(kaihowl) no support for deleted / pruned measurements
+        let our = conflict.our.unwrap();
+        let our_oid = our.id;
+        let our_content = String::from_utf8(repo.find_blob(our_oid)?.content().to_vec())
+            .expect("UTF-8 error for our content");
+        let their_oid = conflict.their.unwrap().id;
+        let their_content = String::from_utf8(repo.find_blob(their_oid)?.content().to_vec())
+            .expect("UTF-8 error for their content");
+        let resolved_content = resolve_conflicts(&our_content, &their_content);
+        // TODO(kaihowl) what should this be set to instead of copied from?
+        let blob = repo.blob(resolved_content.as_bytes())?;
+        let mut entry = our;
+        // Missing bindings for resolving conflict in libgit2-rs. Therefore, manually overwrite.
+        entry.flags = 0;
+        entry.flags_extended = 0;
+        entry.id = blob;
+
+        out_index.add(&entry).expect("Could not add");
+    }
+    let out_index_paths = out_index
+        .iter()
+        .map(|i| String::from_utf8(i.path).unwrap())
+        .collect_vec();
+
+    dbg!(&out_index_paths);
+    dbg!(out_index.has_conflicts());
+    dbg!(out_index.len());
+    let merged_tree = repo.find_tree(out_index.write_tree_to(&repo)?)?;
+
+    // TODO(kaihowl) make this conditional on the conflicts.
+    let signature = repo.signature()?;
+    repo.commit(
+        Some("refs/notes/perf"),
+        &signature,
+        &signature,
+        "Merge it",
+        &merged_tree,
+        &[&notes, &fetch_head],
+    )?;
+    // repo.merge
+    Ok(())
+}
+
+pub fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+    let work_dir = match work_dir {
+        Some(dir) => dir.to_path_buf(),
+        None => current_dir().expect("Could not determine current working directory"),
+    };
+    // TODO(kaihowl) configure remote?
+    // TODO(kaihowl) factor into constants
+    // TODO(kaihowl) capture output
+    let status = Command::new("git")
+        .args(["push", "origin", "refs/notes/perf:refs/notes/perf"])
+        .current_dir(work_dir)
+        .status()?;
+
+    match status.code() {
+        Some(0) => Ok(()),
+        _ => Err(PushPullError::RawGitError),
+    }
+}
+
+#[derive(Debug)]
+pub enum PruneError {
+    ShallowRepo,
+    RawGitError,
+}
+
+// TODO(kaihowl) what happens with a git dir supplied with -C?
+pub fn prune() -> Result<(), PruneError> {
+    match is_shallow_repo() {
+        Some(true) => return Err(PruneError::ShallowRepo),
+        None => return Err(PruneError::RawGitError),
+        _ => {}
+    }
+
+    let status = process::Command::new("git")
+        .args(["notes", "--ref", "refs/notes/perf", "prune"])
+        .status()?;
+
+    if !status.success() {
+        return Err(PruneError::RawGitError);
+    }
+
+    Ok(())
+}
+
+fn is_shallow_repo() -> Option<bool> {
+    match process::Command::new("git")
+        .args(["rev-parse", "--is-shallow-repository"])
+        .output()
+    {
+        Ok(out) if out.status.success() => match std::str::from_utf8(&out.stdout) {
+            Ok(out) => Some(out.starts_with("true")),
+            Err(_) => None,
+        },
+        _ => None,
+    }
+}
+
+#[derive(Debug)]
+pub enum PushPullError {
+    Git(git2::Error),
+    RawGitError,
+    RetriesExceeded,
+}
+
+// TODO(kaihowl) code repetition with other git-only errors
+impl Display for PushPullError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PushPullError::Git(e) => write!(f, "libgit2 error, {e}"),
+            PushPullError::RawGitError => write!(f, "git error"),
+            PushPullError::RetriesExceeded => write!(f, "retries exceeded"),
+        }
+    }
+}
+
+impl From<git2::Error> for PushPullError {
+    fn from(e: git2::Error) -> Self {
+        PushPullError::Git(e)
+    }
+}
+
+impl From<io::Error> for PushPullError {
+    fn from(_: io::Error) -> Self {
+        PushPullError::RawGitError
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_get_head_revision() {
+        let revision = get_head_revision();
+        assert!(
+            revision.chars().all(|c| c.is_ascii_alphanumeric()),
+            "'{}' contained non alphanumeric or non ASCII characters",
+            revision
+        )
+    }
+
+    #[test]
+    fn test_resolve_conflicts() {
+        let a = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234567.0 42.0\n";
+        let b = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234890.0 22.0\n";
+
+        let resolved = resolve_conflicts(a, b);
+        assert!(resolved.contains("mymeasurement 1234567.0 23.0 key=value"));
+        assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
+        assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
+        assert_eq!(3, resolved.lines().count());
+    }
+
+    #[test]
+    fn test_resolve_conflicts_no_trailing_newline() {
+        let a = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234567.0 42.0";
+        let b = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234890.0 22.0";
+
+        let resolved = resolve_conflicts(a, b);
+        assert!(resolved.contains("mymeasurement 1234567.0 23.0 key=value"));
+        assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
+        assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
+        assert_eq!(3, resolved.lines().count());
+    }
+}
