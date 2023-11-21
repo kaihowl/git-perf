@@ -313,7 +313,7 @@ fn audit(
     let repo = Repository::open(".")?;
     let all = walk_commits(&repo, max_count)?;
 
-    let filter_by = |m: &&MeasurementData| {
+    let filter_by = |m: &MeasurementData| {
         m.name == measurement
             && selectors
                 .iter()
@@ -370,7 +370,7 @@ fn summarize_measurements<'a, F>(
     filter_by: &'a F,
 ) -> impl Iterator<Item = Result<CommitSummary, DeserializationError>> + 'a
 where
-    F: Fn(&&MeasurementData) -> bool,
+    F: Fn(&MeasurementData) -> bool,
 {
     let measurements = commits.map(move |c| {
         c.map(|c| {
@@ -378,7 +378,7 @@ where
             let measurement = c
                 .measurements
                 .iter()
-                .filter(filter_by)
+                .filter(|m| filter_by(m))
                 .inspect(|m| {
                     dbg!(m);
                 })
