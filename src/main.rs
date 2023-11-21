@@ -339,7 +339,7 @@ fn audit(
 
     let tail: Vec<_> = aggregates
         .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
-        .take(max_count.into())
+        .take(max_count)
         .try_collect()?;
 
     let head_summary = stats::aggregate_measurements(iter::once(head));
