@@ -3,22 +3,16 @@ use git::{add_note_line_to_head, fetch, raw_push, reconcile, PruneError, PushPul
 use git2::Repository;
 use itertools::{self, Itertools};
 use measurements::{Commit, DeserializationError};
-use plotly::{
-    common::{Font, LegendGroupTitle, Title},
-    layout::Axis,
-    BoxPlot, Layout, Plot,
-};
 use reporting::ReportError;
-use serde::Serialize;
-use serialization::{deserialize, serialize_single, MeasurementData};
+use serialization::{serialize_single, MeasurementData};
 use stats::NumericReductionFunc;
 use std::fmt::Display;
-use std::io::{self, Write};
+use std::io;
 use std::iter;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{self, ExitCode};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use std::{collections::HashMap, fs::File, str};
+use std::{collections::HashMap, str};
 
 mod cli;
 mod config;
