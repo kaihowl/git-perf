@@ -2,6 +2,7 @@ use clap::ValueEnum;
 use git::{add_note_line_to_head, fetch, raw_push, reconcile, PruneError, PushPullError};
 use git2::Repository;
 use itertools::{self, Itertools};
+use measurements::{Commit, DeserializationError};
 use plotly::{
     common::{Font, LegendGroupTitle, Title},
     layout::Axis,
@@ -312,7 +313,7 @@ fn audit(
     sigma: f64,
 ) -> Result<(), AuditError> {
     let repo = Repository::open(".")?;
-    let all = walk_commits(&repo, max_count)?;
+    let all = measurements::walk_commits(&repo, max_count)?;
 
     let filter_by = |m: &MeasurementData| {
         m.name == measurement
@@ -600,7 +601,7 @@ fn report(
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
     let repo = Repository::open(".")?;
-    let commits: Vec<Commit> = walk_commits(&repo, num_commits)?.try_collect()?;
+    let commits: Vec<Commit> = measurements::walk_commits(&repo, num_commits)?.try_collect()?;
 
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
@@ -690,59 +691,66 @@ fn report(
     Ok(())
 }
 
-#[derive(Debug, PartialEq)]
-struct Commit {
-    commit: String,
-    measurements: Vec<MeasurementData>,
-}
+mod measurements {
+    use std::fmt::Display;
 
-#[derive(Debug)]
-enum DeserializationError {
-    GitError(git2::Error),
-}
+    use crate::serialization::MeasurementData;
 
-impl Display for DeserializationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeserializationError::GitError(e) => {
-                write!(f, "git error (maybe shallow clone not deep enough?), {e}")
+    #[derive(Debug, PartialEq)]
+    pub struct Commit {
+        pub commit: String,
+        pub measurements: Vec<MeasurementData>,
+    }
+
+    #[derive(Debug)]
+    pub enum DeserializationError {
+        GitError(git2::Error),
+    }
+
+    impl Display for DeserializationError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                DeserializationError::GitError(e) => {
+                    write!(f, "git error (maybe shallow clone not deep enough?), {e}")
+                }
             }
         }
     }
-}
 
-impl From<git2::Error> for DeserializationError {
-    fn from(value: git2::Error) -> Self {
-        DeserializationError::GitError(value)
+    impl From<git2::Error> for DeserializationError {
+        fn from(value: git2::Error) -> Self {
+            DeserializationError::GitError(value)
+        }
     }
-}
 
-// TODO(hoewelmk) copies all measurements, expensive...
-fn walk_commits(
-    repo: &git2::Repository,
-    num_commits: usize,
-) -> Result<impl Iterator<Item = Result<Commit, DeserializationError>> + '_, DeserializationError> {
-    let mut revwalk = repo.revwalk()?;
-    revwalk.push_head()?;
-    revwalk.simplify_first_parent()?;
-    Ok(revwalk
-        .take(num_commits)
-        .map(|commit_oid| -> Result<Commit, DeserializationError> {
-            let commit_id = commit_oid?;
-            let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
-                // TODO(kaihowl) remove unwrap_or
-                Ok(note) => deserialize(note.message().unwrap_or("")),
-                Err(_) => [].into(),
-            };
-            Ok(Commit {
-                commit: commit_id.to_string(),
-                measurements,
-            })
-        }))
-    // When this fails it is due to a shallow clone.
-    // TODO(kaihowl) proper shallow clone support
-    // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
-    // last commit because the parent cannot be loooked up.
+    // TODO(hoewelmk) copies all measurements, expensive...
+    pub fn walk_commits(
+        repo: &git2::Repository,
+        num_commits: usize,
+    ) -> Result<impl Iterator<Item = Result<Commit, DeserializationError>> + '_, DeserializationError>
+    {
+        let mut revwalk = repo.revwalk()?;
+        revwalk.push_head()?;
+        revwalk.simplify_first_parent()?;
+        Ok(revwalk
+            .take(num_commits)
+            .map(|commit_oid| -> Result<Commit, DeserializationError> {
+                let commit_id = commit_oid?;
+                let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
+                    // TODO(kaihowl) remove unwrap_or
+                    Ok(note) => crate::serialization::deserialize(note.message().unwrap_or("")),
+                    Err(_) => [].into(),
+                };
+                Ok(Commit {
+                    commit: commit_id.to_string(),
+                    measurements,
+                })
+            }))
+        // When this fails it is due to a shallow clone.
+        // TODO(kaihowl) proper shallow clone support
+        // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
+        // last commit because the parent cannot be loooked up.
+    }
 }
 
 #[cfg(test)]
