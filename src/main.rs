@@ -591,24 +591,6 @@ impl From<git2::Error> for ReportError {
     }
 }
 
-fn walk_measurements<'a>(
-    repo: &'a Repository,
-    num_commits: usize,
-    measurement_names: &[String],
-    key_values: &[(String, String)],
-) -> Result<
-    impl Iterator<
-            Item = Result<(String, impl Iterator<Item = MeasurementData>), DeserializationError>,
-        > + 'a,
-    DeserializationError,
-> {
-    let commits = walk_commits(repo, num_commits)?;
-    // TODO(kaihowl) ok to remove not ok result?
-    Ok(commits
-        .into_iter()
-        .map_ok(|c| (c.commit, c.measurements.into_iter())))
-}
-
 // TODO(kaihowl) needs more fine grained output e2e tests
 fn report(
     output: PathBuf,
@@ -625,11 +607,6 @@ fn report(
 
     plot.add_commits(&commits);
 
-    // TODO(kaihowl) duplication with audit
-    // new function to filter measurements with relevant data
-    // get commits from walk_commits with walk_measurements instead -> Iter<Item=(Commit,
-    // MeasurementData)>
-    // fn filter(Iter<Commit>
     let relevant = |m: &MeasurementData| {
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
