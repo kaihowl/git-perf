@@ -1,6 +1,7 @@
 - clean up source / separate modules
   - git interop
   - perf impl
+  - public data types
 - use Any for error handling
 - drop usage of libgit2 altogether?
 - allow using different git / root folder than pwd
