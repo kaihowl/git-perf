@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use thiserror::Error;
 
 use crate::{
     data::{CommitSummary, MeasurementData, MeasurementSummary, ReductionFunc},
@@ -85,25 +85,10 @@ pub struct Commit {
     pub measurements: Vec<MeasurementData>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum DeserializationError {
-    GitError(git2::Error),
-}
-
-impl Display for DeserializationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeserializationError::GitError(e) => {
-                write!(f, "git error (maybe shallow clone not deep enough?), {e}")
-            }
-        }
-    }
-}
-
-impl From<git2::Error> for DeserializationError {
-    fn from(value: git2::Error) -> Self {
-        DeserializationError::GitError(value)
-    }
+    #[error("git error (maybe shallow clone not deep enough?")]
+    GitError(#[from] git2::Error),
 }
 
 // TODO(hoewelmk) copies all measurements, expensive...

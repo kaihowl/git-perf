@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
     process,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -15,21 +14,8 @@ use crate::{
 // TODO(kaihowl) use anyhow / thiserror for error propagation
 #[derive(Debug, Error)]
 pub enum AddError {
-    Git(git2::Error),
-}
-
-impl Display for AddError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AddError::Git(e) => write!(f, "git error, {e}"),
-        }
-    }
-}
-
-impl From<git2::Error> for AddError {
-    fn from(e: git2::Error) -> Self {
-        AddError::Git(e)
-    }
+    #[error("git error")]
+    Git(#[from] git2::Error),
 }
 
 pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {

@@ -1,5 +1,4 @@
 use std::{
-    fmt::Display,
     fs::File,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -24,28 +23,18 @@ use crate::{
 // TODO(kaihowl) make all of these pretty printed for `main`
 #[derive(Debug, Error)]
 pub enum ReportError {
-    DeserializationError(DeserializationError),
+    #[error("failed to read")]
+    DeserializationError(#[from] DeserializationError),
+
+    #[error("invalid separator supplied")]
     InvalidSeparateBy,
+
     // Report would not contain any measurements
+    #[error("no performance measurements found")]
     NoMeasurements,
+
+    #[error("cound not infer output format")]
     InvalidOutputFormat,
-}
-
-impl Display for ReportError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReportError::DeserializationError(e) => write!(f, "failed to read, {e}"),
-            ReportError::InvalidSeparateBy => write!(f, "invalid separator supplied"),
-            ReportError::NoMeasurements => write!(f, "no performance measurements found"),
-            ReportError::InvalidOutputFormat => write!(f, "could not infer output format"),
-        }
-    }
-}
-
-impl From<DeserializationError> for ReportError {
-    fn from(e: DeserializationError) -> Self {
-        ReportError::DeserializationError(e)
-    }
 }
 
 trait Reporter<'a> {
@@ -171,11 +160,6 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
             .expect("serialization error TODO(kaihowl)")
     }
 }
-impl From<git2::Error> for ReportError {
-    fn from(value: git2::Error) -> Self {
-        ReportError::DeserializationError(DeserializationError::GitError(value))
-    }
-}
 
 struct ReporterFactory {}
 
@@ -204,7 +188,7 @@ pub fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
-    let repo = Repository::open(".")?;
+    let repo = Repository::open(".").map_err(DeserializationError::GitError)?;
     let commits: Vec<Commit> =
         measurement_retrieval::walk_commits(&repo, num_commits)?.try_collect()?;
 

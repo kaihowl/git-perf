@@ -1,40 +1,26 @@
-use std::{fmt::Display, iter};
-
-use git2::Repository;
-use itertools::Itertools;
-use thiserror::Error;
-
 use crate::{
     data::{MeasurementData, ReductionFunc},
     measurement_retrieval::{self, summarize_measurements, DeserializationError},
     stats,
 };
+use git2::Repository;
+use itertools::Itertools;
+use std::iter;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AuditError {
-    DeserializationError(DeserializationError),
+    #[error("failed to read")]
+    DeserializationError(#[from] DeserializationError),
+
+    #[error("no measurement for HEAD")]
     NoMeasurementForHead,
+
+    #[error("HEAD differs significantly from tail measurements")]
     SignificantDifference,
 }
 
-impl Display for AuditError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AuditError::DeserializationError(e) => write!(f, "failed to read, {e}"),
-            AuditError::NoMeasurementForHead => write!(f, "no measurement for HEAD"),
-            AuditError::SignificantDifference => {
-                write!(f, "HEAD differs significantly from tail measurements")
-            }
-        }
-    }
-}
-
-impl From<DeserializationError> for AuditError {
-    fn from(e: DeserializationError) -> Self {
-        AuditError::DeserializationError(e)
-    }
-}
-
+// TODO(kaihowl)
 impl From<git2::Error> for AuditError {
     fn from(e: git2::Error) -> Self {
         AuditError::DeserializationError(DeserializationError::GitError(e))

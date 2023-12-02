@@ -1,6 +1,5 @@
 use std::{
     env::current_dir,
-    fmt::Display,
     io,
     path::Path,
     process::{self, Command},
@@ -194,15 +193,21 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
 
 #[derive(Debug, Error)]
 pub enum PruneError {
+    #[error("shallow repo")]
     ShallowRepo,
-    RawGitError,
+
+    #[error("git execution error")]
+    RawGitError(#[from] io::Error),
+
+    #[error("git error")]
+    GitError,
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
 pub fn prune() -> Result<(), PruneError> {
     match is_shallow_repo() {
         Some(true) => return Err(PruneError::ShallowRepo),
-        None => return Err(PruneError::RawGitError),
+        None => return Err(PruneError::GitError),
         _ => {}
     }
 
@@ -211,7 +216,7 @@ pub fn prune() -> Result<(), PruneError> {
         .status()?;
 
     if !status.success() {
-        return Err(PruneError::RawGitError);
+        return Err(PruneError::GitError);
     }
 
     Ok(())
@@ -232,47 +237,17 @@ fn is_shallow_repo() -> Option<bool> {
 
 #[derive(Debug, Error)]
 pub enum PushPullError {
-    Git(git2::Error),
+    #[error("libgit2 error")]
+    Git(#[from] git2::Error),
+
+    #[error("git error")]
     RawGitError,
+
+    #[error("git execution error")]
+    GitExecError(#[from] io::Error),
+
+    #[error("retries exceeded")]
     RetriesExceeded,
-}
-
-// TODO(kaihowl) code repetition with other git-only errors
-impl Display for PushPullError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PushPullError::Git(e) => write!(f, "libgit2 error, {e}"),
-            PushPullError::RawGitError => write!(f, "git error"),
-            PushPullError::RetriesExceeded => write!(f, "retries exceeded"),
-        }
-    }
-}
-
-impl From<git2::Error> for PushPullError {
-    fn from(e: git2::Error) -> Self {
-        PushPullError::Git(e)
-    }
-}
-
-impl From<io::Error> for PushPullError {
-    fn from(_: io::Error) -> Self {
-        PushPullError::RawGitError
-    }
-}
-
-impl From<io::Error> for PruneError {
-    fn from(_: io::Error) -> Self {
-        PruneError::RawGitError
-    }
-}
-
-impl Display for PruneError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PruneError::RawGitError => write!(f, "git error"),
-            PruneError::ShallowRepo => write!(f, "shallow repo"),
-        }
-    }
 }
 
 pub fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
