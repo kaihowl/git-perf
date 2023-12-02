@@ -1,5 +1,5 @@
 - clean up source / separate modules
-  - git interop
+  - git interop (rename)
   - perf impl
   - public data types
 - use Any for error handling

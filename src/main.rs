@@ -1,15 +1,14 @@
 use audit::AuditError;
 use config::BumpError;
-use git::{add_note_line_to_head, fetch, raw_push, reconcile, PruneError, PushPullError};
+use git::{fetch, raw_push, reconcile, PruneError, PushPullError};
 
+use measurement_storage::AddError;
 use reporting::ReportError;
-use serialization::{serialize_single, MeasurementData};
+
 use std::fmt::Display;
 use std::io;
 use std::path::Path;
-use std::process::{self, ExitCode};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use std::{collections::HashMap, str};
+use std::process::ExitCode;
 
 mod audit;
 mod cli;
@@ -89,78 +88,97 @@ fn main() -> ExitCode {
     }
 }
 
-// TODO(kaihowl) use anyhow / thiserror for error propagation
-#[derive(Debug)]
-enum AddError {
-    Git(git2::Error),
-}
-
-impl Display for AddError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AddError::Git(e) => write!(f, "git error, {e}"),
-        }
-    }
-}
-
-impl From<git2::Error> for AddError {
-    fn from(e: git2::Error) -> Self {
-        AddError::Git(e)
-    }
-}
-
-fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
-    // TODO(kaihowl) configure path
-    // TODO(kaihowl) configure
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("TODO(kaihowl)");
-
-    let timestamp = timestamp.as_secs_f64();
-    let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
-
-    let md = MeasurementData {
-        // TODO(hoewelmk)
-        epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
-        name: measurement.to_owned(),
-        timestamp,
-        val: value,
-        key_values,
+mod measurement_storage {
+    use std::{
+        collections::HashMap,
+        fmt::Display,
+        process,
+        time::{Instant, SystemTime, UNIX_EPOCH},
     };
 
-    let serialized = serialize_single(&md);
+    use crate::{
+        config,
+        git::add_note_line_to_head,
+        serialization::{serialize_single, MeasurementData},
+    };
 
-    add_note_line_to_head(&serialized)?;
-
-    Ok(())
-}
-
-fn measure(
-    measurement: &str,
-    repetitions: u16,
-    command: &[String],
-    key_values: &[(String, String)],
-) -> Result<(), AddError> {
-    let exe = command.first().unwrap();
-    let args = &command[1..];
-    for _ in 0..repetitions {
-        let mut process = process::Command::new(exe);
-        process.args(args);
-        let start = Instant::now();
-        let output = process
-            .output()
-            .expect("Command failed to spawn TODO(kaihowl)");
-        output
-            .status
-            .success()
-            .then_some(())
-            .ok_or("TODO(kaihowl) running error")
-            .expect("TODO(kaihowl)");
-        let duration = start.elapsed();
-        let duration_usec = duration.as_micros() as f64;
-        add(measurement, duration_usec, key_values)?;
+    // TODO(kaihowl) use anyhow / thiserror for error propagation
+    #[derive(Debug)]
+    pub enum AddError {
+        Git(git2::Error),
     }
-    Ok(())
+
+    impl Display for AddError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                AddError::Git(e) => write!(f, "git error, {e}"),
+            }
+        }
+    }
+
+    impl From<git2::Error> for AddError {
+        fn from(e: git2::Error) -> Self {
+            AddError::Git(e)
+        }
+    }
+
+    pub fn add(
+        measurement: &str,
+        value: f64,
+        key_values: &[(String, String)],
+    ) -> Result<(), AddError> {
+        // TODO(kaihowl) configure path
+        // TODO(kaihowl) configure
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("TODO(kaihowl)");
+
+        let timestamp = timestamp.as_secs_f64();
+        let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
+
+        let md = MeasurementData {
+            // TODO(hoewelmk)
+            epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
+            name: measurement.to_owned(),
+            timestamp,
+            val: value,
+            key_values,
+        };
+
+        let serialized = serialize_single(&md);
+
+        add_note_line_to_head(&serialized)?;
+
+        Ok(())
+    }
+
+    pub fn measure(
+        measurement: &str,
+        repetitions: u16,
+        command: &[String],
+        key_values: &[(String, String)],
+    ) -> Result<(), AddError> {
+        let exe = command.first().unwrap();
+        let args = &command[1..];
+        for _ in 0..repetitions {
+            let mut process = process::Command::new(exe);
+            process.args(args);
+            let start = Instant::now();
+            let output = process
+                .output()
+                .expect("Command failed to spawn TODO(kaihowl)");
+            output
+                .status
+                .success()
+                .then_some(())
+                .ok_or("TODO(kaihowl) running error")
+                .expect("TODO(kaihowl)");
+            let duration = start.elapsed();
+            let duration_usec = duration.as_micros() as f64;
+            add(measurement, duration_usec, key_values)?;
+        }
+        Ok(())
+    }
 }
 
 fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
