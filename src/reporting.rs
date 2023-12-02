@@ -16,8 +16,8 @@ use serde::Serialize;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
+    data::MeasurementData,
     measurement_retrieval::{self, Commit, DeserializationError},
-    serialization::MeasurementData,
 };
 
 // TODO(kaihowl) make all of these pretty printed for `main`

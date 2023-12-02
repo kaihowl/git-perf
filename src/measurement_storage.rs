@@ -6,9 +6,8 @@ use std::{
 };
 
 use crate::{
-    config,
-    git_interop::add_note_line_to_head,
-    serialization::{serialize_single, MeasurementData},
+    config, data::MeasurementData, git_interop::add_note_line_to_head,
+    serialization::serialize_single,
 };
 
 // TODO(kaihowl) use anyhow / thiserror for error propagation

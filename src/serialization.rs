@@ -2,18 +2,9 @@ use std::collections::HashMap;
 
 use csv::StringRecord;
 use itertools::{EitherOrBoth, Itertools};
-use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
+use serde::{ser::SerializeSeq, Serialize, Serializer};
 
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct MeasurementData {
-    pub epoch: u32,
-    pub name: String,
-    pub timestamp: f64,
-    // TODO(kaihowl) check size of type
-    pub val: f64,
-    #[serde(flatten)]
-    pub key_values: HashMap<String, String>,
-}
+use crate::data::MeasurementData;
 
 // TODO(kaihowl) serialization with flatten and custom function does not work
 #[derive(Debug, PartialEq, Serialize)]

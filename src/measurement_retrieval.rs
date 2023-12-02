@@ -1,29 +1,9 @@
 use std::fmt::Display;
 
-use clap::ValueEnum;
-
-use crate::{serialization::MeasurementData, stats::NumericReductionFunc};
-
-// TODO(kaihowl) maybe move to "data"
-#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReductionFunc {
-    Min,
-    Max,
-    Median,
-    Mean,
-}
-
-#[derive(Debug)]
-pub struct MeasurementSummary {
-    pub epoch: u32,
-    pub val: f64,
-}
-
-#[derive(Debug)]
-pub struct CommitSummary {
-    pub commit: String,
-    pub measurement: Option<MeasurementSummary>,
-}
+use crate::{
+    data::{CommitSummary, MeasurementData, MeasurementSummary, ReductionFunc},
+    stats::NumericReductionFunc,
+};
 
 // TODO(kaihowl) oh god naming
 trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {

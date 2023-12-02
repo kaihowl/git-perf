@@ -1,7 +1,7 @@
 use average::{self, concatenate, Estimate, Mean, Variance};
 use itertools::Itertools;
 
-use crate::measurement_retrieval::ReductionFunc;
+use crate::data::ReductionFunc;
 
 pub trait VecAggregation {
     fn median(&mut self) -> Option<f64>;

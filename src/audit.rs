@@ -4,8 +4,8 @@ use git2::Repository;
 use itertools::Itertools;
 
 use crate::{
-    measurement_retrieval::{self, summarize_measurements, DeserializationError, ReductionFunc},
-    serialization::MeasurementData,
+    data::{MeasurementData, ReductionFunc},
+    measurement_retrieval::{self, summarize_measurements, DeserializationError},
     stats,
 };
 

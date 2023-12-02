@@ -11,6 +11,7 @@ use std::process::ExitCode;
 mod audit;
 mod cli;
 mod config;
+mod data;
 mod git_interop;
 mod measurement_retrieval;
 mod measurement_storage;
