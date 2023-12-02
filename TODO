@@ -1,5 +1,4 @@
 - clean up source / separate modules
-  - git interop (rename)
   - public data types
 - use Any for error handling
 - drop usage of libgit2 altogether?
