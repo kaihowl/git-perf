@@ -4,11 +4,9 @@ use std::path::PathBuf;
 
 use crate::audit;
 use crate::config::bump_epoch;
+use crate::git::{prune, pull, push};
 use crate::measurement_retrieval::ReductionFunc;
 use crate::measurement_storage::{add, measure};
-use crate::prune;
-use crate::pull;
-use crate::push;
 use crate::reporting::report;
 use crate::CliError;
 
