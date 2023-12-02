@@ -15,7 +15,7 @@ mod audit;
 mod cli;
 mod config;
 mod git;
-mod measurements;
+mod measurement_retrieval;
 mod reporting;
 mod serialization;
 mod stats;

@@ -4,7 +4,7 @@ use git2::Repository;
 use itertools::Itertools;
 
 use crate::{
-    measurements::{self, summarize_measurements, DeserializationError, ReductionFunc},
+    measurement_retrieval::{self, summarize_measurements, DeserializationError, ReductionFunc},
     serialization::MeasurementData,
     stats,
 };
@@ -49,7 +49,7 @@ pub fn audit(
     sigma: f64,
 ) -> Result<(), AuditError> {
     let repo = Repository::open(".")?;
-    let all = measurements::walk_commits(&repo, max_count)?;
+    let all = measurement_retrieval::walk_commits(&repo, max_count)?;
 
     let filter_by = |m: &MeasurementData| {
         m.name == measurement

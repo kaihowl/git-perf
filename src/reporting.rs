@@ -16,7 +16,7 @@ use serde::Serialize;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
-    measurements::{self, Commit, DeserializationError},
+    measurement_retrieval::{self, Commit, DeserializationError},
     serialization::MeasurementData,
 };
 
@@ -204,7 +204,8 @@ pub fn report(
     key_values: &[(String, String)],
 ) -> Result<(), ReportError> {
     let repo = Repository::open(".")?;
-    let commits: Vec<Commit> = measurements::walk_commits(&repo, num_commits)?.try_collect()?;
+    let commits: Vec<Commit> =
+        measurement_retrieval::walk_commits(&repo, num_commits)?.try_collect()?;
 
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;

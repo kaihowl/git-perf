@@ -3,7 +3,7 @@ use clap::{CommandFactory, Subcommand};
 use std::path::PathBuf;
 
 use crate::config::bump_epoch;
-use crate::measurements::ReductionFunc;
+use crate::measurement_retrieval::ReductionFunc;
 use crate::pull;
 use crate::push;
 use crate::reporting::report;
