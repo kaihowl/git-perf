@@ -13,6 +13,7 @@ use plotly::{
     BoxPlot, Layout, Plot,
 };
 use serde::Serialize;
+use thiserror::Error;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
 };
 
 // TODO(kaihowl) make all of these pretty printed for `main`
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ReportError {
     DeserializationError(DeserializationError),
     InvalidSeparateBy,

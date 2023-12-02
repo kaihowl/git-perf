@@ -5,13 +5,15 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
+use thiserror::Error;
+
 use crate::{
     config, data::MeasurementData, git_interop::add_note_line_to_head,
     serialization::serialize_single,
 };
 
 // TODO(kaihowl) use anyhow / thiserror for error propagation
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AddError {
     Git(git2::Error),
 }

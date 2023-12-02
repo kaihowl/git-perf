@@ -1,9 +1,9 @@
 use std::{
-    fmt::Display,
     fs::File,
     io::{Read, Write},
 };
 
+use thiserror::Error;
 use toml_edit::{value, Document};
 
 use crate::git_interop::get_head_revision;
@@ -60,14 +60,8 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
     *conf_str = conf.to_string();
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum BumpError {}
-
-impl Display for BumpError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unspecified bumping error")
-    }
-}
 
 // TODO(kaihowl) proper error handling
 pub fn bump_epoch(measurement: &str) -> Result<(), BumpError> {

@@ -2,6 +2,7 @@ use std::{fmt::Display, iter};
 
 use git2::Repository;
 use itertools::Itertools;
+use thiserror::Error;
 
 use crate::{
     data::{MeasurementData, ReductionFunc},
@@ -9,7 +10,7 @@ use crate::{
     stats,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AuditError {
     DeserializationError(DeserializationError),
     NoMeasurementForHead,

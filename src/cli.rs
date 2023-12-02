@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
 use clap::{CommandFactory, Subcommand};
 use std::path::PathBuf;
@@ -8,7 +9,6 @@ use crate::data::ReductionFunc;
 use crate::git_interop::{prune, pull, push};
 use crate::measurement_storage::{add, measure};
 use crate::reporting::report;
-use crate::CliError;
 
 #[derive(Parser)]
 #[command(version)]
@@ -159,7 +159,7 @@ fn parse_spaceless_string(s: &str) -> Result<String, String> {
     }
 }
 
-pub fn handle_calls() -> Result<(), CliError> {
+pub fn handle_calls() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {

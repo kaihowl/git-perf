@@ -8,6 +8,7 @@ use std::{
 
 use git2::{Index, Repository};
 use itertools::Itertools;
+use thiserror::Error;
 
 pub fn add_note_line_to_head(line: &str) -> Result<(), git2::Error> {
     let repo = Repository::open(".")?;
@@ -191,7 +192,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PruneError {
     ShallowRepo,
     RawGitError,
@@ -229,7 +230,7 @@ fn is_shallow_repo() -> Option<bool> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PushPullError {
     Git(git2::Error),
     RawGitError,
