@@ -1,11 +1,10 @@
-use clap::ValueEnum;
 use git::{add_note_line_to_head, fetch, raw_push, reconcile, PruneError, PushPullError};
 use git2::Repository;
 use itertools::{self, Itertools};
-use measurements::{Commit, DeserializationError};
+use measurements::DeserializationError;
+use measurements::ReductionFunc;
 use reporting::ReportError;
 use serialization::{serialize_single, MeasurementData};
-use stats::NumericReductionFunc;
 use std::fmt::Display;
 use std::io;
 use std::iter;
@@ -13,6 +12,8 @@ use std::path::Path;
 use std::process::{self, ExitCode};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, str};
+
+use crate::measurements::summarize_measurements;
 
 mod cli;
 mod config;
@@ -22,14 +23,6 @@ mod reporting;
 mod serialization;
 mod stats;
 
-#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-enum ReductionFunc {
-    Min,
-    Max,
-    Median,
-    Mean,
-}
-
 #[derive(Debug)]
 enum CliError {
     Add(AddError),
@@ -38,44 +31,6 @@ enum CliError {
     Report(ReportError),
     Audit(AuditError),
     BumpError(BumpError),
-}
-
-#[derive(Debug)]
-struct MeasurementSummary {
-    epoch: u32,
-    val: f64,
-}
-
-#[derive(Debug)]
-struct CommitSummary {
-    commit: String,
-    measurement: Option<MeasurementSummary>,
-}
-
-// TODO(kaihowl) oh god naming
-trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
-    fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary>;
-}
-
-impl<'a, T> ReductionFuncIterator<'a> for T
-where
-    T: Iterator<Item = &'a MeasurementData>,
-{
-    fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary> {
-        let mut peekable = self.peekable();
-        let expected_epoch = peekable.peek().map(|m| m.epoch);
-        let mut vals = peekable.map(|m| {
-            debug_assert_eq!(Some(m.epoch), expected_epoch);
-            m.val
-        });
-
-        let aggregate_val = vals.aggregate_by(fun);
-
-        Some(MeasurementSummary {
-            epoch: expected_epoch?,
-            val: aggregate_val?,
-        })
-    }
 }
 
 impl Display for CliError {
@@ -361,54 +316,6 @@ fn audit(
     }
 
     Ok(())
-}
-
-fn summarize_measurements<'a, F>(
-    commits: impl Iterator<Item = Result<Commit, DeserializationError>> + 'a,
-    summarize_by: &'a ReductionFunc,
-    filter_by: &'a F,
-) -> impl Iterator<Item = Result<CommitSummary, DeserializationError>> + 'a
-where
-    F: Fn(&MeasurementData) -> bool,
-{
-    let measurements = commits.map(move |c| {
-        c.map(|c| {
-            dbg!(&c.commit);
-            let measurement = c
-                .measurements
-                .iter()
-                .filter(|m| filter_by(m))
-                .inspect(|m| {
-                    dbg!(m);
-                })
-                .reduce_by(*summarize_by);
-
-            CommitSummary {
-                commit: c.commit,
-                measurement,
-            }
-        })
-    });
-
-    let mut first_epoch = None;
-
-    // TODO(kaihowl) this is a second repsonsibility, move out? "EpochClearing"
-    measurements
-        .inspect(move |m| {
-            dbg!(summarize_by);
-            dbg!(m);
-        })
-        .take_while(move |m| match &m {
-            Ok(CommitSummary {
-                measurement: Some(m),
-                ..
-            }) => {
-                let prev_epoch = first_epoch;
-                first_epoch = Some(m.epoch);
-                prev_epoch.unwrap_or(m.epoch) == m.epoch
-            }
-            _ => true,
-        })
 }
 
 #[cfg(test)]
