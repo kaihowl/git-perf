@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     config,
-    git::add_note_line_to_head,
+    git_interop::add_note_line_to_head,
     serialization::{serialize_single, MeasurementData},
 };
 

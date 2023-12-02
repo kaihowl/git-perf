@@ -6,7 +6,7 @@ use std::{
 
 use toml_edit::{value, Document};
 
-use crate::git::get_head_revision;
+use crate::git_interop::get_head_revision;
 
 // TODO(kaihowl) proper error handling
 pub fn write_config(conf: &str) {

@@ -1,6 +1,6 @@
 use audit::AuditError;
 use config::BumpError;
-use git::{PruneError, PushPullError};
+use git_interop::{PruneError, PushPullError};
 
 use measurement_storage::AddError;
 use reporting::ReportError;
@@ -11,7 +11,7 @@ use std::process::ExitCode;
 mod audit;
 mod cli;
 mod config;
-mod git;
+mod git_interop;
 mod measurement_retrieval;
 mod measurement_storage;
 mod reporting;
