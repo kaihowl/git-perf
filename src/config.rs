@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     fs::File,
     io::{Read, Write},
 };
@@ -57,6 +58,23 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
     // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
     conf["measurement"][measurement]["epoch"] = value(&get_head_revision()[0..8]);
     *conf_str = conf.to_string();
+}
+
+#[derive(Debug)]
+pub enum BumpError {}
+
+impl Display for BumpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unspecified bumping error")
+    }
+}
+
+// TODO(kaihowl) proper error handling
+pub fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
+    let mut conf_str = read_config().unwrap_or_default();
+    bump_epoch_in_conf(measurement, &mut conf_str);
+    write_config(&conf_str);
+    Ok(())
 }
 
 #[cfg(test)]

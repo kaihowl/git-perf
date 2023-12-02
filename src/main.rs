@@ -1,4 +1,5 @@
 use audit::AuditError;
+use config::BumpError;
 use git::{add_note_line_to_head, fetch, raw_push, reconcile, PruneError, PushPullError};
 
 use reporting::ReportError;
@@ -106,23 +107,6 @@ impl From<git2::Error> for AddError {
     fn from(e: git2::Error) -> Self {
         AddError::Git(e)
     }
-}
-
-#[derive(Debug)]
-enum BumpError {}
-
-impl Display for BumpError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unspecified bumping error")
-    }
-}
-
-// TODO(kaihowl) proper error handling
-fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
-    let mut conf_str = config::read_config().unwrap_or_default();
-    config::bump_epoch_in_conf(measurement, &mut conf_str);
-    config::write_config(&conf_str);
-    Ok(())
 }
 
 fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
