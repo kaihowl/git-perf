@@ -1,5 +1,5 @@
-- use `context` instead of handrolled error types?
 - drop usage of libgit2 altogether?
+- use `context` instead of handrolled error types?
 - allow using different git / root folder than pwd
 - create migration script and use different git notes branch for v2
 - use stream / iterator for measurements (see cb261dfb for a start)
