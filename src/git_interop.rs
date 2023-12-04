@@ -1,10 +1,11 @@
 use std::{
     env::current_dir,
-    io,
+    io::{self, BufRead},
     path::Path,
     process::{self, Command},
 };
 
+use anyhow::{bail, Result};
 use git2::{Index, Repository};
 use itertools::Itertools;
 use thiserror::Error;
@@ -233,6 +234,70 @@ fn is_shallow_repo() -> Option<bool> {
         },
         _ => None,
     }
+}
+
+// TODO(kaihowl) return a nested iterator / generator instead?
+fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
+    let output = process::Command::new("git")
+        .args([
+            "notes",
+            "--no-pager",
+            "log",
+            "--no-color",
+            "--ignore-missing",
+            "-n",
+            num_commits.to_string().as_str(),
+            "--first-parent",
+            "--pretty=--,%H,%D%n%N",
+            "--decorate=full",
+            "--notes=refs/notes/perf",
+            "HEAD",
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        bail!("TODO(kaihowl) git error");
+    }
+
+    let mut current_commit = None;
+
+    let lines: Vec<String> = output
+        .stdout
+        .lines()
+        .map(|f| f.expect("stuff").to_string())
+        .collect();
+
+    // TODO(kaihowl) iterator or generator instead / how to propagate exit code?
+    let it = lines.into_iter().filter_map(|l| {
+        if l.starts_with("--") {
+            current_commit = Some(
+                l.split(",")
+                    .skip(1)
+                    .next()
+                    .expect("TODO(kaihowl)")
+                    .to_owned(),
+            );
+            None
+        } else {
+            // TODO(kaihowl) lot's of string copies...
+            Some((
+                current_commit.as_ref().expect("TODO(kaihowl)").to_owned(),
+                l,
+            ))
+        }
+    });
+    let it: Vec<_> = it
+        .group_by(|it| it.0.to_owned())
+        .into_iter()
+        .map(|(k, v)| {
+            (
+                k.to_owned(),
+                // TODO(kaihowl) joining what was split above already
+                v.map(|(_, v)| v).collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    Ok(it)
 }
 
 #[derive(Debug, Error)]
