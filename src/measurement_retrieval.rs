@@ -2,8 +2,11 @@ use thiserror::Error;
 
 use crate::{
     data::{CommitSummary, MeasurementData, MeasurementSummary, ReductionFunc},
+    git_interop::{self},
     stats::NumericReductionFunc,
 };
+
+use anyhow::Result;
 
 // TODO(kaihowl) oh god naming
 trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
@@ -20,14 +23,11 @@ where
 {
     let measurements = commits.map(move |c| {
         c.map(|c| {
-            dbg!(&c.commit);
+            // dbg!(&c.commit);
             let measurement = c
                 .measurements
                 .iter()
                 .filter(|m| filter_by(m))
-                .inspect(|m| {
-                    dbg!(m);
-                })
                 .reduce_by(*summarize_by);
 
             CommitSummary {
@@ -42,8 +42,8 @@ where
     // TODO(kaihowl) this is a second repsonsibility, move out? "EpochClearing"
     measurements
         .inspect(move |m| {
-            dbg!(summarize_by);
-            dbg!(m);
+            // dbg!(summarize_by);
+            // dbg!(m);
         })
         .take_while(move |m| match &m {
             Ok(CommitSummary {
@@ -113,6 +113,26 @@ pub fn walk_commits(
                 measurements,
             })
         }))
+    // When this fails it is due to a shallow clone.
+    // TODO(kaihowl) proper shallow clone support
+    // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
+    // last commit because the parent cannot be loooked up.
+}
+
+pub fn walk_commits2(
+    _: &git2::Repository,
+    num_commits: usize,
+) -> Result<impl Iterator<Item = Result<Commit, DeserializationError>> + '_> {
+    let vec = git_interop::walk_commits(num_commits)?;
+    Ok(vec.into_iter().take(num_commits).map(
+        |(commit_id, lines)| -> Result<Commit, DeserializationError> {
+            let measurements = crate::serialization::deserialize(&lines.join("\n"));
+            Ok(Commit {
+                commit: commit_id,
+                measurements,
+            })
+        },
+    ))
     // When this fails it is due to a shallow clone.
     // TODO(kaihowl) proper shallow clone support
     // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the

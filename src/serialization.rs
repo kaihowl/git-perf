@@ -63,7 +63,7 @@ pub fn serialize_single(measurement_data: &MeasurementData) -> String {
         .serialize(measurement_data)
         .expect("TODO(kaihowl) fix me");
     let result = String::from_utf8(writer.into_inner().unwrap()).unwrap();
-    println!("My result: {}", result);
+    // dbg!("My result: {}", &result);
     result
 }
 

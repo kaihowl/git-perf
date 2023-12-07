@@ -10,6 +10,8 @@ use git2::{Index, Repository};
 use itertools::Itertools;
 use thiserror::Error;
 
+// TODO(kaihowl) this copies the entire content everytime.
+// replace by git invocation...
 pub fn add_note_line_to_head(line: &str) -> Result<(), git2::Error> {
     let repo = Repository::open(".")?;
     let author = repo.signature()?;
@@ -237,10 +239,9 @@ fn is_shallow_repo() -> Option<bool> {
 }
 
 // TODO(kaihowl) return a nested iterator / generator instead?
-fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
+pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     let output = process::Command::new("git")
         .args([
-            "notes",
             "--no-pager",
             "log",
             "--no-color",
@@ -256,6 +257,10 @@ fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
         .output()?;
 
     if !output.status.success() {
+        eprintln!(
+            "git failed: {}",
+            String::from_utf8(output.stderr).expect("Oh god")
+        );
         bail!("TODO(kaihowl) git error");
     }
 
