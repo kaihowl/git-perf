@@ -2,6 +2,7 @@
   - actually add a benchmark
   - append is slower
   - add batching instead
+  - repeat walk_commits measurement
 - drop usage of libgit2 altogether?
 - use `context` instead of handrolled error types?
 - allow using different git / root folder than pwd
