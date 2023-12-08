@@ -53,9 +53,10 @@ fn prep_repo(
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    return;
     let mut first = 0;
     let mut group = c.benchmark_group("walk");
-    for num_measurements in [10, 100, 1_000].iter() {
+    for num_measurements in [10, 100, 500].iter() {
         let (_temp_dir, repo) = prep_repo(40, *num_measurements);
 
         group.throughput(Throughput::Elements(*num_measurements as u64));

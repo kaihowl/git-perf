@@ -43,14 +43,33 @@ pub fn add_note_line_to_head(line: &str) -> Result<(), git2::Error> {
     Ok(())
 }
 
+pub fn add_note_line_to_head2(line: &str) -> Result<()> {
+    let status = process::Command::new("git")
+        .args([
+            "notes",
+            "--ref",
+            "refs/notes/perf",
+            "append",
+            "--no-separator",
+            "-m",
+            line,
+        ])
+        .status()?;
+
+    if !status.success() {
+        bail!("Failed to add new measurement");
+    }
+    Ok(())
+}
+
 pub fn get_head_revision() -> String {
-    let comm = process::Command::new("git")
+    let proc = process::Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()
         .expect("failed to parse head");
 
     // TODO(kaihowl) check status
-    String::from_utf8(comm.stdout)
+    String::from_utf8(proc.stdout)
         .expect("oh no")
         .trim()
         .to_string()

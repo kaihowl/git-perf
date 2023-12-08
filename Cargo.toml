@@ -31,3 +31,7 @@ vendored-openssl = ["git2/vendored-openssl"]
 [[bench]]
 name = "copy"
 harness = false
+
+[[bench]]
+name = "add"
+harness = false

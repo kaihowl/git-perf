@@ -1,6 +1,8 @@
-- drop usage of libgit2 altogether?
 - add_note_line_to_head with git append instead for faster benchmark
   - actually add a benchmark
+  - append is slower
+  - add batching instead
+- drop usage of libgit2 altogether?
 - use `context` instead of handrolled error types?
 - allow using different git / root folder than pwd
 - create migration script and use different git notes branch for v2
