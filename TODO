@@ -1,6 +1,7 @@
-- drop usage of libgit2 altogether!
+- remove all std::Result usage
 - use `context` instead of handrolled error types?
+- drop usage of libgit2 altogether!
 - allow using different git / root folder than pwd
 - create migration script and use different git notes branch for v2
-- use stream / iterator for measurements (see cb261dfb for a start)
 - take std variance per epoch to allow catching staggered performance regressions?
+- use stream / iterator for measurements (see cb261dfb for a start)
