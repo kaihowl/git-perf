@@ -40,10 +40,9 @@ fn prep_repo(
                 )
                 .expect("Failed to create first commit");
 
-            for _ in 1..number_measurements {
-                git_perf::measurement_storage::add("test_measurement", 10.0, &[])
-                    .expect("Failed to create measurement");
-            }
+            let measurements = [10.0].repeat(number_measurements);
+            git_perf::measurement_storage::add_multiple("test_measurement", &measurements, &[])
+                .expect("Could not add measurements");
 
             let commit = repo.find_commit(oid).expect("Could not find new commit");
             parents = vec![commit];
@@ -53,7 +52,6 @@ fn prep_repo(
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    return;
     let mut first = 0;
     let mut group = c.benchmark_group("walk");
     for num_measurements in [10, 100, 500].iter() {

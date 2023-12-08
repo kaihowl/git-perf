@@ -41,10 +41,10 @@ where
 
     // TODO(kaihowl) this is a second repsonsibility, move out? "EpochClearing"
     measurements
-        .inspect(move |m| {
-            // dbg!(summarize_by);
-            // dbg!(m);
-        })
+        // .inspect(move |m| {
+        // dbg!(summarize_by);
+        // dbg!(m);
+        // })
         .take_while(move |m| match &m {
             Ok(CommitSummary {
                 measurement: Some(m),

@@ -4,11 +4,14 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
+use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    config, data::MeasurementData, git_interop::add_note_line_to_head,
-    serialization::serialize_single,
+    config,
+    data::MeasurementData,
+    git_interop::add_note_line_to_head,
+    serialization::{serialize_multiple, serialize_single},
 };
 
 // TODO(kaihowl) use anyhow / thiserror for error propagation
@@ -16,6 +19,38 @@ use crate::{
 pub enum AddError {
     #[error("git error")]
     Git(#[from] git2::Error),
+}
+
+pub fn add_multiple(
+    measurement: &str,
+    values: &[f64],
+    key_values: &[(String, String)],
+) -> Result<(), AddError> {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("TODO(kaihowl)");
+
+    let timestamp = timestamp.as_secs_f64();
+    let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
+
+    // TODO(kaihowl) inefficient recopying
+    let mds = values
+        .iter()
+        .map(|v| MeasurementData {
+            // TODO(hoewelmk)
+            epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
+            name: measurement.to_owned(),
+            timestamp,
+            val: *v,
+            key_values: key_values.clone(),
+        })
+        .collect_vec();
+
+    let serialized = serialize_multiple(&mds);
+
+    add_note_line_to_head(&serialized)?;
+
+    Ok(())
 }
 
 pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {

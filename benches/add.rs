@@ -67,5 +67,36 @@ fn add_measurements(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, add_measurements);
+fn add_multiple_measurements(c: &mut Criterion) {
+    let (_temp_dir, _repo) = prep_repo();
+
+    let mut group = c.benchmark_group("add_multiple_measurements");
+    for num_measurements in [1, 50, 100].into_iter() {
+        let lines = ["some line measurement test"]
+            .repeat(num_measurements)
+            .join("\n");
+        group.bench_with_input(
+            BenchmarkId::new("non-append", num_measurements),
+            &num_measurements,
+            |b, _i| {
+                b.iter(|| {
+                    add_note_line_to_head(&lines).expect("failed to add lines");
+                });
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("git-append", num_measurements),
+            &num_measurements,
+            |b, _i| {
+                b.iter(|| {
+                    add_note_line_to_head2(&lines).expect("failed to add lines");
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, add_measurements, add_multiple_measurements);
 criterion_main!(benches);

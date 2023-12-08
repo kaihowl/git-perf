@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap};
 
 use csv::StringRecord;
 use itertools::{EitherOrBoth, Itertools};
@@ -52,19 +52,23 @@ where
     seq.end()
 }
 
-pub fn serialize_single(measurement_data: &MeasurementData) -> String {
+pub fn serialize_multiple<M: Borrow<MeasurementData>>(measurement_data: &[M]) -> String {
     let mut writer = csv::WriterBuilder::new()
         .delimiter(b' ')
         .has_headers(false)
         .flexible(true)
         .from_writer(vec![]);
 
-    writer
-        .serialize(measurement_data)
-        .expect("TODO(kaihowl) fix me");
+    for md in measurement_data {
+        writer.serialize(md.borrow()).expect("TODO(kaihowl) fix me");
+    }
     let result = String::from_utf8(writer.into_inner().unwrap()).unwrap();
     // dbg!("My result: {}", &result);
     result
+}
+
+pub fn serialize_single(measurement_data: &MeasurementData) -> String {
+    serialize_multiple(&[measurement_data])
 }
 
 pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
