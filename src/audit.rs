@@ -3,6 +3,7 @@ use crate::{
     measurement_retrieval::{self, summarize_measurements, DeserializationError},
     stats,
 };
+use anyhow::Result;
 use git2::Repository;
 use itertools::Itertools;
 use std::iter;
@@ -34,7 +35,7 @@ pub fn audit(
     selectors: &[(String, String)],
     summarize_by: ReductionFunc,
     sigma: f64,
-) -> Result<(), AuditError> {
+) -> Result<()> {
     let repo = Repository::open(".")?;
     let all = measurement_retrieval::walk_commits(&repo, max_count)?;
 
@@ -83,7 +84,7 @@ pub fn audit(
     if head_summary.significantly_different_from(&tail_summary, sigma) {
         eprintln!("Measurements differ significantly");
         // TODO(kaihowl) print details
-        return Err(AuditError::SignificantDifference);
+        return Err(AuditError::SignificantDifference.into());
     }
 
     Ok(())

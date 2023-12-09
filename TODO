@@ -1,4 +1,5 @@
-- remove all std::Result usage
+- wrap git proc calls in helper with result return
+- remove Error:xxx.into() calls
 - use `context` instead of handrolled error types?
 - drop usage of libgit2 altogether!
 - allow using different git / root folder than pwd

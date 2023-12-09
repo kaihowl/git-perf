@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Result;
 use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
 use clap::{CommandFactory, Subcommand};
@@ -142,18 +143,18 @@ enum Commands {
     Manpage {},
 }
 
-fn parse_key_value(s: &str) -> Result<(String, String), String> {
+fn parse_key_value(s: &str) -> Result<(String, String)> {
     let pos = s
         .find('=')
-        .ok_or_else(|| format!("invalid key=value: no '=' found in '{}'", s))?;
+        .ok_or_else(|| anyhow!("invalid key=value: no '=' found in '{}'", s))?;
     let key = parse_spaceless_string(&s[..pos])?;
     let value = parse_spaceless_string(&s[pos + 1..])?;
     Ok((key, value))
 }
 
-fn parse_spaceless_string(s: &str) -> Result<String, String> {
+fn parse_spaceless_string(s: &str) -> Result<String> {
     if s.split_whitespace().count() > 1 {
-        Err(format!("invalid string/key/value: found space in '{}'", s))
+        Err(anyhow!("invalid string/key/value: found space in '{}'", s))
     } else {
         Ok(String::from(s))
     }
@@ -220,7 +221,7 @@ pub fn handle_calls() -> Result<()> {
     }
 }
 
-fn generate_manpage() -> Result<(), std::io::Error> {
+fn generate_manpage() -> Result<()> {
     let man = clap_mangen::Man::new(Cli::command());
     man.render(&mut std::io::stdout())?;
 

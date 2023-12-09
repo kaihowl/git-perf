@@ -62,9 +62,7 @@ pub fn serialize_multiple<M: Borrow<MeasurementData>>(measurement_data: &[M]) ->
     for md in measurement_data {
         writer.serialize(md.borrow()).expect("TODO(kaihowl) fix me");
     }
-    let result = String::from_utf8(writer.into_inner().unwrap()).unwrap();
-    // dbg!("My result: {}", &result);
-    result
+    String::from_utf8(writer.into_inner().unwrap()).unwrap()
 }
 
 pub fn serialize_single(measurement_data: &MeasurementData) -> String {

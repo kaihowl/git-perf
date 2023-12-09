@@ -14,10 +14,10 @@ trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
 }
 
 pub fn summarize_measurements<'a, F>(
-    commits: impl Iterator<Item = Result<Commit, DeserializationError>> + 'a,
+    commits: impl Iterator<Item = Result<Commit>> + 'a,
     summarize_by: &'a ReductionFunc,
     filter_by: &'a F,
-) -> impl Iterator<Item = Result<CommitSummary, DeserializationError>> + 'a
+) -> impl Iterator<Item = Result<CommitSummary>> + 'a
 where
     F: Fn(&MeasurementData) -> bool,
 {
@@ -95,13 +95,13 @@ pub enum DeserializationError {
 pub fn walk_commits(
     repo: &git2::Repository,
     num_commits: usize,
-) -> Result<impl Iterator<Item = Result<Commit, DeserializationError>> + '_, DeserializationError> {
+) -> Result<impl Iterator<Item = Result<Commit>> + '_, DeserializationError> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
     revwalk.simplify_first_parent()?;
     Ok(revwalk
         .take(num_commits)
-        .map(|commit_oid| -> Result<Commit, DeserializationError> {
+        .map(|commit_oid| -> Result<Commit> {
             let commit_id = commit_oid?;
             let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
                 // TODO(kaihowl) remove unwrap_or
@@ -122,17 +122,18 @@ pub fn walk_commits(
 pub fn walk_commits2(
     _: &git2::Repository,
     num_commits: usize,
-) -> Result<impl Iterator<Item = Result<Commit, DeserializationError>> + '_> {
+) -> Result<impl Iterator<Item = Result<Commit>> + '_> {
     let vec = git_interop::walk_commits(num_commits)?;
-    Ok(vec.into_iter().take(num_commits).map(
-        |(commit_id, lines)| -> Result<Commit, DeserializationError> {
+    Ok(vec
+        .into_iter()
+        .take(num_commits)
+        .map(|(commit_id, lines)| -> Result<Commit> {
             let measurements = crate::serialization::deserialize(&lines.join("\n"));
             Ok(Commit {
                 commit: commit_id,
                 measurements,
             })
-        },
-    ))
+        }))
     // When this fails it is due to a shallow clone.
     // TODO(kaihowl) proper shallow clone support
     // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the

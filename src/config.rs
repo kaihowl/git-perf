@@ -1,8 +1,8 @@
+use anyhow::Result;
 use std::{
     fs::File,
     io::{Read, Write},
 };
-
 use thiserror::Error;
 use toml_edit::{value, Document};
 
@@ -64,7 +64,7 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
 pub enum BumpError {}
 
 // TODO(kaihowl) proper error handling
-pub fn bump_epoch(measurement: &str) -> Result<(), BumpError> {
+pub fn bump_epoch(measurement: &str) -> Result<()> {
     let mut conf_str = read_config().unwrap_or_default();
     bump_epoch_in_conf(measurement, &mut conf_str);
     write_config(&conf_str);

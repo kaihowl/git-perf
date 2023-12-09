@@ -12,7 +12,7 @@ use thiserror::Error;
 
 // TODO(kaihowl) this copies the entire content everytime.
 // replace by git invocation...
-pub fn add_note_line_to_head(line: &str) -> Result<(), git2::Error> {
+pub fn add_note_line_to_head(line: &str) -> Result<()> {
     let repo = Repository::open(".")?;
     let author = repo.signature()?;
     let head = repo.head()?;
@@ -87,7 +87,7 @@ fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
         .join("\n")
 }
 
-pub fn fetch(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
     let work_dir = match work_dir {
         Some(dir) => dir.to_path_buf(),
         None => current_dir().expect("Could not determine current working directory"),
@@ -100,13 +100,13 @@ pub fn fetch(work_dir: Option<&Path>) -> Result<(), PushPullError> {
         .status()?;
 
     if !status.success() {
-        return Err(PushPullError::RawGitError);
+        return Err(PushPullError::RawGitError.into());
     }
 
     Ok(())
 }
 
-pub fn reconcile() -> Result<(), PushPullError> {
+pub fn reconcile() -> Result<()> {
     let repo = Repository::open(".")?;
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
     let fetch_head = fetch_head.peel_to_commit()?;
@@ -194,7 +194,7 @@ pub fn reconcile() -> Result<(), PushPullError> {
     Ok(())
 }
 
-pub fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
     let work_dir = match work_dir {
         Some(dir) => dir.to_path_buf(),
         None => current_dir().expect("Could not determine current working directory"),
@@ -209,7 +209,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
 
     match status.code() {
         Some(0) => Ok(()),
-        _ => Err(PushPullError::RawGitError),
+        _ => Err(PushPullError::RawGitError.into()),
     }
 }
 
@@ -226,10 +226,10 @@ pub enum PruneError {
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
-pub fn prune() -> Result<(), PruneError> {
+pub fn prune() -> Result<()> {
     match is_shallow_repo() {
-        Some(true) => return Err(PruneError::ShallowRepo),
-        None => return Err(PruneError::GitError),
+        Some(true) => return Err(PruneError::ShallowRepo.into()),
+        None => return Err(PruneError::GitError.into()),
         _ => {}
     }
 
@@ -238,7 +238,7 @@ pub fn prune() -> Result<(), PruneError> {
         .status()?;
 
     if !status.success() {
-        return Err(PruneError::GitError);
+        return Err(PruneError::GitError.into());
     }
 
     Ok(())
@@ -339,12 +339,12 @@ pub enum PushPullError {
     RetriesExceeded,
 }
 
-pub fn pull(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+pub fn pull(work_dir: Option<&Path>) -> Result<()> {
     fetch(work_dir)?;
     reconcile()
 }
 
-pub fn push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
+pub fn push(work_dir: Option<&Path>) -> Result<()> {
     let mut retries = 3;
 
     // TODO(kaihowl) do actual, random backoff
@@ -359,7 +359,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<(), PushPullError> {
         }
     }
 
-    Err(PushPullError::RetriesExceeded)
+    Err(PushPullError::RetriesExceeded.into())
 }
 #[cfg(test)]
 mod test {

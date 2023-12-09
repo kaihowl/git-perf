@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Result;
 use git2::Repository;
 use itertools::Itertools;
 use plotly::{
@@ -187,7 +188,7 @@ pub fn report(
     num_commits: usize,
     measurement_names: &[String],
     key_values: &[(String, String)],
-) -> Result<(), ReportError> {
+) -> Result<()> {
     let repo = Repository::open(".").map_err(DeserializationError::GitError)?;
     let commits: Vec<Commit> =
         measurement_retrieval::walk_commits(&repo, num_commits)?.try_collect()?;
@@ -222,7 +223,7 @@ pub fn report(
         .collect();
 
     if unique_measurement_names.is_empty() {
-        return Err(ReportError::NoMeasurements);
+        return Err(ReportError::NoMeasurements.into());
     }
 
     for measurement_name in unique_measurement_names {
@@ -247,7 +248,7 @@ pub fn report(
         };
 
         if group_values.is_empty() {
-            return Err(ReportError::InvalidSeparateBy);
+            return Err(ReportError::InvalidSeparateBy.into());
         }
 
         for (group_key, group_value) in group_values {

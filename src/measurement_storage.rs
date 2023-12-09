@@ -1,10 +1,10 @@
+use anyhow::Result;
+use itertools::Itertools;
 use std::{
     collections::HashMap,
     process,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-
-use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
@@ -25,7 +25,7 @@ pub fn add_multiple(
     measurement: &str,
     values: &[f64],
     key_values: &[(String, String)],
-) -> Result<(), AddError> {
+) -> Result<()> {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("TODO(kaihowl)");
@@ -53,7 +53,7 @@ pub fn add_multiple(
     Ok(())
 }
 
-pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<(), AddError> {
+pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<()> {
     // TODO(kaihowl) configure path
     // TODO(kaihowl) configure
     let timestamp = SystemTime::now()
@@ -84,7 +84,7 @@ pub fn measure(
     repetitions: u16,
     command: &[String],
     key_values: &[(String, String)],
-) -> Result<(), AddError> {
+) -> Result<()> {
     let exe = command.first().unwrap();
     let args = &command[1..];
     for _ in 0..repetitions {
