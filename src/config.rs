@@ -3,7 +3,6 @@ use std::{
     fs::File,
     io::{Read, Write},
 };
-use thiserror::Error;
 use toml_edit::{value, Document};
 
 use crate::git_interop::get_head_revision;
@@ -59,9 +58,6 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
     conf["measurement"][measurement]["epoch"] = value(&get_head_revision()[0..8]);
     *conf_str = conf.to_string();
 }
-
-#[derive(Debug, Error)]
-pub enum BumpError {}
 
 // TODO(kaihowl) proper error handling
 pub fn bump_epoch(measurement: &str) -> Result<()> {

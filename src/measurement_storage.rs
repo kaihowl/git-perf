@@ -5,7 +5,6 @@ use std::{
     process,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
-use thiserror::Error;
 
 use crate::{
     config,
@@ -13,13 +12,6 @@ use crate::{
     git_interop::add_note_line_to_head,
     serialization::{serialize_multiple, serialize_single},
 };
-
-// TODO(kaihowl) use anyhow / thiserror for error propagation
-#[derive(Debug, Error)]
-pub enum AddError {
-    #[error("git error")]
-    Git(#[from] git2::Error),
-}
 
 pub fn add_multiple(
     measurement: &str,
