@@ -6,7 +6,7 @@ use crate::{
     stats::NumericReductionFunc,
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 // TODO(kaihowl) oh god naming
 trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
@@ -102,7 +102,8 @@ pub fn walk_commits(
     Ok(revwalk
         .take(num_commits)
         .map(|commit_oid| -> Result<Commit> {
-            let commit_id = commit_oid?;
+            let commit_id = commit_oid
+                .context("Commit retrieval failed; maybe shallow clone not deep enough?")?;
             let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
                 // TODO(kaihowl) remove unwrap_or
                 Ok(note) => crate::serialization::deserialize(note.message().unwrap_or("")),
