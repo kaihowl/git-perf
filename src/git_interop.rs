@@ -1,6 +1,6 @@
 use std::{
     env::current_dir,
-    io::{self, BufRead},
+    io::BufRead,
     path::Path,
     process::{self, Command},
 };
@@ -8,7 +8,6 @@ use std::{
 use anyhow::{bail, Context, Result};
 use git2::{Index, Repository};
 use itertools::Itertools;
-use thiserror::Error;
 
 // TODO(kaihowl) this copies the entire content everytime.
 // replace by git invocation...
@@ -100,7 +99,7 @@ pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
         .status()?;
 
     if !status.success() {
-        return Err(PushPullError::RawGitError.into());
+        bail!("Git error.")
     }
 
     Ok(())
@@ -207,10 +206,11 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         .current_dir(work_dir)
         .status()?;
 
-    match status.code() {
-        Some(0) => Ok(()),
-        _ => Err(PushPullError::RawGitError.into()),
+    if !status.success() {
+        bail!("Git error.")
     }
+
+    Ok(())
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
@@ -312,21 +312,6 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     Ok(it)
 }
 
-#[derive(Debug, Error)]
-pub enum PushPullError {
-    #[error("libgit2 error")]
-    Git(#[from] git2::Error),
-
-    #[error("git error")]
-    RawGitError,
-
-    #[error("git execution error")]
-    GitExecError(#[from] io::Error),
-
-    #[error("retries exceeded")]
-    RetriesExceeded,
-}
-
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {
     fetch(work_dir)?;
     reconcile()
@@ -338,16 +323,15 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) do actual, random backoff
     // TODO(kaihowl) check transient/permanent error
     while retries > 0 {
-        match raw_push(work_dir) {
-            Ok(_) => return Ok(()),
-            Err(_) => {
-                retries -= 1;
-                pull(work_dir)?;
-            }
+        if raw_push(work_dir).is_ok() {
+            return Ok(());
         }
+
+        retries -= 1;
+        pull(work_dir)?;
     }
 
-    Err(PushPullError::RetriesExceeded.into())
+    bail!("Retries exceeded.")
 }
 #[cfg(test)]
 mod test {
