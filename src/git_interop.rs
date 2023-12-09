@@ -5,7 +5,7 @@ use std::{
     process::{self, Command},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use git2::{Index, Repository};
 use itertools::Itertools;
 use thiserror::Error;
@@ -213,24 +213,11 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum PruneError {
-    #[error("shallow repo")]
-    ShallowRepo,
-
-    #[error("git execution error")]
-    RawGitError(#[from] io::Error),
-
-    #[error("git error")]
-    GitError,
-}
-
 // TODO(kaihowl) what happens with a git dir supplied with -C?
 pub fn prune() -> Result<()> {
-    match is_shallow_repo() {
-        Some(true) => return Err(PruneError::ShallowRepo.into()),
-        None => return Err(PruneError::GitError.into()),
-        _ => {}
+    if is_shallow_repo().context("Could not determine if shallow clone.")? {
+        // TODO(kaihowl) is this not already checked by git itself?
+        bail!("Refusing to prune on a shallow repo")
     }
 
     let status = process::Command::new("git")
@@ -238,23 +225,24 @@ pub fn prune() -> Result<()> {
         .status()?;
 
     if !status.success() {
-        return Err(PruneError::GitError.into());
+        bail!("Pruning failed")
     }
 
     Ok(())
 }
 
-fn is_shallow_repo() -> Option<bool> {
-    match process::Command::new("git")
+fn is_shallow_repo() -> Result<bool> {
+    process::Command::new("git")
         .args(["rev-parse", "--is-shallow-repository"])
         .output()
-    {
-        Ok(out) if out.status.success() => match std::str::from_utf8(&out.stdout) {
-            Ok(out) => Some(out.starts_with("true")),
-            Err(_) => None,
-        },
-        _ => None,
-    }
+        .context("Failed to spawn git command")
+        .and_then(|o| {
+            if o.status.success() {
+                Ok(std::str::from_utf8(o.stdout.as_slice())?.starts_with("true"))
+            } else {
+                bail!("Git failed: {}", std::str::from_utf8(&o.stderr)?)
+            }
+        })
 }
 
 // TODO(kaihowl) return a nested iterator / generator instead?
