@@ -17,7 +17,6 @@ hex = "0.4.3"
 itertools = "0.10.5"
 plotly = "0.8.3"
 serde = { version = "1.0.145", features = ["derive"] }
-thiserror = "1.0.50"
 toml = "0.8.6"
 toml_edit = "0.20.4"
 
