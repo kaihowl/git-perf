@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use anyhow::{bail, Result};
 use git2::Repository;
 use itertools::Itertools;
@@ -18,7 +18,7 @@ use serde::Serialize;
 // TODO(kaihowl) find central place for the data structures
 use crate::{
     data::MeasurementData,
-    measurement_retrieval::{self, Commit, DeserializationError},
+    measurement_retrieval::{self, Commit},
 };
 
 trait Reporter<'a> {
@@ -172,7 +172,7 @@ pub fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<()> {
-    let repo = Repository::open(".").map_err(DeserializationError::GitError)?;
+    let repo = Repository::open(".").context("Could not open git repo")?;
     let commits: Vec<Commit> =
         measurement_retrieval::walk_commits(&repo, num_commits)?.try_collect()?;
 

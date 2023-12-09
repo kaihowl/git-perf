@@ -1,6 +1,6 @@
 use crate::{
     data::{MeasurementData, ReductionFunc},
-    measurement_retrieval::{self, summarize_measurements, DeserializationError},
+    measurement_retrieval::{self, summarize_measurements},
     stats,
 };
 use anyhow::Result;
@@ -11,21 +11,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AuditError {
-    #[error("failed to read")]
-    DeserializationError(#[from] DeserializationError),
-
     #[error("no measurement for HEAD")]
     NoMeasurementForHead,
 
     #[error("HEAD differs significantly from tail measurements")]
     SignificantDifference,
-}
-
-// TODO(kaihowl)
-impl From<git2::Error> for AuditError {
-    fn from(e: git2::Error) -> Self {
-        AuditError::DeserializationError(DeserializationError::GitError(e))
-    }
 }
 
 pub fn audit(

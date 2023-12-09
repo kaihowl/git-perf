@@ -1,12 +1,10 @@
-use thiserror::Error;
-
 use crate::{
     data::{CommitSummary, MeasurementData, MeasurementSummary, ReductionFunc},
     git_interop::{self},
     stats::NumericReductionFunc,
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 // TODO(kaihowl) oh god naming
 trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
@@ -85,20 +83,19 @@ pub struct Commit {
     pub measurements: Vec<MeasurementData>,
 }
 
-#[derive(Debug, Error)]
-pub enum DeserializationError {
-    #[error("git error (maybe shallow clone not deep enough?")]
-    GitError(#[from] git2::Error),
-}
-
 // TODO(hoewelmk) copies all measurements, expensive...
 pub fn walk_commits(
     repo: &git2::Repository,
     num_commits: usize,
-) -> Result<impl Iterator<Item = Result<Commit>> + '_, DeserializationError> {
-    let mut revwalk = repo.revwalk()?;
-    revwalk.push_head()?;
-    revwalk.simplify_first_parent()?;
+) -> Result<impl Iterator<Item = Result<Commit>> + '_> {
+    let revwalk = (|| -> Result<_> {
+        let mut revwalk = repo.revwalk()?;
+        revwalk.push_head()?;
+        revwalk.simplify_first_parent()?;
+        Ok(revwalk)
+    })()
+    .context("Git error")?;
+
     Ok(revwalk
         .take(num_commits)
         .map(|commit_oid| -> Result<Commit> {
