@@ -3,20 +3,10 @@ use crate::{
     measurement_retrieval::{self, summarize_measurements},
     stats,
 };
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use git2::Repository;
 use itertools::Itertools;
 use std::iter;
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum AuditError {
-    #[error("no measurement for HEAD")]
-    NoMeasurementForHead,
-
-    #[error("HEAD differs significantly from tail measurements")]
-    SignificantDifference,
-}
 
 pub fn audit(
     measurement: &str,
@@ -40,17 +30,14 @@ pub fn audit(
 
     let head = aggregates
         .next()
-        .ok_or(AuditError::NoMeasurementForHead)
+        .ok_or(anyhow!("No commit at HEAD"))
         .and_then(|s| {
             eprintln!("Head measurement is: {s:?}");
-            match s {
-                Ok(cs) => match cs.measurement {
-                    Some(m) => Ok(m.val),
-                    _ => Err(AuditError::NoMeasurementForHead),
-                },
-                // TODO(kaihowl) more specific error?
-                _ => Err(AuditError::NoMeasurementForHead),
-            }
+            s.and_then(|cs| {
+                cs.measurement
+                    .map(|m| m.val)
+                    .ok_or(anyhow!("No measurement for HEAD."))
+            })
         })?;
 
     let tail: Vec<_> = aggregates
@@ -72,9 +59,12 @@ pub fn audit(
     }
 
     if head_summary.significantly_different_from(&tail_summary, sigma) {
-        eprintln!("Measurements differ significantly");
         // TODO(kaihowl) print details
-        return Err(AuditError::SignificantDifference.into());
+        bail!(
+            "HEAD differs significantly from tail measurements.\nHead: {}\nTail: {}",
+            &head_summary,
+            &tail_summary
+        );
     }
 
     Ok(())

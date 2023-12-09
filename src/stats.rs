@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use average::{self, concatenate, Estimate, Mean, Variance};
 use itertools::Itertools;
 
@@ -23,6 +25,12 @@ pub struct Stats {
     pub mean: f64,
     pub stddev: f64,
     pub len: usize,
+}
+
+impl Display for Stats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "μ: {} σ: {} n: {}", self.mean, self.stddev, self.len)
+    }
 }
 
 impl Stats {
