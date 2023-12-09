@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 script_dir=$(dirname "$0")
 num_procs=4
 
@@ -27,16 +25,31 @@ while IFS= read -r -d '' file; do
     commands+=("$file")
 done < <(find "${script_dir}" -name 'test_*.sh' -print0)
 
+pids=()
+
 # Execute commands in parallel with a maximum of 3 processes at a time
 for cmd in "${commands[@]}"; do
     execute_command bash -c "$cmd" &
+    pids+=($!)
     # Limit the number of concurrent processes
     while [ $(jobs -p | wc -l) -ge $num_procs ]; do
         sleep 1
     done
 done
 
+fail_count=0
 # Wait for all background jobs to finish
-wait
-echo "All commands executed successfully."
+for pid in "${pids[@]}"; do
+  if ! wait "$pid"; then
+    ((fail_count++))
+  fi
+done
+
+if [[ $fail_count != 0 ]]; then
+  echo "Failed tests: $fail_count"
+  exit $fail_count
+else
+  echo "All commands executed successfully."
+  exit 0
+fi
 
