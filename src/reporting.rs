@@ -4,7 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
+use anyhow::anyhow;
+use anyhow::{bail, Result};
 use git2::Repository;
 use itertools::Itertools;
 use plotly::{
@@ -13,30 +14,12 @@ use plotly::{
     BoxPlot, Layout, Plot,
 };
 use serde::Serialize;
-use thiserror::Error;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
     data::MeasurementData,
     measurement_retrieval::{self, Commit, DeserializationError},
 };
-
-// TODO(kaihowl) make all of these pretty printed for `main`
-#[derive(Debug, Error)]
-pub enum ReportError {
-    #[error("failed to read")]
-    DeserializationError(#[from] DeserializationError),
-
-    #[error("invalid separator supplied")]
-    InvalidSeparateBy,
-
-    // Report would not contain any measurements
-    #[error("no performance measurements found")]
-    NoMeasurements,
-
-    #[error("cound not infer output format")]
-    InvalidOutputFormat,
-}
 
 trait Reporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]);
@@ -194,7 +177,7 @@ pub fn report(
         measurement_retrieval::walk_commits(&repo, num_commits)?.try_collect()?;
 
     let mut plot =
-        ReporterFactory::from_file_name(&output).ok_or(ReportError::InvalidOutputFormat)?;
+        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
 
     plot.add_commits(&commits);
 
@@ -223,7 +206,7 @@ pub fn report(
         .collect();
 
     if unique_measurement_names.is_empty() {
-        return Err(ReportError::NoMeasurements.into());
+        bail!("No performance measurements found.")
     }
 
     for measurement_name in unique_measurement_names {
@@ -248,7 +231,7 @@ pub fn report(
         };
 
         if group_values.is_empty() {
-            return Err(ReportError::InvalidSeparateBy.into());
+            bail!("Invalid separator supplied, no measurements.")
         }
 
         for (group_key, group_value) in group_values {
