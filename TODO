@@ -1,5 +1,4 @@
 - wrap git proc calls in helper with result return
-- remove Error:xxx.into() calls
 - random backoff / conflict resolution
 - use `context` instead of handrolled error types?
 - drop usage of libgit2 altogether!
