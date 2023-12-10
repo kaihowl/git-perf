@@ -68,7 +68,6 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             .into_iter()
             .inspect(|(_, md)| {
                 // TODO(kaihowl)
-                assert!(true);
                 measurement_name = Some(&md.name);
             })
             .map(|(i, m)| (i, m.val))

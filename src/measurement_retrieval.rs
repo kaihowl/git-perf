@@ -4,7 +4,7 @@ use crate::{
     stats::NumericReductionFunc,
 };
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 // TODO(kaihowl) oh god naming
 trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
