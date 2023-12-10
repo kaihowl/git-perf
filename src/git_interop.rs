@@ -2,7 +2,7 @@ use std::{
     env::current_dir,
     io::BufRead,
     path::{Path, PathBuf},
-    process::{self, Command},
+    process::{self},
 };
 
 use anyhow::{bail, Context, Result};
@@ -197,21 +197,14 @@ pub fn reconcile() -> Result<()> {
 }
 
 pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
-    let work_dir = match work_dir {
-        Some(dir) => dir.to_path_buf(),
-        None => current_dir().expect("Could not determine current working directory"),
-    };
     // TODO(kaihowl) configure remote?
     // TODO(kaihowl) factor into constants
     // TODO(kaihowl) capture output
-    let status = Command::new("git")
-        .args(["push", "origin", "refs/notes/perf:refs/notes/perf"])
-        .current_dir(work_dir)
-        .status()?;
-
-    if !status.success() {
-        bail!("Git error.")
-    }
+    run_git(
+        &["push", "origin", "refs/notes/perf:refs/notes/perf"],
+        &work_dir,
+    )
+    .context("Failed to push performance measurements.")?;
 
     Ok(())
 }
@@ -223,29 +216,16 @@ pub fn prune() -> Result<()> {
         bail!("Refusing to prune on a shallow repo")
     }
 
-    let status = process::Command::new("git")
-        .args(["notes", "--ref", "refs/notes/perf", "prune"])
-        .status()?;
-
-    if !status.success() {
-        bail!("Pruning failed")
-    }
+    run_git(&["notes", "--ref", "refs/notes/perf", "prune"], &None).context("Failed to prune.")?;
 
     Ok(())
 }
 
 fn is_shallow_repo() -> Result<bool> {
-    process::Command::new("git")
-        .args(["rev-parse", "--is-shallow-repository"])
-        .output()
-        .context("Failed to spawn git command")
-        .and_then(|o| {
-            if o.status.success() {
-                Ok(std::str::from_utf8(o.stdout.as_slice())?.starts_with("true"))
-            } else {
-                bail!("Git failed: {}", std::str::from_utf8(&o.stderr)?)
-            }
-        })
+    let output = run_git(&["rev-parse", "--is-shallow-repository"], &None)
+        .context("Failed to determine if repo is a shallow clone.")?;
+
+    Ok(output.starts_with("true"))
 }
 
 // TODO(kaihowl) return a nested iterator / generator instead?
