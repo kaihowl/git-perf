@@ -1,4 +1,5 @@
 - random backoff / conflict resolution
+  - distinguish permanent and transient errors in git_interop
 - use `context` instead of handrolled error types?
 - drop usage of libgit2 altogether!
 - allow using different git / root folder than pwd
