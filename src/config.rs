@@ -49,20 +49,23 @@ fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
     get_epoch(measurement).or_else(|| get_epoch("*"))
 }
 
-pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) {
+pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()> {
     let mut conf = conf_str
         .parse::<Document>()
         .expect("failed to parse config");
 
+    let head_revision = get_head_revision()?;
     // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
-    conf["measurement"][measurement]["epoch"] = value(&get_head_revision()[0..8]);
+    conf["measurement"][measurement]["epoch"] = value(&head_revision[0..8]);
     *conf_str = conf.to_string();
+
+    Ok(())
 }
 
 // TODO(kaihowl) proper error handling
 pub fn bump_epoch(measurement: &str) -> Result<()> {
     let mut conf_str = read_config().unwrap_or_default();
-    bump_epoch_in_conf(measurement, &mut conf_str);
+    bump_epoch_in_conf(measurement, &mut conf_str)?;
     write_config(&conf_str);
     Ok(())
 }
@@ -104,14 +107,14 @@ epoch = "34567898"
 "#;
 
         let mut actual = String::from(configfile);
-        bump_epoch_in_conf("something", &mut actual);
+        bump_epoch_in_conf("something", &mut actual).expect("Failed to bump epoch");
 
         let expected = format!(
             r#"[measurement."something"]
 #My comment
 epoch = "{}"
 "#,
-            &get_head_revision()[0..8],
+            &get_head_revision().expect("get_head_revision failed")[0..8],
         );
 
         assert_eq!(actual, expected);
@@ -120,7 +123,7 @@ epoch = "{}"
     #[test]
     fn test_bump_new_epoch_and_read_it() {
         let mut conf = String::new();
-        bump_epoch_in_conf("mymeasurement", &mut conf);
+        bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
         let epoch = determine_epoch("mymeasurement", &conf);
         dbg!(&conf);
         assert!(epoch.is_some());

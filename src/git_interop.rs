@@ -1,7 +1,7 @@
 use std::{
     env::current_dir,
     io::BufRead,
-    path::Path,
+    path::{Path, PathBuf},
     process::{self, Command},
 };
 
@@ -9,11 +9,16 @@ use anyhow::{bail, Context, Result};
 use git2::{Index, Repository};
 use itertools::Itertools;
 
-fn run_git(args: &[&str]) -> Result<String> {
+fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String> {
+    let working_dir = working_dir
+        .map(PathBuf::from)
+        .unwrap_or(current_dir().context("Failed to retrieve current directory")?);
+
     let output = process::Command::new("git")
         // TODO(kaihowl) set correct encoding and lang?
         .env("LANG", "")
         .env("LC_ALL", "C")
+        .current_dir(working_dir)
         .args(args)
         .output()
         .context("Failed to spawn git command")?;
@@ -60,8 +65,8 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
 }
 
 pub fn add_note_line_to_head2(line: &str) -> Result<()> {
-    let status = process::Command::new("git")
-        .args([
+    run_git(
+        &[
             "notes",
             "--ref",
             "refs/notes/perf",
@@ -69,26 +74,18 @@ pub fn add_note_line_to_head2(line: &str) -> Result<()> {
             "--no-separator",
             "-m",
             line,
-        ])
-        .status()?;
+        ],
+        &None,
+    )
+    .context("Failed to add new measurement")?;
 
-    if !status.success() {
-        bail!("Failed to add new measurement");
-    }
     Ok(())
 }
 
-pub fn get_head_revision() -> String {
-    let proc = process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .expect("failed to parse head");
+pub fn get_head_revision() -> Result<String> {
+    let head = run_git(&["rev-parse", "HEAD"], &None).context("Failed to parse HEAD.")?;
 
-    // TODO(kaihowl) check status
-    String::from_utf8(proc.stdout)
-        .expect("oh no")
-        .trim()
-        .to_string()
+    Ok(head.trim().to_owned())
 }
 
 /// Resolve conflicts between two measurement runs on the same commit by
@@ -104,20 +101,9 @@ fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
 }
 
 pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
-    let work_dir = match work_dir {
-        Some(dir) => dir.to_path_buf(),
-        None => current_dir().expect("Could not determine current working directory"),
-    };
-
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    let status = process::Command::new("git")
-        .args(["fetch", "origin", "refs/notes/perf"])
-        .current_dir(work_dir)
-        .status()?;
-
-    if !status.success() {
-        bail!("Git error.")
-    }
+    run_git(&["fetch", "origin", "refs/notes/perf"], &work_dir)
+        .context("Failed to fetch performance measurements.")?;
 
     Ok(())
 }
@@ -459,11 +445,11 @@ mod test {
 
     #[test]
     fn test_get_head_revision() {
-        let revision = get_head_revision();
+        let revision = get_head_revision().unwrap();
         assert!(
-            revision.chars().all(|c| c.is_ascii_alphanumeric()),
+            &revision.chars().all(|c| c.is_ascii_alphanumeric()),
             "'{}' contained non alphanumeric or non ASCII characters",
-            revision
+            &revision
         )
     }
 
