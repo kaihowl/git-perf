@@ -1,6 +1,5 @@
 use std::{
     env::current_dir,
-    io::BufRead,
     path::{Path, PathBuf},
     process::{self},
 };
@@ -230,8 +229,8 @@ fn is_shallow_repo() -> Result<bool> {
 
 // TODO(kaihowl) return a nested iterator / generator instead?
 pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
-    let output = process::Command::new("git")
-        .args([
+    let output = run_git(
+        &[
             "--no-pager",
             "log",
             "--no-color",
@@ -243,35 +242,17 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             "--decorate=full",
             "--notes=refs/notes/perf",
             "HEAD",
-        ])
-        .output()?;
-
-    if !output.status.success() {
-        eprintln!(
-            "git failed: {}",
-            String::from_utf8(output.stderr).expect("Oh god")
-        );
-        bail!("TODO(kaihowl) git error");
-    }
+        ],
+        &None,
+    )
+    .context("Failed to retrieve commits")?;
 
     let mut current_commit = None;
 
-    let lines: Vec<String> = output
-        .stdout
-        .lines()
-        .map(|f| f.expect("stuff").to_string())
-        .collect();
-
     // TODO(kaihowl) iterator or generator instead / how to propagate exit code?
-    let it = lines.into_iter().filter_map(|l| {
+    let it = output.lines().filter_map(|l| {
         if l.starts_with("--") {
-            current_commit = Some(
-                l.split(",")
-                    .skip(1)
-                    .next()
-                    .expect("TODO(kaihowl)")
-                    .to_owned(),
-            );
+            current_commit = Some(l.split(',').nth(1).expect("TODO(kaihowl)").to_owned());
             None
         } else {
             // TODO(kaihowl) lot's of string copies...
@@ -281,6 +262,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             ))
         }
     });
+
     let it: Vec<_> = it
         .group_by(|it| it.0.to_owned())
         .into_iter()
@@ -288,7 +270,8 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             (
                 k.to_owned(),
                 // TODO(kaihowl) joining what was split above already
-                v.map(|(_, v)| v).collect::<Vec<_>>(),
+                // TODO(kaihowl) lot's of string copies...
+                v.map(|(_, v)| v.to_owned()).collect::<Vec<_>>(),
             )
         })
         .collect();
