@@ -215,11 +215,21 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     .context("Failed to retrieve commits")?;
 
     let mut current_commit = None;
+    let mut detected_shallow = false;
 
     // TODO(kaihowl) iterator or generator instead / how to propagate exit code?
     let it = output.lines().filter_map(|l| {
         if l.starts_with("--") {
-            current_commit = Some(l.split(',').nth(1).expect("TODO(kaihowl)").to_owned());
+            let info = l.split(',').collect_vec();
+
+            current_commit = Some(
+                info.get(1)
+                    .expect("Could not read commit header.")
+                    .to_owned(),
+            );
+
+            detected_shallow |= info[2..].iter().any(|s| *s == "grafted");
+
             None
         } else {
             // TODO(kaihowl) lot's of string copies...
@@ -230,7 +240,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
         }
     });
 
-    let it: Vec<_> = it
+    let commits: Vec<_> = it
         .group_by(|it| it.0.to_owned())
         .into_iter()
         .map(|(k, v)| {
@@ -242,7 +252,12 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             )
         })
         .collect();
-    Ok(it)
+
+    if detected_shallow && commits.len() < num_commits {
+        bail!("Refusing to continue as commit log depth was limited by shallow clone");
+    }
+
+    Ok(commits)
 }
 
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {

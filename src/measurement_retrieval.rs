@@ -84,40 +84,8 @@ pub struct Commit {
 }
 
 // TODO(hoewelmk) copies all measurements, expensive...
+// TODO(kaihowl) missing check for shallow clone marker!
 pub fn walk_commits(
-    repo: &git2::Repository,
-    num_commits: usize,
-) -> Result<impl Iterator<Item = Result<Commit>> + '_> {
-    let revwalk = (|| -> Result<_> {
-        let mut revwalk = repo.revwalk()?;
-        revwalk.push_head()?;
-        revwalk.simplify_first_parent()?;
-        Ok(revwalk)
-    })()
-    .context("Git error")?;
-
-    Ok(revwalk
-        .take(num_commits)
-        .map(|commit_oid| -> Result<Commit> {
-            let commit_id = commit_oid
-                .context("Commit retrieval failed; maybe shallow clone not deep enough?")?;
-            let measurements = match repo.find_note(Some("refs/notes/perf"), commit_id) {
-                // TODO(kaihowl) remove unwrap_or
-                Ok(note) => crate::serialization::deserialize(note.message().unwrap_or("")),
-                Err(_) => [].into(),
-            };
-            Ok(Commit {
-                commit: commit_id.to_string(),
-                measurements,
-            })
-        }))
-    // When this fails it is due to a shallow clone.
-    // TODO(kaihowl) proper shallow clone support
-    // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
-    // last commit because the parent cannot be loooked up.
-}
-
-pub fn walk_commits2(
     _: &git2::Repository,
     num_commits: usize,
 ) -> Result<impl Iterator<Item = Result<Commit>> + '_> {

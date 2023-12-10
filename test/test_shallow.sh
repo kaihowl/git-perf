@@ -18,8 +18,7 @@ done
 git perf report -n 5
 git perf report -n 20
 cd "$(mktemp -d)"
-# TODO(kaihowl) reset to depth 2
-git clone "file://$full_repo" --depth=3 shallow_clone
+git clone "file://$full_repo" --depth=2 shallow_clone
 cd shallow_clone
 git perf pull
 git perf report -n 2
