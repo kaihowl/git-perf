@@ -30,40 +30,7 @@ fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-// TODO(kaihowl) this copies the entire content everytime.
-// replace by git invocation...
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
-    let repo = Repository::open(".")?;
-    let author = repo.signature()?;
-    let head = repo.head()?;
-    let head = head.peel_to_commit()?;
-
-    let body;
-
-    if let Ok(existing_note) = repo.find_note(Some("refs/notes/perf"), head.id()) {
-        // TODO(kaihowl) check empty / not-utf8
-        let existing_measurements = existing_note.message().expect("Message is not utf-8");
-        // TODO(kaihowl) what about missing trailing new lines?
-        // TODO(kaihowl) is there a more memory efficient way?
-        body = format!("{}{}", existing_measurements, line);
-    } else {
-        body = line.to_string();
-    }
-
-    repo.note(
-        &author,
-        &author,
-        Some("refs/notes/perf"),
-        head.id(),
-        &body,
-        true,
-    )
-    .expect("TODO(kaihowl) note failed");
-
-    Ok(())
-}
-
-pub fn add_note_line_to_head2(line: &str) -> Result<()> {
     run_git(
         &[
             "notes",
