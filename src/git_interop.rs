@@ -9,6 +9,23 @@ use anyhow::{bail, Context, Result};
 use git2::{Index, Repository};
 use itertools::Itertools;
 
+fn run_git(args: &[&str]) -> Result<String> {
+    let output = process::Command::new("git")
+        // TODO(kaihowl) set correct encoding and lang?
+        .env("LANG", "")
+        .env("LC_ALL", "C")
+        .args(args)
+        .output()
+        .context("Failed to spawn git command")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Git command failed to run: {}", stderr);
+    }
+
+    Ok(String::from_utf8(output.stdout)?)
+}
+
 // TODO(kaihowl) this copies the entire content everytime.
 // replace by git invocation...
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
