@@ -12,7 +12,6 @@ clap = { version="4", features=["derive", "wrap_help"] }
 clap_mangen = "0.2.5"
 criterion = "0.5.1"
 csv = "1.1.6"
-git2 = "0.15.0"
 hex = "0.4.3"
 itertools = "0.10.5"
 plotly = "0.8.3"
@@ -25,7 +24,7 @@ tempfile = "3.3.0"
 httptest = "0.15.4"
 
 [features]
-vendored-openssl = ["git2/vendored-openssl"]
+vendored-openssl = []
 
 [[bench]]
 name = "copy"
