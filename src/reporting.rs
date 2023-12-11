@@ -4,9 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use anyhow::{bail, Result};
-use git2::Repository;
 use itertools::Itertools;
 use plotly::{
     common::{Font, LegendGroupTitle, Title},
@@ -171,9 +170,7 @@ pub fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
 ) -> Result<()> {
-    let repo = Repository::open(".").context("Could not open git repo")?;
-    let commits: Vec<Commit> =
-        measurement_retrieval::walk_commits(&repo, num_commits)?.try_collect()?;
+    let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;

@@ -4,7 +4,6 @@ use crate::{
     stats,
 };
 use anyhow::{anyhow, bail, Result};
-use git2::Repository;
 use itertools::Itertools;
 use std::iter;
 
@@ -16,8 +15,7 @@ pub fn audit(
     summarize_by: ReductionFunc,
     sigma: f64,
 ) -> Result<()> {
-    let repo = Repository::open(".")?;
-    let all = measurement_retrieval::walk_commits(&repo, max_count)?;
+    let all = measurement_retrieval::walk_commits(max_count)?;
 
     let filter_by = |m: &MeasurementData| {
         m.name == measurement

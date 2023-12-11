@@ -85,10 +85,7 @@ pub struct Commit {
 
 // TODO(hoewelmk) copies all measurements, expensive...
 // TODO(kaihowl) missing check for shallow clone marker!
-pub fn walk_commits(
-    _: &git2::Repository,
-    num_commits: usize,
-) -> Result<impl Iterator<Item = Result<Commit>> + '_> {
+pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Commit>>> {
     let vec = git_interop::walk_commits(num_commits)?;
     Ok(vec
         .into_iter()
