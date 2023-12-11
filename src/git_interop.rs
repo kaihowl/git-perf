@@ -200,9 +200,8 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{env::set_current_dir, fs::read_to_string};
+    use std::env::set_current_dir;
 
-    use git2::{Repository, Signature};
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
         matchers::{self, request},
@@ -211,30 +210,21 @@ mod test {
     };
     use tempfile::{tempdir, TempDir};
 
-    fn init_repo(dir: &Path) -> Repository {
-        let repo = git2::Repository::init(dir).expect("Failed to create repo");
-        {
-            let tree_oid = repo
-                .treebuilder(None)
-                .expect("Failed to create tree")
-                .write()
-                .expect("Failed to write tree");
-            let tree = &repo
-                .find_tree(tree_oid)
-                .expect("Could not find written tree");
-            let signature = Signature::now("fake", "fake@example.com").expect("No signature");
-            repo.commit(
-                Some("refs/notes/perf"),
-                &signature,
-                &signature,
-                "Initial commit",
-                tree,
-                &[],
-            )
-            .expect("Failed to create first commit");
-        }
+    fn init_repo(dir: &Path) {
+        assert!(process::Command::new("git")
+            .args(["init"])
+            .current_dir(dir)
+            .status()
+            .expect("Failed to spawn git-init")
+            .success());
 
-        repo
+        // TODO(kaihowl) setup name / author
+        assert!(process::Command::new("git")
+            .args(["commit", "--allow-empty", "-m", "Initial commit"])
+            .current_dir(dir)
+            .status()
+            .expect("Failed to spawn git-commit")
+            .success());
     }
 
     fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
@@ -245,18 +235,26 @@ mod test {
 
         let url = origin_url.to_string();
 
-        let repo = init_repo(tempdir.path());
+        init_repo(tempdir.path());
 
-        repo.remote("origin", &url).expect("Failed to add remote");
+        assert!(process::Command::new("git")
+            .args(["remote", "add", "origin", &url])
+            .current_dir(tempdir.path())
+            .status()
+            .expect("Failed to spawn git-remote")
+            .success());
 
-        let mut config = repo.config().expect("Failed to get config");
-        let config_key = format!("http.{}.extraHeader", url);
-        config
-            .set_str(&config_key, extra_header)
-            .expect("Failed to set config value");
-
-        let stuff = read_to_string(tempdir.path().join(".git/config")).expect("No config");
-        eprintln!("config:\n{}", stuff);
+        assert!(process::Command::new("git")
+            .args([
+                "config",
+                "--add",
+                format!("http.{}.extraHeader", url).as_str(),
+                extra_header
+            ])
+            .current_dir(tempdir.path())
+            .status()
+            .expect("Failed to spawn git-config")
+            .success());
 
         tempdir
     }
