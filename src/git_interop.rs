@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use git2::{Index, Repository};
 use itertools::Itertools;
 
 fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String> {
@@ -52,18 +51,6 @@ pub fn get_head_revision() -> Result<String> {
     let head = run_git(&["rev-parse", "HEAD"], &None).context("Failed to parse HEAD.")?;
 
     Ok(head.trim().to_owned())
-}
-
-/// Resolve conflicts between two measurement runs on the same commit by
-/// sorting and deduplicating lines.
-/// This emulates the cat_sort_uniq merge strategy for git notes.
-fn resolve_conflicts(ours: impl AsRef<str>, theirs: impl AsRef<str>) -> String {
-    ours.as_ref()
-        .lines()
-        .chain(theirs.as_ref().lines())
-        .sorted()
-        .dedup()
-        .join("\n")
 }
 
 pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
@@ -325,29 +312,5 @@ mod test {
             "'{}' contained non alphanumeric or non ASCII characters",
             &revision
         )
-    }
-
-    #[test]
-    fn test_resolve_conflicts() {
-        let a = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234567.0 42.0\n";
-        let b = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234890.0 22.0\n";
-
-        let resolved = resolve_conflicts(a, b);
-        assert!(resolved.contains("mymeasurement 1234567.0 23.0 key=value"));
-        assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
-        assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
-        assert_eq!(3, resolved.lines().count());
-    }
-
-    #[test]
-    fn test_resolve_conflicts_no_trailing_newline() {
-        let a = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234567.0 42.0";
-        let b = "mymeasurement 1234567.0 23.0 key=value\nmyothermeasurement 1234890.0 22.0";
-
-        let resolved = resolve_conflicts(a, b);
-        assert!(resolved.contains("mymeasurement 1234567.0 23.0 key=value"));
-        assert!(resolved.contains("myothermeasurement 1234567.0 42.0"));
-        assert!(resolved.contains("myothermeasurement 1234890.0 22.0"));
-        assert_eq!(3, resolved.lines().count());
     }
 }
