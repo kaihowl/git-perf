@@ -75,90 +75,19 @@ pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
 }
 
 pub fn reconcile() -> Result<()> {
-    let repo = Repository::open(".")?;
-    let fetch_head = repo.find_reference("FETCH_HEAD")?;
-    let fetch_head = fetch_head.peel_to_commit()?;
-
-    let notes = match repo.find_reference("refs/notes/perf") {
-        Ok(reference) => reference,
-        Err(_) => {
-            repo.reference(
-                // TODO(kaihowl) pull into constant / configuration
-                "refs/notes/perf",
-                fetch_head.id(),
-                false, /* this should never fail */
-                "init perf notes",
-            )?;
-            return Ok(());
-        }
-    };
-
-    let notes = notes.peel_to_commit()?;
-    let index = repo.merge_commits(&notes, &fetch_head, None)?;
-
-    let mut out_index = Index::new()?;
-    let mut conflict_entries = Vec::new();
-
-    if let Ok(conflicts) = index.conflicts() {
-        conflict_entries = conflicts.try_collect()?;
-    }
-
-    for entry in index.iter() {
-        if conflict_entries.iter().any(|c| {
-            // TODO(kaihowl) think harder about this
-            let conflict_entry = if let Some(our) = &c.our {
-                our
-            } else {
-                c.their.as_ref().expect("Both our and their unset")
-            };
-
-            conflict_entry.path == entry.path
-        }) {
-            continue;
-        }
-        out_index.add(&entry).expect("failing entry in new index");
-    }
-    for conflict in conflict_entries {
-        // TODO(kaihowl) no support for deleted / pruned measurements
-        let our = conflict.our.unwrap();
-        let our_oid = our.id;
-        let our_content = String::from_utf8(repo.find_blob(our_oid)?.content().to_vec())
-            .expect("UTF-8 error for our content");
-        let their_oid = conflict.their.unwrap().id;
-        let their_content = String::from_utf8(repo.find_blob(their_oid)?.content().to_vec())
-            .expect("UTF-8 error for their content");
-        let resolved_content = resolve_conflicts(&our_content, &their_content);
-        // TODO(kaihowl) what should this be set to instead of copied from?
-        let blob = repo.blob(resolved_content.as_bytes())?;
-        let mut entry = our;
-        // Missing bindings for resolving conflict in libgit2-rs. Therefore, manually overwrite.
-        entry.flags = 0;
-        entry.flags_extended = 0;
-        entry.id = blob;
-
-        out_index.add(&entry).expect("Could not add");
-    }
-    let out_index_paths = out_index
-        .iter()
-        .map(|i| String::from_utf8(i.path).unwrap())
-        .collect_vec();
-
-    dbg!(&out_index_paths);
-    dbg!(out_index.has_conflicts());
-    dbg!(out_index.len());
-    let merged_tree = repo.find_tree(out_index.write_tree_to(&repo)?)?;
-
-    // TODO(kaihowl) make this conditional on the conflicts.
-    let signature = repo.signature()?;
-    repo.commit(
-        Some("refs/notes/perf"),
-        &signature,
-        &signature,
-        "Merge it",
-        &merged_tree,
-        &[&notes, &fetch_head],
-    )?;
-    // repo.merge
+    let _ = run_git(
+        &[
+            "notes",
+            "--ref",
+            "refs/notes/perf",
+            "merge",
+            "-s",
+            "cat_sort_uniq",
+            "FETCH_HEAD",
+        ],
+        &None,
+    )
+    .context("Failed to merge measurements with upstream")?;
     Ok(())
 }
 
