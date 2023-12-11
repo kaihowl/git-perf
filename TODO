@@ -1,7 +1,7 @@
-- random backoff / conflict resolution
-  - distinguish permanent and transient errors in git_interop
 - drop usage of libgit2 altogether!
   - replace reconcile with git internal functionality
+- random backoff / conflict resolution
+  - distinguish permanent and transient errors in git_interop
 - use `context` instead of handrolled error types?
 - use field separator
   - create migration script and use different git notes branch for v2
