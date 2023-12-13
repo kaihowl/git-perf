@@ -210,21 +210,21 @@ mod test {
     };
     use tempfile::{tempdir, TempDir};
 
-    fn init_repo(dir: &Path) {
+    fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")
-            .args(["init"])
+            .args(args)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_AUTHOR_NAME", "testuser")
+            .env("GIT_AUTHOR_EMAIL", "testuser@example.com")
             .current_dir(dir)
             .status()
-            .expect("Failed to spawn git-init")
+            .expect("Failed to spawn git command")
             .success());
+    }
 
-        // TODO(kaihowl) setup name / author
-        assert!(process::Command::new("git")
-            .args(["commit", "--allow-empty", "-m", "Initial commit"])
-            .current_dir(dir)
-            .status()
-            .expect("Failed to spawn git-commit")
-            .success());
+    fn init_repo(dir: &Path) {
+        run_git_command(&["init"], dir);
+        run_git_command(&["commit", "--allow-empty", "-m", "Initial commit"], dir);
     }
 
     fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
@@ -237,24 +237,16 @@ mod test {
 
         init_repo(tempdir.path());
 
-        assert!(process::Command::new("git")
-            .args(["remote", "add", "origin", &url])
-            .current_dir(tempdir.path())
-            .status()
-            .expect("Failed to spawn git-remote")
-            .success());
-
-        assert!(process::Command::new("git")
-            .args([
+        run_git_command(&["remote", "add", "origin", &url], tempdir.path());
+        run_git_command(
+            &[
                 "config",
                 "--add",
                 format!("http.{}.extraHeader", url).as_str(),
-                extra_header
-            ])
-            .current_dir(tempdir.path())
-            .status()
-            .expect("Failed to spawn git-config")
-            .success());
+                extra_header,
+            ],
+            tempdir.path(),
+        );
 
         tempdir
     }
