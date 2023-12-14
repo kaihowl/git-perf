@@ -200,7 +200,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::env::set_current_dir;
+    use std::env::{self, set_current_dir};
 
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
@@ -269,6 +269,10 @@ mod test {
         // TODO(kaihowl) not so great test as this fails with/without authorization
         // We only want to verify that a call on the server with the authorization header was
         // received.
+        // TODO(kaihowl) duplication, leaks out of this test
+        env::set_var("GIT_CONFIG_NOSYSTEM", "1");
+        env::set_var("GIT_AUTHOR_NAME", "testuser");
+        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
         pull(Some(repo_dir.path()))
             .expect_err("We have no valid git http server setup -> should fail");
     }
@@ -290,12 +294,17 @@ mod test {
             .respond_with(status_code(200)),
         );
 
+        // TODO(kaihowl) duplication, leaks out of this test
+        env::set_var("GIT_CONFIG_NOSYSTEM", "1");
+        env::set_var("GIT_AUTHOR_NAME", "testuser");
+        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
         push(Some(repo_dir.path()))
             .expect_err("We have no valid git http sever setup -> should fail");
     }
 
     #[test]
     fn test_get_head_revision() {
+        // TODO(kaihowl) this uses the current repo, not good
         let revision = get_head_revision().unwrap();
         assert!(
             &revision.chars().all(|c| c.is_ascii_alphanumeric()),
