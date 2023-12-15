@@ -213,9 +213,14 @@ mod test {
     fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")
             .args(args)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_AUTHOR_NAME", "testuser")
-            .env("GIT_AUTHOR_EMAIL", "testuser@example.com")
+            .envs([
+                ("GIT_CONFIG_NOSYSTEM", "true"),
+                ("GIT_CONFIG_GLOBAL", "/dev/null"),
+                ("GIT_AUTHOR_NAME", "testuser"),
+                ("GIT_AUTHOR_EMAIL", "testuser@example.com"),
+                ("GIT_COMMITTER_NAME", "testuser"),
+                ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
+            ])
             .current_dir(dir)
             .status()
             .expect("Failed to spawn git command")
@@ -270,9 +275,12 @@ mod test {
         // We only want to verify that a call on the server with the authorization header was
         // received.
         // TODO(kaihowl) duplication, leaks out of this test
-        env::set_var("GIT_CONFIG_NOSYSTEM", "1");
+        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
         env::set_var("GIT_AUTHOR_NAME", "testuser");
         env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+        env::set_var("GIT_COMMITTER_NAME", "testuser");
+        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
         pull(Some(repo_dir.path()))
             .expect_err("We have no valid git http server setup -> should fail");
     }
@@ -295,7 +303,7 @@ mod test {
         );
 
         // TODO(kaihowl) duplication, leaks out of this test
-        env::set_var("GIT_CONFIG_NOSYSTEM", "1");
+        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
         env::set_var("GIT_AUTHOR_NAME", "testuser");
         env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
         push(Some(repo_dir.path()))
