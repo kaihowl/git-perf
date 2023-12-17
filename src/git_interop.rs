@@ -228,19 +228,20 @@ mod test {
     }
 
     fn init_repo(dir: &Path) {
-        run_git_command(&["init"], dir);
+        run_git_command(&["init", "--initial-branch", "master"], dir);
         run_git_command(&["commit", "--allow-empty", "-m", "Initial commit"], dir);
     }
 
-    fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
+    fn dir_with_repo() -> TempDir {
         let tempdir = tempdir().unwrap();
-        dbg!(&tempdir);
-        dbg!(&extra_header);
-        dbg!(&origin_url);
+        init_repo(tempdir.path());
+        tempdir
+    }
+
+    fn dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) -> TempDir {
+        let tempdir = dir_with_repo();
 
         let url = origin_url.to_string();
-
-        init_repo(tempdir.path());
 
         run_git_command(&["remote", "add", "origin", &url], tempdir.path());
         run_git_command(
@@ -312,7 +313,8 @@ mod test {
 
     #[test]
     fn test_get_head_revision() {
-        // TODO(kaihowl) this uses the current repo, not good
+        let repo_dir = dir_with_repo();
+        set_current_dir(repo_dir.path()).expect("Failed to change dir");
         let revision = get_head_revision().unwrap();
         assert!(
             &revision.chars().all(|c| c.is_ascii_alphanumeric()),
