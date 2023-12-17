@@ -6,8 +6,19 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use itertools::Itertools;
+use thiserror::Error;
 
-fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String> {
+#[derive(PartialEq)]
+enum AllowFailure {
+    Yes,
+    No,
+}
+
+fn run_git(
+    args: &[&str],
+    working_dir: &Option<&Path>,
+    allow_failure: AllowFailure,
+) -> Result<String> {
     let working_dir = working_dir
         .map(PathBuf::from)
         .unwrap_or(current_dir().context("Failed to retrieve current directory")?);
@@ -23,7 +34,10 @@ fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Git command failed to run: {}", stderr);
+        dbg!(&stderr);
+        if allow_failure != AllowFailure::Yes {
+            bail!("Git command failed to run: {}", stderr);
+        }
     }
 
     Ok(String::from_utf8(output.stdout)?)
@@ -41,6 +55,7 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
             line,
         ],
         &None,
+        AllowFailure::No,
     )
     .context("Failed to add new measurement")?;
 
@@ -48,15 +63,20 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
 }
 
 pub fn get_head_revision() -> Result<String> {
-    let head = run_git(&["rev-parse", "HEAD"], &None).context("Failed to parse HEAD.")?;
+    let head = run_git(&["rev-parse", "HEAD"], &None, AllowFailure::No)
+        .context("Failed to parse HEAD.")?;
 
     Ok(head.trim().to_owned())
 }
 
 pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    run_git(&["fetch", "origin", "refs/notes/perf"], &work_dir)
-        .context("Failed to fetch performance measurements.")?;
+    run_git(
+        &["fetch", "origin", "refs/notes/perf"],
+        &work_dir,
+        AllowFailure::No,
+    )
+    .context("Failed to fetch performance measurements.")?;
 
     Ok(())
 }
@@ -73,22 +93,48 @@ pub fn reconcile() -> Result<()> {
             "FETCH_HEAD",
         ],
         &None,
+        AllowFailure::No,
     )
     .context("Failed to merge measurements with upstream")?;
     Ok(())
+}
+
+#[derive(Debug, Error)]
+enum PushError {
+    #[error("A ref failed to be pushed")]
+    RefFailedToPush,
 }
 
 pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) configure remote?
     // TODO(kaihowl) factor into constants
     // TODO(kaihowl) capture output
-    run_git(
-        &["push", "origin", "refs/notes/perf:refs/notes/perf"],
+    let output = run_git(
+        &[
+            "push",
+            "--porcelain",
+            "origin",
+            "refs/notes/perf:refs/notes/perf",
+        ],
         &work_dir,
+        AllowFailure::Yes,
     )
     .context("Failed to push performance measurements.")?;
 
-    Ok(())
+    dbg!(&output);
+
+    for line in output.lines() {
+        if !line.contains("refs/notes/perf:") {
+            continue;
+        }
+        if line.starts_with('!') {
+            bail!(PushError::RefFailedToPush);
+        }
+        return Ok(());
+    }
+
+    // TODO(kaihowl) missing error propagation
+    bail!("Some other error")
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
@@ -98,14 +144,23 @@ pub fn prune() -> Result<()> {
         bail!("Refusing to prune on a shallow repo")
     }
 
-    run_git(&["notes", "--ref", "refs/notes/perf", "prune"], &None).context("Failed to prune.")?;
+    run_git(
+        &["notes", "--ref", "refs/notes/perf", "prune"],
+        &None,
+        AllowFailure::No,
+    )
+    .context("Failed to prune.")?;
 
     Ok(())
 }
 
 fn is_shallow_repo() -> Result<bool> {
-    let output = run_git(&["rev-parse", "--is-shallow-repository"], &None)
-        .context("Failed to determine if repo is a shallow clone.")?;
+    let output = run_git(
+        &["rev-parse", "--is-shallow-repository"],
+        &None,
+        AllowFailure::No,
+    )
+    .context("Failed to determine if repo is a shallow clone.")?;
 
     Ok(output.starts_with("true"))
 }
@@ -127,6 +182,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             "HEAD",
         ],
         &None,
+        AllowFailure::No,
     )
     .context("Failed to retrieve commits")?;
 
