@@ -310,7 +310,9 @@ mod test {
         hermetic_git_env();
         let error = push(Some(repo_dir.path()));
         dbg!(&error);
-        error.expect_err("We have no valid git http sever setup -> should fail");
+        let error = error.unwrap_err().root_cause().to_string();
+        dbg!(&error);
+        assert!(error.contains("couldn't find remote ref"));
     }
 
     #[test]
