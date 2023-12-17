@@ -271,6 +271,7 @@ mod test {
         let test_server = Server::run();
         let repo_dir =
             dir_with_repo_and_customheader(test_server.url(""), "AUTHORIZATION: sometoken");
+        set_current_dir(repo_dir.path()).expect("Failed to change dir");
 
         test_server.expect(
             Expectation::matching(request::headers(matchers::contains((
@@ -294,7 +295,6 @@ mod test {
         let test_server = Server::run();
         let repo_dir =
             dir_with_repo_and_customheader(test_server.url(""), "AUTHORIZATION: someothertoken");
-
         set_current_dir(&repo_dir).expect("Failed to change dir");
 
         test_server.expect(
