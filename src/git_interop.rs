@@ -257,6 +257,15 @@ mod test {
         tempdir
     }
 
+    fn hermetic_git_env() {
+        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+        env::set_var("GIT_AUTHOR_NAME", "testuser");
+        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+        env::set_var("GIT_COMMITTER_NAME", "testuser");
+        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+    }
+
     #[test]
     fn test_customheader_push() {
         let test_server = Server::run();
@@ -275,13 +284,7 @@ mod test {
         // TODO(kaihowl) not so great test as this fails with/without authorization
         // We only want to verify that a call on the server with the authorization header was
         // received.
-        // TODO(kaihowl) duplication, leaks out of this test
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-        env::set_var("GIT_COMMITTER_NAME", "testuser");
-        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+        hermetic_git_env();
         pull(Some(repo_dir.path()))
             .expect_err("We have no valid git http server setup -> should fail");
     }
@@ -304,9 +307,7 @@ mod test {
         );
 
         // TODO(kaihowl) duplication, leaks out of this test
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+        hermetic_git_env();
         push(Some(repo_dir.path()))
             .expect_err("We have no valid git http sever setup -> should fail");
     }
