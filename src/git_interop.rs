@@ -308,8 +308,9 @@ mod test {
 
         // TODO(kaihowl) duplication, leaks out of this test
         hermetic_git_env();
-        push(Some(repo_dir.path()))
-            .expect_err("We have no valid git http sever setup -> should fail");
+        let error = push(Some(repo_dir.path()));
+        dbg!(&error);
+        error.expect_err("We have no valid git http sever setup -> should fail");
     }
 
     #[test]
