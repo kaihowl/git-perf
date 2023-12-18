@@ -116,7 +116,8 @@ pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
                 match values.deserialize(Some(&headers)) {
                     Ok(md) => Some(md),
                     Err(e) => {
-                        eprintln!("{e}, skipping record");
+                        let kvs = headers.iter().zip(values.iter()).collect_vec();
+                        eprintln!("{e}, skipping record, invalid data format: {kvs:?}");
                         None
                     }
                 }
