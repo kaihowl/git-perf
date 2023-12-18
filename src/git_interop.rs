@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+use backoff::{Error, ExponentialBackoff};
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -238,21 +239,28 @@ pub fn pull(work_dir: Option<&Path>) -> Result<()> {
 }
 
 pub fn push(work_dir: Option<&Path>) -> Result<()> {
-    let mut retries = 3;
+    // TODO(kaihowl) configure
+    let backoff = ExponentialBackoff::default();
 
-    // TODO(kaihowl) do actual, random backoff
     // TODO(kaihowl) check transient/permanent error
-    while retries > 0 {
-        if raw_push(work_dir).is_ok() {
-            return Ok(());
-        }
+    let op = || -> Result<(), backoff::Error<anyhow::Error>> {
+        raw_push(work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
+            Some(PushError::RefFailedToPush) => match pull(work_dir) {
+                Err(pull_error) => Error::permanent(pull_error),
+                Ok(_) => Error::transient(e),
+            },
+            None => Error::Permanent(e),
+        })
+    };
 
-        retries -= 1;
-        pull(work_dir)?;
-    }
+    backoff::retry(backoff, op).map_err(|e| match e {
+        Error::Permanent(e) => e.context("Permanent failure while pushing refs"),
+        Error::Transient { err, .. } => err.context("Timed out pushing refs"),
+    })?;
 
-    bail!("Retries exceeded.")
+    Ok(())
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
