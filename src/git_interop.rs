@@ -90,8 +90,8 @@ pub fn reconcile() -> Result<()> {
 
 #[derive(Debug, Error)]
 enum PushError {
-    #[error("A ref failed to be pushed")]
-    RefFailedToPush,
+    #[error("A ref failed to be pushed:\n{stdout}\n{stderr}")]
+    RefFailedToPush { stdout: String, stderr: String },
 }
 
 pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
@@ -112,7 +112,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
 
     match output {
         Ok(_) => Ok(()),
-        Err(GitError::ExecError { stdout, .. }) => {
+        Err(GitError::ExecError { stdout, stderr }) => {
             for line in stdout.lines() {
                 if !line.contains("refs/notes/perf:") {
                     continue;
@@ -121,8 +121,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
                     return Ok(());
                 }
             }
-            // TODO(kaihowl) error propagation
-            bail!(PushError::RefFailedToPush)
+            bail!(PushError::RefFailedToPush { stdout, stderr })
         }
         Err(e) => bail!(e),
     }
@@ -225,7 +224,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) check transient/permanent error
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
         raw_push(work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
-            Some(PushError::RefFailedToPush) => match pull(work_dir) {
+            Some(PushError::RefFailedToPush { .. }) => match pull(work_dir) {
                 Err(pull_error) => Error::permanent(pull_error),
                 Ok(_) => Error::transient(e),
             },
