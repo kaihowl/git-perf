@@ -28,7 +28,7 @@ tmpdir=$(mktemp -d)
 
 pushd "$tmpdir"
 
-trap 'rm -r $tmpdir' EXIT
+trap 'rm -rf $tmpdir' EXIT
 
 git clone "${directory}" test-repo
 
