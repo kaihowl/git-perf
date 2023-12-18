@@ -1,4 +1,3 @@
-- central place for branch name
 - create migration script for epoch and use different git notes branch for v2
 - release new version and test it out
 - remove dbg output

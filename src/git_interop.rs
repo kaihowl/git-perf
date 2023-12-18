@@ -40,12 +40,14 @@ fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitErro
     Ok(stdout)
 }
 
+const REFS_NOTES_BRANCH: &str = "refs/notes/perf";
+
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
     run_git(
         &[
             "notes",
             "--ref",
-            "refs/notes/perf",
+            REFS_NOTES_BRANCH,
             "append",
             "--no-separator",
             "-m",
@@ -65,7 +67,7 @@ pub fn get_head_revision() -> Result<String> {
 }
 pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    run_git(&["fetch", "origin", "refs/notes/perf"], &work_dir)
+    run_git(&["fetch", "origin", REFS_NOTES_BRANCH], &work_dir)
         .context("Failed to fetch performance measurements.")?;
 
     Ok(())
@@ -76,7 +78,7 @@ pub fn reconcile() -> Result<()> {
         &[
             "notes",
             "--ref",
-            "refs/notes/perf",
+            REFS_NOTES_BRANCH,
             "merge",
             "-s",
             "cat_sort_uniq",
@@ -103,7 +105,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
             "push",
             "--porcelain",
             "origin",
-            "refs/notes/perf:refs/notes/perf",
+            format!("{REFS_NOTES_BRANCH}:{REFS_NOTES_BRANCH}").as_str(),
         ],
         &work_dir,
     );
@@ -114,7 +116,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         Ok(_) => Ok(()),
         Err(GitError::ExecError { stdout, stderr }) => {
             for line in stdout.lines() {
-                if !line.contains("refs/notes/perf:") {
+                if !line.contains(format!("{REFS_NOTES_BRANCH}:").as_str()) {
                     continue;
                 }
                 if !line.starts_with('!') {
@@ -134,7 +136,7 @@ pub fn prune() -> Result<()> {
         bail!("Refusing to prune on a shallow repo")
     }
 
-    run_git(&["notes", "--ref", "refs/notes/perf", "prune"], &None).context("Failed to prune.")?;
+    run_git(&["notes", "--ref", REFS_NOTES_BRANCH, "prune"], &None).context("Failed to prune.")?;
 
     Ok(())
 }
@@ -159,7 +161,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             "--first-parent",
             "--pretty=--,%H,%D%n%N",
             "--decorate=full",
-            "--notes=refs/notes/perf",
+            format!("--notes={REFS_NOTES_BRANCH}").as_str(),
             "HEAD",
         ],
         &None,
