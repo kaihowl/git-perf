@@ -17,7 +17,7 @@ for _i in $(seq 1 100); do
   git add a
   git commit -m 'test' -q
   "${script_dir}/perf_test.py"
-  git notes --ref=perf add -F test.txt
+  git notes --ref=refs/notes/perf-v2 add -F test.txt
 done
 
 test_repo=$(pwd)
@@ -54,7 +54,7 @@ git remote add origin "file://${test_repo}"
 git fetch origin master --depth=1
 git checkout -b test-branch origin/master
 
-git notes --ref=perf add -m "test 12345678.0 123 os=ubuntu-20.04"
+git notes --ref=refs/notes/perf-v2 add -m "test 12345678.0 123 os=ubuntu-20.04"
 
 gtime -v git fetch origin --depth=1 refs/notes/perf
 gtime -v git notes --ref perf merge -s cat_sort_uniq FETCH_HEAD
