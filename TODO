@@ -1,6 +1,7 @@
 - random backoff / conflict resolution
   - distinguish permanent and transient errors in git_interop
 - release new version and test it out
+- remove dbg output
 - use dots instead of boxplots in reporter
 - use `context` instead of handrolled error types?
 - use field separator
