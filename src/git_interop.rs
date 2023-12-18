@@ -1,5 +1,6 @@
 use std::{
     env::current_dir,
+    io,
     path::{Path, PathBuf},
     process::{self},
 };
@@ -9,20 +10,17 @@ use backoff::{Error, ExponentialBackoff};
 use itertools::Itertools;
 use thiserror::Error;
 
-#[derive(PartialEq)]
-enum AllowFailure {
-    Yes,
-    No,
+#[derive(Debug, Error)]
+enum GitError {
+    #[error("Git failed to execute, stdout:\n{stdout}\nstderr:\n{stderr}")]
+    ExecError { stdout: String, stderr: String },
+
+    #[error("Failed to execute git command")]
+    IoError(#[from] io::Error),
 }
 
-fn run_git(
-    args: &[&str],
-    working_dir: &Option<&Path>,
-    allow_failure: AllowFailure,
-) -> Result<String> {
-    let working_dir = working_dir
-        .map(PathBuf::from)
-        .unwrap_or(current_dir().context("Failed to retrieve current directory")?);
+fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitError> {
+    let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
 
     let output = process::Command::new("git")
         // TODO(kaihowl) set correct encoding and lang?
@@ -30,18 +28,16 @@ fn run_git(
         .env("LC_ALL", "C")
         .current_dir(working_dir)
         .args(args)
-        .output()
-        .context("Failed to spawn git command")?;
+        .output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        dbg!(&stderr);
-        if allow_failure != AllowFailure::Yes {
-            bail!("Git command failed to run: {}", stderr);
-        }
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(GitError::ExecError { stdout, stderr });
     }
 
-    Ok(String::from_utf8(output.stdout)?)
+    Ok(stdout)
 }
 
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
@@ -56,7 +52,6 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
             line,
         ],
         &None,
-        AllowFailure::No,
     )
     .context("Failed to add new measurement")?;
 
@@ -64,20 +59,14 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
 }
 
 pub fn get_head_revision() -> Result<String> {
-    let head = run_git(&["rev-parse", "HEAD"], &None, AllowFailure::No)
-        .context("Failed to parse HEAD.")?;
+    let head = run_git(&["rev-parse", "HEAD"], &None).context("Failed to parse HEAD.")?;
 
     Ok(head.trim().to_owned())
 }
-
 pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    run_git(
-        &["fetch", "origin", "refs/notes/perf"],
-        &work_dir,
-        AllowFailure::No,
-    )
-    .context("Failed to fetch performance measurements.")?;
+    run_git(&["fetch", "origin", "refs/notes/perf"], &work_dir)
+        .context("Failed to fetch performance measurements.")?;
 
     Ok(())
 }
@@ -94,7 +83,6 @@ pub fn reconcile() -> Result<()> {
             "FETCH_HEAD",
         ],
         &None,
-        AllowFailure::No,
     )
     .context("Failed to merge measurements with upstream")?;
     Ok(())
@@ -118,24 +106,26 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
             "refs/notes/perf:refs/notes/perf",
         ],
         &work_dir,
-        AllowFailure::Yes,
-    )
-    .context("Failed to push performance measurements.")?;
+    );
 
     dbg!(&output);
 
-    for line in output.lines() {
-        if !line.contains("refs/notes/perf:") {
-            continue;
+    match output {
+        Ok(_) => Ok(()),
+        Err(GitError::ExecError { stdout, .. }) => {
+            for line in stdout.lines() {
+                if !line.contains("refs/notes/perf:") {
+                    continue;
+                }
+                if !line.starts_with('!') {
+                    return Ok(());
+                }
+            }
+            // TODO(kaihowl) error propagation
+            bail!(PushError::RefFailedToPush)
         }
-        if line.starts_with('!') {
-            bail!(PushError::RefFailedToPush);
-        }
-        return Ok(());
+        Err(e) => bail!(e),
     }
-
-    // TODO(kaihowl) missing error propagation
-    bail!("Some other error")
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
@@ -145,23 +135,14 @@ pub fn prune() -> Result<()> {
         bail!("Refusing to prune on a shallow repo")
     }
 
-    run_git(
-        &["notes", "--ref", "refs/notes/perf", "prune"],
-        &None,
-        AllowFailure::No,
-    )
-    .context("Failed to prune.")?;
+    run_git(&["notes", "--ref", "refs/notes/perf", "prune"], &None).context("Failed to prune.")?;
 
     Ok(())
 }
 
 fn is_shallow_repo() -> Result<bool> {
-    let output = run_git(
-        &["rev-parse", "--is-shallow-repository"],
-        &None,
-        AllowFailure::No,
-    )
-    .context("Failed to determine if repo is a shallow clone.")?;
+    let output = run_git(&["rev-parse", "--is-shallow-repository"], &None)
+        .context("Failed to determine if repo is a shallow clone.")?;
 
     Ok(output.starts_with("true"))
 }
@@ -183,7 +164,6 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             "HEAD",
         ],
         &None,
-        AllowFailure::No,
     )
     .context("Failed to retrieve commits")?;
 
