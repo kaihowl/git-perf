@@ -35,7 +35,6 @@ git perf audit -m timer -s myselector=test && exit 1
 git perf add -m timer 4 -k myselector=other
 git perf audit -m timer -s myselector=test && exit 1
 git perf add -m timer 4 -k myselector=test
-git log --format=fuller --notes=refs/notes/perf
 git perf audit -m timer -s myselector=test
 
 exit 0
