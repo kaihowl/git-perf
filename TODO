@@ -1,3 +1,50 @@
+- fix measurement bug:
+  - different resolution for measure function?
+    Head: μ: 154091 σ: 0 n: 1
+    Tail: μ: 162314727.27272728 σ: 18042367.461566173 n: 11
+    precision now is microseconds, but it was in nanoseconds so far
+    change precision
+  - observation: stddev bigger than mean for zsh measurement on dotfiles
+      https://github.com/kaihowl/dotfiles/actions/runs/7252115002/job/19755899076#step:4:4066
+      ```
+      ubuntu-22.04, zsh
+        [src/audit.rs:49] &head_summary = Stats {
+            mean: 66519.0,
+            stddev: 0.0,
+            len: 1,
+        }
+        [src/audit.rs:50] &tail_summary = Stats {
+            mean: 156843735.02941176,
+            stddev: 161231585.37070373,
+            len: 34,
+        }
+        ```
+        Huge discrepancy in the measured values already. Too bad.
+- fix flaky test
+---- git_interop::test::test_customheader_pull stdout ----
+[src/git_interop.rs:113] &output = Err(
+    ExecError {
+        stdout: "",
+        stderr: "error: src refspec refs/notes/perf-v2 does not match any\nerror: failed to push some refs to 'http://[::1]:43457/'\n",
+    },
+)
+[src/git_interop.rs:357] &error = Err(
+    Error {
+        context: "Permanent failure while pushing refs",
+        source: Error {
+            context: "Failed to fetch performance measurements.",
+            source: IoError(
+                Os {
+                    code: 2,
+                    kind: NotFound,
+                    message: "No such file or directory",
+                },
+            ),
+        },
+    },
+)
+
+
 - release new version and test it out
 - remove dbg output
 - use dots instead of boxplots in reporter
@@ -8,3 +55,11 @@
 - take std variance per epoch to allow catching staggered performance regressions?
 - use stream / iterator for measurements (see cb261dfb for a start)
   - first define maximum size for measurements and measure if there is any improvement
+- allow units in measurements?
+- flag huge stddev? / show stddev in results?
+- allow piping without panicking
+  git perf report -o - | cut -f5 -d, | head
+  thread 'main' panicked at src/reporting.rs:252:14:
+  Could not write to stdout: Os { code: 32, kind: BrokenPipe, message: "Broken pipe" }
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
