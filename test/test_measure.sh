@@ -23,7 +23,7 @@ git perf measure -m test-measure -- does-not-exist && exit 1
 
 echo Valid command, repeated measurements
 cd_temp_repo
-git perf measure -m test-emasure -n 5 -- true
+git perf measure -m test-measure -n 5 -- true
 num_measurements=$(git perf report -o - | wc -l)
 [[ ${num_measurements} -eq 5 ]] || exit 1
 
