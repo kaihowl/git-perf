@@ -26,7 +26,7 @@ pub fn measure(
             .ok_or("TODO(kaihowl) running error")
             .expect("TODO(kaihowl)");
         let duration = start.elapsed();
-        let duration_usec = duration.as_micros() as f64;
+        let duration_usec = duration.as_nanos() as f64;
         measurement_storage::add(measurement, duration_usec, key_values)?;
     }
     Ok(())
