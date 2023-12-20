@@ -36,11 +36,7 @@ struct PlotlyReporter {
 
 impl PlotlyReporter {
     fn new() -> PlotlyReporter {
-        let config = Configuration::default()
-            .static_plot(false)
-            .autosizable(true)
-            .responsive(true)
-            .fill_frame(true);
+        let config = Configuration::default().responsive(true).fill_frame(true);
         let mut plot = Plot::new();
         plot.set_configuration(config);
         PlotlyReporter { plot }
