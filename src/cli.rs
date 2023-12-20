@@ -40,7 +40,7 @@ struct CliReportHistory {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Measure the runtime of the supplied command
+    /// Measure the runtime of the supplied command (in nanoseconds)
     Measure {
         /// Repetitions
         #[arg(short = 'n', long, value_parser=clap::value_parser!(u16).range(1..), default_value = "1")]
