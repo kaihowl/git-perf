@@ -9,7 +9,7 @@ use anyhow::{bail, Result};
 use itertools::Itertools;
 use plotly::{
     common::{Font, LegendGroupTitle, Title},
-    layout::Axis,
+    layout::{Axis, Legend},
     BoxPlot, Layout, Plot,
 };
 use serde::Serialize;
@@ -50,10 +50,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         let x_axis = Axis::new()
             .tick_values(commit_nrs)
             .tick_text(short_hashes)
+            .tick_angle(45.0)
             .tick_font(Font::new().family("monospace"));
         let layout = Layout::new()
-            .title(Title::new("Something, something"))
-            .x_axis(x_axis);
+            .title(Title::new("Performance Measurements"))
+            .x_axis(x_axis)
+            .legend(Legend::new().orientation(plotly::common::Orientation::Horizontal));
+
         self.plot.set_layout(layout);
     }
 
