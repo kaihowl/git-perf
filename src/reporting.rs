@@ -10,7 +10,7 @@ use itertools::Itertools;
 use plotly::{
     common::{Font, LegendGroupTitle, Title},
     layout::{Axis, Legend},
-    BoxPlot, Layout, Plot,
+    BoxPlot, Configuration, Layout, Plot,
 };
 use serde::Serialize;
 
@@ -36,7 +36,14 @@ struct PlotlyReporter {
 
 impl PlotlyReporter {
     fn new() -> PlotlyReporter {
-        PlotlyReporter { plot: Plot::new() }
+        let config = Configuration::default()
+            .static_plot(false)
+            .autosizable(true)
+            .responsive(true)
+            .fill_frame(true);
+        let mut plot = Plot::new();
+        plot.set_configuration(config);
+        PlotlyReporter { plot }
     }
 }
 
@@ -88,11 +95,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
     }
 
     fn as_bytes(&self) -> Vec<u8> {
-        // TODO(kaihowl) hack, use proper configuration
-        let header = r#"<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
-          <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>"#;
-        let plot = self.plot.to_inline_html(None);
-        format!("{header}\n{plot}").as_bytes().to_vec()
+        self.plot.to_html().as_bytes().to_vec()
     }
 }
 
