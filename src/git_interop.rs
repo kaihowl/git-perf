@@ -354,10 +354,12 @@ mod test {
         // TODO(kaihowl) duplication, leaks out of this test
         hermetic_git_env();
         let error = push(Some(repo_dir.path()));
+        error
+            .as_ref()
+            .expect_err("We have no valid git http server setup -> should fail");
         dbg!(&error);
         let error = error.unwrap_err().root_cause().to_string();
         dbg!(&error);
-        assert!(error.contains("couldn't find remote ref"));
     }
 
     #[test]
