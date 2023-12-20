@@ -5,10 +5,11 @@ use clap::{CommandFactory, Subcommand};
 use std::path::PathBuf;
 
 use crate::audit;
+use crate::basic_measure::measure;
 use crate::config::bump_epoch;
 use crate::data::ReductionFunc;
 use crate::git_interop::{prune, pull, push};
-use crate::measurement_storage::{add, measure};
+use crate::measurement_storage::add;
 use crate::reporting::report;
 
 #[derive(Parser)]

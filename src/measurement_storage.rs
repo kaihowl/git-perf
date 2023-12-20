@@ -2,8 +2,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use std::{
     collections::HashMap,
-    process,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
@@ -68,33 +67,5 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
 
     add_note_line_to_head(&serialized)?;
 
-    Ok(())
-}
-
-pub fn measure(
-    measurement: &str,
-    repetitions: u16,
-    command: &[String],
-    key_values: &[(String, String)],
-) -> Result<()> {
-    let exe = command.first().unwrap();
-    let args = &command[1..];
-    for _ in 0..repetitions {
-        let mut process = process::Command::new(exe);
-        process.args(args);
-        let start = Instant::now();
-        let output = process
-            .output()
-            .expect("Command failed to spawn TODO(kaihowl)");
-        output
-            .status
-            .success()
-            .then_some(())
-            .ok_or("TODO(kaihowl) running error")
-            .expect("TODO(kaihowl)");
-        let duration = start.elapsed();
-        let duration_usec = duration.as_micros() as f64;
-        add(measurement, duration_usec, key_values)?;
-    }
     Ok(())
 }
