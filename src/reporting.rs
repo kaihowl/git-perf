@@ -58,7 +58,11 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         let layout = Layout::new()
             .title(Title::new("Performance Measurements"))
             .x_axis(x_axis)
-            .legend(Legend::new().orientation(plotly::common::Orientation::Horizontal));
+            .legend(
+                Legend::new()
+                    .group_click(plotly::layout::GroupClick::ToggleItem)
+                    .orientation(plotly::common::Orientation::Horizontal),
+            );
 
         self.plot.set_layout(layout);
     }
