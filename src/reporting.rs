@@ -10,7 +10,7 @@ use itertools::Itertools;
 use plotly::{
     common::{Font, LegendGroupTitle, Title},
     layout::{Axis, Legend},
-    BoxPlot, Configuration, Layout, Plot,
+    BoxPlot, Configuration, Layout, Plot, Scatter, Trace,
 };
 use serde::Serialize;
 
@@ -40,6 +40,50 @@ impl PlotlyReporter {
         let mut plot = Plot::new();
         plot.set_configuration(config);
         PlotlyReporter { plot }
+    }
+}
+
+trait NameAndLegend: Trace {
+    fn legend_name(&mut self, name: &str) -> Box<dyn NameAndLegend>;
+    fn legend_group_with_title(&mut self, name: &str) -> Box<dyn NameAndLegend>;
+    fn as_trace(self) -> Box<dyn Trace>;
+}
+
+impl<X, Y> NameAndLegend for BoxPlot<X, Y>
+where
+    X: Serialize + Clone,
+    Y: Serialize + Clone,
+{
+    fn legend_name(&mut self, name: &str) -> Box<dyn NameAndLegend> {
+        self.name(name)
+    }
+
+    fn legend_group_with_title(&mut self, name: &str) -> Box<dyn NameAndLegend> {
+        self.legend_group(name)
+            .legend_group_title(LegendGroupTitle::new(name))
+    }
+
+    fn as_trace(self) -> Box<dyn Trace> {
+        Box::new(self)
+    }
+}
+
+impl<X, Y> NameAndLegend for Scatter<X, Y>
+where
+    X: Serialize + Clone,
+    Y: Serialize + Clone,
+{
+    fn legend_name(&mut self, name: &str) -> Box<dyn NameAndLegend> {
+        self.name(name)
+    }
+
+    fn legend_group_with_title(&mut self, name: &str) -> Box<dyn NameAndLegend> {
+        self.legend_group(name)
+            .legend_group_title(LegendGroupTitle::new(name))
+    }
+
+    fn as_trace(self) -> Box<dyn Trace> {
+        Box::new(self)
     }
 }
 
@@ -82,16 +126,29 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             .map(|(i, m)| (i, m.val))
             .unzip();
 
+        let num_commits = x.iter().unique().count();
+        enum PlotType {
+            Line,
+            Box,
+        }
+
+        let trace: Box<dyn NameAndLegend> = if num_commits == y.len()
+        // there is a single measurement per commit
+        {
+            plotly::Scatter::new(x, y)
+        } else {
+            plotly::BoxPlot::new_xy(x, y)
+        };
+
         let measurement_name = measurement_name.expect("No measurements supplied for trace");
         let trace = if let Some(group_value) = group_value {
-            BoxPlot::new_xy(x, y)
-                .name(group_value)
-                .legend_group(measurement_name)
-                .legend_group_title(LegendGroupTitle::new(measurement_name))
+            trace
+                .legend_name(&group_value)
+                .legend_group_with_title(&measurement_name)
         } else {
-            BoxPlot::new_xy(x, y).name(measurement_name)
+            trace.legend_name(&measurement_name)
         };
-        self.plot.add_trace(trace);
+        self.plot.add_trace(trace.as_trace());
     }
 
     fn as_bytes(&self) -> Vec<u8> {
