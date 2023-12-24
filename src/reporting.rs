@@ -43,47 +43,45 @@ impl PlotlyReporter {
     }
 }
 
-trait NameAndLegend: Trace {
-    fn legend_name(&mut self, name: &str) -> Box<dyn NameAndLegend>;
-    fn legend_group_with_title(&mut self, name: &str) -> Box<dyn NameAndLegend>;
-    fn as_trace(self) -> Box<dyn Trace>;
+enum TracesWithLegends<X, Y>
+where
+    X: Serialize + Clone + 'static,
+    Y: Serialize + Clone + 'static,
+{
+    BoxPlot(BoxPlot<X, Y>),
+    Scatter(Scatter<X, Y>),
 }
 
-impl<X, Y> NameAndLegend for BoxPlot<X, Y>
+impl<X, Y> TracesWithLegends<X, Y>
 where
     X: Serialize + Clone,
     Y: Serialize + Clone,
 {
-    fn legend_name(&mut self, name: &str) -> Box<dyn NameAndLegend> {
-        self.name(name)
+    fn legend_name(self, name: &str) -> TracesWithLegends<X, Y> {
+        match self {
+            TracesWithLegends::BoxPlot(t) => TracesWithLegends::BoxPlot(*t.name(name)),
+            TracesWithLegends::Scatter(t) => TracesWithLegends::Scatter(*t.name(name)),
+        }
     }
 
-    fn legend_group_with_title(&mut self, name: &str) -> Box<dyn NameAndLegend> {
-        self.legend_group(name)
-            .legend_group_title(LegendGroupTitle::new(name))
-    }
-
-    fn as_trace(self) -> Box<dyn Trace> {
-        Box::new(self)
-    }
-}
-
-impl<X, Y> NameAndLegend for Scatter<X, Y>
-where
-    X: Serialize + Clone,
-    Y: Serialize + Clone,
-{
-    fn legend_name(&mut self, name: &str) -> Box<dyn NameAndLegend> {
-        self.name(name)
-    }
-
-    fn legend_group_with_title(&mut self, name: &str) -> Box<dyn NameAndLegend> {
-        self.legend_group(name)
-            .legend_group_title(LegendGroupTitle::new(name))
+    fn legend_group_with_title(self, name: &str) -> TracesWithLegends<X, Y> {
+        match self {
+            TracesWithLegends::BoxPlot(t) => TracesWithLegends::BoxPlot(
+                *t.legend_group(name)
+                    .legend_group_title(LegendGroupTitle::new(name)),
+            ),
+            TracesWithLegends::Scatter(t) => TracesWithLegends::Scatter(
+                *t.legend_group(name)
+                    .legend_group_title(LegendGroupTitle::new(name)),
+            ),
+        }
     }
 
     fn as_trace(self) -> Box<dyn Trace> {
-        Box::new(self)
+        match self {
+            TracesWithLegends::BoxPlot(t) => Box::new(t),
+            TracesWithLegends::Scatter(t) => Box::new(t),
+        }
     }
 }
 
@@ -127,26 +125,22 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             .unzip();
 
         let num_commits = x.iter().unique().count();
-        enum PlotType {
-            Line,
-            Box,
-        }
 
-        let trace: Box<dyn NameAndLegend> = if num_commits == y.len()
+        let trace: TracesWithLegends<_, _> = if num_commits == y.len()
         // there is a single measurement per commit
         {
-            plotly::Scatter::new(x, y)
+            TracesWithLegends::Scatter(*plotly::Scatter::new(x, y))
         } else {
-            plotly::BoxPlot::new_xy(x, y)
+            TracesWithLegends::BoxPlot(*plotly::BoxPlot::new_xy(x, y))
         };
 
         let measurement_name = measurement_name.expect("No measurements supplied for trace");
         let trace = if let Some(group_value) = group_value {
             trace
-                .legend_name(&group_value)
-                .legend_group_with_title(&measurement_name)
+                .legend_name(group_value)
+                .legend_group_with_title(measurement_name)
         } else {
-            trace.legend_name(&measurement_name)
+            trace.legend_name(measurement_name)
         };
         self.plot.add_trace(trace.as_trace());
     }
