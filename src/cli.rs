@@ -89,6 +89,10 @@ enum Commands {
         /// Create individual traces in the graph by grouping with the value of this selector
         #[arg(short, long, value_parser=parse_spaceless_string)]
         separate_by: Option<String>,
+
+        /// What to aggregate the measurements in each group with
+        #[arg(short, long, default_value = "min")]
+        aggregate_by: Option<ReductionFunc>,
     },
 
     /// For a given measurement, check perfomance deviations of the HEAD commit
@@ -186,12 +190,14 @@ pub fn handle_calls() -> Result<()> {
             report_history,
             measurement,
             key_value,
+            aggregate_by,
         } => Ok(report(
             output,
             separate_by,
             report_history.max_count,
             &measurement,
             &key_value,
+            aggregate_by,
         )?),
         Commands::Audit {
             measurement,

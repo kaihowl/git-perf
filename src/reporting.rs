@@ -16,7 +16,7 @@ use serde::Serialize;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
-    data::MeasurementData,
+    data::{MeasurementData, ReductionFunc},
     measurement_retrieval::{self, Commit},
 };
 
@@ -230,6 +230,7 @@ pub fn report(
     num_commits: usize,
     measurement_names: &[String],
     key_values: &[(String, String)],
+    aggregate_by: Option<ReductionFunc>,
 ) -> Result<()> {
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
@@ -248,17 +249,13 @@ pub fn report(
             .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
     };
 
-    let indexed_measurements = commits.iter().enumerate().flat_map(|(index, commit)| {
-        commit
-            .measurements
-            .iter()
-            .map(move |m| (index, m))
-            .filter(|(_, m)| relevant(m))
-    });
+    let relevant_measurements = commits
+        .iter()
+        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
 
-    let unique_measurement_names: Vec<_> = indexed_measurements
+    let unique_measurement_names: Vec<_> = relevant_measurements
         .clone()
-        .map(|(_, m)| &m.name)
+        .flat_map(|m| m.map(|m| &m.name))
         .unique()
         .collect();
 
@@ -267,18 +264,20 @@ pub fn report(
     }
 
     for measurement_name in unique_measurement_names {
-        let filtered_measurements = indexed_measurements
+        let filtered_measurements = relevant_measurements
             .clone()
-            .filter(|(_i, m)| m.name == *measurement_name);
+            .map(|ms| ms.filter(|m| m.name == *measurement_name));
 
         let group_values = if let Some(separate_by) = &separate_by {
             filtered_measurements
                 .clone()
-                .flat_map(|(_, m)| {
-                    m.key_values
-                        .iter()
-                        .filter(|kv| kv.0 == separate_by)
-                        .map(|kv| kv.1)
+                .flat_map(|ms| {
+                    ms.flat_map(|m| {
+                        m.key_values
+                            .iter()
+                            .filter(|(k, _v)| *k == separate_by)
+                            .map(|(_k, v)| v)
+                    })
                 })
                 .unique()
                 .map(|val| (Some(separate_by), Some(val)))
@@ -294,10 +293,14 @@ pub fn report(
         for (group_key, group_value) in group_values {
             let trace_measurements: Vec<_> = filtered_measurements
                 .clone()
-                .filter(|(_, m)| {
-                    group_key
-                        .map(|key| m.key_values.get(key) == group_value)
-                        .unwrap_or(true)
+                .enumerate()
+                .flat_map(|(i, ms)| {
+                    ms.filter(|m| {
+                        group_key
+                            .map(|gk| m.key_values.get(gk) == group_value)
+                            .unwrap_or(true)
+                    })
+                    .map(move |m| (i, m))
                 })
                 .collect();
             plot.add_trace(trace_measurements, group_value);
