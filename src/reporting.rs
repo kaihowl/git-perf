@@ -312,7 +312,7 @@ pub fn report(
                 //         .collect_vec();
                 // }
             } else {
-                let trace_measurements: Vec<_> = filtered_measurements
+                let trace_measurements: Vec<_> = group_measurements
                     .clone()
                     .enumerate()
                     .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
