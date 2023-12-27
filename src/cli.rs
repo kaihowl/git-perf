@@ -91,7 +91,7 @@ enum Commands {
         separate_by: Option<String>,
 
         /// What to aggregate the measurements in each group with
-        #[arg(short, long, default_value = "min")]
+        #[arg(short, long)]
         aggregate_by: Option<ReductionFunc>,
     },
 
