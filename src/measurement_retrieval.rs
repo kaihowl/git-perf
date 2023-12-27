@@ -8,7 +8,7 @@ use anyhow::Result;
 
 // TODO(kaihowl) oh god naming
 pub trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
-    fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary>;
+    fn reduce_by(self, fun: ReductionFunc) -> Option<MeasurementSummary>;
 }
 
 pub fn summarize_measurements<'a, F>(
@@ -60,7 +60,7 @@ impl<'a, T> ReductionFuncIterator<'a> for T
 where
     T: Iterator<Item = &'a MeasurementData>,
 {
-    fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary> {
+    fn reduce_by(self, fun: ReductionFunc) -> Option<MeasurementSummary> {
         let mut peekable = self.peekable();
         let expected_epoch = peekable.peek().map(|m| m.epoch);
         let mut vals = peekable.map(|m| {
