@@ -17,7 +17,7 @@ use serde::Serialize;
 // TODO(kaihowl) find central place for the data structures
 use crate::{
     data::{MeasurementData, ReductionFunc},
-    measurement_retrieval::{self, Commit},
+    measurement_retrieval::{self, Commit, ReductionFuncIterator},
 };
 
 trait Reporter<'a> {
@@ -293,19 +293,32 @@ pub fn report(
         }
 
         for (group_key, group_value) in group_values {
-            let trace_measurements: Vec<_> = filtered_measurements
-                .clone()
-                .enumerate()
-                .flat_map(|(i, ms)| {
-                    ms.filter(|m| {
-                        group_key
-                            .map(|gk| m.key_values.get(gk) == group_value)
-                            .unwrap_or(true)
-                    })
-                    .map(move |m| (i, m))
+            let group_measurements = filtered_measurements.clone().map(|ms| {
+                ms.filter(|m| {
+                    group_key
+                        .map(|gk| m.key_values.get(gk) == group_value)
+                        .unwrap_or(true)
                 })
-                .collect();
-            plot.add_trace(trace_measurements, measurement_name, group_value);
+            });
+
+            if let Some(reduction_func) = aggregate_by {
+                println!("reduction_func: {reduction_func:?}");
+                todo!("TODO(kaihowl)")
+                // if let Some(reduc_func) = aggregate_by {
+                //     measurements = measurements
+                //         .into_iter()
+                //         .reduce_by(reduc_func)
+                //         .into_iter()
+                //         .collect_vec();
+                // }
+            } else {
+                let trace_measurements: Vec<_> = filtered_measurements
+                    .clone()
+                    .enumerate()
+                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
+                    .collect();
+                plot.add_trace(trace_measurements, measurement_name, group_value);
+            }
         }
     }
 

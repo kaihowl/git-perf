@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 
 // TODO(kaihowl) oh god naming
-trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
+pub trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
     fn reduce_by(&mut self, fun: ReductionFunc) -> Option<MeasurementSummary>;
 }
 
