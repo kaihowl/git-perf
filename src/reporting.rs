@@ -16,7 +16,7 @@ use serde::Serialize;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
-    data::{MeasurementData, ReductionFunc},
+    data::{MeasurementData, MeasurementSummary, ReductionFunc},
     measurement_retrieval::{self, Commit, ReductionFuncIterator},
 };
 
@@ -25,6 +25,12 @@ trait Reporter<'a> {
     fn add_trace(
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        measurement_name: &str,
+        group_value: Option<&String>,
+    );
+    fn add_summarized_trace(
+        &mut self,
+        indexed_measurements: Vec<(usize, MeasurementSummary)>,
         measurement_name: &str,
         group_value: Option<&String>,
     );
@@ -43,6 +49,40 @@ impl PlotlyReporter {
         let mut plot = Plot::new();
         plot.set_configuration(config);
         PlotlyReporter { plot, size: 0 }
+    }
+
+    fn add_val_trace(
+        &mut self,
+        indexed_measurements: Vec<(usize, f64)>,
+        measurement_name: &str,
+        group_value: Option<&String>,
+    ) {
+        assert!(!indexed_measurements.is_empty());
+
+        // TODO(kaihowl) split this up by the two trait methods instead
+        let (x, y): (Vec<usize>, Vec<f64>) = indexed_measurements
+            .iter()
+            .map(|(i, m)| (self.size - i - 1, m))
+            .unzip();
+
+        let num_commits = x.iter().unique().count();
+
+        let trace: TracesWithLegends<_, _> = if num_commits == y.len()
+        // there is a single measurement per commit
+        {
+            TracesWithLegends::Scatter(*plotly::Scatter::new(x, y))
+        } else {
+            TracesWithLegends::BoxPlot(*plotly::BoxPlot::new_xy(x, y))
+        };
+
+        let trace = if let Some(group_value) = group_value {
+            trace
+                .legend_name(group_value)
+                .legend_group_with_title(measurement_name)
+        } else {
+            trace.legend_name(measurement_name)
+        };
+        self.plot.add_trace(trace.as_trace());
     }
 }
 
@@ -119,31 +159,30 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         measurement_name: &str,
         group_value: Option<&String>,
     ) {
-        assert!(!indexed_measurements.is_empty());
+        self.add_val_trace(
+            indexed_measurements
+                .into_iter()
+                .map(|(i, m)| (i, m.val))
+                .collect_vec(),
+            measurement_name,
+            group_value,
+        );
+    }
 
-        let (x, y): (Vec<usize>, Vec<f64>) = indexed_measurements
-            .iter()
-            .map(|(i, m)| (self.size - i - 1, m.val))
-            .unzip();
-
-        let num_commits = x.iter().unique().count();
-
-        let trace: TracesWithLegends<_, _> = if num_commits == y.len()
-        // there is a single measurement per commit
-        {
-            TracesWithLegends::Scatter(*plotly::Scatter::new(x, y))
-        } else {
-            TracesWithLegends::BoxPlot(*plotly::BoxPlot::new_xy(x, y))
-        };
-
-        let trace = if let Some(group_value) = group_value {
-            trace
-                .legend_name(group_value)
-                .legend_group_with_title(measurement_name)
-        } else {
-            trace.legend_name(measurement_name)
-        };
-        self.plot.add_trace(trace.as_trace());
+    fn add_summarized_trace(
+        &mut self,
+        indexed_measurements: Vec<(usize, MeasurementSummary)>,
+        measurement_name: &str,
+        group_value: Option<&String>,
+    ) {
+        self.add_val_trace(
+            indexed_measurements
+                .into_iter()
+                .map(|(i, m)| (i, m.val))
+                .collect_vec(),
+            measurement_name,
+            group_value,
+        )
     }
 
     fn as_bytes(&self) -> Vec<u8> {
@@ -203,6 +242,15 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         writer
             .into_inner()
             .expect("serialization error TODO(kaihowl)")
+    }
+
+    fn add_summarized_trace(
+        &mut self,
+        indexed_measurements: Vec<(usize, MeasurementSummary)>,
+        measurement_name: &str,
+        group_value: Option<&String>,
+    ) {
+        todo!()
     }
 }
 
@@ -302,15 +350,16 @@ pub fn report(
             });
 
             if let Some(reduction_func) = aggregate_by {
-                println!("reduction_func: {reduction_func:?}");
-                todo!("TODO(kaihowl)")
-                // if let Some(reduc_func) = aggregate_by {
-                //     measurements = measurements
-                //         .into_iter()
-                //         .reduce_by(reduc_func)
-                //         .into_iter()
-                //         .collect_vec();
-                // }
+                let trace_measurements = group_measurements
+                    .clone()
+                    .enumerate()
+                    .flat_map(move |(i, ms)| {
+                        ms.reduce_by(reduction_func)
+                            .into_iter()
+                            .map(move |m| (i, m))
+                    })
+                    .collect_vec();
+                plot.add_summarized_trace(trace_measurements, measurement_name, group_value);
             } else {
                 let trace_measurements: Vec<_> = group_measurements
                     .clone()
