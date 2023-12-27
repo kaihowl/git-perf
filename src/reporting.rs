@@ -25,6 +25,7 @@ trait Reporter<'a> {
     fn add_trace(
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        measurement_name: &str,
         group_value: Option<&String>,
     );
     fn as_bytes(&self) -> Vec<u8>;
@@ -115,16 +116,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
     fn add_trace(
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        measurement_name: &str,
         group_value: Option<&String>,
     ) {
-        let mut measurement_name = None;
+        assert!(!indexed_measurements.is_empty());
 
         let (x, y): (Vec<usize>, Vec<f64>) = indexed_measurements
             .iter()
-            .inspect(|(_, md)| {
-                // TODO(kaihowl)
-                measurement_name = Some(&md.name);
-            })
             .map(|(i, m)| (self.size - i - 1, m.val))
             .unzip();
 
@@ -138,7 +136,6 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             TracesWithLegends::BoxPlot(*plotly::BoxPlot::new_xy(x, y))
         };
 
-        let measurement_name = measurement_name.expect("No measurements supplied for trace");
         let trace = if let Some(group_value) = group_value {
             trace
                 .legend_name(group_value)
@@ -181,6 +178,7 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     fn add_trace(
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+        _measurement_name: &str,
         _group_value: Option<&String>,
     ) {
         self.indexed_measurements
@@ -307,7 +305,7 @@ pub fn report(
                     .map(move |m| (i, m))
                 })
                 .collect();
-            plot.add_trace(trace_measurements, group_value);
+            plot.add_trace(trace_measurements, measurement_name, group_value);
         }
     }
 
