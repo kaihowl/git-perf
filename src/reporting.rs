@@ -32,6 +32,8 @@ trait Reporter<'a> {
 
 struct PlotlyReporter {
     plot: Plot,
+    // TODO(kaihowl) hack until we can auto_range 'reverse' the axis in plotly directly
+    size: usize,
 }
 
 impl PlotlyReporter {
@@ -39,7 +41,7 @@ impl PlotlyReporter {
         let config = Configuration::default().responsive(true).fill_frame(true);
         let mut plot = Plot::new();
         plot.set_configuration(config);
-        PlotlyReporter { plot }
+        PlotlyReporter { plot, size: 0 }
     }
 }
 
@@ -87,7 +89,8 @@ where
 
 impl<'a> Reporter<'a> for PlotlyReporter {
     fn add_commits(&mut self, commits: &'a [Commit]) {
-        let enumerated_commits = commits.iter().enumerate();
+        let enumerated_commits = commits.iter().rev().enumerate();
+        self.size = commits.len();
 
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
             .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
@@ -115,13 +118,14 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         group_value: Option<&String>,
     ) {
         let mut measurement_name = None;
+
         let (x, y): (Vec<usize>, Vec<f64>) = indexed_measurements
-            .into_iter()
+            .iter()
             .inspect(|(_, md)| {
                 // TODO(kaihowl)
                 measurement_name = Some(&md.name);
             })
-            .map(|(i, m)| (i, m.val))
+            .map(|(i, m)| (self.size - i - 1, m.val))
             .unzip();
 
         let num_commits = x.iter().unique().count();
