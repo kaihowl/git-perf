@@ -110,8 +110,6 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         &work_dir,
     );
 
-    dbg!(&output);
-
     match output {
         Ok(_) => Ok(()),
         Err(GitError::ExecError { stdout, stderr }) => {

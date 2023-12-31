@@ -1,4 +1,3 @@
-- remove dbg output
 - use `context` instead of handrolled error types?
 - use field separator
   - create migration script and use different git notes branch for v2

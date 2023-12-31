@@ -21,7 +21,6 @@ where
 {
     let measurements = commits.map(move |c| {
         c.map(|c| {
-            // dbg!(&c.commit);
             let measurement = c
                 .measurements
                 .iter()
@@ -38,22 +37,17 @@ where
     let mut first_epoch = None;
 
     // TODO(kaihowl) this is a second repsonsibility, move out? "EpochClearing"
-    measurements
-        // .inspect(move |m| {
-        // dbg!(summarize_by);
-        // dbg!(m);
-        // })
-        .take_while(move |m| match &m {
-            Ok(CommitSummary {
-                measurement: Some(m),
-                ..
-            }) => {
-                let prev_epoch = first_epoch;
-                first_epoch = Some(m.epoch);
-                prev_epoch.unwrap_or(m.epoch) == m.epoch
-            }
-            _ => true,
-        })
+    measurements.take_while(move |m| match &m {
+        Ok(CommitSummary {
+            measurement: Some(m),
+            ..
+        }) => {
+            let prev_epoch = first_epoch;
+            first_epoch = Some(m.epoch);
+            prev_epoch.unwrap_or(m.epoch) == m.epoch
+        }
+        _ => true,
+    })
 }
 
 impl<'a, T> ReductionFuncIterator<'a> for T

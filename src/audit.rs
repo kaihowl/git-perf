@@ -46,8 +46,6 @@ pub fn audit(
     let head_summary = stats::aggregate_measurements(iter::once(head));
     let tail_summary = stats::aggregate_measurements(tail.into_iter());
 
-    dbg!(&head_summary);
-    dbg!(&tail_summary);
     if tail_summary.len < min_count.into() {
         // TODO(kaihowl) handle with explicit return? Print text somewhere else?
         let number_measurements = tail_summary.len;

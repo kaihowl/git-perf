@@ -125,7 +125,6 @@ epoch = "{}"
         let mut conf = String::new();
         bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
         let epoch = determine_epoch("mymeasurement", &conf);
-        dbg!(&conf);
         assert!(epoch.is_some());
     }
 
