@@ -14,4 +14,8 @@ git perf add -m test 2
 create_commit
 git perf add -m test 4
 create_commit
-git perf report -o - | false
+git perf report -o - | true
+if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+  echo git-perf pipe failed
+  exit 1
+fi
