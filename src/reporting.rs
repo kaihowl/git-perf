@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, Write},
+    io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
 };
 
@@ -328,14 +328,12 @@ pub fn report(
     // python)
 
     if output == Path::new("-") {
-        io::stdout()
-            .write_all(&plot.as_bytes())
-            .expect("Could not write to stdout");
+        match io::stdout().write_all(&plot.as_bytes()) {
+            Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+            res => res,
+        }?;
     } else {
-        File::create(&output)
-            .expect("Cannot open file")
-            .write_all(&plot.as_bytes())
-            .expect("Could not write file");
+        File::create(&output)?.write_all(&plot.as_bytes())?;
     }
 
     Ok(())
