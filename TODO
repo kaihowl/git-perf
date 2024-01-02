@@ -1,5 +1,6 @@
 - use field separator
   - create migration script and use different git notes branch for v2
+  - remove csv parser?
 - allow using different git / root folder than pwd
 - take std variance per epoch to allow catching staggered performance regressions?
 - use stream / iterator for measurements (see cb261dfb for a start)
