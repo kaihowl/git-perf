@@ -12,7 +12,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 enum GitError {
-    #[error("Git failed to execute, stdout:\n{stdout}\nstderr:\n{stderr}")]
+    #[error("Git failed to execute.\n\nstdout:\n{stdout}\nstderr:\n{stderr}")]
     ExecError { stdout: String, stderr: String },
 
     #[error("Failed to execute git command")]
