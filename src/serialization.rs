@@ -28,116 +28,101 @@ where
 {
     let md: &MeasurementData = measurement_data.borrow();
 
-    // TODO(kaihowl) key values
     let mut m = vec![
-        md.epoch.to_string(),
+        format!("{:?}", md.epoch),
         md.name.clone(),
-        md.timestamp.to_string(),
-        md.val.to_string(),
+        format!("{:?}", md.timestamp),
+        format!("{:?}", md.val),
     ];
 
-    m.extend(
-        md.key_values
-            .iter()
-            .map(|(k, v)| format!("{k}{DELIMITER}{v}")),
-    );
+    m.extend(md.key_values.iter().map(|(k, v)| format!("{k}={v}")));
 
-    m.join(DELIMITER)
+    m.join(DELIMITER) + "\n"
 }
 
 pub fn serialize_multiple<M: Borrow<MeasurementData>>(measurement_data: &[M]) -> String {
-    let mut result = String::new();
+    measurement_data
+        .iter()
+        .map(|md| serialize_single(md))
+        .join("")
+}
 
-    for md in measurement_data {
-        let md = md.borrow();
-        let record = [md.epoch.to_string(), md.timestamp.to_string()].join(DELIMITER);
+fn deserialize_single(line: &str) -> Option<MeasurementData> {
+    let components = line
+        .split(DELIMITER)
+        .filter(|item| !item.is_empty())
+        .collect_vec();
 
-        result.push_str(&record);
-        result.push_str("\n");
+    if components.len() < 4 {
+        eprintln!("Too few items, skipping record");
+        return None;
     }
 
-    return result;
+    // TODO(kaihowl) test this
+    let epoch = components[0];
+    let epoch = match epoch.parse::<u32>() {
+        Ok(e) => e,
+        Err(err) => {
+            eprintln!("Cannot parse epoch '{epoch}': {err}, skipping record");
+            return None;
+        }
+    };
+
+    let name = components[1].to_string();
+
+    let timestamp = components[2];
+    let timestamp = match timestamp.parse::<f64>() {
+        Ok(ts) => ts,
+        Err(err) => {
+            eprintln!("Cannot parse timestamp '{timestamp}': {err}, skipping record");
+            return None;
+        }
+    };
+
+    let val = components[3];
+    let val = match val.parse::<f64>() {
+        Ok(val) => val,
+        Err(err) => {
+            eprintln!("Cannot parse value '{val}': {err}, skipping record");
+            return None;
+        }
+    };
+
+    let mut key_values = HashMap::new();
+
+    if components.len() > 4 {
+        for kv in components.iter().skip(4) {
+            // TODO(kaihowl) different delimiter?
+            if let Some((key, value)) = kv.split_once('=') {
+                let entry = key_values.entry(key.to_string());
+                let value = value.to_string();
+                match entry {
+                    Occupied(mut e) => {
+                        eprintln!("Duplicate entries for key {key}");
+                        e.insert(value);
+                    }
+                    Vacant(e) => {
+                        e.insert(value);
+                    }
+                }
+            } else {
+                eprintln!("No equals sign in key value pair, skipping record");
+                return None;
+            }
+        }
+    }
+
+    Some(MeasurementData {
+        epoch,
+        name,
+        timestamp,
+        val,
+        key_values,
+    })
 }
 
 pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
-    let mut result = vec![];
-
-    for line in lines.lines() {
-        let components = line.split(DELIMITER).collect_vec();
-        if components.len() < 4 {
-            eprintln!("Too few items, skipping record");
-            continue;
-        }
-
-        // TODO(kaihowl) test this
-        let epoch = components[0];
-        let epoch = match epoch.parse::<u32>() {
-            Ok(e) => e,
-            Err(err) => {
-                eprintln!("Cannot parse epoch '{epoch}': {err}, skipping record");
-                continue;
-            }
-        };
-
-        let name = components[1].to_string();
-
-        let timestamp = components[2];
-        let timestamp = match timestamp.parse::<f64>() {
-            Ok(ts) => ts,
-            Err(err) => {
-                eprintln!("Cannot parse timestamp '{timestamp}': {err}, skipping record");
-                continue;
-            }
-        };
-
-        let val = components[3];
-        let val = match val.parse::<f64>() {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Cannot parse value '{val}': {err}, skipping record");
-                continue;
-            }
-        };
-
-        let mut key_values = HashMap::new();
-
-        let mut skip_record = false;
-        if components.len() > 4 {
-            for kv in components.iter().skip(4) {
-                // TODO(kaihowl) different delimiter?
-                if let Some((key, value)) = kv.split_once('=') {
-                    let entry = key_values.entry(key.to_string());
-                    let value = value.to_string();
-                    match entry {
-                        Occupied(mut e) => {
-                            eprintln!("Duplicate entries for key {key}");
-                            e.insert(value);
-                        }
-                        Vacant(e) => {
-                            e.insert(value);
-                        }
-                    }
-                } else {
-                    eprintln!("No equals sign in key value pair, skipping record");
-                    skip_record = true;
-                }
-            }
-        }
-
-        if skip_record {
-            continue;
-        }
-
-        result.push(MeasurementData {
-            epoch,
-            name,
-            timestamp,
-            val,
-            key_values,
-        });
-    }
-
-    return result;
+    lines.lines().filter_map(deserialize_single).collect_vec()
 }
 
 #[cfg(test)]
@@ -146,7 +131,7 @@ mod test {
 
     #[test]
     fn key_value_deserialization() {
-        let lines = "0 test 1234 123 key1=value1 key2=value2";
+        let lines = "0test1234123key1=value1key2=value2";
         let actual = deserialize(lines);
         let expected = MeasurementData {
             epoch: 0,
@@ -166,8 +151,8 @@ mod test {
     #[test]
     fn key_value_invalid_pair() {
         // Missing equals sign in first line, should be skipped
-        let lines = "0 test 1234 123 key1 value1\n\
-                     0 test2 4567 890 key2=value2";
+        let lines = "0test1234123key1value1\n\
+                     0test24567890key2=value2";
 
         let expected = [MeasurementData {
             epoch: 0,
@@ -182,7 +167,7 @@ mod test {
 
     #[test]
     fn additional_whitespace_deserialization() {
-        let lines = "0     test     1234     123";
+        let lines = "0test1234123";
         let actual = deserialize(lines);
         assert_eq!(1, actual.len());
     }
@@ -197,6 +182,6 @@ mod test {
             key_values: [("mykey".to_string(), "myvalue".to_string())].into(),
         };
         let serialized = serialize_single(&md);
-        assert_eq!(serialized, "3 Mymeasurement 1234567.0 42.0 mykey=myvalue\n");
+        assert_eq!(serialized, "3Mymeasurement1234567.042.0mykey=myvalue\n");
     }
 }
