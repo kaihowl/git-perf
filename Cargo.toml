@@ -12,9 +12,11 @@ backoff = "0.4.0"
 clap = { version="4", features=["derive", "wrap_help"] }
 clap_mangen = "0.2.5"
 criterion = "0.5.1"
+csv = "1.1.6"
 hex = "0.4.3"
 itertools = "0.10.5"
 plotly = "0.8.3"
+serde = { version = "1.0.145", features = ["derive"] }
 thiserror = "1.0.51"
 toml = "0.8.6"
 toml_edit = "0.20.4"

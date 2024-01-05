@@ -36,7 +36,7 @@ fi
 echo Measurement without date
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$RANDOMkey=value"
+"${script_dir}/measure.sh" "$epoch myothermeasurement $RANDOM key=value"
 output=$(git perf report 2>&1 1>/dev/null)
 if [[ ${output} != *'skipping'* ]]; then
   echo "Missing 'skipping' in output:"
@@ -47,7 +47,7 @@ fi
 echo Measurement without kvs
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOM"
+"${script_dir}/measure.sh" "$epoch myothermeasurement $(date +%s) $RANDOM"
 output=$(git perf report 2>&1 1>/dev/null)
 if [[ -n ${output} ]]; then
   echo "There should be no output in stderr but instead there is:"
@@ -58,17 +58,17 @@ fi
 echo Measurement with invalid kvs
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMtestotherteststuff"
+"${script_dir}/measure.sh" "$epoch myothermeasurement $(date +%s) $RANDOM test othertest stuff"
 output=$(git perf report 2>&1 1>/dev/null)
 if [[ -z ${output} ]]; then
   echo "There should be output in stderr but instead it is empty"
   exit 1
 fi
 
-echo Measurement valid but with too many separators
+echo Measurement valid but with too many spaces
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=value"
+"${script_dir}/measure.sh" "$epoch myothermeasurement    $(date +%s)      $RANDOM key=value"
 output=$(git perf report 2>&1 1>/dev/null)
 if [[ -n ${output} ]]; then
   echo "There should be no output in stderr but instead there is:"
@@ -79,7 +79,7 @@ fi
 echo Duplicate kvs
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value"
+"${script_dir}/measure.sh" "$epoch myothermeasurement $(date +%s) $RANDOM key=value key=value"
 output=$(git perf report 2>&1 1>/dev/null)
 if [[ -n ${output} ]]; then
   echo "There should be no output in stderr but instead there is:"
@@ -90,7 +90,7 @@ fi
 echo Conflicting kvs
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value2"
+"${script_dir}/measure.sh" "$epoch myothermeasurement $(date +%s) $RANDOM key=value key=value2"
 output=$(git perf report 2>&1 1>/dev/null)
 if [[ -n ${output} ]]; then
   echo "There should be no output in stderr but instead there is:"

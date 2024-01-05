@@ -1,134 +1,129 @@
-use std::{
-    borrow::Borrow,
-    collections::{
-        hash_map::Entry::{Occupied, Vacant},
-        HashMap,
-    },
-};
+use std::{borrow::Borrow, collections::HashMap};
 
-use itertools::Itertools;
+use csv::StringRecord;
+use itertools::{EitherOrBoth, Itertools};
+use serde::{ser::SerializeSeq, Serialize, Serializer};
 
 use crate::data::MeasurementData;
 
 // TODO(kaihowl) serialization with flatten and custom function does not work
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 struct SerializeMeasurementData<'a> {
     epoch: u32,
     name: &'a str,
     timestamp: f64,
     val: f64,
+    #[serde(serialize_with = "key_value_serialization")]
     key_values: &'a HashMap<String, String>,
 }
 
-pub const DELIMITER: &str = "";
+impl Serialize for MeasurementData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializeMeasurementData::from(self).serialize(serializer)
+    }
+}
 
-pub fn serialize_single<M>(measurement_data: &M) -> String
+impl<'a> From<&'a MeasurementData> for SerializeMeasurementData<'a> {
+    fn from(md: &'a MeasurementData) -> Self {
+        SerializeMeasurementData {
+            epoch: md.epoch,
+            name: md.name.as_str(),
+            timestamp: md.timestamp,
+            val: md.val,
+            key_values: &md.key_values,
+        }
+    }
+}
+
+fn key_value_serialization<S>(
+    key_values: &HashMap<String, String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
-    M: Borrow<MeasurementData>,
+    S: Serializer,
 {
-    let md: &MeasurementData = measurement_data.borrow();
-
-    let mut m = vec![
-        format!("{:?}", md.epoch),
-        md.name.clone(),
-        format!("{:?}", md.timestamp),
-        format!("{:?}", md.val),
-    ];
-
-    m.extend(md.key_values.iter().map(|(k, v)| format!("{k}={v}")));
-
-    m.join(DELIMITER) + "\n"
+    let mut seq = serializer.serialize_seq(Some(key_values.len()))?;
+    for (k, v) in key_values {
+        seq.serialize_element(&format!("{}={}", k, v))?
+    }
+    seq.end()
 }
 
 pub fn serialize_multiple<M: Borrow<MeasurementData>>(measurement_data: &[M]) -> String {
-    measurement_data
-        .iter()
-        .map(|md| serialize_single(md))
-        .join("")
+    let mut writer = csv::WriterBuilder::new()
+        .delimiter(b' ')
+        .has_headers(false)
+        .flexible(true)
+        .from_writer(vec![]);
+
+    for md in measurement_data {
+        writer.serialize(md.borrow()).expect("TODO(kaihowl) fix me");
+    }
+    String::from_utf8(writer.into_inner().unwrap()).unwrap()
 }
 
-fn deserialize_single(line: &str) -> Option<MeasurementData> {
-    let components = line
-        .split(DELIMITER)
-        .filter(|item| !item.is_empty())
-        .collect_vec();
-
-    let num_components = components.len();
-    if num_components < 4 {
-        eprintln!("Too few items with {num_components}, skipping record");
-        return None;
-    }
-
-    // TODO(kaihowl) test this
-    let epoch = components[0];
-    let epoch = match epoch.parse::<u32>() {
-        Ok(e) => e,
-        Err(err) => {
-            eprintln!("Cannot parse epoch '{epoch}': {err}, skipping record");
-            return None;
-        }
-    };
-
-    let name = components[1].to_string();
-
-    let timestamp = components[2];
-    let timestamp = match timestamp.parse::<f64>() {
-        Ok(ts) => ts,
-        Err(err) => {
-            eprintln!("Cannot parse timestamp '{timestamp}': {err}, skipping record");
-            return None;
-        }
-    };
-
-    let val = components[3];
-    let val = match val.parse::<f64>() {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("Cannot parse value '{val}': {err}, skipping record");
-            return None;
-        }
-    };
-
-    let mut key_values = HashMap::new();
-
-    if components.len() > 4 {
-        for kv in components.iter().skip(4) {
-            // TODO(kaihowl) different delimiter?
-            if let Some((key, value)) = kv.split_once('=') {
-                let entry = key_values.entry(key.to_string());
-                let value = value.to_string();
-                match entry {
-                    Occupied(mut e) => {
-                        // TODO(kaihowl) reinstate + only emit this (and other) errors once
-                        // eprintln!("Duplicate entries for key {key}");
-                        e.insert(value);
-                    }
-                    Vacant(e) => {
-                        e.insert(value);
-                    }
-                }
-            } else {
-                eprintln!("No equals sign in key value pair, skipping record");
-                return None;
-            }
-        }
-    }
-
-    Some(MeasurementData {
-        epoch,
-        name,
-        timestamp,
-        val,
-        key_values,
-    })
+pub fn serialize_single(measurement_data: &MeasurementData) -> String {
+    serialize_multiple(&[measurement_data])
 }
 
 pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
-    lines
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .filter_map(deserialize_single)
-        .collect_vec()
+    let reader = csv::ReaderBuilder::new()
+        .delimiter(b' ')
+        .has_headers(false)
+        .flexible(true)
+        .from_reader(lines.as_bytes());
+
+    reader
+        .into_records()
+        .filter_map(|r| {
+            if let Err(e) = &r {
+                eprintln!("{e}, skipping record.");
+            }
+            let record = r.ok()?;
+            // Filter empty record fields: Repeated whitespace in records does not count as
+            // a field separator.
+            let record: StringRecord = record.into_iter().filter(|f| !f.is_empty()).collect();
+            let fixed_headers = vec!["epoch", "name", "timestamp", "val"];
+
+            let mut skip_record = false;
+            let (headers, values): (csv::StringRecord, csv::StringRecord) = record
+                .into_iter()
+                .zip_longest(fixed_headers)
+                .filter_map(|pair| match pair {
+                    EitherOrBoth::Both(val, header) => Some((header, val)),
+                    EitherOrBoth::Right(_) => {
+                        eprintln!("Too few items, skipping record");
+                        skip_record = true;
+                        None
+                    }
+                    EitherOrBoth::Left(keyvalue) => match keyvalue.split_once('=') {
+                        Some(a) => Some(a),
+                        None => {
+                            eprintln!("No equals sign in key value pair, skipping record");
+                            skip_record = true;
+                            None
+                        }
+                    },
+                })
+                .unzip();
+
+            if skip_record {
+                None
+            } else {
+                match values.deserialize(Some(&headers)) {
+                    Ok(md) => Some(md),
+                    Err(e) => {
+                        let kvs = headers.iter().zip(values.iter()).collect_vec();
+                        eprintln!("{e}, skipping record, invalid data format: {kvs:?}");
+                        None
+                    }
+                }
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -137,7 +132,7 @@ mod test {
 
     #[test]
     fn key_value_deserialization() {
-        let lines = "0test1234123key1=value1key2=value2";
+        let lines = "0 test 1234 123 key1=value1 key2=value2";
         let actual = deserialize(lines);
         let expected = MeasurementData {
             epoch: 0,
@@ -157,8 +152,8 @@ mod test {
     #[test]
     fn key_value_invalid_pair() {
         // Missing equals sign in first line, should be skipped
-        let lines = "0test1234123key1value1\n\
-                     0test24567890key2=value2";
+        let lines = "0 test 1234 123 key1 value1\n\
+                     0 test2 4567 890 key2=value2";
 
         let expected = [MeasurementData {
             epoch: 0,
@@ -173,7 +168,7 @@ mod test {
 
     #[test]
     fn additional_whitespace_deserialization() {
-        let lines = "0test1234123";
+        let lines = "0     test     1234     123";
         let actual = deserialize(lines);
         assert_eq!(1, actual.len());
     }
@@ -188,6 +183,6 @@ mod test {
             key_values: [("mykey".to_string(), "myvalue".to_string())].into(),
         };
         let serialized = serialize_single(&md);
-        assert_eq!(serialized, "3Mymeasurement1234567.042.0mykey=myvalue\n");
+        assert_eq!(serialized, "3 Mymeasurement 1234567.0 42.0 mykey=myvalue\n");
     }
 }
