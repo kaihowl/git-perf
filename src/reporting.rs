@@ -157,11 +157,6 @@ impl CsvReporter<'_> {
     }
 }
 
-struct HashAndMeasurement<'a> {
-    commit: &'a str,
-    measurement: &'a MeasurementData,
-}
-
 impl<'a> Reporter<'a> for CsvReporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]) {
         self.hashes = hashes.iter().map(|c| c.commit.to_owned()).collect();
