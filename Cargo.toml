@@ -29,7 +29,7 @@ httptest = "0.15.4"
 vendored-openssl = []
 
 [[bench]]
-name = "copy"
+name = "read"
 harness = false
 
 [[bench]]
