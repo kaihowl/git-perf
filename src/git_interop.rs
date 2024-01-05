@@ -40,7 +40,7 @@ fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitErro
     Ok(stdout)
 }
 
-const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v2";
+const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
 
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
     run_git(

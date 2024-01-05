@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use clap::ValueEnum;
-use serde::Deserialize;
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReductionFunc {
@@ -23,13 +22,12 @@ pub struct CommitSummary {
     pub measurement: Option<MeasurementSummary>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct MeasurementData {
     pub epoch: u32,
     pub name: String,
     pub timestamp: f64,
     // TODO(kaihowl) check size of type
     pub val: f64,
-    #[serde(flatten)]
     pub key_values: HashMap<String, String>,
 }
