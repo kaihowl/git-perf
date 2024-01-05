@@ -1,7 +1,8 @@
-use std::{
-    env::{self, set_current_dir},
-    process::Command,
-};
+mod utils;
+
+use std::env::set_current_dir;
+
+use utils::{empty_commit, hermetic_git_env, init_repo};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use git_perf::{
@@ -10,35 +11,16 @@ use git_perf::{
 };
 use tempfile::tempdir;
 
-fn hermetic_git_env() {
-    env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-    env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-    env::set_var("GIT_AUTHOR_NAME", "testuser");
-    env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-    env::set_var("GIT_COMMITTER_NAME", "testuser");
-    env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
-}
-
 fn prep_repo(number_commits: usize, number_measurements: usize) -> tempfile::TempDir {
     let temp_dir = tempdir().unwrap();
 
     set_current_dir(temp_dir.path()).expect("Failed to change current path");
     hermetic_git_env();
 
-    assert!(Command::new("git")
-        .arg("init")
-        .output()
-        .expect("Failed to init git repo")
-        .status
-        .success());
+    init_repo();
 
     for _ in 1..number_commits {
-        assert!(Command::new("git")
-            .args(["commit", "--allow-empty", "-m", "test commit"])
-            .output()
-            .expect("Failed to init repo")
-            .status
-            .success());
+        empty_commit();
 
         let measurements = [10.0].repeat(number_measurements);
         git_perf::measurement_storage::add_multiple("test_measurement", &measurements, &[])
