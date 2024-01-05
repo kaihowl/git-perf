@@ -53,8 +53,9 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
         .filter(|item| !item.is_empty())
         .collect_vec();
 
-    if components.len() < 4 {
-        eprintln!("Too few items, skipping record");
+    let num_components = components.len();
+    if num_components < 4 {
+        eprintln!("Too few items with {num_components}, skipping record");
         return None;
     }
 
@@ -98,7 +99,8 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
                 let value = value.to_string();
                 match entry {
                     Occupied(mut e) => {
-                        eprintln!("Duplicate entries for key {key}");
+                        // TODO(kaihowl) reinstate + only emit this (and other) errors once
+                        // eprintln!("Duplicate entries for key {key}");
                         e.insert(value);
                     }
                     Vacant(e) => {
@@ -122,7 +124,11 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
 }
 
 pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
-    lines.lines().filter_map(deserialize_single).collect_vec()
+    lines
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(deserialize_single)
+        .collect_vec()
 }
 
 #[cfg(test)]
