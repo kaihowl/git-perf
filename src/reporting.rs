@@ -12,12 +12,12 @@ use plotly::{
     layout::{Axis, Legend},
     Configuration, Layout, Plot,
 };
-use serde::Serialize;
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
     data::{MeasurementData, MeasurementSummary, ReductionFunc},
     measurement_retrieval::{self, Commit, ReductionFuncIterator},
+    serialization::{serialize_single, DELIMITER},
 };
 
 trait Reporter<'a> {
@@ -156,7 +156,7 @@ impl CsvReporter<'_> {
         }
     }
 }
-#[derive(Serialize)]
+
 struct HashAndMeasurement<'a> {
     commit: &'a str,
     measurement: &'a MeasurementData,
@@ -179,22 +179,16 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
 
     fn as_bytes(&self) -> Vec<u8> {
         // TODO(kaihowl) write to path directly instead?
-        let mut writer = csv::WriterBuilder::new()
-            .has_headers(false)
-            .flexible(true)
-            .from_writer(vec![]);
 
-        for (index, measurement_data) in &self.indexed_measurements {
-            writer
-                .serialize(HashAndMeasurement {
-                    commit: &self.hashes[*index],
-                    measurement: measurement_data,
-                })
-                .expect("inner serialization error TODO(kaihowl)")
-        }
-        writer
-            .into_inner()
-            .expect("serialization error TODO(kaihowl)")
+        self.indexed_measurements
+            .iter()
+            .map(|(index, measurement_data)| {
+                let ser_measurement = serialize_single(measurement_data);
+                let commit = &self.hashes[*index];
+                format!("{commit}{DELIMITER}{ser_measurement}")
+            })
+            .join("\n")
+            .into_bytes()
     }
 
     fn add_summarized_trace(
