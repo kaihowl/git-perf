@@ -1,5 +1,3 @@
-- use field separator
-  - performance check
 - take std variance per epoch to allow catching staggered performance regressions?
 - use stream / iterator for measurements (see cb261dfb for a start)
   - first define maximum size for measurements and measure if there is any improvement
