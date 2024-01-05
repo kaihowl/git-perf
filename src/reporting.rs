@@ -187,7 +187,7 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
                 let commit = &self.hashes[*index];
                 format!("{commit}{DELIMITER}{ser_measurement}")
             })
-            .join("\n")
+            .join("")
             .into_bytes()
     }
 
