@@ -1,3 +1,4 @@
+- replace git-perf on master with rust version
 - add github actions to repo, start with install, extend with full reporting
 - report / command to get config info including the branch name?
 - version get from git?
