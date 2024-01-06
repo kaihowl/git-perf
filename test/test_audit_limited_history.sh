@@ -52,5 +52,4 @@ git perf add -m timer 3
 git perf audit -m timer --min-measurements 1 && exit 1
 git perf audit -m timer --min-measurements 2
 
-
 exit 0

@@ -70,7 +70,6 @@ fi
 # Must work as this is the exact history length
 # If we erroneously considered the feature_branch's history, it would be filtered
 # out and we end up with fewer than 10 commits when following the first parent.
-# TODO(kaihowl) reset to 10
-git perf report -n 9
+git perf report -n 10
 
 exit 0
