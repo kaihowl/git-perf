@@ -4,16 +4,19 @@ Test tracking performance measurements in git-notes.
 
 Example report for [master](https://kaihowl.github.io/git-perf/master.html).
 
-## Development
+## Warning
+Experimental only.
+Repeated additions of measurements (instead of bulk additions) will be costly:
+Each time the entire previous measurements are copied and a single line is appended.
 
-Create development environment with
+# Development
 
+## Rust tests
 ```
-tox -e dev
+cargo test
 ```
 
-Run tests with
-
+## Integration / bash tests
 ```
-source .tox/dev/bin/activate && ./tests/run_tests.sh
+cargo build && PATH=$(pwd)/target/debug:$PATH test/run_tests.sh
 ```

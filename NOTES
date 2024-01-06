@@ -1,3 +1,0 @@
-No performance benefit of libgit2 other than a 4 ms forking overhead for calling the git binary.
-Due to the small number of measurements, no generators/complicated iterators are necessary.
-Since we have to rehash the blob for each new measurement, adding new measurements will become prohibitively expensive at some point. That is fine as we only expect to store a small number of measurements in here per commit.
