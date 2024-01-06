@@ -1,5 +1,3 @@
-- release new version
-- finalize migration dotfiles to new git-perf version
 - add github actions to repo, start with install, extend with full reporting
 - report / command to get config info including the branch name?
 - version get from git?
