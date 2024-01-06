@@ -1,3 +1,4 @@
+- add git-perf reporting to workflow again
 - replace git-perf on master with rust version
 - rewrite tests to use explicit dir and not cwd (to run them in parallel)
 - update release script
