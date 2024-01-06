@@ -1,5 +1,6 @@
 - replace git-perf on master with rust version
 - update release script
+- push "latest" tag once the release is published (from pre-release)
 - add github actions to repo, start with install, extend with full reporting
 - report / command to get config info including the branch name?
 - version get from git?
