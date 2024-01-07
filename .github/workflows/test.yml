@@ -70,8 +70,8 @@ jobs:
       run: |
           cargo install --path .
           # Run report on repo with known (n=10) number of measurements
-          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} sleep 0.01
-          git perf measure -m report -k os=${{matrix.os}} git perf report
+          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -- sleep 0.01
+          git perf measure -m report -k os=${{matrix.os}} -- git perf report
           git perf push
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
           git perf audit -n 40 -m report -s os=${{matrix.os}}
