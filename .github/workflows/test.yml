@@ -41,6 +41,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 40
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -72,7 +74,7 @@ jobs:
           cargo install --path .
           # Run report on repo with known (n=10) number of measurements
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -- sleep 0.01
-          git perf measure -m report -k os=${{matrix.os}} -- git perf report
+          git perf measure -m report -k os=${{matrix.os}} -- git perf report -n 1
           git perf push
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
           git perf audit -n 40 -m report -s os=${{matrix.os}}
