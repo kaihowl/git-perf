@@ -1,19 +1,15 @@
 - replace git-perf on master with rust version
-- remove vendored in plotly javascript
 - track binary size in perf
 - track report size in perf
-- rename push to send?
-- rewrite tests to use explicit dir and not cwd (to run them in parallel)
+- add github actions to repo, start with install, extend with full reporting
 - update release script
 - push "latest" tag once the release is published (from pre-release)
-- add github actions to repo, start with install, extend with full reporting
+- rewrite tests to use explicit dir and not cwd (to run them in parallel)
+- rename push to send?
+- remove vendored in plotly javascript
+- flag huge stddev? / show stddev in results?
 - report / command to get config info including the branch name?
-- version get from git?
-- make report work on aggregated results
 - take std variance per epoch to allow catching staggered performance regressions?
-- use stream / iterator for measurements (see cb261dfb for a start)
-  - first define maximum size for measurements and measure if there is any improvement
 - allow units in measurements?
 - allow rerunning / replacing existing measurements in bulk groups. E.g., with a staging area.
-- flag huge stddev? / show stddev in results?
 
