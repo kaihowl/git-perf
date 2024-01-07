@@ -21,7 +21,8 @@ pub fn measure(
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
             bail!(
-                "Command failed to run:\nstdout:\n{}\nstderr:\n{}",
+                "Command '{}' failed to run:\nstdout:\n{}\nstderr:\n{}",
+                exe,
                 stdout,
                 stderr,
             );

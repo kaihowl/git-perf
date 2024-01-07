@@ -68,6 +68,7 @@ jobs:
 
     - name: Run fake perf measurements
       run: |
+          set -x
           cargo install --path .
           # Run report on repo with known (n=10) number of measurements
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -- sleep 0.01
