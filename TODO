@@ -1,5 +1,6 @@
 - add git-perf reporting to workflow again
 - replace git-perf on master with rust version
+- remove vendored in plotly javascript
 - rename push to send?
 - rewrite tests to use explicit dir and not cwd (to run them in parallel)
 - update release script
