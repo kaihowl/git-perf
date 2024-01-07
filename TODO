@@ -1,4 +1,3 @@
-- add git-perf reporting to workflow again
 - replace git-perf on master with rust version
 - remove vendored in plotly javascript
 - track binary size in perf
