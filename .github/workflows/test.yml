@@ -8,10 +8,6 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches:
-    - master
-    - build/*
   pull_request:
     branches:
       - master
@@ -112,7 +108,7 @@ jobs:
         cargo doc --no-deps
 
   report:
-    needs: build
+    needs: test
     concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
     if: always()
     runs-on: ubuntu-20.04
