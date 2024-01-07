@@ -70,6 +70,17 @@ jobs:
         export PATH=$(pwd)/target/debug:$PATH
         bash ./test/run_tests.sh
 
+    - name: Run fake perf measurements
+      run: |
+          cargo install .
+          # Run report on repo with known (n=10) number of measurements
+          git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
+          git perf measure -m report -kv os=${{matrix.os}} git perf report
+          git perf push
+          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
+          git perf audit -n 40 -m report -s os=${{matrix.os}}
+
+
   rustfmt:
     name: rustfmt
     runs-on: ubuntu-22.04
@@ -100,5 +111,52 @@ jobs:
         export RUSTDOCFLAGS="-D warnings"
         cargo doc --no-deps
 
-# TODO(kaihowl) add git perf reporting again
-
+  report:
+    needs: build
+    concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 40
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4
+      - name: use commit name as report name
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
+      - name: use branch name as report name
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "REPORT_NAME=${GITHUB_REF_SLUG}" >> $GITHUB_ENV
+      - name: report
+        shell: bash
+        run: |
+          # TODO(kaihowl) use current or LATEST?
+          cargo install
+          git perf pull
+          mkdir reports/
+          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s os
+      - name: Publish new perf reports
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          keep_files: true
+      - uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { REPORT_NAME } = process.env
+            const pages = await github.rest.repos.getPages({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
+              })
