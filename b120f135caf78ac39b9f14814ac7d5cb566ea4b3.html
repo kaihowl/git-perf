@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+</head>
+
+<body>
+    <div>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+        <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>
+        <div id="plotly-html-element" class="plotly-graph-div" style="height:100%; width:100%;"></div>
+
+        <script type="module">
+            const graph_div = document.getElementById("plotly-html-element");
+            await Plotly.newPlot(graph_div, {
+  "data": [
+    {
+      "type": "box",
+      "x": [
+        39,
+        39
+      ],
+      "y": [
+        4525496.0,
+        4390893.0
+      ],
+      "name": "ubuntu-22.04",
+      "legendgroup": "report",
+      "legendgrouptitle": {
+        "text": "report"
+      }
+    },
+    {
+      "type": "box",
+      "x": [
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39,
+        39
+      ],
+      "y": [
+        11618801.0,
+        11558817.0,
+        11657152.0,
+        11521056.0,
+        11574900.0,
+        11621385.0,
+        11506620.0,
+        11538330.0,
+        11559528.0,
+        11581099.0,
+        11518434.0,
+        11477975.0,
+        11528978.0,
+        11557315.0,
+        11493335.0,
+        11502742.0,
+        11582842.0,
+        11527137.0,
+        11548027.0,
+        11506660.0
+      ],
+      "name": "ubuntu-22.04",
+      "legendgroup": "test-measure2",
+      "legendgrouptitle": {
+        "text": "test-measure2"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Performance Measurements"
+    },
+    "legend": {
+      "orientation": "h",
+      "groupclick": "toggleitem"
+    },
+    "xaxis": {
+      "tickvals": [
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0,
+        25.0,
+        26.0,
+        27.0,
+        28.0,
+        29.0,
+        30.0,
+        31.0,
+        32.0,
+        33.0,
+        34.0,
+        35.0,
+        36.0,
+        37.0,
+        38.0,
+        39.0
+      ],
+      "ticktext": [
+        "ffb118",
+        "c05c28",
+        "b33a59",
+        "9b3693",
+        "49e94f",
+        "b7bc60",
+        "5fab96",
+        "459b35",
+        "d532f2",
+        "b47aa8",
+        "b05511",
+        "eb2e40",
+        "10048e",
+        "1ead69",
+        "1bff06",
+        "93c6cc",
+        "2ca209",
+        "7b8e8d",
+        "1fe887",
+        "6f946f",
+        "1e05bd",
+        "b3a47c",
+        "565ee8",
+        "cc60f6",
+        "34e4b6",
+        "cf844a",
+        "9d425e",
+        "e7d9ce",
+        "755903",
+        "3acbd0",
+        "f214b5",
+        "d3128a",
+        "074d48",
+        "d8d8ed",
+        "1fb864",
+        "61c97f",
+        "3fd2fb",
+        "0fe5f0",
+        "3c44d4",
+        "b120f1"
+      ],
+      "tickfont": {
+        "family": "monospace"
+      },
+      "tickangle": 45.0
+    }
+  },
+  "config": {
+    "fillFrame": true,
+    "responsive": true
+  }
+});
+        </script>
+    </div>
+</body>
+
+</html>
