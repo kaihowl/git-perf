@@ -68,7 +68,7 @@ jobs:
 
     - name: Run fake perf measurements
       run: |
-          cargo install .
+          cargo install --path .
           # Run report on repo with known (n=10) number of measurements
           git perf measure -n 10 -m test-measure2 -kv os=${{matrix.os}} sleep 0.01
           git perf measure -m report -kv os=${{matrix.os}} git perf report
@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           # TODO(kaihowl) use current or LATEST?
-          cargo install
+          cargo install --path .
           git perf pull
           mkdir reports/
           git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s os
