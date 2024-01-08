@@ -8,6 +8,10 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  push:
+    branches:
+      - master
+      - build/*
   pull_request:
     branches:
       - master
