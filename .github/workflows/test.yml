@@ -73,15 +73,15 @@ jobs:
           set -x
           cargo install --path .
           # Run report on repo with known (n=10) number of measurements
-          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{rust}} -- sleep 0.01
-          git perf measure -m report -k os=${{matrix.os}} -k rust=${{rust}} -- git perf report -n 1 -o report.html
-          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{rust}} $(wc -c < report.html)
-          git perf add -m release-binary-size -k os=${{matrix.os}} -k rust=${{rust}} $(wc -c < "$(which git-perf)")
+          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 0.01
+          git perf measure -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
+          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
+          git perf add -m release-binary-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < "$(which git-perf)")
           git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -k rust=${{rust}}
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -k rust=${{rust}}
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -k rust=${{rust}}
-          git perf audit -n 40 -m release-binary-size -s os=${{matrix.os}} -k rust=${{rust}}
+          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -k rust=${{matrix.rust}}
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -k rust=${{matrix.rust}}
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -k rust=${{matrix.rust}}
+          git perf audit -n 40 -m release-binary-size -s os=${{matrix.os}} -k rust=${{matrix.rust}}
 
 
   rustfmt:
