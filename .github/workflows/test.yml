@@ -82,10 +82,10 @@ jobs:
           git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
           git perf add -m release-binary-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < "$(which git-perf)")
           git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}}
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}}
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}}
-          git perf audit -n 40 -m release-binary-size -s os=${{matrix.os}} -s rust=${{matrix.rust}}
+          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m release-binary-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
 
 
   rustfmt:
