@@ -68,16 +68,20 @@ jobs:
         export PATH=$(pwd)/target/debug:$PATH
         bash ./test/run_tests.sh
 
-    - name: Run fake perf measurements
+    - name: Run sample perf measurements
       run: |
           set -x
           cargo install --path .
           # Run report on repo with known (n=10) number of measurements
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -- sleep 0.01
-          git perf measure -m report -k os=${{matrix.os}} -- git perf report -n 1
+          git perf measure -m report -k os=${{matrix.os}} -- git perf report -n 1 -o report.html
+          git perf add -m report-size -k os=${{matrix.os}} $(stat -f '%z' report.html)
+          git perf add -m release-binary-size -k os=${{matrix.os}} $(stat -f '%z' "$(which git-perf)")
           git perf push
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}}
           git perf audit -n 40 -m report -s os=${{matrix.os}}
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}}
+          git perf audit -n 40 -m release-binary-size -s os=${{matrix.os}}
 
 
   rustfmt:
