@@ -8,4 +8,4 @@ fi
 
 measurements=$*
 
-git notes --ref refs/notes/perf append -m "${measurements[@]}"
+git notes --ref refs/notes/perf-v3 append -m "${measurements[@]}"

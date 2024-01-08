@@ -14,7 +14,12 @@ mkdir orig
 cd orig
 orig=$(pwd)
 
-git init
+git init --bare
+
+cd "$(mktemp -d)"
+git clone "$orig" myworkrepo
+
+cd myworkrepo
 
 touch a
 git add a
@@ -28,8 +33,8 @@ touch c
 git add c
 git commit -m 'third commit'
 
+git push
 
-orig=$(pwd)
 cd "$root"
 git clone "$orig" repo1
 git clone "$orig" repo2
@@ -38,8 +43,14 @@ repo2=$(pwd)/repo2
 
 echo Leave one commit in middle without any notes
 cd "$repo1"
+# TODO(kaihowl)
+# Only setting the values with envvars fails for libgit2 git_signature_default
+git config user.name "$GIT_COMMITTER_NAME"
+git config user.email "$GIT_COMMITTER_EMAIL"
+
 git checkout master~2
-git perf measure -n 2 -m echo echo test
+git perf add -m echo 0.5
+git perf add -m echo 0.5
 git checkout master
 git perf add -m echo 0.5
 
@@ -47,6 +58,10 @@ git perf push
 
 echo Print from second repo
 cd "$repo2"
+# TODO(kaihowl)
+# Only setting the values with envvars fails for libgit2 git_signature_default
+git config user.name "$GIT_COMMITTER_NAME"
+git config user.email "$GIT_COMMITTER_EMAIL"
 git perf pull
 git perf report -o result.html
 

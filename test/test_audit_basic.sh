@@ -13,12 +13,12 @@ cd_temp_repo
 # mean: 2, std: 1
 git checkout HEAD~3
 git perf add -m timer 1
-git checkout - && git checkout HEAD~2
+git checkout master && git checkout HEAD~2
 git perf add -m timer 2
-git checkout - && git checkout HEAD~1
+git checkout master && git checkout HEAD~1
 git perf add -m timer 3
 # head commit
-git checkout -
+git checkout master
 git perf add -m timer 4
 # measure
 git perf audit -m timer -d 4

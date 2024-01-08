@@ -25,13 +25,13 @@ git perf report -n 2
 git perf audit -n 2 -m test-measure
 output=$(git perf report -n 3 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'shallow clone'* ]]; then
-  echo Missing warning for 'shallow clone'
+  echo "Missing warning for 'shallow clone'"
   echo "$output"
   exit 1
 fi
 output=$(git perf audit -n 3 -m test-measure 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'shallow clone'* ]]; then
-  echo Missing warning for 'shallow clone'
+  echo "Missing warning for 'shallow clone'"
   echo "$output"
   exit 1
 fi
@@ -48,7 +48,7 @@ git checkout -b feature_branch
 for i in $(seq 1 5); do
   create_commit
 done
-git checkout -
+git checkout master
 git merge --no-ff -
 # Test first-parent fetch-depth behavior even if HEAD is non-merge commit.
 commit=$(git rev-parse HEAD)
@@ -63,7 +63,7 @@ git perf pull
 # Must fail as this expects more history
 output=$(git perf report -n 11 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'shallow clone'* ]]; then
-  echo Missing warning for 'shallow clone'
+  echo "Missing warning for 'shallow clone'"
   echo "$output"
   exit 1
 fi
