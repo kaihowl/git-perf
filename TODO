@@ -1,4 +1,6 @@
 - add github actions to repo, start with install, extend with full reporting
+- allow multiple splits -s in report for separate dimensions
+- add default / environment sources key-value pairs
 - update release script
 - push "latest" tag once the release is published (from pre-release)
 - rewrite tests to use explicit dir and not cwd (to run them in parallel)
