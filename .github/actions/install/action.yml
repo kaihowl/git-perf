@@ -1,15 +1,15 @@
 name: 'Install git-perf'
 description: 'Install git-perf binary'
 inputs:
-  release:  # id of input
+  release:
     description: 'release to install'
     required: false
     default: 'latest'
 runs:
   using: "composite"
   steps:
-    - id: latest-version
-      name: determine latest version
+    - id: latest-release
+      name: determine latest release
       uses: pozetroninc/github-action-get-latest-release@master
       with:
         repository: ${{ github.repository }}
@@ -29,7 +29,7 @@ runs:
         fi
 
         if [[ "${{ inputs.release }}" == "latest" ]]; then
-          release=${{ steps.latest-version.outputs.release }}
+          release=${{ steps.latest-release.outputs.release }}
         else
           release=${{ inputs.release }}
         fi
