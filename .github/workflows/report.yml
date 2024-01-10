@@ -1,5 +1,4 @@
 name: 'git-perf report'
-description: 'git-perf report, upload to GitHub pages, and comment on PR'
 on:
   workflow_call:
     inputs:
