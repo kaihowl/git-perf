@@ -21,7 +21,7 @@ runs:
 
         if [ "${{ runner.os }}" = "Linux" ]; then
           os="x86_64-unknown-linux-musl"
-        elif [ "${{ runner.os }}" = "Darwin" ]; then
+        elif [ "${{ runner.os }}" = "macOS" ]; then
           os="x86_64-apple-darwin"
         else
           echo "Unsupported OS"
