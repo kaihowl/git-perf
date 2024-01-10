@@ -123,4 +123,4 @@ jobs:
     name: git-perf report
     needs: test
     if: always()
-    uses: ./.github/actions/report
+    uses: kaihowl/git-perf/report@add-report-action
