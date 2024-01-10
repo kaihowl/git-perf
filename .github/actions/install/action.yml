@@ -26,6 +26,7 @@ runs:
         else
           echo "Unsupported OS"
           exit 1
+        fi
 
         if [[ "${{ inputs.version }}" == "latest" ]]; then
           version=${{ steps.latest-version.outputs.release }}
