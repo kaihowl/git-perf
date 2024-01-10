@@ -43,6 +43,9 @@ jobs:
           os: ubuntu-22.04
           rust: beta
     steps:
+    - name: Install git-perf latest release
+      uses: kaihowl/git-perf/.github/actions/install@add-action
+
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
