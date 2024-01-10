@@ -36,6 +36,8 @@ runs:
 
         gitperf_url="https://github.com/kaihowl/git-perf/releases/download/${version}/gitperf-${version}-${os}.tar.gz"
 
+        echo "Downloading and installing ${gitperf_url}"
+
         curl -L "$gitperf_url" | tar -xz --strip-components=1
 
         echo "$HOME/.git-perf" >> $GITHUB_PATH
