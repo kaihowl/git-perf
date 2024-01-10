@@ -31,11 +31,11 @@ jobs:
           fetch-depth: ${{ inputs.depth }}
       - name: Checkout central reusable repo
         uses: actions/checkout@v3
-        ref: ${{ github.workflow_sha }}
         with:
           repository: kaihowl/git-perf
           token: ${{ secrets.GH_TOKEN }}
           path: .git-perf-actions
+          ref: ${{ github.workflow_sha }}
 
       - id: install
         name: install git-perf
