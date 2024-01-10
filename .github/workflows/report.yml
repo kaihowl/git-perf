@@ -1,15 +1,66 @@
 name: 'git-perf report'
 description: 'git-perf report, upload to GitHub pages, and comment on PR'
-inputs:
-  release:
-    description: 'release to install'
-    required: false
-    default: 'latest'
-runs:
-  using: "composite"
-  concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
-  runs-on: ubuntu-22.04
-  steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 40
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: 'release to install'
+        required: false
+        type: string
+        default: 'latest'
+
+concurrency:
+  # TODO(kaihowl) configure
+  group: gh-pages-concurrency
+
+jobs:
+  report:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 40
+      - id: install
+        name: install git-perf
+        uses: .github/actions/install
+        with:
+          release: ${{ inputs.release }}
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4
+      - name: use commit name as report name
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
+      - name: use branch name as report name
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "REPORT_NAME=${GITHUB_REF_SLUG}" >> $GITHUB_ENV
+      - name: report
+        shell: bash
+        run: |
+          git perf pull
+          mkdir reports/
+          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s rust
+      - name: Publish new perf reports
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          keep_files: true
+      - uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { REPORT_NAME } = process.env
+            const pages = await github.rest.repos.getPages({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
+              })
