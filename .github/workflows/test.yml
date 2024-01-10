@@ -83,4 +83,4 @@ jobs:
     name: git-perf
     needs: test
     if: always()
-    uses: .github/workflows/report.yml
+    uses: ./.github/workflows/report.yml
