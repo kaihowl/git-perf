@@ -120,7 +120,10 @@ jobs:
 
 
   report:
-    name: git-perf report
+    name: git-perf
     needs: test
     if: always()
-    uses: kaihowl/git-perf/report@add-report-action
+    steps:
+      - name: report
+        uses: ./.github/actions/report
+
