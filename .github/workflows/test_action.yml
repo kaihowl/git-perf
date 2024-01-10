@@ -1,0 +1,39 @@
+name: action-ci
+
+concurrency:
+  group: ci-${{ github.ref }}-action
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - master
+      - build/*
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test-action:
+    name: test action
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-22.04
+        - macos-12
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install git-perf latest release
+      uses: ./.github/actions/install
+
+    - name: Check if git-perf available
+      run: |
+        which git-perf
+        git perf --version
