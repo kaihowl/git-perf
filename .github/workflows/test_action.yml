@@ -16,6 +16,16 @@ on:
 jobs:
   test-action:
     name: test action
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-22.04
+        - macos-12
+
+    runs-on: ${{ matrix.os }}
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
