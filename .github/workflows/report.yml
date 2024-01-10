@@ -12,6 +12,11 @@ on:
         required: false
         type: string
         default: 'gh-pages-concurrency'
+      depth:
+        description: 'depth of the report in number of commits'
+        required: false
+        type: number
+        default: 40
 
 concurrency:
   group: ${{ inputs.concurrency-token }}
@@ -23,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 40
+          fetch-depth: ${{ inputs.depth }}
       - id: install
         name: install git-perf
         uses: ./.github/actions/install
@@ -44,7 +49,7 @@ jobs:
         run: |
           git perf pull
           mkdir reports/
-          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s rust
+          git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html -s rust
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v3
         with:
