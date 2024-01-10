@@ -1,8 +1,8 @@
 name: 'Install git-perf'
 description: 'Install git-perf binary'
 inputs:
-  version:  # id of input
-    description: 'Version to install'
+  release:  # id of input
+    description: 'release to install'
     required: false
     default: 'latest'
 runs:
@@ -28,13 +28,13 @@ runs:
           exit 1
         fi
 
-        if [[ "${{ inputs.version }}" == "latest" ]]; then
-          version=${{ steps.latest-version.outputs.release }}
+        if [[ "${{ inputs.release }}" == "latest" ]]; then
+          release=${{ steps.latest-version.outputs.release }}
         else
-          version=${{ inputs.version }}
+          release=${{ inputs.release }}
         fi
 
-        gitperf_url="https://github.com/kaihowl/git-perf/releases/download/${version}/gitperf-${version}-${os}.tar.gz"
+        gitperf_url="https://github.com/kaihowl/git-perf/releases/download/${release}/gitperf-${release}-${os}.tar.gz"
 
         echo "Downloading and installing ${gitperf_url}"
 
