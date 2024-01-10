@@ -85,6 +85,8 @@ jobs:
     if: always()
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - name: report
         uses: ./.github/actions/report
 
