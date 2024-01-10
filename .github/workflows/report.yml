@@ -31,7 +31,7 @@ jobs:
           fetch-depth: ${{ inputs.depth }}
       - id: install
         name: install git-perf
-        uses: ./.github/actions/install
+        uses: kaihowl/git-perf@${{ github.workflow_sha }}
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
