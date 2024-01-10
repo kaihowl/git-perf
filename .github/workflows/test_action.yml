@@ -31,7 +31,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Install git-perf latest release
-      uses: ./.github/actions/install
+      uses: kaihowl/git-perf/report@add-report-action
 
     - name: Check if git-perf available
       run: |
