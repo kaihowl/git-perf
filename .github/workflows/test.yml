@@ -44,7 +44,7 @@ jobs:
           rust: beta
     steps:
     - name: Install git-perf latest release
-      uses: kaihowl/git-perf/.github/actions/install@add-action
+      uses: ./.github/actions/install
       with:
         release: 0.13.0
 
