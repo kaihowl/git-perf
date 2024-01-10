@@ -45,6 +45,8 @@ jobs:
     steps:
     - name: Install git-perf latest release
       uses: kaihowl/git-perf/.github/actions/install@add-action
+      with:
+        release: 0.13.0
 
     - name: Checkout repository
       uses: actions/checkout@v3
