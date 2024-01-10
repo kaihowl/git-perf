@@ -12,7 +12,7 @@ runs:
       name: determine latest release
       uses: pozetroninc/github-action-get-latest-release@master
       with:
-        repository: ${{ github.action_repository }}
+        repository: kaihowl/git-perf
         excludes: prerelease, draft
     - id: install
       run: |
