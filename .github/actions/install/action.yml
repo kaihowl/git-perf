@@ -12,7 +12,7 @@ runs:
       name: determine latest release
       uses: pozetroninc/github-action-get-latest-release@master
       with:
-        repository: ${{ github.repository }}
+        repository: ${{ github.action_repository }}
         excludes: prerelease, draft
     - id: install
       run: |
