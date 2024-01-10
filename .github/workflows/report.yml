@@ -7,10 +7,14 @@ on:
         required: false
         type: string
         default: 'latest'
+      concurrency-token:
+        description: 'token to prevent concurrent updates of github pages'
+        required: false
+        type: string
+        default: 'gh-pages-concurrency'
 
 concurrency:
-  # TODO(kaihowl) configure
-  group: gh-pages-concurrency
+  group: ${{ inputs.concurrency-token }}
 
 jobs:
   report:
