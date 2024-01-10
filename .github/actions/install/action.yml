@@ -42,4 +42,3 @@ runs:
 
         echo "$HOME/.git-perf" >> $GITHUB_PATH
       shell: bash
-
