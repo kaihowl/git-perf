@@ -35,7 +35,7 @@ jobs:
           repository: kaihowl/git-perf
           token: ${{ secrets.GITHUB_TOKEN }}
           path: .git-perf-actions
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ github.action_ref }}
 
       - id: install
         name: install git-perf
