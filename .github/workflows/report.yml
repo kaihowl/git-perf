@@ -29,9 +29,17 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: ${{ inputs.depth }}
+      - name: Checkout central reusable repo
+        uses: actions/checkout@v3
+        ref: ${{ github.workflow_sha }}
+        with:
+          repository: kaihowl/git-perf
+          token: ${{ secrets.GH_TOKEN }}
+          path: .git-perf-actions
+
       - id: install
         name: install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@${{ github.workflow_sha }}
+        uses: ./.git-perf-actions/.github/actions/install@${{ github.workflow_sha }}
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
