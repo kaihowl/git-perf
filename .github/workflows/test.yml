@@ -123,6 +123,7 @@ jobs:
     name: git-perf
     needs: test
     if: always()
+    runs-on: ubuntu-22.04
     steps:
       - name: report
         uses: ./.github/actions/report
