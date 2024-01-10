@@ -73,7 +73,7 @@ jobs:
         bash ./test/run_tests.sh
 
     - name: Install git-perf latest release
-      use: kaihowl/git-perf/.github/actions/install@add-action
+      use: kaihowl/git-perf/install@add-action
 
     - name: Run sample perf measurements
       run: |
