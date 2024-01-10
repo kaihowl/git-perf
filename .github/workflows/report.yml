@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 40
       - id: install
         name: install git-perf
-        uses: .github/actions/install
+        uses: ./.github/actions/install
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
