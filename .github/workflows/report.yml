@@ -32,7 +32,8 @@ jobs:
       - id: install
         name: install git-perf
         # TODO(kaihowl) any way to reference an action inside the reusable workflow repo?
-        uses: kaihowl/git-perf/.github/actions/install@master
+        # TODO(kaihowl) fix up version
+        uses: kaihowl/git-perf/.github/actions/install@add-report-action
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
