@@ -12,6 +12,7 @@ runs:
       name: determine latest release
       uses: pozetroninc/github-action-get-latest-release@master
       with:
+        # TODO(kaihowl) how to not hard code?
         repository: kaihowl/git-perf
         excludes: prerelease, draft
     - id: install
