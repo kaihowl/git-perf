@@ -123,4 +123,4 @@ jobs:
     if: always()
     uses: ./.github/workflows/report.yml
     with:
-      separate-by: 'rust'
+      additional-args: '-s rust'

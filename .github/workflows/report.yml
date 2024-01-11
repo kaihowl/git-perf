@@ -17,8 +17,8 @@ on:
         required: false
         type: number
         default: 40
-      separate-by
-        description: "-s parameter for git-perf report; what key's values should the report be separated by?"
+      additional-args:
+        description: "additional arguments to git-perf report invocation"
         required: false
         type: string
         default: ''
@@ -55,7 +55,7 @@ jobs:
         run: |
           git perf pull
           mkdir reports/
-          git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html ${{ inputs.separate-by }}
+          git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html ${{ inputs.additional-args }}
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v3
         with:
