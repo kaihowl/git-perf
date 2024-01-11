@@ -17,6 +17,11 @@ on:
         required: false
         type: number
         default: 40
+      separate-by
+        description: "-s parameter for git-perf report; what key's values should the report be separated by?"
+        required: false
+        type: string
+        default: ''
 
 concurrency:
   group: ${{ inputs.concurrency-token }}
@@ -50,7 +55,7 @@ jobs:
         run: |
           git perf pull
           mkdir reports/
-          git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html -s rust
+          git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html ${{ inputs.separate-by }}
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v3
         with:
