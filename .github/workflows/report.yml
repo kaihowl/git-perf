@@ -37,7 +37,7 @@ jobs:
       - id: install
         name: install git-perf
         # TODO(kaihowl) fix up version
-        uses: kaihowl/git-perf/.github/actions/install@${{ inputs.release == 'latest' && 'add-report-action' || inputs.release }}
+        uses: kaihowl/git-perf/.github/actions/install@add-report-action
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
