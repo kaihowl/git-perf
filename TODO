@@ -1,4 +1,5 @@
 - add github actions to repo, start with install, extend with full reporting
+  - test on external repo with nested, composite action
 - allow multiple splits -s in report for separate dimensions
 - add default / environment sources key-value pairs
 - update release script

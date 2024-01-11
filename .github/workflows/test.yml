@@ -119,55 +119,9 @@ jobs:
         cargo doc --no-deps
 
   report:
-    needs: test
-    concurrency: gh-pages-concurrency # keep_files==True uses last writer wins
+    name: git-perf
     if: always()
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 40
-      - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4
-      - name: use commit name as report name
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
-      - name: use branch name as report name
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "REPORT_NAME=${GITHUB_REF_SLUG}" >> $GITHUB_ENV
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-      - name: report
-        shell: bash
-        run: |
-          # TODO(kaihowl) use current or LATEST?
-          cargo install --path .
-          git perf pull
-          mkdir reports/
-          git perf report -n 40 -o reports/${{env.REPORT_NAME}}.html -s rust
-      - name: Publish new perf reports
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports
-          keep_files: true
-      - uses: actions/github-script@v6
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const { REPORT_NAME } = process.env
-            const pages = await github.rest.repos.getPages({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            })
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
-              })
+    uses: ./.github/workflows/report.yml
+    # TODO(kaihowl) run with version from branch instead?
+    with:
+      additional-args: '-s rust'
