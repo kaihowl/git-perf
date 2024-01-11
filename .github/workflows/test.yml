@@ -16,7 +16,111 @@ on:
     branches:
       - master
 jobs:
+  test:
+    name: test
+    env:
+      # For some builds, we use cross to test on 32-bit and big-endian
+      # systems.
+      CARGO: cargo
+      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
+      TARGET_FLAGS:
+      # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
+      TARGET_DIR: ./target
+      # Emit backtraces on panics.
+      RUST_BACKTRACE: 1
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+        - stable
+        - beta
+        include:
+        - build: stable
+          os: ubuntu-22.04
+          rust: stable
+        - build: beta
+          os: ubuntu-22.04
+          rust: beta
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 40
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Show command used for Cargo
+      run: |
+        echo "cargo command is: ${{ env.CARGO }}"
+        echo "target flag is: ${{ env.TARGET_FLAGS }}"
+
+    - name: Build git-perf
+      run: ${{ env.CARGO }} build --verbose ${{ env.TARGET_FLAGS }}
+
+    - uses: fregante/setup-git-user@v1
+
+    - name: Run tests
+      # TODO(kaihowl) allow concurrency after test rewrite for cwd again
+      run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }} -- --test-threads 1
+
+    - name: Run bash e2e tests
+      run: |
+        export PATH=$(pwd)/target/debug:$PATH
+        bash ./test/run_tests.sh
+
+    - name: Run sample perf measurements
+      run: |
+          set -x
+          cargo install --path .
+          # Run report on repo with known (n=10) number of measurements
+          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 0.01
+          git perf measure -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
+          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
+          git perf add -m release-binary-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < "$(which git-perf)")
+          git perf push
+          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m release-binary-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+
+
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+        components: rustfmt
+    - name: Check formatting
+      run: cargo fmt --all --check
+
+  rustdoc:
+    name: rust doc
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+        components: rustfmt
+    - name: Check docs
+      run: |
+        export RUSTDOCFLAGS="-D warnings"
+        cargo doc --no-deps
+
   report:
     name: git-perf
     if: always()
     uses: ./.github/workflows/report.yml
+    with:
+      separate-by: 'rust'
