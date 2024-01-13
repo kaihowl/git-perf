@@ -23,6 +23,11 @@ on:
         type: string
         default: ''
 
+
+permissions:
+  pages: write
+  contents: write
+
 concurrency:
   group: ${{ inputs.concurrency-token }}
 
