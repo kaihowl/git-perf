@@ -10,6 +10,7 @@ concurrency:
 permissions:
   contents: write
   pages: write
+  pull-requests: write
 
 on:
   push:
