@@ -9,6 +9,7 @@ concurrency:
 
 permissions:
   contents: write
+  pages: write
 
 on:
   push:
