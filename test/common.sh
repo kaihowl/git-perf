@@ -31,7 +31,10 @@ function create_commit() {
   # Instead, use random files such that there is a very small chance in collision.
   local file
   file=$RANDOM
-  touch "$file"
+  # As the RANDOM function can collide, ensure that with each call of create_commit, the file content changes
+  # by appending to the (often but not always) new file.
+  # Without this, the git commit might end up as 'empty'.
+  echo content >> "$file"
   git add "$file"
   git commit -m 'my commit'
 }
