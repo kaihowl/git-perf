@@ -3,10 +3,11 @@ use std::{
     io,
     path::{Path, PathBuf},
     process::{self},
+    time::Duration,
 };
 
 use anyhow::{bail, Context, Result};
-use backoff::{Error, ExponentialBackoff};
+use backoff::{Error, ExponentialBackoffBuilder};
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -218,9 +219,6 @@ pub fn pull(work_dir: Option<&Path>) -> Result<()> {
 }
 
 pub fn push(work_dir: Option<&Path>) -> Result<()> {
-    // TODO(kaihowl) configure
-    let backoff = ExponentialBackoff::default();
-
     // TODO(kaihowl) check transient/permanent error
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
         raw_push(work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
@@ -231,6 +229,11 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
             None => Error::Permanent(e),
         })
     };
+
+    // TODO(kaihowl) configure
+    let backoff = ExponentialBackoffBuilder::default()
+        .with_max_elapsed_time(Some(Duration::from_secs(60)))
+        .build();
 
     backoff::retry(backoff, op).map_err(|e| match e {
         Error::Permanent(e) => e.context("Permanent failure while pushing refs"),
