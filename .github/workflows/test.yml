@@ -49,7 +49,7 @@ jobs:
           rust: beta
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 40
 
@@ -66,7 +66,7 @@ jobs:
     - name: Build git-perf
       run: ${{ env.CARGO }} build --verbose ${{ env.TARGET_FLAGS }}
 
-    - uses: fregante/setup-git-user@v1
+    - uses: fregante/setup-git-user@v2
 
     - name: Run tests
       # TODO(kaihowl) allow concurrency after test rewrite for cwd again
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
