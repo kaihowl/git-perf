@@ -52,7 +52,7 @@ jobs:
         run: |
           echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
       - name: use branch name as report name
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           echo "REPORT_NAME=${GITHUB_REF_SLUG}" >> $GITHUB_ENV
       - name: report
