@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2](https://github.com/kaihowl/git-perf/compare/v0.15.1...v0.15.2) - 2024-01-18
+
+### Other
+- release flow with cargo-dist ([#82](https://github.com/kaihowl/git-perf/pull/82))
+- use branch name when not running on a PR ([#81](https://github.com/kaihowl/git-perf/pull/81))
+- release as draft by default ([#79](https://github.com/kaihowl/git-perf/pull/79))
+
 ## [0.15.1](https://github.com/kaihowl/git-perf/compare/v0.15.0...v0.15.1) - 2024-01-14
 
 ### Added
