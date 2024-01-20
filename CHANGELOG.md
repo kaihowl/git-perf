@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.3](https://github.com/kaihowl/git-perf/compare/v0.15.2...v0.15.3) - 2024-01-20
+
+### Other
+- upload release artifacts and retain generated release text ([#85](https://github.com/kaihowl/git-perf/pull/85))
+
 ## [0.15.2](https://github.com/kaihowl/git-perf/compare/v0.15.1...v0.15.2) - 2024-01-18
 
 ### Other
