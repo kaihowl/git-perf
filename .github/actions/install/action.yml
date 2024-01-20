@@ -8,37 +8,10 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - id: latest-release
-      name: determine latest release
-      uses: pozetroninc/github-action-get-latest-release@master
-      with:
-        repository: kaihowl/git-perf
-        excludes: prerelease, draft
     - id: install
       run: |
-        mkdir -p ~/.git-perf/
-        pushd ~/.git-perf
-
-        if [ "${{ runner.os }}" = "Linux" ]; then
-          os="x86_64-unknown-linux-musl"
-        elif [ "${{ runner.os }}" = "macOS" ]; then
-          os="x86_64-apple-darwin"
-        else
-          echo "Unsupported OS"
-          exit 1
-        fi
-
-        if [[ "${{ inputs.release }}" == "latest" ]]; then
-          release=${{ steps.latest-release.outputs.release }}
-        else
-          release=${{ inputs.release }}
-        fi
-
-        gitperf_url="https://github.com/kaihowl/git-perf/releases/download/${release}/gitperf-${release}-${os}.tar.gz"
-
-        echo "Downloading and installing ${gitperf_url}"
-
-        curl -L "$gitperf_url" | tar -xz --strip-components=1
-
-        echo "$HOME/.git-perf" >> $GITHUB_PATH
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/download/v0.15.3/git-perf-installer.sh | sh
+        export PATH=$HOME/.cargo/bin:$PATH
+        git-perf --help
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       shell: bash
