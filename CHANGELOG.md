@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.4](https://github.com/kaihowl/git-perf/compare/v0.15.3...v0.15.4) - 2024-01-20
+
+### Fixed
+- install action uses installer ([#88](https://github.com/kaihowl/git-perf/pull/88))
+
+### Other
+- add musl artifact ([#89](https://github.com/kaihowl/git-perf/pull/89))
+
 ## [0.15.3](https://github.com/kaihowl/git-perf/compare/v0.15.2...v0.15.3) - 2024-01-20
 
 ### Other
