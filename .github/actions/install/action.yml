@@ -17,7 +17,7 @@ runs:
         if [ ${{ inputs.release }} = branch ]; then
           latest="latest/"
         else
-          version=${{ inputs.version }}/
+          version=${{ inputs.release }}/
         fi
         download_url=https://github.com/kaihowl/git-perf/releases/${latest}download${version}/git-perf-installer.sh 
         echo "Downloading $download_url"
