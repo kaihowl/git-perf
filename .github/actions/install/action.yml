@@ -8,7 +8,8 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - id: install released version
+    - id: install-release
+      name: Install released version
       if: ${{ inputs.release }} != 'branch'
       run: |
         curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/download/${{ inputs.release }}/git-perf-installer.sh | sh
