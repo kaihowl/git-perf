@@ -12,7 +12,14 @@ runs:
       name: Install released version
       if: ${{ inputs.release }} != 'branch'
       run: |
-        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/download/${{ inputs.release }}/git-perf-installer.sh | sh
+        latest=""
+        version=""
+        if [ ${{ inputs.release }} = branch ]; then
+          latest="latest/"
+        else
+          version=${{ inputs.version }}/
+        fi
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/${latest}download${version}/git-perf-installer.sh | sh
         export PATH=$HOME/.cargo/bin:$PATH
         git-perf --help
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
