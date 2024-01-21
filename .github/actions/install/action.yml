@@ -19,7 +19,9 @@ runs:
         else
           version=${{ inputs.version }}/
         fi
-        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/${latest}download${version}/git-perf-installer.sh | sh
+        download_url=https://github.com/kaihowl/git-perf/releases/${latest}download${version}/git-perf-installer.sh 
+        echo "Downloading $download_url"
+        curl --proto '=https' --tlsv1.2 -LsSf "$download_url" | sh
         export PATH=$HOME/.cargo/bin:$PATH
         git-perf --help
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
