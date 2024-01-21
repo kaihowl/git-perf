@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       release:
-        description: 'release to install'
+        description: 'release to install (`latest`, a version number, or `branch`)'
         required: false
         type: string
         default: 'latest'
