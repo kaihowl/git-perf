@@ -14,12 +14,12 @@ runs:
       run: |
         latest=""
         version=""
-        if [ ${{ inputs.release }} = branch ]; then
+        if [ ${{ inputs.release }} = latest ]; then
           latest="latest/"
         else
           version=${{ inputs.release }}/
         fi
-        download_url=https://github.com/kaihowl/git-perf/releases/${latest}download${version}/git-perf-installer.sh 
+        download_url=https://github.com/kaihowl/git-perf/releases/${latest}download/${version}git-perf-installer.sh 
         echo "Downloading $download_url"
         curl --proto '=https' --tlsv1.2 -LsSf "$download_url" | sh
         export PATH=$HOME/.cargo/bin:$PATH
