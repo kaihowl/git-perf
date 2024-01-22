@@ -50,7 +50,8 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
             "--ref",
             REFS_NOTES_BRANCH,
             "append",
-            "--no-separator",
+            // TODO(kaihowl) disabled until #96 is solved
+            // "--no-separator",
             "-m",
             line,
         ],
