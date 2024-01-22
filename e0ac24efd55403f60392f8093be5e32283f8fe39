@@ -21,3 +21,5 @@
 0report1705943042.99794244429645.0rust=stableos=ubuntu-22.04
 
 0report-size1705943043.00477741418.0rust=stableos=ubuntu-22.04
+
+0release-binary-size1705943043.012889410452320.0os=ubuntu-22.04rust=stable
