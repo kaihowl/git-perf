@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.5](https://github.com/kaihowl/git-perf/compare/v0.15.4...v0.15.5) - 2024-01-22
+
+### Fixed
+- disable no-separator option ([#97](https://github.com/kaihowl/git-perf/pull/97))
+
 ## [0.15.4](https://github.com/kaihowl/git-perf/compare/v0.15.3...v0.15.4) - 2024-01-20
 
 ### Fixed
