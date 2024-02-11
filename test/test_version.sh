@@ -28,3 +28,5 @@ git-perf --version && exit 1
 # Git version just right
 export PATH=${script_dir}/fake_git_2.41.0:$PATH
 git-perf --version
+
+exit 0
