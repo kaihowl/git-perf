@@ -178,7 +178,7 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         self.indexed_measurements
             .iter()
             .map(|(index, measurement_data)| {
-                let ser_measurement = serialize_single(measurement_data);
+                let ser_measurement = serialize_single(measurement_data, "\t");
                 let commit = &self.hashes[*index];
                 format!("{commit}{DELIMITER}{ser_measurement}")
             })

@@ -22,7 +22,7 @@ struct SerializeMeasurementData<'a> {
 
 pub const DELIMITER: &str = "";
 
-pub fn serialize_single<M>(measurement_data: &M) -> String
+pub fn serialize_single<M>(measurement_data: &M, custom_delimiter: &str) -> String
 where
     M: Borrow<MeasurementData>,
 {
@@ -37,13 +37,13 @@ where
 
     m.extend(md.key_values.iter().map(|(k, v)| format!("{k}={v}")));
 
-    m.join(DELIMITER) + "\n"
+    m.join(custom_delimiter) + "\n"
 }
 
 pub fn serialize_multiple<M: Borrow<MeasurementData>>(measurement_data: &[M]) -> String {
     measurement_data
         .iter()
-        .map(|md| serialize_single(md))
+        .map(|md| serialize_single(md, DELIMITER))
         .join("")
 }
 
@@ -187,7 +187,7 @@ mod test {
             val: 42.0,
             key_values: [("mykey".to_string(), "myvalue".to_string())].into(),
         };
-        let serialized = serialize_single(&md);
+        let serialized = serialize_single(&md, DELIMITER);
         assert_eq!(serialized, "3Mymeasurement1234567.042.0mykey=myvalue\n");
     }
 }
