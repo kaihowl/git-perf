@@ -8,6 +8,7 @@ use crate::audit;
 use crate::basic_measure::measure;
 use crate::config::bump_epoch;
 use crate::data::ReductionFunc;
+use crate::git_interop;
 use crate::git_interop::{prune, pull, push};
 use crate::measurement_storage::add;
 use crate::reporting::report;
@@ -166,8 +167,9 @@ fn parse_spaceless_string(s: &str) -> Result<String> {
 }
 
 pub fn handle_calls() -> Result<()> {
-    let cli = Cli::parse();
+    git_interop::check_git_version()?;
 
+    let cli = Cli::parse();
     match cli.command {
         Commands::Measure {
             repetitions,

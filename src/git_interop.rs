@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use backoff::{Error, ExponentialBackoffBuilder};
 use itertools::Itertools;
 use thiserror::Error;
@@ -244,6 +244,42 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
+    let version = version
+        .split_whitespace()
+        .nth(2)
+        .ok_or(anyhow!("Could not find git version in string {version}"))?;
+    match version.split('.').collect_vec()[..] {
+        [major, minor, patch] => Ok((major.parse()?, minor.parse()?, patch.parse()?)),
+        _ => Err(anyhow!("Failed determine semantic version from {version}")),
+    }
+}
+
+fn get_git_version() -> Result<(i32, i32, i32)> {
+    let version = run_git(&["--version"], &None).context("Determine git version")?;
+    parse_git_version(&version)
+}
+
+fn concat_version(version_tuple: (i32, i32, i32)) -> String {
+    format!(
+        "{}.{}.{}",
+        version_tuple.0, version_tuple.1, version_tuple.2
+    )
+}
+
+pub fn check_git_version() -> Result<()> {
+    let version_tuple = get_git_version().context("Determining compatible git version")?;
+    let expected_version = (2, 41, 0);
+    if version_tuple < expected_version {
+        bail!(
+            "Version {} is smaller than {}",
+            concat_version(version_tuple),
+            concat_version(expected_version)
+        )
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -374,5 +410,14 @@ mod test {
             "'{}' contained non alphanumeric or non ASCII characters",
             &revision
         )
+    }
+
+    #[test]
+    fn test_parse_git_version() {
+        let version = parse_git_version("git version 2.52.0");
+        assert_eq!(version.unwrap(), (2, 52, 0));
+
+        let version = parse_git_version("git version 2.52.0\n");
+        assert_eq!(version.unwrap(), (2, 52, 0));
     }
 }
