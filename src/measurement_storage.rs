@@ -9,7 +9,7 @@ use crate::{
     config,
     data::MeasurementData,
     git_interop::add_note_line_to_head,
-    serialization::{serialize_multiple, serialize_single},
+    serialization::{serialize_multiple, serialize_single, DELIMITER},
 };
 
 pub fn add_multiple(
@@ -63,7 +63,7 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
         key_values,
     };
 
-    let serialized = serialize_single(&md);
+    let serialized = serialize_single(&md, DELIMITER);
 
     add_note_line_to_head(&serialized)?;
 
