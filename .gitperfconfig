@@ -1,1 +1,1 @@
-measurement = { report-size = { epoch = "c25d7d4b" } }
+measurement = { report-size = { epoch = "c25d7d4b" } , report = { epoch = "cfe69917" } }
