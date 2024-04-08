@@ -62,7 +62,7 @@ jobs:
           mkdir reports/
           git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html ${{ inputs.additional-args }}
       - name: Publish new perf reports
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./reports
