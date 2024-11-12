@@ -46,7 +46,7 @@ jobs:
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
-        uses: rlespinasse/github-slug-action@v4
+        uses: rlespinasse/github-slug-action@v5
       - name: use commit name as report name
         if: ${{ github.event_name == 'pull_request' }}
         run: |
