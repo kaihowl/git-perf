@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0](https://github.com/kaihowl/git-perf/compare/v0.15.5...v0.16.0) - 2024-11-12
+
+### Added
+
+- check git version before operation ([#102](https://github.com/kaihowl/git-perf/pull/102))
+- use tab as delimiter in csv ([#101](https://github.com/kaihowl/git-perf/pull/101))
+
+### Other
+
+- *(deps)* bump rlespinasse/github-slug-action from 4 to 5 in the github-actions group ([#112](https://github.com/kaihowl/git-perf/pull/112))
+- *(deps)* bump peaceiris/actions-gh-pages from 3 to 4 in the github-actions group ([#111](https://github.com/kaihowl/git-perf/pull/111))
+- *(deps)* bump the github-actions group with 3 updates ([#99](https://github.com/kaihowl/git-perf/pull/99))
+- bump report measurement epoch ([#108](https://github.com/kaihowl/git-perf/pull/108))
+- must measure report command repeatedly for significance ([#107](https://github.com/kaihowl/git-perf/pull/107))
+- remove release-binary-size tracking ([#104](https://github.com/kaihowl/git-perf/pull/104))
+
 ## [0.15.5](https://github.com/kaihowl/git-perf/compare/v0.15.4...v0.15.5) - 2024-01-22
 
 ### Fixed
