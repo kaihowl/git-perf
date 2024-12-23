@@ -36,7 +36,7 @@ where
 
     let mut first_epoch = None;
 
-    // TODO(kaihowl) this is a second repsonsibility, move out? "EpochClearing"
+    // TODO(kaihowl) this is a second responsibility, move out? "EpochClearing"
     measurements.take_while(move |m| match &m {
         Ok(CommitSummary {
             measurement: Some(m),
