@@ -30,7 +30,6 @@ pub fn audit(
         .next()
         .ok_or(anyhow!("No commit at HEAD"))
         .and_then(|s| {
-            eprintln!("Head measurement is: {s:?}");
             s.and_then(|cs| {
                 cs.measurement
                     .map(|m| m.val)

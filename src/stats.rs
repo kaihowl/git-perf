@@ -5,6 +5,8 @@ use itertools::Itertools;
 
 use crate::data::ReductionFunc;
 
+use readable::num::*;
+
 pub trait VecAggregation {
     fn median(&mut self) -> Option<f64>;
 }
@@ -29,7 +31,13 @@ pub struct Stats {
 
 impl Display for Stats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "μ: {} σ: {} n: {}", self.mean, self.stddev, self.len)
+        write!(
+            f,
+            "μ: {} σ: {} n: {}",
+            Float::from(self.mean),
+            Float::from(self.stddev),
+            Unsigned::from(self.len),
+        )
     }
 }
 
