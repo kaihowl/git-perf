@@ -5,6 +5,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use chrono::prelude::*;
+
 use crate::{
     config,
     data::MeasurementData,
@@ -68,4 +70,8 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
     add_note_line_to_head(&serialized)?;
 
     Ok(())
+}
+
+pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
+    crate::git_interop::remove_measurements_from_commits(older_than)
 }
