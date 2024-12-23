@@ -1,8 +1,10 @@
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
 use clap::{CommandFactory, Subcommand};
 use std::path::PathBuf;
+
+use chrono::prelude::*;
+use chrono::Duration;
 
 use crate::audit;
 use crate::basic_measure::measure;
@@ -10,7 +12,7 @@ use crate::config::bump_epoch;
 use crate::data::ReductionFunc;
 use crate::git_interop;
 use crate::git_interop::{prune, pull, push};
-use crate::measurement_storage::add;
+use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
 
 #[derive(Parser)]
@@ -140,6 +142,13 @@ enum Commands {
         measurement: String,
     },
 
+    /// Remove all performance measurements for commits that have been committed
+    /// before the specified time period.
+    Remove {
+        #[arg(long = "older-than", value_parser = parse_datetime_value_now)]
+        older_than: DateTime<Utc>,
+    },
+
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
@@ -164,6 +173,26 @@ fn parse_spaceless_string(s: &str) -> Result<String> {
     } else {
         Ok(String::from(s))
     }
+}
+
+fn parse_datetime_value_now(input: &str) -> Result<DateTime<Utc>> {
+    parse_datetime_value(&Utc::now(), input)
+}
+
+fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc>> {
+    if input.len() < 2 {
+        bail!("Invalid datetime format");
+    }
+
+    let (num, unit) = input.split_at(input.len() - 1);
+    let num: i64 = num.parse()?;
+    let subtractor = match unit {
+        "w" => Duration::weeks(num),
+        "d" => Duration::days(num),
+        "h" => Duration::hours(num),
+        _ => bail!("Unsupported datetime format"),
+    };
+    Ok(*now - subtractor)
 }
 
 pub fn handle_calls() -> Result<()> {
@@ -227,6 +256,7 @@ pub fn handle_calls() -> Result<()> {
             generate_manpage().expect("Man page generation failed");
             Ok(())
         }
+        Commands::Remove { older_than } => remove_measurements_from_commits(older_than),
     }
 }
 
@@ -253,5 +283,31 @@ mod test {
     #[test]
     fn verify_cli() {
         Cli::command().debug_assert()
+    }
+
+    #[test]
+    fn verify_date_parsing() {
+        let now = Utc::now();
+
+        assert_eq!(
+            now - Duration::weeks(2),
+            parse_datetime_value(&now, "2w").unwrap()
+        );
+
+        assert_eq!(
+            now - Duration::days(30),
+            parse_datetime_value(&now, "30d").unwrap()
+        );
+
+        assert_eq!(
+            now - Duration::hours(72),
+            parse_datetime_value(&now, "72h").unwrap()
+        );
+
+        assert!(parse_datetime_value(&now, " 2w ").is_err());
+
+        assert!(parse_datetime_value(&now, "").is_err());
+
+        assert!(parse_datetime_value(&now, "945kjfg").is_err());
     }
 }
