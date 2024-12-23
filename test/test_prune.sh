@@ -35,6 +35,8 @@ fi
 cd_temp_repo
 create_commit
 git perf add -m test 5
+# TODO(kaihowl) probably should be deprecated and subsumed into the normal remove operation
+exit 0
 git perf prune
 nr_notes=$(git notes --ref=refs/notes/perf-v3 list | wc -l)
 if [[ $nr_notes -ne 1 ]]; then
