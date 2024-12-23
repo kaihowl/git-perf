@@ -4,6 +4,8 @@ set -e
 PS4='${BASH_SOURCE}:${LINENO}: '
 set -x
 
+export RUST_BACKTRACE=1
+
 shopt -s nocasematch
 
 export GIT_COMMITTER_NAME="github-actions[bot]"
