@@ -11,8 +11,7 @@ if [[ $(uname -s) = Darwin ]]; then
   export DYLD_FORCE_FLAT_NAMESPACE=1
   export DYLD_INSERT_LIBRARIES=/opt/homebrew/lib/faketime/libfaketime.1.dylib
 else
-  echo "not implemented"
-  exit 1
+  export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
 fi
 
 cd_temp_repo

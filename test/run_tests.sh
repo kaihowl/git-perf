@@ -3,6 +3,14 @@
 script_dir=$(dirname "$0")
 num_procs=4
 
+install_on_ci() {
+  if [[ $(uname -s) = Darwin ]]; then
+    brew install libfaketime
+  else # ubuntu
+    apt-get install libfaketime
+  fi
+}
+
 # Function to execute command and capture output
 execute_command() {
     local output_file
@@ -18,6 +26,10 @@ execute_command() {
         exit 1
     fi
 }
+
+if [[ -n $CI ]]; then
+  install_on_ci
+fi
 
 # Find command to generate the list of scripts
 commands=()
