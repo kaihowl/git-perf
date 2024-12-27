@@ -13,7 +13,7 @@ output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
 re=".*following (required )?arguments.*"
 if [[ ! ${output} =~ $re ]]; then
   echo "Missing 'following arguments' in output:"
-  echo "$output"
+  echo "Output: '$output'"
   exit 1
 fi
 
@@ -48,10 +48,11 @@ fi
 
 echo "Measurement with padding spaces (quoted)"
 cd_temp_repo
-git perf add -m test-measure " 0.5 "
-val=$(git perf report -o - | cut -f5 -d, | head -n 1)
-if [[ $val -ne 0.5 ]]; then
-  echo "Unexpected measurement of val '${val}'. Expected 0.5 instead."
+output=$(git perf add -m test-measure " 0.5 " 2>&1 1>/dev/null) && exit 1
+re=".*invalid float.*"
+if [[ ! ${output} =~ re ]]; then
+  echo "Error message does not mention problem with float literal value"
+  echo "Output: '$output'"
   exit 1
 fi
 
