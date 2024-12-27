@@ -140,6 +140,13 @@ enum Commands {
         measurement: String,
     },
 
+    /// Remove all performance measurements for commits that have been committed
+    /// before the specified time period.
+    Remove {
+        #[arg(long = "older-than")]
+        older_than: String,
+    },
+
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
@@ -227,6 +234,7 @@ pub fn handle_calls() -> Result<()> {
             generate_manpage().expect("Man page generation failed");
             Ok(())
         }
+        Commands::Remove { older_than } => todo!(),
     }
 }
 
