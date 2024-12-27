@@ -30,7 +30,7 @@ num_measurements=$(git perf report -o - | wc -l)
 echo Measurements in nanoseconds
 cd_temp_repo
 git perf measure -m test-measure -- bash -c 'sleep 0.1'
-val=$(git perf report -o - | cut -f5 -d, | head -n 1)
+val=$(git perf report -o - | cut -f4 | head -n 1)
 if [[ 1 -eq "$(echo "${val} < 10^(9-1)" | bc)" ]]; then
     echo "Measure is not in nanosecond precision"
     echo "0.1 seconds of sleep + fork + etc. overhead is currently $val"
