@@ -40,8 +40,8 @@ fi
 echo "Measurement with padding spaces (argparse)"
 cd_temp_repo
 git perf add -m test-measure  0.5  
-val=$(git perf report -o - | cut -f5 -d, | head -n 1)
-if [[ $val -ne 0.5 ]]; then
+val=$(git perf report -o - | cut -f4 | head -n 1)
+if [[ $val != 0.5 ]]; then
   echo "Unexpected measurement of val '${val}'. Expected 0.5 instead."
   exit 1
 fi
