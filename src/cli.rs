@@ -145,7 +145,7 @@ enum Commands {
     /// Remove all performance measurements for commits that have been committed
     /// before the specified time period.
     Remove {
-        #[arg(long = "older-than", value_parser = parse_datetime_value)]
+        #[arg(long = "older-than", value_parser = parse_datetime_value_now)]
         older_than: DateTime<Utc>,
     },
 
@@ -175,16 +175,24 @@ fn parse_spaceless_string(s: &str) -> Result<String> {
     }
 }
 
-fn parse_datetime_value(input: &str) -> Result<DateTime<Utc>> {
+fn parse_datetime_value_now(input: &str) -> Result<DateTime<Utc>> {
+    parse_datetime_value(&Utc::now(), input)
+}
+
+fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc>> {
+    if input.len() < 2 {
+        bail!("Invalid datetime format");
+    }
+
     let (num, unit) = input.split_at(input.len() - 1);
     let num: i64 = num.parse()?;
     let subtractor = match unit {
+        "w" => Duration::weeks(num),
         "d" => Duration::days(num),
         "h" => Duration::hours(num),
-        "m" => Duration::minutes(num),
         _ => bail!("Unsupported datetime format"),
     };
-    Ok(Utc::now() - subtractor)
+    Ok(*now - subtractor)
 }
 
 pub fn handle_calls() -> Result<()> {
@@ -278,5 +286,31 @@ mod test {
     #[test]
     fn verify_cli() {
         Cli::command().debug_assert()
+    }
+
+    #[test]
+    fn verify_date_parsing() {
+        let now = Utc::now();
+
+        assert_eq!(
+            now - Duration::weeks(2),
+            parse_datetime_value(&now, "2w").unwrap()
+        );
+
+        assert_eq!(
+            now - Duration::days(30),
+            parse_datetime_value(&now, "30d").unwrap()
+        );
+
+        assert_eq!(
+            now - Duration::hours(72),
+            parse_datetime_value(&now, "72h").unwrap()
+        );
+
+        assert!(parse_datetime_value(&now, " 2w ").is_err());
+
+        assert!(parse_datetime_value(&now, "").is_err());
+
+        assert!(parse_datetime_value(&now, "945kjfg").is_err());
     }
 }
