@@ -12,6 +12,7 @@ repository = "https://github.com/kaihowl/git-perf"
 anyhow = "1.0.75"
 average = "0.13.1"
 backoff = "0.4.0"
+chrono = "0.4.39"
 clap = { version="4", features=["derive", "wrap_help"] }
 clap_mangen = "0.2.5"
 criterion = "0.5.1"

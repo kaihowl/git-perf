@@ -1,8 +1,10 @@
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
 use clap::{CommandFactory, Subcommand};
 use std::path::PathBuf;
+
+use chrono::prelude::*;
+use chrono::Duration;
 
 use crate::audit;
 use crate::basic_measure::measure;
@@ -143,8 +145,8 @@ enum Commands {
     /// Remove all performance measurements for commits that have been committed
     /// before the specified time period.
     Remove {
-        #[arg(long = "older-than")]
-        older_than: String,
+        #[arg(long = "older-than", value_parser = parse_datetime_value)]
+        older_than: DateTime<Utc>,
     },
 
     /// Remove all performance measurements for non-existent/unreachable objects.
@@ -171,6 +173,18 @@ fn parse_spaceless_string(s: &str) -> Result<String> {
     } else {
         Ok(String::from(s))
     }
+}
+
+fn parse_datetime_value(input: &str) -> Result<DateTime<Utc>> {
+    let (num, unit) = input.split_at(input.len() - 1);
+    let num: i64 = num.parse()?;
+    let subtractor = match unit {
+        "d" => Duration::days(num),
+        "h" => Duration::hours(num),
+        "m" => Duration::minutes(num),
+        _ => bail!("Unsupported datetime format"),
+    };
+    Ok(Utc::now() - subtractor)
 }
 
 pub fn handle_calls() -> Result<()> {
@@ -234,7 +248,10 @@ pub fn handle_calls() -> Result<()> {
             generate_manpage().expect("Man page generation failed");
             Ok(())
         }
-        Commands::Remove { older_than } => todo!(),
+        Commands::Remove { older_than } => {
+            println!("{:?}", older_than);
+            todo!()
+        }
     }
 }
 
