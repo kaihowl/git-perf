@@ -133,6 +133,20 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
     let reader = BufReader::new(notes_out);
     let mut writer = BufWriter::new(dates_in);
 
+    let dates_handler = thread::spawn(move || {
+        let reader = BufReader::new(dates_out);
+        for line in reader.lines().map_while(Result::ok) {
+            if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
+                println!("commit: {}, timestamp: {}", commit, timestamp);
+                if let Ok(timestamp) = timestamp.parse::<i64>() {
+                    if timestamp < oldest_timestamp {
+                        println!("OLDER");
+                    }
+                }
+            }
+        }
+    });
+
     reader.lines().map_while(Result::ok).for_each(|line| {
         if let Some(line) = line.split_whitespace().nth(1) {
             writeln!(writer, "{}", line).expect("Failed to write to pipe");
@@ -141,26 +155,10 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
 
     drop(writer);
 
-    let dates_handler = thread::spawn(move || {
-        let reader = BufReader::new(dates_out);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
-                    println!("commit: {}, timestamp: {}", line, timestamp);
-                    if let Ok(timestamp) = timestamp.parse::<i64>() {
-                        if timestamp < oldest_timestamp {
-                            println!("OLDER");
-                        }
-                    }
-                }
-            }
-        }
-    });
+    list_notes.wait()?;
+    get_commit_dates.wait()?;
 
-    list_notes.wait();
-    get_commit_dates.wait();
-
-    dates_handler.join();
+    dates_handler.join().expect("Failed to join");
 
     Ok(())
 }
