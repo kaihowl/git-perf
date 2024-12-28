@@ -342,7 +342,6 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
 }
 
 fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
-    dbg!(&version);
     let version = version
         .split_whitespace()
         .nth(2)
