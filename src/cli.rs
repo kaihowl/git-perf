@@ -12,7 +12,7 @@ use crate::config::bump_epoch;
 use crate::data::ReductionFunc;
 use crate::git_interop;
 use crate::git_interop::{prune, pull, push};
-use crate::measurement_storage::add;
+use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
 
 #[derive(Parser)]
@@ -256,10 +256,7 @@ pub fn handle_calls() -> Result<()> {
             generate_manpage().expect("Man page generation failed");
             Ok(())
         }
-        Commands::Remove { older_than } => {
-            println!("{:?}", older_than);
-            todo!()
-        }
+        Commands::Remove { older_than } => remove_measurements_from_commits(older_than),
     }
 }
 

@@ -1,8 +1,10 @@
 use std::{
     env::current_dir,
-    io,
+    io::{self, BufRead, BufReader, BufWriter, Read, Stderr, Write},
     path::{Path, PathBuf},
-    process::{self},
+    process::{self, Child, Stdio},
+    sync::mpsc,
+    thread,
     time::Duration,
 };
 
@@ -10,6 +12,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use backoff::{Error, ExponentialBackoffBuilder};
 use itertools::Itertools;
 use thiserror::Error;
+
+use chrono::prelude::*;
 
 #[derive(Debug, Error)]
 enum GitError {
@@ -20,16 +24,26 @@ enum GitError {
     IoError(#[from] io::Error),
 }
 
-fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitError> {
+fn spawn_git_command(
+    args: &[&str],
+    working_dir: &Option<&Path>,
+    stdin: Option<Stdio>,
+) -> Result<Child, io::Error> {
     let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
-
-    let output = process::Command::new("git")
+    let stdin = stdin.unwrap_or(Stdio::null());
+    process::Command::new("git")
         // TODO(kaihowl) set correct encoding and lang?
         .env("LANG", "")
+        .stdin(stdin)
+        .stdout(Stdio::piped())
         .env("LC_ALL", "C")
         .current_dir(working_dir)
         .args(args)
-        .output()?;
+        .spawn()
+}
+
+fn capture_git_output(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitError> {
+    let output = spawn_git_command(args, &working_dir, None)?.wait_with_output()?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
@@ -44,7 +58,7 @@ fn run_git(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitErro
 const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
 
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
-    run_git(
+    capture_git_output(
         &[
             "notes",
             "--ref",
@@ -63,20 +77,21 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
 }
 
 pub fn get_head_revision() -> Result<String> {
-    let head = run_git(&["rev-parse", "HEAD"], &None).context("Failed to parse HEAD.")?;
+    let head =
+        capture_git_output(&["rev-parse", "HEAD"], &None).context("Failed to parse HEAD.")?;
 
     Ok(head.trim().to_owned())
 }
 pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    run_git(&["fetch", "origin", REFS_NOTES_BRANCH], &work_dir)
+    capture_git_output(&["fetch", "origin", REFS_NOTES_BRANCH], &work_dir)
         .context("Failed to fetch performance measurements.")?;
 
     Ok(())
 }
 
 pub fn reconcile() -> Result<()> {
-    let _ = run_git(
+    let _ = capture_git_output(
         &[
             "notes",
             "--ref",
@@ -92,6 +107,100 @@ pub fn reconcile() -> Result<()> {
     Ok(())
 }
 
+pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
+    let oldest_timestamp = older_than.timestamp();
+    // Outputs line-by-line <note_oid> <annotated_oid>
+    let args = &["notes", "--ref", REFS_NOTES_BRANCH, "list"];
+    // let mut list_notes = process::Command::new("git")
+    //     // TODO(kaihowl) set correct encoding and lang?
+    //     .env("LANG", "")
+    //     // .stdin(Stdio::null())
+    //     .stdout(Stdio::piped())
+    //     .env("LC_ALL", "C")
+    //     .args(args)
+    //     .spawn()
+    //     .expect("Failed to spawn");
+    let mut list_notes =
+        spawn_git_command(&["notes", "--ref", REFS_NOTES_BRANCH, "list"], &None, None)?;
+
+    // let stderr = list_notes.stderr.take().unwrap();
+    // eprintln!("{:?}", stderr.bytes());
+    // let out = list_notes.wait_with_output()?.stdout;
+    // eprintln!("stdout: {}", String::from_utf8_lossy(&out));
+
+    let mut get_commit_dates = spawn_git_command(
+        &[
+            "log",
+            "--ignore-missing",
+            "--no-walk",
+            "--pretty=format:%H %ct",
+            "--stdin",
+        ],
+        &None,
+        Some(Stdio::piped()),
+    )?;
+
+    let notes_out = list_notes.stdout.take().unwrap();
+
+    let dates_in = get_commit_dates.stdin.take().unwrap();
+    let dates_out = get_commit_dates.stdout.take().unwrap();
+    //
+    // // let (tx, rx) = mpsc::channel();
+    let reader = BufReader::new(notes_out);
+    let mut writer = BufWriter::new(dates_in);
+    //
+    reader.lines().map_while(Result::ok).for_each(|line| {
+        if let Some(line) = line.split_whitespace().nth(1) {
+            writeln!(writer, "{}", line).expect("Failed to write to pipe");
+        }
+    });
+    //
+    drop(writer);
+    //
+    let dates_handler = thread::spawn(move || {
+        let reader = BufReader::new(dates_out);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
+                    println!("commit: {}, timestamp: {}", line, timestamp);
+                    if let Ok(timestamp) = timestamp.parse::<i64>() {
+                        if timestamp < oldest_timestamp {
+                            println!("OLDER");
+                        }
+                    }
+                }
+            }
+        }
+    });
+    //
+    list_notes.wait();
+    get_commit_dates.wait();
+
+    dates_handler.join();
+
+    // let notes_to_dates = async_std::task::spawn(async move || -> io::Result<()> {
+    //     let reader = BufReader::new(notes_out);
+    //     let mut lines = reader.lines();
+    //
+    //     while let Some(line) = lines.next_line().await? {}
+    // while let line = .await {
+    //     match line {
+    //         Ok(line) => match line.split_whitespace().take(2).collect_vec()[..] {
+    //             [_note_oid, commit_oid] => writeln!(&dates_input, "{}", commit_oid),
+    //             _ => continue,
+    //         },
+    //         Err(_) => todo!(),
+    //     };
+    //     // TODO(kaihowl) service also after done
+    //     for line in BufReader::new(dates_output).lines() {
+    //         println!("{:?}", line);
+    //     }
+    // }
+    // });
+
+    Ok(())
+}
+
 #[derive(Debug, Error)]
 enum PushError {
     #[error("A ref failed to be pushed:\n{stdout}\n{stderr}")]
@@ -102,7 +211,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) configure remote?
     // TODO(kaihowl) factor into constants
     // TODO(kaihowl) capture output
-    let output = run_git(
+    let output = capture_git_output(
         &[
             "push",
             "--porcelain",
@@ -136,13 +245,14 @@ pub fn prune() -> Result<()> {
         bail!("Refusing to prune on a shallow repo")
     }
 
-    run_git(&["notes", "--ref", REFS_NOTES_BRANCH, "prune"], &None).context("Failed to prune.")?;
+    capture_git_output(&["notes", "--ref", REFS_NOTES_BRANCH, "prune"], &None)
+        .context("Failed to prune.")?;
 
     Ok(())
 }
 
 fn is_shallow_repo() -> Result<bool> {
-    let output = run_git(&["rev-parse", "--is-shallow-repository"], &None)
+    let output = capture_git_output(&["rev-parse", "--is-shallow-repository"], &None)
         .context("Failed to determine if repo is a shallow clone.")?;
 
     Ok(output.starts_with("true"))
@@ -150,7 +260,7 @@ fn is_shallow_repo() -> Result<bool> {
 
 // TODO(kaihowl) return a nested iterator / generator instead?
 pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
-    let output = run_git(
+    let output = capture_git_output(
         &[
             "--no-pager",
             "log",
@@ -245,6 +355,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
 }
 
 fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
+    dbg!(&version);
     let version = version
         .split_whitespace()
         .nth(2)
@@ -256,7 +367,7 @@ fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
 }
 
 fn get_git_version() -> Result<(i32, i32, i32)> {
-    let version = run_git(&["--version"], &None).context("Determine git version")?;
+    let version = capture_git_output(&["--version"], &None).context("Determine git version")?;
     parse_git_version(&version)
 }
 
