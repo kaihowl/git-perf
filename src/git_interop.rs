@@ -1,9 +1,8 @@
 use std::{
     env::current_dir,
-    io::{self, BufRead, BufReader, BufWriter, Read, Stderr, Write},
+    io::{self, BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
     process::{self, Child, Stdio},
-    sync::mpsc,
     thread,
     time::Duration,
 };
