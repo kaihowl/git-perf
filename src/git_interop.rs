@@ -110,23 +110,8 @@ pub fn reconcile() -> Result<()> {
 pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
     let oldest_timestamp = older_than.timestamp();
     // Outputs line-by-line <note_oid> <annotated_oid>
-    let args = &["notes", "--ref", REFS_NOTES_BRANCH, "list"];
-    // let mut list_notes = process::Command::new("git")
-    //     // TODO(kaihowl) set correct encoding and lang?
-    //     .env("LANG", "")
-    //     // .stdin(Stdio::null())
-    //     .stdout(Stdio::piped())
-    //     .env("LC_ALL", "C")
-    //     .args(args)
-    //     .spawn()
-    //     .expect("Failed to spawn");
     let mut list_notes =
         spawn_git_command(&["notes", "--ref", REFS_NOTES_BRANCH, "list"], &None, None)?;
-
-    // let stderr = list_notes.stderr.take().unwrap();
-    // eprintln!("{:?}", stderr.bytes());
-    // let out = list_notes.wait_with_output()?.stdout;
-    // eprintln!("stdout: {}", String::from_utf8_lossy(&out));
 
     let mut get_commit_dates = spawn_git_command(
         &[
@@ -144,19 +129,18 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
 
     let dates_in = get_commit_dates.stdin.take().unwrap();
     let dates_out = get_commit_dates.stdout.take().unwrap();
-    //
-    // // let (tx, rx) = mpsc::channel();
+
     let reader = BufReader::new(notes_out);
     let mut writer = BufWriter::new(dates_in);
-    //
+
     reader.lines().map_while(Result::ok).for_each(|line| {
         if let Some(line) = line.split_whitespace().nth(1) {
             writeln!(writer, "{}", line).expect("Failed to write to pipe");
         }
     });
-    //
+
     drop(writer);
-    //
+
     let dates_handler = thread::spawn(move || {
         let reader = BufReader::new(dates_out);
         for line in reader.lines() {
@@ -172,31 +156,11 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
             }
         }
     });
-    //
+
     list_notes.wait();
     get_commit_dates.wait();
 
     dates_handler.join();
-
-    // let notes_to_dates = async_std::task::spawn(async move || -> io::Result<()> {
-    //     let reader = BufReader::new(notes_out);
-    //     let mut lines = reader.lines();
-    //
-    //     while let Some(line) = lines.next_line().await? {}
-    // while let line = .await {
-    //     match line {
-    //         Ok(line) => match line.split_whitespace().take(2).collect_vec()[..] {
-    //             [_note_oid, commit_oid] => writeln!(&dates_input, "{}", commit_oid),
-    //             _ => continue,
-    //         },
-    //         Err(_) => todo!(),
-    //     };
-    //     // TODO(kaihowl) service also after done
-    //     for line in BufReader::new(dates_output).lines() {
-    //         println!("{:?}", line);
-    //     }
-    // }
-    // });
 
     Ok(())
 }
