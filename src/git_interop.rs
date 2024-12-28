@@ -127,9 +127,15 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
     let dates_in = get_commit_dates.stdin.take().unwrap();
     let dates_out = get_commit_dates.stdout.take().unwrap();
 
-    // TODO(kaihowl) replace by actual command
     let mut remove_measurements = spawn_git_command(
-        &["log", "--no-walk", "--stdin"],
+        &[
+            "notes",
+            "--ref",
+            REFS_NOTES_BRANCH,
+            "remove",
+            "--stdin",
+            "--ignore-missing",
+        ],
         &None,
         Some(Stdio::piped()),
     )?;
