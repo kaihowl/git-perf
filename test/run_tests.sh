@@ -7,7 +7,7 @@ install_on_ci() {
   if [[ $(uname -s) = Darwin ]]; then
     brew install libfaketime
   else # ubuntu
-    apt-get install libfaketime
+    sudo apt-get install libfaketime
   fi
 }
 
