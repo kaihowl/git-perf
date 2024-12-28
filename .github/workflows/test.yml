@@ -75,6 +75,7 @@ jobs:
     - name: Run bash e2e tests
       run: |
         export PATH=$(pwd)/target/debug:$PATH
+        export CI=true
         bash ./test/run_tests.sh
 
     - name: Run sample perf measurements
