@@ -42,7 +42,7 @@ fn spawn_git_command(
 }
 
 fn capture_git_output(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitError> {
-    let output = spawn_git_command(args, &working_dir, None)?.wait_with_output()?;
+    let output = spawn_git_command(args, working_dir, None)?.wait_with_output()?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
@@ -111,6 +111,7 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
     // Outputs line-by-line <note_oid> <annotated_oid>
     let mut list_notes =
         spawn_git_command(&["notes", "--ref", REFS_NOTES_BRANCH, "list"], &None, None)?;
+    let notes_out = list_notes.stdout.take().unwrap();
 
     let mut get_commit_dates = spawn_git_command(
         &[
@@ -123,41 +124,60 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
         &None,
         Some(Stdio::piped()),
     )?;
-
-    let notes_out = list_notes.stdout.take().unwrap();
-
     let dates_in = get_commit_dates.stdin.take().unwrap();
     let dates_out = get_commit_dates.stdout.take().unwrap();
 
-    let reader = BufReader::new(notes_out);
-    let mut writer = BufWriter::new(dates_in);
+    // TODO(kaihowl) replace by actual command
+    let mut remove_measurements = spawn_git_command(
+        &["log", "--no-walk", "--stdin"],
+        &None,
+        Some(Stdio::piped()),
+    )?;
+    let removal_in = remove_measurements.stdin.take().unwrap();
+    let removal_out = remove_measurements.stdout.take().unwrap();
 
-    let dates_handler = thread::spawn(move || {
+    let removal_handler = thread::spawn(move || {
         let reader = BufReader::new(dates_out);
+        let mut writer = BufWriter::new(removal_in);
         for line in reader.lines().map_while(Result::ok) {
             if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
-                println!("commit: {}, timestamp: {}", commit, timestamp);
                 if let Ok(timestamp) = timestamp.parse::<i64>() {
                     if timestamp < oldest_timestamp {
-                        println!("OLDER");
+                        writeln!(writer, "{}", commit).expect("Could not write to stream");
                     }
                 }
             }
         }
     });
 
-    reader.lines().map_while(Result::ok).for_each(|line| {
-        if let Some(line) = line.split_whitespace().nth(1) {
-            writeln!(writer, "{}", line).expect("Failed to write to pipe");
-        }
+    let debugging_handler = thread::spawn(move || {
+        let reader = BufReader::new(removal_out);
+        reader
+            .lines()
+            .map_while(Result::ok)
+            .for_each(|l| println!("{}", l))
     });
 
-    drop(writer);
+    {
+        let reader = BufReader::new(notes_out);
+        let mut writer = BufWriter::new(dates_in);
+
+        reader.lines().map_while(Result::ok).for_each(|line| {
+            if let Some(line) = line.split_whitespace().nth(1) {
+                writeln!(writer, "{}", line).expect("Failed to write to pipe");
+            }
+        });
+
+        // TODO(kaihowl) necessary?
+        drop(writer);
+    }
+
+    removal_handler.join().expect("Failed to join");
+    debugging_handler.join().expect("Failed to join");
 
     list_notes.wait()?;
     get_commit_dates.wait()?;
-
-    dates_handler.join().expect("Failed to join");
+    remove_measurements.wait()?;
 
     Ok(())
 }
