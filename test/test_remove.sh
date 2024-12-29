@@ -57,9 +57,18 @@ export FAKETIME=
 
 echo "Remove older than 7 days measurements"
 git perf remove --older-than 7d
+
 num_measurements=$(git perf report -o - | wc -l)
 # No measurement should be there
 [[ ${num_measurements} -eq 0 ]] || exit 1
+
+echo "Add a commit with a newer measurement"
+create_commit
+git perf add -m test-measure 30.0
+
+num_measurements=$(git perf report -o - | wc -l)
+# One measurement should be there
+[[ ${num_measurements} -eq 1 ]] || exit 1
 
 # TODO check that we reach the state of 7 days prior
 
@@ -81,6 +90,7 @@ if [[ $prev_head = "$cutoff_head" ]]; then
   exit 1
 fi
 # TODO(kaihowl) debug command
+return_commit=$(git rev-parse HEAD)
 git reflog "$REFS_NOTES_BRANCH"
 git checkout --orphan "$TEMP_BRANCH" "$cutoff_head"
 git commit -m 'truncated history'
@@ -106,5 +116,11 @@ if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; 
   echo "Drop compaction has not worked"
   exit 1
 fi
+
+# TODO(kaihowl) remove once no checkout is needed above anymore
+git checkout "$return_commit"
+num_measurements=$(git perf report -o - | wc -l)
+# One measurement should be there
+[[ ${num_measurements} -eq 1 ]] || exit 1
 
 exit 0
