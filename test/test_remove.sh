@@ -73,7 +73,7 @@ TEMP_BRANCH=temp-force-compact
 # Checkout git perf branch (TODO(kaihowl) handle this without the checkout)
 # Go back 7 days on branch (TODO(kaihowl) check that this works without reflog)
 prev_head=$(git rev-parse "$REFS_NOTES_BRANCH")
-cutoff_head=$(git rev-pase "$REFS_NOTES_BRANCH@{7 days ago}")
+cutoff_head=$(git rev-parse "$REFS_NOTES_BRANCH@{7 days ago}")
 # Make orphan checkout / new temp branch
 # Check that the commits is a different one than before
 if [[ $prev_head = "$cutoff_head" ]]; then
@@ -91,7 +91,6 @@ new_head=$(git rev-parse HEAD)
 git update-ref "$REFS_NOTES_BRANCH" "$new_head"
 # Delete temp branch
 git branch -D "$TEMP_BRANCH"
-zsh -i
 # Prune
 # TODO maybe expire the reflog first / more specifically?
 git reflog expire --expire=all "$REFS_NOTES_BRANCH"
