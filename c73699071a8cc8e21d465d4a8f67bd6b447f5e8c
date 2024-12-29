@@ -15,3 +15,5 @@
 0test-measure21735481209.117684811515914.0os=ubuntu-22.04rust=stable
 
 0test-measure21735481209.131544611576747.0os=ubuntu-22.04rust=stable
+
+0test-measure21735481209.145582711520943.0rust=stableos=ubuntu-22.04
