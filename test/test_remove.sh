@@ -78,29 +78,29 @@ prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 # TODO(kaihowl) move all into rust impl
 REFS_NOTES_BRANCH=refs/notes/perf-v3
-TEMP_BRANCH=temp-force-compact
 # Checkout git perf branch (TODO(kaihowl) handle this without the checkout)
 # Go back 7 days on branch (TODO(kaihowl) check that this works without reflog)
 prev_head=$(git rev-parse "$REFS_NOTES_BRANCH")
 cutoff_head=$(git rev-parse "$REFS_NOTES_BRANCH@{7 days ago}")
-# Make orphan checkout / new temp branch
 # Check that the commits is a different one than before
 if [[ $prev_head = "$cutoff_head" ]]; then
   echo "cutoff head after checkout did not change"
   exit 1
 fi
 # TODO(kaihowl) debug command
-return_commit=$(git rev-parse HEAD)
 git reflog "$REFS_NOTES_BRANCH"
-git checkout --orphan "$TEMP_BRANCH" "$cutoff_head"
-git commit -m 'truncated history'
+
+# Make orphan checkout / new temp branch
+new_history=$(git commit-tree -m 'cutoff history' "$(git rev-parse "$cutoff_head^{tree}")")
 # Rebase remaining history on top of new parent
-git rebase --onto "$TEMP_BRANCH" "$cutoff_head" "$prev_head"
-# Install new HEAD as notes branch
-new_head=$(git rev-parse HEAD)
-git update-ref "$REFS_NOTES_BRANCH" "$new_head"
+# TODO(kaihowl) check that this works with merges in between and still has the correct state
+for commit in $(git rev-list --reverse "${cutoff_head}..${prev_head}"); do
+  # TODO(kaihowl) fix the message?
+  new_history=$(git commit-tree -m 'reapply' -p "$new_history" "$commit^{tree}")
+done
+# Install new history as notes branch
+git update-ref "$REFS_NOTES_BRANCH" "$new_history"
 # Delete temp branch
-git branch -D "$TEMP_BRANCH"
 # Prune
 # TODO maybe expire the reflog first / more specifically?
 git reflog expire --expire=all "$REFS_NOTES_BRANCH"
@@ -144,7 +144,6 @@ if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; 
 fi
 
 # TODO(kaihowl) remove once no checkout is needed above anymore
-git checkout "$return_commit"
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
 [[ ${num_measurements} -eq 1 ]] || exit 1
