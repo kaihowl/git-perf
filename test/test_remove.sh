@@ -63,16 +63,44 @@ num_measurements=$(git perf report -o - | wc -l)
 
 # TODO check that we reach the state of 7 days prior
 
-# TODO(kaihowl) move into rust impl
 echo "Manual implementation of drop compaction"
 prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
-git prune
+# TODO(kaihowl) move all into rust impl
+REFS_NOTES_BRANCH=refs/notes/perf-v3
+TEMP_BRANCH=temp-force-compact
+# Checkout git perf branch (TODO(kaihowl) handle this without the checkout)
+# Go back 7 days on branch (TODO(kaihowl) check that this works without reflog)
+prev_head=$(git rev-parse "$REFS_NOTES_BRANCH")
+cutoff_head=$(git rev-pase "$REFS_NOTES_BRANCH@{7 days ago}")
+# Make orphan checkout / new temp branch
+# Check that the commits is a different one than before
+if [[ $prev_head = "$cutoff_head" ]]; then
+  echo "cutoff head after checkout did not change"
+  exit 1
+fi
+# TODO(kaihowl) debug command
+git reflog "$REFS_NOTES_BRANCH"
+git checkout --orphan "$TEMP_BRANCH" "$cutoff_head"
+git commit -m 'truncated history'
+# Rebase remaining history on top of new parent
+git rebase --onto "$TEMP_BRANCH" "$cutoff_head" "$prev_head"
+# Install new HEAD as notes branch
+new_head=$(git rev-parse HEAD)
+git update-ref "$REFS_NOTES_BRANCH" "$new_head"
+# Delete temp branch
+git branch -D "$TEMP_BRANCH"
+zsh -i
+# Prune
+# TODO maybe expire the reflog first / more specifically?
+git reflog expire --expire=all "$REFS_NOTES_BRANCH"
+git prune --expire=now
 
 cur_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 cur_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
+# TODO(kaihowl) check that no object contains measurements for the first commit anymore
 if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; then
   echo "The number of objects now ($cur_objects + $cur_in_pack)
   is not less than previously ($prev_objects + $prev_in_pack)"
