@@ -320,10 +320,13 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) check transient/permanent error
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
         raw_push(work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
-            Some(PushError::RefFailedToPush { .. }) => match pull(work_dir) {
-                Err(pull_error) => Error::permanent(pull_error),
-                Ok(_) => Error::transient(e),
-            },
+            Some(PushError::RefFailedToPush { .. }) => {
+                eprintln!("Retry...");
+                match pull(work_dir) {
+                    Err(pull_error) => Error::permanent(pull_error),
+                    Ok(_) => Error::transient(e),
+                }
+            }
             None => Error::Permanent(e),
         })
     };
