@@ -8,13 +8,13 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
-use backoff::{Error, ExponentialBackoffBuilder};
+use backoff;
+use backoff::ExponentialBackoffBuilder;
 use itertools::Itertools;
-use thiserror::Error;
 
 use chrono::prelude::*;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 enum GitError {
     #[error("Git failed to execute.\n\nstdout:\n{stdout}\nstderr:\n{stderr}")]
     ExecError { stdout: String, stderr: String },
@@ -188,7 +188,7 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
     Ok(())
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 enum PushError {
     #[error("A ref failed to be pushed:\n{stdout}\n{stderr}")]
     RefFailedToPush { stdout: String, stderr: String },
@@ -323,11 +323,11 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
             Some(PushError::RefFailedToPush { .. }) => {
                 eprintln!("Retry...");
                 match pull(work_dir) {
-                    Err(pull_error) => Error::permanent(pull_error),
-                    Ok(_) => Error::transient(e),
+                    Err(pull_error) => backoff::Error::permanent(pull_error),
+                    Ok(_) => backoff::Error::transient(e),
                 }
             }
-            None => Error::Permanent(e),
+            None => backoff::Error::Permanent(e),
         })
     };
 
@@ -337,8 +337,8 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
         .build();
 
     backoff::retry(backoff, op).map_err(|e| match e {
-        Error::Permanent(e) => e.context("Permanent failure while pushing refs"),
-        Error::Transient { err, .. } => err.context("Timed out pushing refs"),
+        backoff::Error::Permanent(e) => e.context("Permanent failure while pushing refs"),
+        backoff::Error::Transient { err, .. } => err.context("Timed out pushing refs"),
     })?;
 
     Ok(())
