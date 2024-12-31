@@ -170,7 +170,10 @@ num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
 [[ ${num_measurements} -eq 1 ]] || exit 1
 
-git perf push
+git perf push && exit 1
+
+# TODO(kaihowl) implementation needed
+git perf push -f
 
 popd
 
@@ -178,8 +181,8 @@ echo "Add no longer shared history measurement from second checkout"
 pushd my-second-checkout
 
 git perf add -m second-measurement 103.0
-# TODO(kaihowl) what happens here?
-git perf push
+
+git perf push && exit 1
 
 # TODO(kaihowl) humpty dumpty implementation:
 # Merge unrelated histories after all
