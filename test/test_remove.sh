@@ -14,7 +14,16 @@ else
   export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
 fi
 
-cd_temp_repo
+cd "$(mktemp -d)"
+
+mkdir orig
+pushd orig
+orig=$(pwd)
+git init --bare
+popd
+
+git clone "$orig" my-first-checkout
+pushd my-first-checkout
 
 # --- 28 days ago
 export FAKETIME='-28d'
@@ -66,12 +75,25 @@ echo "Add a commit with a newer measurement"
 create_commit
 git perf add -m test-measure-three 30.0
 
+git push
+git perf push
+
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
 [[ ${num_measurements} -eq 1 ]] || exit 1
 
+popd
+
 # TODO check that we reach the state of 7 days prior
 
+# Checkout repo on second checkout with earlier notes state
+git clone "$orig" my-second-checkout
+pushd my-second-checkout
+zsh -i 
+git perf pull
+popd
+
+pushd my-first-checkout
 echo "Manual implementation of drop compaction"
 prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
@@ -147,5 +169,20 @@ fi
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
 [[ ${num_measurements} -eq 1 ]] || exit 1
+
+git perf push
+
+popd
+
+echo "Add no longer shared history measurement from second checkout"
+pushd my-second-checkout
+
+git perf add -m second-measurement 103.0
+# TODO(kaihowl) what happens here?
+git perf push
+
+git perf report -o -
+
+git log "$REFS_NOTES_BRANCH"
 
 exit 0
