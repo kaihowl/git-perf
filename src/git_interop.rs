@@ -98,6 +98,7 @@ pub fn reconcile() -> Result<()> {
             "merge",
             "-s",
             "cat_sort_uniq",
+            // TODO(kaihowl) do not use FETCH_HEAD!
             "FETCH_HEAD",
         ],
         &None,
