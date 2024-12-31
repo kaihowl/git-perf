@@ -188,8 +188,5 @@ git perf push
 # These would always be replayed on whatever is upstream, even with unrelated histories.
 # I.e., create an empty tree, replay the non-published changes, merge the result with the (maybe unrelated) upstream history?
 
-git perf report -o -
-
-git log "$REFS_NOTES_BRANCH"
 
 exit 0
