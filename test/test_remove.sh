@@ -181,6 +181,13 @@ git perf add -m second-measurement 103.0
 # TODO(kaihowl) what happens here?
 git perf push
 
+# TODO(kaihowl) humpty dumpty implementation:
+# Merge unrelated histories after all
+# What happens if a checkout did not consume a compaction commit, adds new measurements and replays the commits to the remote?
+# Could we establish "a set of unpublished measurements" with an upstream ref?
+# These would always be replayed on whatever is upstream, even with unrelated histories.
+# I.e., create an empty tree, replay the non-published changes, merge the result with the (maybe unrelated) upstream history?
+
 git perf report -o -
 
 git log "$REFS_NOTES_BRANCH"
