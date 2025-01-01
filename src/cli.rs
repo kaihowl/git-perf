@@ -67,7 +67,10 @@ enum Commands {
     },
 
     /// Publish performance results to remote
-    Push {},
+    Push {
+        #[arg(short)]
+        force: bool,
+    },
 
     /// Pull performance results from remote
     Pull {},
@@ -213,7 +216,7 @@ pub fn handle_calls() -> Result<()> {
         Commands::Add { value, measurement } => {
             Ok(add(&measurement.name, value, &measurement.key_value)?)
         }
-        Commands::Push {} => Ok(push(None)?),
+        Commands::Push { force } => Ok(push(force, None)?),
         Commands::Pull {} => Ok(pull(None)?),
         Commands::Report {
             output,
