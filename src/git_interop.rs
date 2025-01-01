@@ -30,6 +30,7 @@ fn spawn_git_command(
 ) -> Result<Child, io::Error> {
     let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
     let stdin = stdin.unwrap_or(Stdio::null());
+    dbg!(args);
     process::Command::new("git")
         // TODO(kaihowl) set correct encoding and lang?
         .env("LANG", "")
