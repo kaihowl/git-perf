@@ -204,19 +204,19 @@ enum PushError {
     RefFailedToPush { stdout: String, stderr: String },
 }
 
-pub fn raw_push(force: bool, work_dir: Option<&Path>) -> Result<()> {
+pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) configure remote?
     // TODO(kaihowl) factor into constants
     // TODO(kaihowl) capture output
-    let branch_spec = format!("{REFS_NOTES_BRANCH}:{REFS_NOTES_BRANCH}");
-
-    let mut args = vec!["push", "--porcelain", "origin", branch_spec.as_str()];
-
-    if force {
-        args.push("--force");
-    }
-
-    let output = capture_git_output(&args, &work_dir);
+    let output = capture_git_output(
+        &[
+            "push",
+            "--porcelain",
+            "origin",
+            format!("{REFS_NOTES_BRANCH}:{REFS_NOTES_BRANCH}").as_str(),
+        ],
+        &work_dir,
+    );
 
     match output {
         Ok(_) => Ok(()),
@@ -326,10 +326,10 @@ pub fn pull(work_dir: Option<&Path>) -> Result<()> {
     reconcile()
 }
 
-pub fn push(force: bool, work_dir: Option<&Path>) -> Result<()> {
+pub fn push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) check transient/permanent error
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
-        raw_push(force, work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
+        raw_push(work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
             Some(PushError::RefFailedToPush { .. }) => {
                 eprintln!("Retry...");
                 match pull(work_dir) {
@@ -501,7 +501,7 @@ mod test {
 
         // TODO(kaihowl) duplication, leaks out of this test
         hermetic_git_env();
-        let error = push(false, Some(repo_dir.path()));
+        let error = push(Some(repo_dir.path()));
         error
             .as_ref()
             .expect_err("We have no valid git http server setup -> should fail");

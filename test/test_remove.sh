@@ -172,6 +172,7 @@ num_measurements=$(git perf report -o - | wc -l)
 
 git perf push && exit 1
 
+# TODO(kaihowl) implementation needed
 git perf push -f
 
 popd
