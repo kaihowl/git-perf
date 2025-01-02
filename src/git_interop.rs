@@ -90,15 +90,16 @@ pub fn fetch(work_dir: Option<&Path>) -> Result<()> {
 }
 
 pub fn reconcile() -> Result<()> {
-    // Check if related bases
-    // git-notes merge does not explicitly check this before attempting a merge
-    if capture_git_output(&["merge-base", REFS_NOTES_BRANCH, "FETCH_HEAD"], &None).is_err() {
-        let notes_branch_exists =
-            capture_git_output(&["rev-parse", REFS_NOTES_BRANCH], &None).is_ok();
-        if notes_branch_exists {
-            bail!("Unrelated perf history; not attempting to merge.");
-        }
-    };
+    // TODO(kaihowl) probably not needed
+    // // Check if related bases
+    // // git-notes merge does not explicitly check this before attempting a merge
+    // if capture_git_output(&["merge-base", REFS_NOTES_BRANCH, "FETCH_HEAD"], &None).is_err() {
+    //     let notes_branch_exists =
+    //         capture_git_output(&["rev-parse", REFS_NOTES_BRANCH], &None).is_ok();
+    //     if notes_branch_exists {
+    //         bail!("Unrelated perf history; not attempting to merge.");
+    //     }
+    // };
     _ = capture_git_output(
         &[
             "notes",
