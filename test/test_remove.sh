@@ -130,6 +130,8 @@ git update-ref "$REFS_NOTES_BRANCH" "$new_history"
 # Prune
 # TODO maybe expire the reflog first / more specifically?
 git reflog expire --expire=all "$REFS_NOTES_BRANCH"
+# TODO(kaihowl) remove
+git reflog expire --expire=all "refs/notes/perf-v3-write"
 git prune --expire=now
 
 cur_objects=$(git count-objects -v | awk '/count:/ { print $2 }')

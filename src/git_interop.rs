@@ -55,13 +55,15 @@ fn capture_git_output(args: &[&str], working_dir: &Option<&Path>) -> Result<Stri
 }
 
 const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
+const REFS_NOTES_WRITE_SYMBOLIC_REF: &str = "refs/notes/perf-v3-write";
 
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
+    ensure_symbolic_write_ref_exists()?;
     capture_git_output(
         &[
             "notes",
             "--ref",
-            REFS_NOTES_BRANCH,
+            REFS_NOTES_WRITE_SYMBOLIC_REF,
             "append",
             // TODO(kaihowl) disabled until #96 is solved
             // "--no-separator",
@@ -73,6 +75,25 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
     .context("Failed to add new measurement")?;
 
     Ok(())
+}
+
+fn git_rev_parse(reference: &str, working_dir: &Option<&Path>) -> Result<String, GitError> {
+    capture_git_output(&["rev-parse", reference], working_dir)
+}
+
+fn ensure_symbolic_write_ref_exists() -> Result<()> {
+    if git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF, &None).is_err() {
+        git_set_symbolic_ref(REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_BRANCH)?
+    }
+    Ok(())
+}
+
+fn git_set_symbolic_ref(reference: &str, target: &str) -> Result<(), GitError> {
+    capture_git_output(&["symbolic-ref", reference, target], &None).map(|_s| ())
+}
+
+fn git_update_ref(reference: &str, target: String) -> Result<(), GitError> {
+    capture_git_output(&["update-ref", reference, &target], &None).map(|_s| ())
 }
 
 pub fn get_head_revision() -> Result<String> {
