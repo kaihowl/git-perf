@@ -3,6 +3,8 @@
 set -e
 set -x
 
+REFS_NOTES_BRANCH=refs/notes/perf-v3
+
 script_dir=$(dirname "$0")
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
@@ -42,6 +44,9 @@ git perf remove --older-than 10d
 num_measurements=$(git perf report -o - | wc -l)
 # Nothing should have been removed
 [[ ${num_measurements} -eq 1 ]] || exit 1
+
+old_history=$(git rev-parse "$REFS_NOTES_BRANCH")
+echo 
 
 # --- 14 days ago
 export FAKETIME='-14d'
@@ -99,7 +104,6 @@ prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 # TODO(kaihowl) move all into rust impl
-REFS_NOTES_BRANCH=refs/notes/perf-v3
 # Checkout git perf branch (TODO(kaihowl) handle this without the checkout)
 # Go back 7 days on branch (TODO(kaihowl) check that this works without reflog)
 prev_head=$(git rev-parse "$REFS_NOTES_BRANCH")
@@ -170,10 +174,10 @@ num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
 [[ ${num_measurements} -eq 1 ]] || exit 1
 
-git perf push && exit 1
+# The old history should not be part of the shared measurements anymore
+git merge-base --is-ancestor "$old_history" "$REFS_NOTES_BRANCH" && exit 1
 
-# TODO(kaihowl) implementation needed
-git perf push -f
+git perf push
 
 popd
 
@@ -182,7 +186,10 @@ pushd my-second-checkout
 
 git perf add -m second-measurement 103.0
 
-git perf push && exit 1
+git perf push
+
+# The old history should not be part of the shared measurements anymore
+git merge-base --is-ancestor "$old_history" "$REFS_NOTES_BRANCH" && exit 1
 
 # TODO(kaihowl) humpty dumpty implementation:
 # Merge unrelated histories after all
@@ -190,6 +197,5 @@ git perf push && exit 1
 # Could we establish "a set of unpublished measurements" with an upstream ref?
 # These would always be replayed on whatever is upstream, even with unrelated histories.
 # I.e., create an empty tree, replay the non-published changes, merge the result with the (maybe unrelated) upstream history?
-
 
 exit 0
