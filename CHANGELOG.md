@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0](https://github.com/kaihowl/git-perf/compare/v0.15.5...v0.16.0) - 2025-02-14
+
+### Added
+
+- readable print for Stats (#113)
+- check git version before operation (#102)
+- use tab as delimiter in csv (#101)
+
+### Fixed
+
+- set CI to true (#118)
+- correct parsing of measured value in test (#116)
+- upgrade to macos-latest in test_action (#115)
+
+### Other
+
+- do not show cargo.lock changes in review (#120)
+- use better script_dir determination (#117)
+- *(deps)* bump rlespinasse/github-slug-action from 4 to 5 in the github-actions group (#112)
+- *(deps)* bump peaceiris/actions-gh-pages from 3 to 4 in the github-actions group (#111)
+- *(deps)* bump the github-actions group with 3 updates (#99)
+- bump report measurement epoch (#108)
+- must measure report command repeatedly for significance (#107)
+- remove release-binary-size tracking (#104)
+
 ## [0.15.5](https://github.com/kaihowl/git-perf/compare/v0.15.4...v0.15.5) - 2024-01-22
 
 ### Fixed
