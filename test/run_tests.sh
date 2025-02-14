@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_dir=$(dirname "$0")
+script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 num_procs=4
 
 # Function to execute command and capture output

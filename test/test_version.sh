@@ -3,7 +3,8 @@
 set -e
 set -x
 
-script_dir=$(dirname "$0")
+script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
+
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 

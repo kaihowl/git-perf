@@ -6,10 +6,6 @@ set -x
 
 shopt -s nocasematch
 
-script_dir=$(pwd)/$(dirname "$0")
-
-export PYTHONOPTIMIZE=TRUE
-
 export GIT_COMMITTER_NAME="github-actions[bot]"
 export GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
 export GIT_AUTHOR_NAME="github-actions[bot]"
