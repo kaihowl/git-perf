@@ -11,6 +11,10 @@ Each time the entire previous measurements are copied and a single line is appen
 
 # Development
 
+## Development dependencies
+
+- libfaketime
+
 ## Rust tests
 ```
 cargo test
