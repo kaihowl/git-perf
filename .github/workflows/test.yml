@@ -91,6 +91,15 @@ jobs:
           git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
 
+    - name: Archive report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        include-hidden-files: true
+        name: report-${{matrix.os}}-${{matrix.rust}}.html
+        path: report.html
+        if-no-files-found: error
+
 
   rustfmt:
     name: rustfmt
