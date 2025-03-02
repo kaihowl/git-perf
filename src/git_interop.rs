@@ -88,6 +88,7 @@ fn feed_git_command(
 const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
 const REFS_NOTES_WRITE_SYMBOLIC_REF: &str = "refs/notes/perf-v3-write";
 const REFS_NOTES_WRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-write-";
+const REFS_NOTES_REWRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-rewrite-";
 const REFS_NOTES_MERGE_BRANCH: &str = "refs/notes/perf-v3-merge";
 const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
 
@@ -189,11 +190,92 @@ fn reconcile_branch_with(target: &str, branch: &str) -> Result<()> {
     Ok(())
 }
 
+fn create_temp_rewrite_head() -> Result<String> {
+    let suffix = random_suffix();
+    let target = format!("{REFS_NOTES_REWRITE_TARGET_PREFIX}{suffix}");
+
+    let current_notes_head =
+        git_rev_parse(REFS_NOTES_BRANCH).ok_or(anyhow!("missing notes head"))?;
+
+    // Clone reference
+    git_update_ref(unindent(
+        format!(
+            r#"
+            start
+            create {target} {current_notes_head}
+            commit
+            "#
+        )
+        .as_str(),
+    ))?;
+
+    Ok(target)
+}
+
+fn compact_head(target: &str) -> Result<()> {
+    let new_removal_head = git_rev_parse(&format!("{target}^{{tree}}").as_str())
+        .ok_or(anyhow!("could not find compaction head"))?;
+
+    // Orphan compaction commit
+    let compaction_head = capture_git_output(
+        &["commit-tree", "-m", "cutoff history", &new_removal_head],
+        &None,
+    )?;
+
+    let compaction_head = compaction_head.trim();
+
+    git_update_ref(unindent(
+        format!(
+            r#"
+            start
+            update {target} {compaction_head}
+            commit
+            "#
+        )
+        .as_str(),
+    ))?;
+
+    Ok(())
+}
+
 pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
+    // TODO(kaihowl) flow
+    // 1. pull
+    // 2. remove measurements
+    // 3. compact
+    // 4. try to push
+    // repeat with back off
+    // TODO(kaihowl) clean up branches
+
+    // TODO(kaihowl) better error message for remote empty / never pushed
+    pull(None)?;
+
+    let target = create_temp_rewrite_head()?;
+
+    remove_measurements_from_reference(&target, older_than)?;
+
+    compact_head(&target)?;
+
+    // TODO(kaihowl) actual push needed
+    git_update_ref(unindent(
+        format!(
+            r#"
+            start
+            update {REFS_NOTES_BRANCH} {target}
+            commit
+            "#
+        )
+        .as_str(),
+    ))?;
+
+    Ok(())
+}
+
+// Remove notes pertaining to git commits whose commit date is older than specified.
+fn remove_measurements_from_reference(reference: &str, older_than: DateTime<Utc>) -> Result<()> {
     let oldest_timestamp = older_than.timestamp();
     // Outputs line-by-line <note_oid> <annotated_oid>
-    let mut list_notes =
-        spawn_git_command(&["notes", "--ref", REFS_NOTES_BRANCH, "list"], &None, None)?;
+    let mut list_notes = spawn_git_command(&["notes", "--ref", reference, "list"], &None, None)?;
     let notes_out = list_notes.stdout.take().unwrap();
 
     let mut get_commit_dates = spawn_git_command(
@@ -214,7 +296,7 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
         &[
             "notes",
             "--ref",
-            REFS_NOTES_BRANCH,
+            reference,
             "remove",
             "--stdin",
             "--ignore-missing",

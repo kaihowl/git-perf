@@ -16,9 +16,6 @@ else
   export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
 fi
 
-# TODO(kaihowl) fix up and redo
-exit 0
-
 cd "$(mktemp -d)"
 
 mkdir orig
@@ -45,7 +42,7 @@ git perf push
 
 # TODO(kaihowl) specify >= or > precisely
 echo "Remove measurements on commits older than 7 days"
-git perf remove --older-than 10d
+git perf remove --older-than 10d || bash -i
 num_measurements=$(git perf report -o - | wc -l)
 # Nothing should have been removed
 [[ ${num_measurements} -eq 1 ]] || exit 1
@@ -65,6 +62,8 @@ num_measurements=$(git perf report -o - | wc -l)
 # TODO(kaihowl) need to update the main branch
 git perf push
 
+export FAKETIME=
+
 echo "Remove older than 7 days measurements"
 git perf remove --older-than 7d
 num_measurements=$(git perf report -o - | wc -l)
@@ -76,6 +75,7 @@ git perf report -o - | grep '20\.0'
 # -- NOW
 export FAKETIME=
 
+# TODO(kaihowl) really needed?
 # TODO(kaihowl) need to update the main branch
 git perf push
 
@@ -104,6 +104,9 @@ zsh -i
 
 popd
 
+# TODO(kaihowl)
+exit 0
+
 # TODO check that we reach the state of 7 days prior
 
 # Checkout repo on second checkout with earlier notes state
@@ -118,7 +121,6 @@ echo "Manual implementation of drop compaction"
 prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
-# TODO(kaihowl) move all into rust impl
 # Checkout git perf branch (TODO(kaihowl) handle this without the checkout)
 # Go back 7 days on branch (TODO(kaihowl) check that this works without reflog)
 prev_head=$(git rev-parse "$REFS_NOTES_BRANCH")
@@ -128,17 +130,7 @@ if [[ $prev_head = "$cutoff_head" ]]; then
   echo "cutoff head after checkout did not change"
   exit 1
 fi
-# TODO(kaihowl) debug command
-git reflog "$REFS_NOTES_BRANCH"
 
-# Make orphan checkout / new temp branch
-new_history=$(git commit-tree -m 'cutoff history' "$(git rev-parse "$cutoff_head^{tree}")")
-# Rebase remaining history on top of new parent
-# TODO(kaihowl) check that this works with merges in between and still has the correct state
-for commit in $(git rev-list --reverse "${cutoff_head}..${prev_head}"); do
-  # TODO(kaihowl) fix the message?
-  new_history=$(git commit-tree -m 'reapply' -p "$new_history" "$commit^{tree}")
-done
 # Install new history as notes branch
 git update-ref "$REFS_NOTES_BRANCH" "$new_history"
 # Delete temp branch
