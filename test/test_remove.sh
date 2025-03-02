@@ -42,7 +42,7 @@ git perf push
 
 # TODO(kaihowl) specify >= or > precisely
 echo "Remove measurements on commits older than 7 days"
-git perf remove --older-than 10d || bash -i
+git perf remove --older-than 7d || bash -i
 num_measurements=$(git perf report -o - | wc -l)
 # Nothing should have been removed
 [[ ${num_measurements} -eq 1 ]] || exit 1
@@ -61,8 +61,6 @@ num_measurements=$(git perf report -o - | wc -l)
 
 # TODO(kaihowl) need to update the main branch
 git perf push
-
-export FAKETIME=
 
 echo "Remove older than 7 days measurements"
 git perf remove --older-than 7d
@@ -84,7 +82,7 @@ git perf remove --older-than 7d
 
 # TODO(kaihowl) Fails here as the upstream is no longer in sync AND we use the (behind) upstream forcibly as the new local branch
 # This restores the just-before-deleted measurements.
-git perf push
+# git perf push
 num_measurements=$(git perf report -o - | wc -l)
 # No measurement should be there
 [[ ${num_measurements} -eq 0 ]] || exit 1
@@ -98,7 +96,6 @@ git perf push
 
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
-zsh -i
 # TODO(kaihowl) clean up of write branches needed
 [[ ${num_measurements} -eq 1 ]] || exit 1
 

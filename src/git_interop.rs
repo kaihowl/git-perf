@@ -1,6 +1,6 @@
 use std::{
     env::current_dir,
-    io::{self, stdout, BufRead, BufReader, BufWriter, Write},
+    io::{self, BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
     process::{self, Child, Stdio},
     thread,
@@ -190,12 +190,9 @@ fn reconcile_branch_with(target: &str, branch: &str) -> Result<()> {
     Ok(())
 }
 
-fn create_temp_rewrite_head() -> Result<String> {
+fn create_temp_rewrite_head(current_notes_head: &str) -> Result<String> {
     let suffix = random_suffix();
     let target = format!("{REFS_NOTES_REWRITE_TARGET_PREFIX}{suffix}");
-
-    let current_notes_head =
-        git_rev_parse(REFS_NOTES_BRANCH).ok_or(anyhow!("missing notes head"))?;
 
     // Clone reference
     git_update_ref(unindent(
@@ -250,13 +247,18 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
     // TODO(kaihowl) better error message for remote empty / never pushed
     pull(None)?;
 
-    let target = create_temp_rewrite_head()?;
+    let current_notes_head =
+        git_rev_parse(REFS_NOTES_BRANCH).ok_or(anyhow!("missing notes head"))?;
+
+    let target = create_temp_rewrite_head(&current_notes_head)?;
 
     remove_measurements_from_reference(&target, older_than)?;
 
     compact_head(&target)?;
 
     // TODO(kaihowl) actual push needed
+    git_push_notes_ref(&current_notes_head, &target, &None)?;
+
     git_update_ref(unindent(
         format!(
             r#"
@@ -434,6 +436,35 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         reconcile_branch_with(REFS_NOTES_MERGE_BRANCH, &reference.oid)?;
     }
 
+    git_push_notes_ref(&current_upstream_oid, REFS_NOTES_MERGE_BRANCH, &work_dir)?;
+
+    // TODO(kaihowl) can git push immediately update the local ref as well?
+    // This might be necessary for a concurrent push in between the last push from here and the now
+    // following fetch. Otherwise, the `verify` will fail in the update-ref call later.
+    fetch(None)?;
+
+    // Delete merged in write references
+    let mut commands = Vec::new();
+    commands.push(String::from("start"));
+    for Reference { refname, oid } in &refs {
+        commands.push(format!("delete {refname} {oid}"));
+    }
+    commands.push(String::from("commit"));
+    // empty line
+    commands.push(String::new());
+    let commands = commands.join("\n");
+    git_update_ref(commands)?;
+
+    Ok(())
+
+    // TODO(kaihowl) - Clean up all local write refs that have been merged into the upstream branch.
+}
+
+fn git_push_notes_ref(
+    expected_upstream: &str,
+    push_ref: &str,
+    working_dir: &Option<&Path>,
+) -> Result<()> {
     // TODO(kaihowl) configure remote?
     // TODO(kaihowl) factor into constants
     // TODO(kaihowl) capture output
@@ -443,11 +474,11 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         &[
             "push",
             "--porcelain",
-            format!("--force-with-lease={REFS_NOTES_BRANCH}:{current_upstream_oid}").as_str(),
+            format!("--force-with-lease={REFS_NOTES_BRANCH}:{expected_upstream}").as_str(),
             "origin",
-            format!("{REFS_NOTES_MERGE_BRANCH}:{REFS_NOTES_BRANCH}").as_str(),
+            format!("{push_ref}:{REFS_NOTES_BRANCH}").as_str(),
         ],
-        &work_dir,
+        &working_dir,
     );
 
     // - Clean your own temporary merge ref and all others with a merge commit older than x days.
@@ -472,26 +503,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         Err(e) => Err(anyhow!(e)),
     }?;
 
-    // TODO(kaihowl) can git push immediately update the local ref as well?
-    // This might be necessary for a concurrent push in between the last push from here and the now
-    // following fetch. Otherwise, the `verify` will fail in the update-ref call later.
-    fetch(None)?;
-
-    // Delete merged in write references
-    let mut commands = Vec::new();
-    commands.push(String::from("start"));
-    for Reference { refname, oid } in &refs {
-        commands.push(format!("delete {refname} {oid}"));
-    }
-    commands.push(String::from("commit"));
-    // empty line
-    commands.push(String::new());
-    let commands = commands.join("\n");
-    git_update_ref(commands)?;
-
     Ok(())
-
-    // TODO(kaihowl) - Clean up all local write refs that have been merged into the upstream branch.
 }
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
@@ -792,8 +804,6 @@ mod test {
         init_repo(tempdir.path());
         tempdir
     }
-
-    fn switch_to_dir_with_repo_and_customheader(origin_url: Uri, extra_header: &str) {}
 
     fn add_server_remote(origin_url: Uri, extra_header: &str, dir: &Path) {
         let url = origin_url.to_string();
