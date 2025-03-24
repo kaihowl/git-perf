@@ -76,7 +76,8 @@ run_add_test() {
         local random_value=$((RANDOM + RANDOM * i + $(date +%s) % 10000))
 
         # Run the add command with measurement parameter
-        git-perf "$@" --measurement test $random_value 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to add" && exit 1)
+        # Adding separate measurements for each adder as the random values could overlap
+        git-perf "$@" --measurement "test-$log_prefix" $random_value 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to add" && exit 1)
 
         # Every 100 iterations, print a status update
         if (( i % 100 == 0 )); then
@@ -123,11 +124,12 @@ fi
 # Verify the results
 echo "Verifying results..."
 LINE_COUNT=$(git-perf report -o - | wc -l)
+EXPECTED_COUNT=$((NUM_ADD_ITERATIONS * 2))
 
-if [[ "$LINE_COUNT" -eq $((NUM_ADD_ITERATIONS*2)) ]]; then
-    echo "SUCCESS: Verification passed. Found exactly $NUM_ADD_ITERATIONS lines in the report."
+if [[ "$LINE_COUNT" -eq "$NUM_ADD_ITERATIONS" ]]; then
+    echo "SUCCESS: Verification passed. Found exactly $EXPECTED_COUNT lines in the report."
     exit 0
 else
-    echo "ERROR: Verification failed. Expected $NUM_ADD_ITERATIONS lines but found $LINE_COUNT."
+    echo "ERROR: Verification failed. Expected $EXPECTED_COUNT lines but found $LINE_COUNT."
     exit 1
 fi
