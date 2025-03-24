@@ -108,8 +108,11 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
     // `git notes append` is not safe to use concurrently.
     // We create a new type of temporary reference: Cannot reuse the normal write references as
     // they only get merged upon push. This can take arbitrarily long.
-    let suffix = random_suffix();
-    let temp_target = format!("{REFS_NOTES_ADD_TARGET_PREFIX}{suffix}");
+    let current_note_head =
+        git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).unwrap_or(EMPTY_OID.to_string());
+    let current_symbolic_ref_target = git_rev_parse_symbolic_ref(REFS_NOTES_WRITE_SYMBOLIC_REF)
+        .expect("Missing symbolic-ref for target");
+    let temp_target = create_temp_add_head(&current_note_head)?;
 
     capture_git_output(
         &[
@@ -126,15 +129,15 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
     )
     .context("Failed to add new measurement")?;
 
-    // Now merge back
-    reconcile_branch_with(REFS_NOTES_WRITE_SYMBOLIC_REF, &temp_target)?;
-
+    // Update current write branch with pending write
     // Delete target
     // TODO(kaihowl) duplication
     git_update_ref(unindent(
         format!(
             r#"
             start
+            symref-verify {REFS_NOTES_WRITE_SYMBOLIC_REF} {current_symbolic_ref_target}
+            update {current_symbolic_ref_target} {temp_target}
             delete {temp_target}
             commit
             "#
@@ -239,6 +242,7 @@ fn reconcile_branch_with(target: &str, branch: &str) -> Result<()> {
     Ok(())
 }
 
+// TODO(kaihowl) duplication
 fn create_temp_rewrite_head(current_notes_head: &str) -> Result<String> {
     let suffix = random_suffix();
     let target = format!("{REFS_NOTES_REWRITE_TARGET_PREFIX}{suffix}");
@@ -254,6 +258,28 @@ fn create_temp_rewrite_head(current_notes_head: &str) -> Result<String> {
         )
         .as_str(),
     ))?;
+
+    Ok(target)
+}
+
+fn create_temp_add_head(current_notes_head: &str) -> Result<String> {
+    let suffix = random_suffix();
+    let target = format!("{REFS_NOTES_ADD_TARGET_PREFIX}{suffix}");
+
+    // TODO(kaihowl) humpty dumpty
+    if current_notes_head != EMPTY_OID {
+        // Clone reference
+        git_update_ref(unindent(
+            format!(
+                r#"
+            start
+            create {target} {current_notes_head}
+            commit
+            "#
+            )
+            .as_str(),
+        ))?;
+    }
 
     Ok(target)
 }
@@ -442,6 +468,12 @@ const EMPTY_OID: &str = "0000000000000000000000000000000000000000";
 
 fn git_rev_parse(reference: &str) -> Option<String> {
     capture_git_output(&["rev-parse", "--verify", "-q", reference], &None)
+        .ok()
+        .map(|s| s.trim().to_owned())
+}
+
+fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
+    capture_git_output(&["symbolic-ref", "-q", reference], &None)
         .ok()
         .map(|s| s.trim().to_owned())
 }
