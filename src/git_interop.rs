@@ -51,7 +51,7 @@ fn spawn_git_command(
         .stderr(Stdio::piped())
         .env("LC_ALL", "C")
         .current_dir(working_dir)
-        .args(args)
+        .args(dbg!(args))
         .spawn()
 }
 
@@ -64,6 +64,7 @@ fn feed_git_command(
     working_dir: &Option<&Path>,
     input: Option<&str>,
 ) -> Result<std::string::String, GitError> {
+    dbg!(input);
     let stdin = input.and_then(|_s| Some(Stdio::piped()));
 
     let child = spawn_git_command(args, working_dir, stdin)?;
@@ -78,10 +79,10 @@ fn feed_git_command(
         None => child.wait_with_output(),
     }?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stdout = dbg!(String::from_utf8_lossy(&output.stdout).to_string());
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let stderr = dbg!(String::from_utf8_lossy(&output.stderr).to_string());
         return Err(GitError::ExecError {
             command: args.join(" "),
             stdout,
@@ -813,7 +814,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
         raw_push(work_dir).map_err(|e| match e.downcast_ref::<GitError>() {
             Some(GitError::RefFailedToPush { .. }) | Some(GitError::RefFailedToLock { .. }) => {
-                // Try pulling first
+                dbg!(&e);
                 match pull(work_dir) {
                     Err(pull_error) => backoff::Error::permanent(pull_error),
                     Ok(_) => backoff::Error::transient(e),
