@@ -97,14 +97,16 @@ run_push_test "PUSH" push &
 PUSH_PID=$!
 
 # Start the add process (with measurement parameter)
-run_add_test "ADD" add &
-ADD_PID=$!
+run_add_test "ADD1" add &
+ADD_PID_1=$!
+run_add_test "ADD2" add &
+ADD_PID_2=$!
 
 # Wait for both processes to complete
 echo "Waiting for all tests to complete..."
 wait $PUSH_PID
 PUSH_STATUS=$?
-wait $ADD_PID
+wait $ADD_PID_1 $ADD_PID_2
 ADD_STATUS=$?
 
 # Reset trap for normal completion
@@ -122,7 +124,7 @@ fi
 echo "Verifying results..."
 LINE_COUNT=$(git-perf report -o - | wc -l)
 
-if [ "$LINE_COUNT" -eq $NUM_ADD_ITERATIONS ]; then
+if [[ "$LINE_COUNT" -eq $((NUM_ADD_ITERATIONS*2)) ]]; then
     echo "SUCCESS: Verification passed. Found exactly $NUM_ADD_ITERATIONS lines in the report."
     exit 0
 else
