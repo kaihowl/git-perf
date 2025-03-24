@@ -68,7 +68,7 @@ run_add_test() {
     shift  # Remove first parameter (prefix) from the argument list
     local iterations=$NUM_ADD_ITERATIONS
 
-    local cmd_display="git-perf $* --measurement test <random>"
+    local cmd_display="git-perf $* --measurement test-$log_prefix <random>"
     echo "Starting $iterations iterations of '$cmd_display'..."
 
     for (( i=1; i<=iterations; i++ )); do
