@@ -456,6 +456,12 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
         .filter(|r| r.refname != new_write_ref)
         .collect_vec();
 
+    // TODO(kaihowl) explicit test needed, currently only fails in concurrency test
+    // when push is called before the first add.
+    if refs.is_empty() {
+        return Ok(());
+    }
+
     for reference in &refs {
         reconcile_branch_with(REFS_NOTES_MERGE_BRANCH, &reference.oid)?;
     }
