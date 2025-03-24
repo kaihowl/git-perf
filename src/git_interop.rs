@@ -92,20 +92,29 @@ fn feed_git_command(
     Ok(stdout)
 }
 
+// TODO(kaihowl) missing docs
 const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
 const REFS_NOTES_WRITE_SYMBOLIC_REF: &str = "refs/notes/perf-v3-write";
 const REFS_NOTES_WRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-write-";
+const REFS_NOTES_ADD_TARGET_PREFIX: &str = "refs/notes/perf-v3-add-";
 const REFS_NOTES_REWRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-rewrite-";
 const REFS_NOTES_MERGE_BRANCH: &str = "refs/notes/perf-v3-merge";
 const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
 
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
     ensure_symbolic_write_ref_exists()?;
+
+    // `git notes append` is not safe to use concurrently.
+    // We create a new type of temporary reference: Cannot reuse the normal write references as
+    // they only get merged upon push. This can take arbitrarily long.
+    let suffix = random_suffix();
+    let temp_target = format!("{REFS_NOTES_ADD_TARGET_PREFIX}{suffix}");
+
     capture_git_output(
         &[
             "notes",
             "--ref",
-            REFS_NOTES_WRITE_SYMBOLIC_REF,
+            &temp_target,
             "append",
             // TODO(kaihowl) disabled until #96 is solved
             // "--no-separator",
@@ -115,6 +124,22 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
         &None,
     )
     .context("Failed to add new measurement")?;
+
+    // Now merge back
+    reconcile_branch_with(REFS_NOTES_WRITE_SYMBOLIC_REF, &temp_target)?;
+
+    // Delete target
+    // TODO(kaihowl) duplication
+    git_update_ref(unindent(
+        format!(
+            r#"
+            start
+            delete {temp_target}
+            commit
+            "#
+        )
+        .as_str(),
+    ))?;
 
     Ok(())
 }
