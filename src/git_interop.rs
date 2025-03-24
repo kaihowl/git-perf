@@ -957,8 +957,12 @@ mod test {
             .respond_with(status_code(200)),
         );
 
+        // Must add a single write as a push without pending local writes just succeeds
+        add_note_line_to_head("test note line").expect("Failed to add note line");
+
         // TODO(kaihowl) duplication, leaks out of this test
         hermetic_git_env();
+
         let error = push(None);
         error
             .as_ref()
