@@ -9,6 +9,9 @@ script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
+# Disable set -x from the common.sh inclusion
+set +x
+
 cd "$(mktemp -d)"
 root=$(pwd)
 
@@ -49,8 +52,8 @@ run_push_test() {
         # Run the push command without additional parameters
         git-perf "$@" 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to push" && exit 1)
 
-        # Every 100 iterations, print a status update
-        if (( i % 100 == 0 )); then
+        # Every 10 iterations, print a status update
+        if (( i % 10 == 0 )); then
             echo "[$log_prefix] Completed $i/$iterations iterations"
         fi
     done
