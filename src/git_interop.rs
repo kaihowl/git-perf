@@ -19,6 +19,12 @@ use rand::{thread_rng, Rng};
 
 #[derive(Debug, thiserror::Error)]
 enum GitError {
+    #[error("A ref failed to be pushed:\n{stdout}\n{stderr}")]
+    RefFailedToPush { stdout: String, stderr: String },
+
+    #[error("A ref failed to be locked:\n{stdout}\n{stderr}")]
+    RefFailedToLock { stdout: String, stderr: String },
+
     #[error("Git failed to execute.\n\nstdout:\n{stdout}\nstderr:\n{stderr}")]
     ExecError {
         command: String,
@@ -128,7 +134,14 @@ fn ensure_symbolic_write_ref_exists() -> Result<()> {
                 "#
             )
             .as_str(),
-        ))?
+        ))
+        .or_else(|err| {
+            if let GitError::RefFailedToLock { .. } = err {
+                return Ok(());
+            } else {
+                return Err(err);
+            }
+        })?;
     }
     Ok(())
 }
@@ -138,7 +151,7 @@ fn random_suffix() -> String {
     format!("{:08x}", suffix)
 }
 
-fn git_update_ref(commands: impl AsRef<str>) -> Result<()> {
+fn git_update_ref(commands: impl AsRef<str>) -> Result<(), GitError> {
     match feed_git_command(
         &[
             "update-ref",
@@ -155,10 +168,9 @@ fn git_update_ref(commands: impl AsRef<str>) -> Result<()> {
             stdout,
             stderr,
         }) if stderr.contains("cannot lock ref") => {
-            // TODO(kaihowl) Move to separate type?
-            Err(anyhow!(PushError::RefFailedToPush { stdout, stderr }))
+            Err(GitError::RefFailedToLock { stdout, stderr })
         }
-        Err(e) => Err(anyhow!(e)),
+        Err(e) => Err(e),
     }
 }
 
@@ -378,12 +390,6 @@ fn remove_measurements_from_reference(reference: &str, older_than: DateTime<Utc>
     Ok(())
 }
 
-#[derive(Debug, thiserror::Error)]
-enum PushError {
-    #[error("A ref failed to be pushed:\n{stdout}\n{stderr}")]
-    RefFailedToPush { stdout: String, stderr: String },
-}
-
 fn new_symbolic_write_ref() -> Result<String> {
     let suffix = random_suffix();
     let target = format!("{REFS_NOTES_WRITE_TARGET_PREFIX}{suffix}");
@@ -531,7 +537,7 @@ fn git_push_notes_ref(
             if successful_push {
                 Ok(())
             } else {
-                Err(anyhow!(PushError::RefFailedToPush { stdout, stderr }))
+                Err(anyhow!(GitError::RefFailedToPush { stdout, stderr }))
             }
         }
         Err(e) => Err(anyhow!(e)),
@@ -780,12 +786,17 @@ pub fn pull(work_dir: Option<&Path>) -> Result<()> {
 pub fn push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) check transient/permanent error
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
-        raw_push(work_dir).map_err(|e| match e.downcast_ref::<PushError>() {
-            Some(PushError::RefFailedToPush { .. }) => match pull(work_dir) {
-                Err(pull_error) => backoff::Error::permanent(pull_error),
-                Ok(_) => backoff::Error::transient(e),
-            },
-            None => backoff::Error::Permanent(e),
+        raw_push(work_dir).map_err(|e| match e.downcast_ref::<GitError>() {
+            Some(GitError::RefFailedToPush { .. }) | Some(GitError::RefFailedToLock { .. }) => {
+                // Try pulling first
+                match pull(work_dir) {
+                    Err(pull_error) => backoff::Error::permanent(pull_error),
+                    Ok(_) => backoff::Error::transient(e),
+                }
+            }
+            Some(GitError::ExecError { .. }) | Some(GitError::IoError { .. }) | None => {
+                backoff::Error::permanent(e)
+            }
         })
     };
 
