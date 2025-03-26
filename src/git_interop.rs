@@ -25,6 +25,9 @@ enum GitError {
     #[error("A ref failed to be locked:\n{stdout}\n{stderr}")]
     RefFailedToLock { stdout: String, stderr: String },
 
+    #[error("A concurrent change to the ref occurred:\n{stdout}\n{stderr}")]
+    RefConcurrentModification { stdout: String, stderr: String },
+
     #[error("Git failed to execute.\n\nstdout:\n{stdout}\nstderr:\n{stderr}")]
     ExecError {
         command: String,
@@ -105,9 +108,10 @@ const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
     let op = || -> Result<(), backoff::Error<GitError>> {
         raw_add_note_line_to_head(line).map_err(|e| match e {
-            GitError::RefFailedToLock { .. } => backoff::Error::transient(e),
+            GitError::RefConcurrentModification { .. } => backoff::Error::transient(e),
             GitError::ExecError { .. }
             | GitError::IoError { .. }
+            | GitError::RefFailedToLock { .. }
             | GitError::RefFailedToPush { .. } => backoff::Error::permanent(e),
         })
     };
@@ -224,6 +228,13 @@ fn git_update_ref(commands: impl AsRef<str>) -> Result<(), GitError> {
             stderr,
         }) if stderr.contains("cannot lock ref") => {
             Err(GitError::RefFailedToLock { stdout, stderr })
+        }
+        Err(GitError::ExecError {
+            command: _,
+            stdout,
+            stderr,
+        }) if stderr.contains("but expected") => {
+            Err(GitError::RefConcurrentModification { stdout, stderr })
         }
         Err(e) => Err(e),
     }
@@ -878,9 +889,10 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
                     Ok(_) => backoff::Error::transient(e),
                 }
             }
-            Some(GitError::ExecError { .. }) | Some(GitError::IoError { .. }) | None => {
-                backoff::Error::permanent(e)
-            }
+            Some(GitError::ExecError { .. })
+            | Some(GitError::IoError { .. })
+            | Some(GitError::RefConcurrentModification { .. })
+            | None => backoff::Error::permanent(e),
         })
     };
 
