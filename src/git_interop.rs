@@ -108,10 +108,12 @@ const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
     let op = || -> Result<(), backoff::Error<GitError>> {
         raw_add_note_line_to_head(line).map_err(|e| match e {
-            GitError::RefConcurrentModification { .. } => backoff::Error::transient(e),
+            // TODO(kaihowl) when do we really need RefFailedToLock in this case?
+            GitError::RefConcurrentModification { .. } | GitError::RefFailedToLock { .. } => {
+                backoff::Error::transient(e)
+            }
             GitError::ExecError { .. }
             | GitError::IoError { .. }
-            | GitError::RefFailedToLock { .. }
             | GitError::RefFailedToPush { .. } => backoff::Error::permanent(e),
         })
     };
