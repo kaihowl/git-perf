@@ -103,6 +103,33 @@ const REFS_NOTES_MERGE_BRANCH: &str = "refs/notes/perf-v3-merge";
 const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
 
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
+    let op = || -> Result<(), backoff::Error<GitError>> {
+        raw_add_note_line_to_head(line).map_err(|e| match e {
+            GitError::RefFailedToLock { .. } => backoff::Error::transient(e),
+            GitError::ExecError { .. }
+            | GitError::IoError { .. }
+            | GitError::RefFailedToPush { .. } => backoff::Error::permanent(e),
+        })
+    };
+
+    // TODO(kaihowl) configure
+    let backoff = ExponentialBackoffBuilder::default()
+        .with_max_elapsed_time(Some(Duration::from_secs(10)))
+        .build();
+
+    backoff::retry(backoff, op).map_err(|e| match e {
+        backoff::Error::Permanent(err) => {
+            anyhow!(err).context("Permanent failure while adding note line to head")
+        }
+        backoff::Error::Transient { err, .. } => {
+            anyhow!(err).context("Timed out while adding note line to head")
+        }
+    })?;
+
+    Ok(())
+}
+
+fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     ensure_symbolic_write_ref_exists()?;
 
     // `git notes append` is not safe to use concurrently.
@@ -126,8 +153,7 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
             line,
         ],
         &None,
-    )
-    .context("Failed to add new measurement")?;
+    )?;
 
     // Update current write branch with pending write
     // Delete target
@@ -148,7 +174,7 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
     Ok(())
 }
 
-fn ensure_symbolic_write_ref_exists() -> Result<()> {
+fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
     if git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).is_none() {
         let suffix = random_suffix();
         let target = format!("{REFS_NOTES_WRITE_TARGET_PREFIX}{suffix}");
@@ -262,7 +288,7 @@ fn create_temp_rewrite_head(current_notes_head: &str) -> Result<String> {
     Ok(target)
 }
 
-fn create_temp_add_head(current_notes_head: &str) -> Result<String> {
+fn create_temp_add_head(current_notes_head: &str) -> Result<String, GitError> {
     let suffix = random_suffix();
     let target = format!("{REFS_NOTES_ADD_TARGET_PREFIX}{suffix}");
 
