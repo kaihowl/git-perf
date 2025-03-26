@@ -163,7 +163,7 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
             r#"
             start
             symref-verify {REFS_NOTES_WRITE_SYMBOLIC_REF} {current_symbolic_ref_target}
-            update {current_symbolic_ref_target} {temp_target}
+            update {current_symbolic_ref_target} {temp_target} {current_note_head}
             delete {temp_target}
             commit
             "#
