@@ -126,7 +126,7 @@ echo "Verifying results..."
 LINE_COUNT=$(git-perf report -o - | wc -l)
 EXPECTED_COUNT=$((NUM_ADD_ITERATIONS * 2))
 
-if [[ "$LINE_COUNT" -eq "$NUM_ADD_ITERATIONS" ]]; then
+if [[ $LINE_COUNT -eq $EXPECTED_COUNT ]]; then
     echo "SUCCESS: Verification passed. Found exactly $EXPECTED_COUNT lines in the report."
     exit 0
 else
