@@ -120,7 +120,7 @@ pub fn add_note_line_to_head(line: &str) -> Result<()> {
 
     // TODO(kaihowl) configure
     let backoff = ExponentialBackoffBuilder::default()
-        .with_max_elapsed_time(Some(Duration::from_secs(10)))
+        .with_max_elapsed_time(Some(Duration::from_secs(60)))
         .build();
 
     backoff::retry(backoff, op).map_err(|e| match e {
