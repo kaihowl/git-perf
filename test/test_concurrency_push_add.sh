@@ -4,6 +4,7 @@ set -euo pipefail
 # Constants
 NUM_PUSH_ITERATIONS=98
 NUM_ADD_ITERATIONS=499
+CONCURRENT_ADDERS=2
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -97,17 +98,19 @@ echo "Press CTRL+C at any time to abort the test"
 run_push_test "PUSH" push &
 PUSH_PID=$!
 
+ADD_PIDS=()
 # Start the add process (with measurement parameter)
-run_add_test "ADD1" add &
-ADD_PID_1=$!
-run_add_test "ADD2" add &
-ADD_PID_2=$!
+for i in $(seq 1 $CONCURRENT_ADDERS); do
+run_add_test "ADD_$i" add &
+ADD_PIDS+=($!)
+done
 
 # Wait for both processes to complete
 echo "Waiting for all tests to complete..."
 wait $PUSH_PID
 PUSH_STATUS=$?
-wait $ADD_PID_1 $ADD_PID_2
+
+wait "${ADD_PIDS[@]}"
 ADD_STATUS=$?
 
 # Reset trap for normal completion
