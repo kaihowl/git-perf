@@ -519,6 +519,10 @@ fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
 
 //TODO(kaihowl) clean up pub methods
 pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
+    // This might merge concurrently created write branches. There is no protection against that.
+    // This wants to achieve an at-least-once semantic. The exactly-once semantic is ensured by the
+    // cat_sort_uniq merge strategy.
+
     // - Reset the symbolic-ref “write” to a new unique write ref.
     //     - Allows to continue committing measurements while pushing.
     //     - ?? What happens when a git notes amend concurrently still writes to the old ref?
