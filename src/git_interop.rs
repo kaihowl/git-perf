@@ -527,7 +527,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
     // OLD
     // - Create a temporary merge ref, set to the upstream perf ref, merge in all existing write refs except the newly created one from the previous step.
     //     - Same step (except for filtering of the new ref) happens on local read as well.)
-    //     - Relies on unrelated histories, cat_uniq_sort merge strategy
+    //     - Relies on unrelated histories, cat_sort_uniq merge strategy
     //     - Allows to cut off the history on upstream periodically
     // NEW
     // - Note down the current upstream perf ref oid
@@ -551,7 +551,7 @@ pub fn raw_push(work_dir: Option<&Path>) -> Result<()> {
 
     // - merge in all existing write refs, except for the newly created one from first step
     //     - Same step (except for filtering of the new ref) happens on local read as well.)
-    //     - Relies on unrelated histories, cat_uniq_sort merge strategy
+    //     - Relies on unrelated histories, cat_sort_uniq merge strategy
     //     - Allows to cut off the history on upstream periodically
     let additional_args = vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")];
     let refs = get_refs(additional_args)?
@@ -793,7 +793,7 @@ fn update_read_branch() -> Result<()> {
     }
 
     // - With each local refs/notes/perf-v3-write-XXX
-    //     - If not merged into refs/notes/perf-v3-read: merge in with cat_uniq_sort
+    //     - If not merged into refs/notes/perf-v3-read: merge in with cat_sort_uniq
     for reference in &refs {
         // TODO(kaihowl) unnecessary optimization?
         if Some(reference) == read_ref {
