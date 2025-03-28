@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Constants
 NUM_PUSH_ITERATIONS=150
-NUM_REMOVE_ITERATIONS=20
+NUM_REMOVE_ITERATIONS=150
 NUM_ADD_ITERATIONS=199
 CONCURRENT_ADDERS=2
 
@@ -26,6 +26,12 @@ git clone "$root/upstream" work
 pushd work
 git commit --allow-empty -m 'test commit'
 git push
+
+# Add initial measurement to evade corner cases of for example git-perf remove with no measurements on the remote.
+# These are not useful to test in this context.
+git perf add -m 'seedmeasurement' 1
+git perf push
+
 
 # Function to handle cleanup when script is interrupted
 # shellcheck disable=SC2317
