@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Constants
-NUM_PUSH_ITERATIONS=98
-NUM_ADD_ITERATIONS=499
+NUM_PUSH_ITERATIONS=150
+NUM_ADD_ITERATIONS=199
 CONCURRENT_ADDERS=2
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
@@ -53,9 +53,11 @@ run_push_test() {
         # Run the push command without additional parameters
         git-perf "$@" 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to push" && exit 1)
 
-        # Every 10 iterations, print a status update
+        # Every 10 iterations, print a status update, and back off a bit
         if (( i % 10 == 0 )); then
             echo "[$log_prefix] Completed $i/$iterations iterations"
+            # Back off a little bit
+            sleep 1
         fi
     done
 
@@ -81,7 +83,7 @@ run_add_test() {
         git-perf "$@" --measurement "test-$log_prefix" $random_value 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to add" && exit 1)
 
         # Every 100 iterations, print a status update
-        if (( i % 100 == 0 )); then
+        if (( i % 10 == 0 )); then
             echo "[$log_prefix] Completed $i/$iterations iterations"
         fi
     done
