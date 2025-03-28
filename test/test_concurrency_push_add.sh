@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Constants
 NUM_PUSH_ITERATIONS=150
+NUM_REMOVE_ITERATIONS=20
 NUM_ADD_ITERATIONS=199
 CONCURRENT_ADDERS=2
 
@@ -39,6 +40,32 @@ cleanup() {
 
 # Set up trap for CTRL+C and other termination signals
 trap cleanup SIGINT SIGTERM
+
+# Function to run git-perf push command (without measurement parameter)
+run_remove_test() {
+    local log_prefix=$1
+    shift  # Remove first parameter (prefix) from the argument list
+    local iterations=$NUM_REMOVE_ITERATIONS
+
+    local cmd_display="git-perf $*"
+    echo "Starting $iterations iterations of '$cmd_display'..."
+
+    for (( i=1; i<=iterations; i++ )); do
+        # Run the push command without additional parameters
+        # TODO(kaihowl) uses a static 7 days, does that make sense?
+        git-perf "$@" --older-than '7d' 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to push" && exit 1)
+
+        # Every 10 iterations, print a status update, and back off a bit
+        if (( i % 10 == 0 )); then
+            echo "[$log_prefix] Completed $i/$iterations iterations"
+            # Back off a little bit
+            sleep 1
+        fi
+    done
+
+    echo "[$log_prefix] All $iterations iterations completed"
+    return 0
+}
 
 # Function to run git-perf push command (without measurement parameter)
 run_push_test() {
@@ -100,6 +127,10 @@ echo "Press CTRL+C at any time to abort the test"
 run_push_test "PUSH" push &
 PUSH_PID=$!
 
+# Start the remove process
+run_remove_test "REMOVE" remove &
+REMOVE_PID=$!
+
 ADD_PIDS=()
 # Start the add process (with measurement parameter)
 for i in $(seq 1 $CONCURRENT_ADDERS); do
@@ -112,16 +143,20 @@ echo "Waiting for all tests to complete..."
 wait $PUSH_PID
 PUSH_STATUS=$?
 
+wait $REMOVE_PID
+REMOVE_STATUS=$?
+
 wait "${ADD_PIDS[@]}"
 ADD_STATUS=$?
 
 # Reset trap for normal completion
 trap - SIGINT SIGTERM
 
-# Check if both processes completed successfully
-if [ $PUSH_STATUS -ne 0 ] || [ $ADD_STATUS -ne 0 ]; then
+# Check if all processes completed successfully
+if [ $PUSH_STATUS -ne 0 ] || [ $ADD_STATUS -ne 0 ] || [ $REMOVE_STATUS -ne 0 ]; then
     echo "ERROR: One or more tests failed!"
     [ $PUSH_STATUS -ne 0 ] && echo "  'push' test failed with exit code $PUSH_STATUS"
+    [ $REMOVE_STATUS -ne 0 ] && echo "  'remove' test failed with exit code $REMOVE_STATUS"
     [ $ADD_STATUS -ne 0 ] && echo "  'add' test failed with exit code $ADD_STATUS"
     exit 1
 fi
