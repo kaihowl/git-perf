@@ -140,6 +140,8 @@ done
 
 # Wait for both processes to complete
 echo "Waiting for all tests to complete..."
+set +e
+
 wait $PUSH_PID
 PUSH_STATUS=$?
 
