@@ -4,8 +4,12 @@ set -euo pipefail
 # Constants
 NUM_PUSH_ITERATIONS=150
 NUM_REMOVE_ITERATIONS=150
+NUM_PRUNE_ITERATIONS=100
 NUM_ADD_ITERATIONS=199
-CONCURRENT_ADDERS=2
+CONCURRENT_ADDERS=4
+CONCURRENT_PUSHERS=2
+CONCURRENT_REMOVERS=2
+CONCURRENT_PRUNERS=2
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -59,7 +63,32 @@ run_remove_test() {
     for (( i=1; i<=iterations; i++ )); do
         # Run the push command without additional parameters
         # TODO(kaihowl) uses a static 7 days, does that make sense?
-        git-perf "$@" --older-than '7d' 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to push" && exit 1)
+        git-perf "$@" --older-than '7d' 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to remove" && exit 1)
+
+        # Every 10 iterations, print a status update, and back off a bit
+        if (( i % 10 == 0 )); then
+            echo "[$log_prefix] Completed $i/$iterations iterations"
+            # Back off a little bit
+            sleep 1
+        fi
+    done
+
+    echo "[$log_prefix] All $iterations iterations completed"
+    return 0
+}
+
+run_prune_test() {
+    local log_prefix=$1
+    shift  # Remove first parameter (prefix) from the argument list
+    local iterations=$NUM_PRUNE_ITERATIONS
+
+    local cmd_display="git-perf $*"
+    echo "Starting $iterations iterations of '$cmd_display'..."
+
+    for (( i=1; i<=iterations; i++ )); do
+        # Run the push command without additional parameters
+        # TODO(kaihowl) uses a static 7 days, does that make sense?
+        git-perf "$@" 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to prune" && exit 1)
 
         # Every 10 iterations, print a status update, and back off a bit
         if (( i % 10 == 0 )); then
@@ -129,39 +158,51 @@ run_add_test() {
 echo "Starting test harness..."
 echo "Press CTRL+C at any time to abort the test"
 
-# Start the push process (without measurement parameter)
-run_push_test "PUSH" push &
-PUSH_PID=$!
+PUSH_PIDS=()
+for i in $(seq 1 $CONCURRENT_PUSHERS); do
+  run_push_test "PUSH_$i" push &
+  PUSH_PIDS+=($!)
+done
 
-# Start the remove process
-run_remove_test "REMOVE" remove &
-REMOVE_PID=$!
+REMOVE_PIDS=()
+for i in $(seq 1 $CONCURRENT_REMOVERS); do
+  run_remove_test "REMOVE_$i" remove &
+  REMOVE_PIDS+=($!)
+done
 
 ADD_PIDS=()
-# Start the add process (with measurement parameter)
 for i in $(seq 1 $CONCURRENT_ADDERS); do
-run_add_test "ADD_$i" add &
-ADD_PIDS+=($!)
+  run_add_test "ADD_$i" add &
+  ADD_PIDS+=($!)
+done
+
+PRUNE_PIDS=()
+for i in $(seq 1 $CONCURRENT_PRUNERS); do
+  run_prune_test "PRUNE_$i" prune &
+  REMOVE_PIDS+=($!)
 done
 
 # Wait for both processes to complete
 echo "Waiting for all tests to complete..."
 set +e
 
-wait $PUSH_PID
+wait "${PUSH_PIDS[@]}"
 PUSH_STATUS=$?
 
-wait $REMOVE_PID
+wait "${REMOVE_PIDS[@]}"
 REMOVE_STATUS=$?
 
 wait "${ADD_PIDS[@]}"
 ADD_STATUS=$?
 
+wait "${PRUNE_PIDS[@]}"
+PRUNE_STATUS=$?
+
 # Reset trap for normal completion
 trap - SIGINT SIGTERM
 
 # Check if all processes completed successfully
-if [ $PUSH_STATUS -ne 0 ] || [ $ADD_STATUS -ne 0 ] || [ $REMOVE_STATUS -ne 0 ]; then
+if [ $PUSH_STATUS -ne 0 ] || [ $ADD_STATUS -ne 0 ] || [ $REMOVE_STATUS -ne 0 ] || [ $PRUNE_STATUS -ne 0 ]; then
     echo "ERROR: One or more tests failed!"
     [ $PUSH_STATUS -ne 0 ] && echo "  'push' test failed with exit code $PUSH_STATUS"
     [ $REMOVE_STATUS -ne 0 ] && echo "  'remove' test failed with exit code $REMOVE_STATUS"
