@@ -695,6 +695,7 @@ fn git_push_notes_ref(
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
 pub fn prune() -> Result<()> {
+    // TODO(kaihowl) missing raw + retry
     if is_shallow_repo().context("Could not determine if shallow clone.")? {
         // TODO(kaihowl) is this not already checked by git itself?
         bail!("Refusing to prune on a shallow repo")
@@ -926,7 +927,14 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
 }
 
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {
-    fetch(work_dir)?;
+    fetch(work_dir).or_else(|err| match err {
+        // A concurrent modification comes from a concurrent fetch.
+        // Don't fail for that.
+        // TODO(kaihowl) must potentially be moved into the retry logic from the push backoff as it
+        // only is there safe to assume that we successfully pulled.
+        GitError::RefConcurrentModification { .. } | GitError::RefFailedToLock { .. } => Ok(()),
+        _ => Err(err),
+    })?;
 
     Ok(())
 }
@@ -935,7 +943,9 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     // TODO(kaihowl) check transient/permanent error
     let op = || -> Result<(), backoff::Error<anyhow::Error>> {
         raw_push(work_dir).map_err(|e| match e.downcast_ref::<GitError>() {
-            Some(GitError::RefFailedToPush { .. }) | Some(GitError::RefFailedToLock { .. }) => {
+            Some(GitError::RefFailedToPush { .. })
+            | Some(GitError::RefFailedToLock { .. })
+            | Some(GitError::RefConcurrentModification { .. }) => {
                 // Try pulling first
                 match pull(work_dir) {
                     Err(pull_error) => backoff::Error::permanent(pull_error),
@@ -944,7 +954,6 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
             }
             Some(GitError::ExecError { .. })
             | Some(GitError::IoError { .. })
-            | Some(GitError::RefConcurrentModification { .. })
             | Some(GitError::MissingHead { .. })
             | None => backoff::Error::permanent(e),
         })
