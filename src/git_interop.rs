@@ -11,7 +11,7 @@ use unindent::unindent;
 
 use anyhow::{anyhow, bail, Context, Result};
 use backoff::ExponentialBackoffBuilder;
-use backoff::{self, default};
+use backoff::{self};
 use itertools::Itertools;
 
 use chrono::prelude::*;
@@ -695,6 +695,34 @@ fn git_push_notes_ref(
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
 pub fn prune() -> Result<()> {
+    // TODO(kaihowl) put the transient / permanent error in its own function, reuse
+    let op = || -> Result<(), backoff::Error<anyhow::Error>> {
+        raw_prune().map_err(|e| match e.downcast_ref::<GitError>() {
+            Some(GitError::RefFailedToPush { .. })
+            | Some(GitError::RefFailedToLock { .. })
+            | Some(GitError::RefConcurrentModification { .. }) => backoff::Error::transient(e),
+
+            Some(GitError::ExecError { .. })
+            | Some(GitError::IoError { .. })
+            | Some(GitError::MissingHead { .. })
+            | None => backoff::Error::permanent(e),
+        })
+    };
+
+    // TODO(kaihowl) configure
+    let backoff = ExponentialBackoffBuilder::default()
+        .with_max_elapsed_time(Some(Duration::from_secs(60)))
+        .build();
+
+    backoff::retry(backoff, op).map_err(|e| match e {
+        backoff::Error::Permanent(e) => e.context("Permanent failure while pushing refs"),
+        backoff::Error::Transient { err, .. } => err.context("Timed out pushing refs"),
+    })?;
+
+    Ok(())
+}
+
+fn raw_prune() -> Result<()> {
     // TODO(kaihowl) missing raw + retry
     if is_shallow_repo().context("Could not determine if shallow clone.")? {
         // TODO(kaihowl) is this not already checked by git itself?
