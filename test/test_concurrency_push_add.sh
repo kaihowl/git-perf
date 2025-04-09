@@ -179,7 +179,7 @@ done
 PRUNE_PIDS=()
 for i in $(seq 1 $CONCURRENT_PRUNERS); do
   run_prune_test "PRUNE_$i" prune &
-  REMOVE_PIDS+=($!)
+  PRUNE_PIDS+=($!)
 done
 
 # Wait for both processes to complete
