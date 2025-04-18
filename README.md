@@ -20,6 +20,10 @@ git perf manpage | pandoc -f man -t gfm > docs/manpage.md
 
 # Development
 
+## Development dependencies
+
+- libfaketime
+
 ## Rust tests
 ```
 cargo test
