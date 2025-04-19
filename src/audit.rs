@@ -5,6 +5,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use itertools::Itertools;
+use log::error;
 use std::iter;
 
 pub fn audit(
@@ -49,7 +50,7 @@ pub fn audit(
         // TODO(kaihowl) handle with explicit return? Print text somewhere else?
         let number_measurements = tail_summary.len;
         let plural_s = if number_measurements > 1 { "s" } else { "" };
-        eprintln!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
+        error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
         return Ok(());
     }
 
