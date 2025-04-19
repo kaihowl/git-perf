@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       release:
-        description: 'release to install'
+        description: 'release to install (`latest` or `branch`)'
         required: false
         type: string
         default: 'latest'
@@ -40,11 +40,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: ${{ inputs.depth }}
-      - id: install
+      - id: install-action
+        if: ${{ inputs.release == 'branch' }}
         name: install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@master
+        uses: ./.github/actions/install
         with:
           release: ${{ inputs.release }}
+      - id: install-action-from-release
+        if: ${{ inputs.release != 'branch' }}
+        name: install git-perf
+        # TODO(kaihowl) move to `latest` once actions are published
+        uses: kaihowl/git-perf/.github/actions/install@master
+        with:
+          release: latest
       - name: Inject slug/short variables
         uses: rlespinasse/github-slug-action@v5
       - name: use commit name as report name
