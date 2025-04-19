@@ -40,10 +40,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: ${{ inputs.depth }}
-      - id: install
+      - id: install-action
         name: install git-perf
-        # TODO(kaihowl)
-        uses: kaihowl/git-perf/.github/actions/install@install-branch
+        uses: kaihowl/git-perf/.github/actions/install@${{ inputs.release }}
         with:
           release: ${{ inputs.release }}
       - name: Inject slug/short variables
