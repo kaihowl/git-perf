@@ -7,6 +7,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use log::warn;
 
 use crate::data::MeasurementData;
 
@@ -45,7 +46,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
 
     let num_components = components.len();
     if num_components < 4 {
-        eprintln!("Too few items with {num_components}, skipping record");
+        warn!("Too few items with {num_components}, skipping record");
         return None;
     }
 
@@ -54,7 +55,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
     let epoch = match epoch.parse::<u32>() {
         Ok(e) => e,
         Err(err) => {
-            eprintln!("Cannot parse epoch '{epoch}': {err}, skipping record");
+            warn!("Cannot parse epoch '{epoch}': {err}, skipping record");
             return None;
         }
     };
@@ -65,7 +66,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
     let timestamp = match timestamp.parse::<f64>() {
         Ok(ts) => ts,
         Err(err) => {
-            eprintln!("Cannot parse timestamp '{timestamp}': {err}, skipping record");
+            warn!("Cannot parse timestamp '{timestamp}': {err}, skipping record");
             return None;
         }
     };
@@ -74,7 +75,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
     let val = match val.parse::<f64>() {
         Ok(val) => val,
         Err(err) => {
-            eprintln!("Cannot parse value '{val}': {err}, skipping record");
+            warn!("Cannot parse value '{val}': {err}, skipping record");
             return None;
         }
     };
@@ -98,7 +99,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
                     }
                 }
             } else {
-                eprintln!("No equals sign in key value pair, skipping record");
+                warn!("No equals sign in key value pair, skipping record");
                 return None;
             }
         }

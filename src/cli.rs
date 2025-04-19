@@ -1,6 +1,8 @@
 use anyhow::{anyhow, bail, Result};
 use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
 use clap::{CommandFactory, Subcommand};
+use env_logger::Env;
+use log::Level;
 use std::path::PathBuf;
 
 use chrono::prelude::*;
@@ -18,6 +20,11 @@ use crate::reporting::report;
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
+    /// Increase verbosity level (can be specified multiple times.) The first level sets level
+    /// "info", second sets level "debug", and third sets level "trace" for the logger.
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -196,9 +203,17 @@ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc
 }
 
 pub fn handle_calls() -> Result<()> {
+    let cli = Cli::parse();
+    let logger_level = match cli.verbose {
+        0 => Level::Warn,
+        1 => Level::Info,
+        2 => Level::Debug,
+        3 | _ => Level::Trace,
+    };
+    env_logger::Builder::from_env(Env::default().default_filter_or(logger_level.as_str())).init();
+
     git_interop::check_git_version()?;
 
-    let cli = Cli::parse();
     match cli.command {
         Commands::Measure {
             repetitions,

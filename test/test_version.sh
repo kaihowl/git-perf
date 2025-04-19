@@ -24,10 +24,10 @@ fi
 
 # Git version too old
 export PATH=${script_dir}/fake_git_2.40.0:$PATH
-git-perf --version && exit 1
+git-perf add -m test 12 && exit 1
 
 # Git version just right
 export PATH=${script_dir}/fake_git_2.41.0:$PATH
-git-perf --version
+git-perf add -m test 12
 
 exit 0

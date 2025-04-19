@@ -8,6 +8,7 @@ use std::{
 };
 
 use defer::defer;
+use log::{debug, trace};
 use unindent::unindent;
 
 use ::backoff::ExponentialBackoffBuilder;
@@ -52,6 +53,7 @@ fn spawn_git_command(
 ) -> Result<Child, io::Error> {
     let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
     let stdin = stdin.unwrap_or(Stdio::null());
+    debug!("execute: git {}", args.join(" "));
     process::Command::new("git")
         // TODO(kaihowl) set correct encoding and lang?
         .env("LANG", "")
@@ -77,6 +79,8 @@ fn feed_git_command(
 
     let child = spawn_git_command(args, working_dir, stdin)?;
 
+    debug!("input: {}", input.unwrap_or(""));
+
     let output = match child.stdin {
         Some(ref stdin) => {
             let mut writer = BufWriter::new(stdin);
@@ -89,8 +93,11 @@ fn feed_git_command(
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
+    trace!("output: {}", stdout);
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        debug!("stderr: {}", stderr);
         return Err(GitError::ExecError {
             command: args.join(" "),
             stdout,
