@@ -138,3 +138,4 @@ jobs:
     # TODO(kaihowl) run with version from branch instead?
     with:
       additional-args: '-s rust'
+      concurrency-token: gh-pages-${{ github.ref }}
