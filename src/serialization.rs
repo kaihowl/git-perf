@@ -10,16 +10,6 @@ use itertools::Itertools;
 
 use crate::data::MeasurementData;
 
-// TODO(kaihowl) serialization with flatten and custom function does not work
-#[derive(Debug, PartialEq)]
-struct SerializeMeasurementData<'a> {
-    epoch: u32,
-    name: &'a str,
-    timestamp: f64,
-    val: f64,
-    key_values: &'a HashMap<String, String>,
-}
-
 pub const DELIMITER: &str = "";
 
 pub fn serialize_single<M>(measurement_data: &M, custom_delimiter: &str) -> String
