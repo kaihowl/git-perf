@@ -199,16 +199,16 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
 struct ReporterFactory {}
 
 impl ReporterFactory {
-    fn from_file_name<'a, 'b: 'a>(path: &'b Path) -> Option<Box<dyn Reporter + 'a>> {
+    fn from_file_name(path: &Path) -> Option<Box<dyn Reporter + '_>> {
         if path == Path::new("-") {
-            return Some(Box::new(CsvReporter::new()) as Box<dyn Reporter + 'a>);
+            return Some(Box::new(CsvReporter::new()) as Box<dyn Reporter>);
         }
         let mut res = None;
         if let Some(ext) = path.extension() {
             let extension = ext.to_ascii_lowercase().into_string().unwrap();
             res = match extension.as_str() {
                 "html" => Some(Box::new(PlotlyReporter::new()) as Box<dyn Reporter>),
-                "csv" => Some(Box::new(CsvReporter::new()) as Box<dyn Reporter + 'a>),
+                "csv" => Some(Box::new(CsvReporter::new()) as Box<dyn Reporter>),
                 _ => None,
             }
         }
