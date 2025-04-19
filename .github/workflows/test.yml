@@ -139,3 +139,4 @@ jobs:
       additional-args: '-s rust'
       concurrency-token: gh-pages-${{ github.ref }}
       release: 'branch'
+      branch: ${{ github.ref }}

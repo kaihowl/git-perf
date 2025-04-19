@@ -7,6 +7,10 @@ on:
         required: false
         type: string
         default: 'latest'
+      branch:
+        description: 'in case of release==branch, provide the github.ref to install from'
+        type: string
+        default: ''
       concurrency-token:
         description: 'token to prevent concurrent updates of github pages'
         required: false
@@ -43,7 +47,7 @@ jobs:
       - id: install-action
         if: ${{ inputs.release == 'branch' }}
         name: install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@${{ github.ref }}
+        uses: kaihowl/git-perf/.github/actions/install@${{ inputs.branch }}
         with:
           release: ${{ inputs.release }}
       - id: install-action-from-release
