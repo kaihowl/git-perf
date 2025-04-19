@@ -827,34 +827,6 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
         .collect_vec())
 }
 
-fn ensure_branch_exists(branch: &str) -> Result<()> {
-    if git_rev_parse(branch).is_ok() {
-        return Ok(());
-    }
-
-    let empty_tree_oid = capture_git_output(&["mktree"], &None)?;
-    let empty_tree_oid = empty_tree_oid.trim();
-
-    let empty_commit = capture_git_output(
-        &["commit-tree", "-m", "empty commit", empty_tree_oid],
-        &None,
-    )?;
-    let empty_commit = empty_commit.trim();
-
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            create {branch} {empty_commit}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
-
-    Ok(())
-}
-
 fn update_read_branch() -> Result<()> {
     // TODO(kaihowl) use temp branches and return RAII object
     git_update_ref(unindent(
