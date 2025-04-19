@@ -41,6 +41,13 @@ jobs:
         with:
           fetch-depth: ${{ inputs.depth }}
       - id: install-action
+        if: ${{ inputs.release == 'branch' }}
+        name: install git-perf
+        uses: kaihowl/git-perf/.github/actions/install@${{ github.ref }}
+        with:
+          release: ${{ inputs.release }}
+      - id: install-action-from-release
+        if: ${{ inputs.release != 'branch' }}
         name: install git-perf
         uses: kaihowl/git-perf/.github/actions/install@${{ inputs.release }}
         with:
