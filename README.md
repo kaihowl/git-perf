@@ -24,6 +24,15 @@ git perf manpage | pandoc -f man -t gfm > docs/manpage.md
 
 - libfaketime
 
+Install with 
+```
+if [[ $(uname -s) = Darwin ]]; then
+    brew install libfaketime
+else # ubuntu
+    sudo apt-get install libfaketime
+fi
+```
+
 ## Rust tests
 ```
 cargo test

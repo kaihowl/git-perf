@@ -58,6 +58,14 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
 
+    - name: Install libfaketime
+      run: |
+        if [[ $(uname -s) = Darwin ]]; then
+          brew install libfaketime
+        else # ubuntu
+          sudo apt-get install libfaketime
+        fi
+
     - name: Show command used for Cargo
       run: |
         echo "cargo command is: ${{ env.CARGO }}"
