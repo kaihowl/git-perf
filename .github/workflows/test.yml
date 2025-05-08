@@ -77,8 +77,7 @@ jobs:
     - uses: fregante/setup-git-user@v2
 
     - name: Run tests
-      # TODO(kaihowl) allow concurrency after test rewrite for cwd again
-      run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }} -- --test-threads 1
+      run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }}
 
     - name: Run bash e2e tests
       run: |
