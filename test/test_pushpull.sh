@@ -56,6 +56,9 @@ git perf add -m echo 0.5
 
 git perf push
 
+# Second git perf push should be no-op
+git perf push
+
 echo Print from second repo
 cd "$repo2"
 # TODO(kaihowl)

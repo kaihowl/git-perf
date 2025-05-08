@@ -32,6 +32,9 @@ enum GitError {
     #[error("Shallow repository. Refusing operation.")]
     ShallowRepository,
 
+    #[error("This repo does not have any measurements.")]
+    MissingMeasurements,
+
     #[error("A concurrent change to the ref occurred:\n{stdout}\n{stderr}")]
     RefConcurrentModification { stdout: String, stderr: String },
 
@@ -120,12 +123,13 @@ const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
         GitError::RefFailedToPush { .. }
-        | GitError::MissingHead { .. }
         | GitError::RefFailedToLock { .. }
         | GitError::RefConcurrentModification { .. } => ::backoff::Error::transient(e),
-        GitError::ExecError { .. } | GitError::IoError(..) | GitError::ShallowRepository => {
-            ::backoff::Error::permanent(e)
-        }
+        GitError::ExecError { .. }
+        | GitError::IoError(..)
+        | GitError::ShallowRepository
+        | GitError::MissingHead { .. }
+        | GitError::MissingMeasurements => ::backoff::Error::permanent(e),
     }
 }
 
@@ -174,6 +178,13 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
         .as_str(),
     ))
     .expect("Deleting our own temp ref for adding should never fail"));
+
+    // Test if the repo has any commit checked out at HEAD
+    if let Err(_) = internal_get_head_revision() {
+        return Err(GitError::MissingHead {
+            reference: "HEAD".to_string(),
+        });
+    }
 
     capture_git_output(
         &[
@@ -657,6 +668,10 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
     let refs =
         consolidate_write_branches_into(&current_upstream_oid, &merge_ref, Some(&new_write_ref))?;
+
+    if refs.is_empty() && current_upstream_oid == EMPTY_OID {
+        return Err(GitError::MissingMeasurements);
+    }
 
     git_push_notes_ref(&current_upstream_oid, &merge_ref, &work_dir)?;
 
