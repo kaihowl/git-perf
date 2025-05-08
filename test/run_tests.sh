@@ -3,6 +3,13 @@
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 num_procs=4
 
+if [[ $# -eq 1 ]]; then
+  include_pattern=$1
+else
+  # Include both test_ and testslow_
+  include_pattern="test"
+fi
+
 # Function to execute command and capture output
 execute_command() {
     local output_file
@@ -23,7 +30,7 @@ execute_command() {
 commands=()
 while IFS= read -r -d '' file; do
     commands+=("$file")
-done < <(find "${script_dir}" -name 'test_*.sh' -print0)
+done < <(find "${script_dir}" -name "$include_pattern*.sh" -print0)
 
 pids=()
 
