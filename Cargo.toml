@@ -10,6 +10,7 @@ repository = "https://github.com/kaihowl/git-perf"
 
 [dependencies]
 anyhow = "1.0.75"
+assert_cmd = "2.0.17"
 average = "0.13.1"
 backoff = "0.4.0"
 chrono = "0.4.39"

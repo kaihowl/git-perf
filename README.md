@@ -38,8 +38,7 @@ fi
 cargo test
 ```
 
-## Integration / bash tests
+Exclude slow integration tests with:
 ```
-cargo build && PATH=$(pwd)/target/debug:$PATH test/run_tests.sh
+cargo test -- --skip slow
 ```
-
