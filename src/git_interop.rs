@@ -96,6 +96,7 @@ fn feed_git_command(
     trace!("output: {}", stdout);
 
     if !output.status.success() {
+        trace!("exec failed");
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         debug!("stderr: {}", stderr);
         return Err(GitError::ExecError {
