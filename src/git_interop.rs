@@ -18,16 +18,22 @@ use itertools::Itertools;
 use chrono::prelude::*;
 use rand::{thread_rng, Rng};
 
+#[derive(Debug)]
+struct GitOutput {
+    stdout: String,
+    stderr: String,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum GitError {
-    #[error("A ref failed to be pushed:\n{stdout}\n{stderr}")]
-    RefFailedToPush { stdout: String, stderr: String },
+    #[error("A ref failed to be pushed:\n{0}\n{1}", output.stdout, output.stderr)]
+    RefFailedToPush { output: GitOutput },
 
     #[error("Missing HEAD for {reference}")]
     MissingHead { reference: String },
 
-    #[error("A ref failed to be locked:\n{stdout}\n{stderr}")]
-    RefFailedToLock { stdout: String, stderr: String },
+    #[error("A ref failed to be locked:\n{0}\n{1}", output.stdout, output.stderr)]
+    RefFailedToLock { output: GitOutput },
 
     #[error("Shallow repository. Refusing operation.")]
     ShallowRepository,
@@ -35,15 +41,11 @@ enum GitError {
     #[error("This repo does not have any measurements.")]
     MissingMeasurements,
 
-    #[error("A concurrent change to the ref occurred:\n{stdout}\n{stderr}")]
-    RefConcurrentModification { stdout: String, stderr: String },
+    #[error("A concurrent change to the ref occurred:\n{0}\n{1}", output.stdout, output.stderr)]
+    RefConcurrentModification { output: GitOutput },
 
-    #[error("Git failed to execute.\n\nstdout:\n{stdout}\nstderr:\n{stderr}")]
-    ExecError {
-        command: String,
-        stdout: String,
-        stderr: String,
-    },
+    #[error("Git failed to execute. {output:?}")]
+    ExecError { command: String, output: GitOutput },
 
     #[error("Failed to execute git command")]
     IoError(#[from] io::Error),
@@ -69,7 +71,7 @@ fn spawn_git_command(
         .spawn()
 }
 
-fn capture_git_output(args: &[&str], working_dir: &Option<&Path>) -> Result<String, GitError> {
+fn capture_git_output(args: &[&str], working_dir: &Option<&Path>) -> Result<GitOutput, GitError> {
     feed_git_command(args, working_dir, None)
 }
 
@@ -77,7 +79,7 @@ fn feed_git_command(
     args: &[&str],
     working_dir: &Option<&Path>,
     input: Option<&str>,
-) -> Result<std::string::String, GitError> {
+) -> Result<GitOutput, GitError> {
     let stdin = input.and_then(|_s| Some(Stdio::piped()));
 
     let child = spawn_git_command(args, working_dir, stdin)?;
@@ -95,21 +97,24 @@ fn feed_git_command(
     }?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    trace!("stdout: {}", stdout);
 
-    trace!("output: {}", stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    trace!("stderr: {}", stderr);
 
-    if !output.status.success() {
+    let git_output = GitOutput { stdout, stderr };
+
+    if output.status.success() {
+        trace!("exec succeeded");
+    } else {
         trace!("exec failed");
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        debug!("stderr: {}", stderr);
         return Err(GitError::ExecError {
             command: args.join(" "),
-            stdout,
-            stderr,
+            output: git_output,
         });
     }
 
-    Ok(stdout)
+    Ok(git_output)
 }
 
 // TODO(kaihowl) missing docs
@@ -274,23 +279,13 @@ fn internal_get_head_revision() -> Result<String, GitError> {
 }
 
 fn map_git_error(err: GitError) -> GitError {
-    match &err {
-        GitError::ExecError {
-            command: _,
-            stdout,
-            stderr,
-        } if stderr.contains("cannot lock ref") => GitError::RefFailedToLock {
-            stdout: stdout.to_string(),
-            stderr: stderr.to_string(),
-        },
-        GitError::ExecError {
-            command: _,
-            stdout,
-            stderr,
-        } if stderr.contains("but expected") => GitError::RefConcurrentModification {
-            stdout: stdout.to_string(),
-            stderr: stderr.to_string(),
-        },
+    match err {
+        GitError::ExecError { command: _, output } if output.stderr.contains("cannot lock ref") => {
+            GitError::RefFailedToLock { output }
+        }
+        GitError::ExecError { command: _, output } if output.stderr.contains("but expected") => {
+            GitError::RefConcurrentModification { output }
+        }
         _ => err,
     }
 }
@@ -379,7 +374,8 @@ fn compact_head(target: &str) -> Result<(), GitError> {
     let compaction_head = capture_git_output(
         &["commit-tree", "-m", "cutoff history", &new_removal_head],
         &None,
-    )?;
+    )?
+    .stdout;
 
     let compaction_head = compaction_head.trim();
 
@@ -582,13 +578,13 @@ fn git_rev_parse(reference: &str) -> Result<String, GitError> {
         .map_err(|_e| GitError::MissingHead {
             reference: reference.into(),
         })
-        .map(|s| s.trim().to_owned())
+        .map(|s| s.stdout.trim().to_owned())
 }
 
 fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
     capture_git_output(&["symbolic-ref", "-q", reference], &None)
         .ok()
-        .map(|s| s.trim().to_owned())
+        .map(|s| s.stdout.trim().to_owned())
 }
 
 fn consolidate_write_branches_into(
@@ -724,18 +720,14 @@ fn git_push_notes_ref(
 
     match output {
         Ok(_) => Ok(()),
-        Err(GitError::ExecError {
-            command: _,
-            stdout,
-            stderr,
-        }) => {
-            let successful_push = stdout.lines().any(|l| {
+        Err(GitError::ExecError { command: _, output }) => {
+            let successful_push = output.stdout.lines().any(|l| {
                 l.contains(format!("{REFS_NOTES_BRANCH}:").as_str()) && !l.starts_with('!')
             });
             if successful_push {
                 Ok(())
             } else {
-                Err(GitError::RefFailedToPush { stdout, stderr })
+                Err(GitError::RefFailedToPush { output })
             }
         }
         Err(e) => Err(e),
@@ -823,7 +815,7 @@ fn raw_prune() -> Result<(), GitError> {
 fn is_shallow_repo() -> Result<bool, GitError> {
     let output = capture_git_output(&["rev-parse", "--is-shallow-repository"], &None)?;
 
-    Ok(output.starts_with("true"))
+    Ok(output.stdout.starts_with("true"))
 }
 
 #[derive(Debug, PartialEq)]
@@ -838,6 +830,7 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
 
     let output = capture_git_output(&args, &None)?;
     Ok(output
+        .stdout
         .lines()
         .map(|s| {
             let items = s.split('\0').take(2).collect_vec();
@@ -912,7 +905,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     let mut detected_shallow = false;
 
     // TODO(kaihowl) iterator or generator instead / how to propagate exit code?
-    let it = output.lines().filter_map(|l| {
+    let it = output.stdout.lines().filter_map(|l| {
         if l.starts_with("--") {
             let info = l.split(',').collect_vec();
 
@@ -1015,7 +1008,9 @@ fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
 }
 
 fn get_git_version() -> Result<(i32, i32, i32)> {
-    let version = capture_git_output(&["--version"], &None).context("Determine git version")?;
+    let version = capture_git_output(&["--version"], &None)
+        .context("Determine git version")?
+        .stdout;
     parse_git_version(&version)
 }
 
