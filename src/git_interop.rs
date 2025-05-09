@@ -719,7 +719,10 @@ fn git_push_notes_ref(
     //     - In case of crashes before clean up, old merge refs are eliminated eventually.
 
     match output {
-        Ok(_) => Ok(()),
+        Ok(output) => {
+            print!("{}", &output.stdout);
+            Ok(())
+        }
         Err(GitError::ExecError { command: _, output }) => {
             let successful_push = output.stdout.lines().any(|l| {
                 l.contains(format!("{REFS_NOTES_BRANCH}:").as_str()) && !l.starts_with('!')
