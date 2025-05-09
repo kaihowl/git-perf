@@ -54,7 +54,12 @@ git perf add -m echo 0.5
 git checkout master
 git perf add -m echo 0.5
 
-git perf push
+output=$(git perf push)
+if [[ ${output} != *'new reference'* ]]; then
+  echo "Missing 'new reference' in output:"
+  echo "$output"
+  exit 1
+fi
 
 # Second git perf push should be no-op
 git perf push
