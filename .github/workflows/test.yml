@@ -53,6 +53,9 @@ jobs:
       with:
         fetch-depth: 40
 
+    - name: Setup git user
+      uses: fregante/setup-git-user@v1
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
