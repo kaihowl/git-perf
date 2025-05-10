@@ -8,7 +8,7 @@ use std::{
 };
 
 use defer::defer;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use unindent::unindent;
 
 use ::backoff::ExponentialBackoffBuilder;
@@ -409,6 +409,11 @@ fn compact_head(target: &str) -> Result<(), GitError> {
     Ok(())
 }
 
+fn retry_notify(err: GitError, dur: Duration) {
+    debug!("Error happened at {:?}: {}", dur, err);
+    warn!("Retrying...");
+}
+
 pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
     let op = || -> Result<(), ::backoff::Error<GitError>> {
         raw_remove_measurements_from_commits(older_than).map_err(map_git_error_for_backoff)
@@ -419,7 +424,7 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
         .with_max_elapsed_time(Some(Duration::from_secs(60)))
         .build();
 
-    ::backoff::retry(backoff, op).map_err(|e| match e {
+    ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
             anyhow!(err).context("Permanent failure while adding note line to head")
         }
@@ -767,7 +772,7 @@ pub fn prune() -> Result<()> {
         .with_max_elapsed_time(Some(Duration::from_secs(60)))
         .build();
 
-    ::backoff::retry(backoff, op).map_err(|e| match e {
+    ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
             anyhow!(err).context("Permanent failure while pushing refs")
         }
@@ -1005,7 +1010,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
         .with_max_elapsed_time(Some(Duration::from_secs(60)))
         .build();
 
-    ::backoff::retry(backoff, op).map_err(|e| match e {
+    ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
             anyhow!(err).context("Permanent failure while pushing refs")
         }
