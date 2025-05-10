@@ -53,7 +53,12 @@ git config user.email "$GIT_COMMITTER_EMAIL"
 
 git perf add -m echo 0.5
 
-git perf push
+output=$(git perf push 2>&1 1>/dev/null)
+if [[ $output != *retrying* ]]; then
+  echo "Output is missing 'retrying'. Output:"
+  echo "$output"
+  exit 1
+fi
 
 popd
 
