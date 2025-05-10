@@ -7,7 +7,23 @@ Example report for [master](https://kaihowl.github.io/git-perf/master.html).
 ## Warning
 Experimental only.
 Repeated additions of measurements (instead of bulk additions) will be costly:
-Each time the entire previous measurements are copied and a single line is appended.
+Each time the entire previous measurements are copied and a single line is
+appended.
+
+# Limitations
+
+Contrary to git itself, git-perf does not support decentralized collection of
+performance measurements. Instead, git-perf assumes that there is a single,
+central place for the collection of metrics. This should usually be your source
+foundry, e.g., GitHub. As performance measurements become less relevant over
+time, we allow metrics to be purged. As a delete in git still preserves the
+history before that deletion event, we have to rewrite history. To make
+rewriting of shared history safe, git-perf deliberately dropped some basic
+ideas of decentralized version control and instead focuses on the collection of
+metrics in a single central location.
+
+## Migrate measurements
+TODO document this
 
 # Docs
 
