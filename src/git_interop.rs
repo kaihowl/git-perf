@@ -47,6 +47,9 @@ enum GitError {
     #[error("Git failed to execute.\n\nstdout:\n{0}\nstderr:\n{1}", output.stdout, output.stderr)]
     ExecError { command: String, output: GitOutput },
 
+    #[error("No measurements found on remote")]
+    NoRemoteMeasurements {},
+
     #[error("Failed to execute git command")]
     IoError(#[from] io::Error),
 }
@@ -135,6 +138,7 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
         | GitError::IoError(..)
         | GitError::ShallowRepository
         | GitError::MissingHead { .. }
+        | GitError::NoRemoteMeasurements { .. }
         | GitError::MissingMeasurements => ::backoff::Error::permanent(e),
     }
 }
@@ -279,6 +283,7 @@ fn internal_get_head_revision() -> Result<String, GitError> {
 }
 
 fn map_git_error(err: GitError) -> GitError {
+    // TODO(kaihowl) is parsing user facing string such a good idea. Probably not...
     match err {
         GitError::ExecError { command: _, output } if output.stderr.contains("cannot lock ref") => {
             GitError::RefFailedToLock { output }
@@ -286,11 +291,15 @@ fn map_git_error(err: GitError) -> GitError {
         GitError::ExecError { command: _, output } if output.stderr.contains("but expected") => {
             GitError::RefConcurrentModification { output }
         }
+        GitError::ExecError { command: _, output } if output.stderr.contains("find remote ref") => {
+            GitError::NoRemoteMeasurements {}
+        }
         _ => err,
     }
 }
 
 fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
+    let ref_before = git_rev_parse(REFS_NOTES_BRANCH).ok();
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
     capture_git_output(
         &[
@@ -304,7 +313,14 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
         ],
         &work_dir,
     )
+    .map(|output| print!("{}", output.stderr))
     .map_err(map_git_error)?;
+
+    let ref_after = git_rev_parse(REFS_NOTES_BRANCH).ok();
+
+    if ref_before == ref_after {
+        println!("Already up to date");
+    }
 
     Ok(())
 }
