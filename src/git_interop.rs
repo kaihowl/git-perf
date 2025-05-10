@@ -44,7 +44,7 @@ enum GitError {
     #[error("A concurrent change to the ref occurred:\n{0}\n{1}", output.stdout, output.stderr)]
     RefConcurrentModification { output: GitOutput },
 
-    #[error("Git failed to execute. {output:?}")]
+    #[error("Git failed to execute.\n\nstdout:\n{0}\nstderr:\n{1}", output.stdout, output.stderr)]
     ExecError { command: String, output: GitOutput },
 
     #[error("Failed to execute git command")]
