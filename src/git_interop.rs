@@ -52,6 +52,9 @@ enum GitError {
     #[error("No measurements found on remote")]
     NoRemoteMeasurements {},
 
+    #[error("No upstream found. Consider setting origin or {}.", GIT_PERF_REMOTE)]
+    NoUpstream {},
+
     #[error("Failed to execute git command")]
     IoError(#[from] io::Error),
 }
@@ -130,6 +133,8 @@ const REFS_NOTES_ADD_TARGET_PREFIX: &str = "refs/notes/perf-v3-add-";
 const REFS_NOTES_REWRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-rewrite-";
 const REFS_NOTES_MERGE_BRANCH_PREFIX: &str = "refs/notes/perf-v3-merge-";
 const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
+const GIT_PERF_REMOTE: &str = "git-perf-origin";
+const GIT_ORIGIN: &str = "origin";
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
@@ -141,6 +146,7 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
         | GitError::ShallowRepository
         | GitError::MissingHead { .. }
         | GitError::NoRemoteMeasurements { .. }
+        | GitError::NoUpstream { .. }
         | GitError::MissingMeasurements => ::backoff::Error::permanent(e),
     }
 }
@@ -229,6 +235,28 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     Ok(())
 }
 
+fn get_git_perf_remote(remote: &str) -> Option<String> {
+    capture_git_output(&["remote", "get-url", remote], &None)
+        .ok()
+        .map(|s| s.stdout.trim().to_owned())
+}
+
+fn set_git_perf_remote(remote: &str, url: &str) -> Result<(), GitError> {
+    capture_git_output(&["remote", "add", remote, url], &None).map(|_| ())
+}
+
+fn ensure_remote_exists() -> Result<(), GitError> {
+    if let Some(_) = get_git_perf_remote(GIT_PERF_REMOTE) {
+        return Ok(());
+    }
+
+    if let Some(x) = get_git_perf_remote(GIT_ORIGIN) {
+        return set_git_perf_remote(GIT_PERF_REMOTE, &x);
+    }
+
+    return Err(GitError::NoUpstream {});
+}
+
 fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
     if let Err(GitError::MissingHead { .. }) = git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF) {
         let suffix = random_suffix();
@@ -301,6 +329,8 @@ fn map_git_error(err: GitError) -> GitError {
 }
 
 fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
+    ensure_remote_exists()?;
+
     let ref_before = git_rev_parse(REFS_NOTES_BRANCH).ok();
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
     capture_git_output(
@@ -654,6 +684,7 @@ fn consolidate_write_branches_into(
 
 //TODO(kaihowl) clean up pub methods
 fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
+    ensure_remote_exists()?;
     // This might merge concurrently created write branches. There is no protection against that.
     // This wants to achieve an at-least-once semantic. The exactly-once semantic is ensured by the
     // cat_sort_uniq merge strategy.
