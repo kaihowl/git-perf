@@ -11,8 +11,8 @@ echo Pull in repo without a remote
 cd_empty_repo
 
 output="$(git perf pull 2>&1 1>/dev/null)" && exit 1
-if [[ $output != *"does not appear to be a git repository"* ]]; then
-  echo "Missing 'does not appear to be a git repository' from output:"
+if [[ $output != *"No upstream found"* ]]; then
+  echo "Missing 'No upstream found' from output:"
   echo "$output"
   exit 1
 fi

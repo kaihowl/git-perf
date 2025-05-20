@@ -17,6 +17,35 @@ if [[ ${output} != *'Missing HEAD'* ]]; then
   exit 1
 fi
 
+echo Empty repo with upstream
+cd "$(mktemp -d)"
+root=$(pwd)
+
+mkdir orig
+cd orig
+orig=$(pwd)
+
+git init --bare
+
+cd "$(mktemp -d)"
+git clone "$orig" myworkrepo
+
+cd myworkrepo
+
+output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
+if [[ ${output} != *'No commit at HEAD'* ]]; then
+  # TODO(kaihowl) is this the right error message?
+  echo "Missing 'No Commit at HEAD' in output:"
+  echo "$output"
+  exit 1
+fi
+
+touch a
+git add a
+git commit -m 'first commit'
+
+git push
+
 output=$(git perf report 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'No performance measurements found'* ]]; then
   # TODO(kaihowl) more specific error messsage might be nice?
@@ -32,23 +61,6 @@ if [[ ${output} != *'This repo does not have any measurements'* ]]; then
   exit 1
 fi
 
-output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'No commit at HEAD'* ]]; then
-  # TODO(kaihowl) is this the right error message?
-  echo "Missing 'No Commit at HEAD' in output:"
-  echo "$output"
-  exit 1
-fi
-
-echo New repo, single commit, error out without crash
-cd_empty_repo
-create_commit
-output=$(git perf report 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'No performance measurements found'* ]]; then
-  echo "Missing 'No performance measurements found' in output:"
-  echo "$output"
-  exit 1
-fi
 output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'No measurement for HEAD'* ]]; then
   echo "Missing 'No measurement for HEAD' in output:"
