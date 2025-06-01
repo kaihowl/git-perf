@@ -24,6 +24,8 @@ struct GitOutput {
     stderr: String,
 }
 
+// TODO(kaihowl) separate into git low and high level logic
+
 #[derive(Debug, thiserror::Error)]
 enum GitError {
     #[error("A ref failed to be pushed:\n{0}\n{1}", output.stdout, output.stderr)]
