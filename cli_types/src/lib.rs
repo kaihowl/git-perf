@@ -1,12 +1,17 @@
 use anyhow::{anyhow, bail, Result};
-use clap::{Args, Parser};
-use clap::{CommandFactory, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 use chrono::prelude::*;
 use chrono::Duration;
 
-use crate::data::ReductionFunc;
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ReductionFunc {
+    Min,
+    Max,
+    Median,
+    Mean,
+}
 
 #[derive(Parser)]
 #[command(version)]
@@ -187,22 +192,6 @@ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc
         _ => bail!("Unsupported datetime format"),
     };
     Ok(*now - subtractor)
-}
-
-fn generate_manpage() -> Result<()> {
-    let man = clap_mangen::Man::new(Cli::command());
-    man.render(&mut std::io::stdout())?;
-
-    // TODO(kaihowl) this does not look very nice. Fix it.
-    for command in Cli::command()
-        .get_subcommands()
-        .filter(|c| !c.is_hide_set())
-    {
-        let man = clap_mangen::Man::new(command.clone());
-        man.render(&mut std::io::stdout())?
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

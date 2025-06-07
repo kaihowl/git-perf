@@ -1,7 +1,6 @@
 pub mod audit;
 pub mod basic_measure;
 pub mod cli;
-pub mod cli_types;
 pub mod config;
 pub mod data;
 pub mod git_interop;

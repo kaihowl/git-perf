@@ -1,22 +1,17 @@
-use anyhow::{anyhow, bail, Result};
-use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
-use clap::{CommandFactory, Subcommand};
+use anyhow::Result;
+use clap::CommandFactory;
+use clap::{error::ErrorKind::ArgumentConflict, Parser};
 use env_logger::Env;
 use log::Level;
-use std::path::PathBuf;
-
-use chrono::prelude::*;
-use chrono::Duration;
 
 use crate::audit;
 use crate::basic_measure::measure;
-use crate::cli_types::{Cli, Commands};
 use crate::config::bump_epoch;
-use crate::data::ReductionFunc;
 use crate::git_interop;
 use crate::git_interop::{prune, pull, push};
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
+use cli_types::{Cli, Commands};
 
 pub fn handle_calls() -> Result<()> {
     let cli = Cli::parse();

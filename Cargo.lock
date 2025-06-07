@@ -385,6 +385,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cli_types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -798,6 +807,7 @@ dependencies = [
  "chrono",
  "clap",
  "clap_mangen",
+ "cli_types",
  "criterion",
  "defer",
  "env_logger",
