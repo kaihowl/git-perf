@@ -15,7 +15,7 @@ mod test {
 
         // Run the bash test script with the updated PATH
         let output = Command::new("bash")
-            .args(["test/run_tests.sh", start_filter])
+            .args(["../test/run_tests.sh", start_filter])
             .env("PATH", new_path)
             .output()
             .expect("Failed to run bash test");
