@@ -15,10 +15,11 @@ use plotly::{
 
 // TODO(kaihowl) find central place for the data structures
 use crate::{
-    data::{MeasurementData, MeasurementSummary, ReductionFunc},
+    data::{MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, Commit, ReductionFuncIterator},
     serialization::{serialize_single, DELIMITER},
 };
+use cli_types::ReductionFunc;
 
 trait Reporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]);

@@ -1,15 +1,5 @@
 use std::collections::HashMap;
 
-use clap::ValueEnum;
-
-#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReductionFunc {
-    Min,
-    Max,
-    Median,
-    Mean,
-}
-
 #[derive(Debug)]
 pub struct MeasurementSummary {
     pub epoch: u32,
