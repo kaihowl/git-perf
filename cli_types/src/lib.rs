@@ -1,55 +1,51 @@
 use anyhow::{anyhow, bail, Result};
-use clap::{error::ErrorKind::ArgumentConflict, Args, Parser};
-use clap::{CommandFactory, Subcommand};
-use env_logger::Env;
-use log::Level;
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 use chrono::prelude::*;
 use chrono::Duration;
 
-use crate::audit;
-use crate::basic_measure::measure;
-use crate::config::bump_epoch;
-use crate::data::ReductionFunc;
-use crate::git_interop;
-use crate::git_interop::{prune, pull, push};
-use crate::measurement_storage::{add, remove_measurements_from_commits};
-use crate::reporting::report;
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ReductionFunc {
+    Min,
+    Max,
+    Median,
+    Mean,
+}
 
 #[derive(Parser)]
-#[command(version)]
-struct Cli {
+#[command(version, name = "git-perf")]
+pub struct Cli {
     /// Increase verbosity level (can be specified multiple times.) The first level sets level
     /// "info", second sets level "debug", and third sets level "trace" for the logger.
     #[arg(short, long, action = clap::ArgAction::Count)]
-    verbose: u8,
+    pub verbose: u8,
 
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Args)]
-struct CliMeasurement {
+pub struct CliMeasurement {
     /// Name of the measurement
     #[arg(short = 'm', long = "measurement", value_parser=parse_spaceless_string)]
-    name: String,
+    pub name: String,
 
     /// Key-value pairs separated by '='
     #[arg(short, long, value_parser=parse_key_value)]
-    key_value: Vec<(String, String)>,
+    pub key_value: Vec<(String, String)>,
 }
 
 #[derive(Args)]
-struct CliReportHistory {
+pub struct CliReportHistory {
     /// Limit the number of previous commits considered.
     /// HEAD is included in this count.
     #[arg(short = 'n', long, default_value = "40")]
-    max_count: usize,
+    pub max_count: usize,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub enum Commands {
     /// Measure the runtime of the supplied command (in nanoseconds)
     Measure {
         /// Repetitions
@@ -159,10 +155,6 @@ enum Commands {
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
-
-    /// Generate the manpage content
-    #[command(hide = true)]
-    Manpage {},
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String)> {
@@ -202,97 +194,10 @@ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc
     Ok(*now - subtractor)
 }
 
-pub fn handle_calls() -> Result<()> {
-    let cli = Cli::parse();
-    let logger_level = match cli.verbose {
-        0 => Level::Warn,
-        1 => Level::Info,
-        2 => Level::Debug,
-        3 | _ => Level::Trace,
-    };
-    env_logger::Builder::from_env(Env::default().default_filter_or(logger_level.as_str())).init();
-
-    git_interop::check_git_version()?;
-
-    match cli.command {
-        Commands::Measure {
-            repetitions,
-            command,
-            measurement,
-        } => Ok(measure(
-            &measurement.name,
-            repetitions,
-            &command,
-            &measurement.key_value,
-        )?),
-        Commands::Add { value, measurement } => {
-            Ok(add(&measurement.name, value, &measurement.key_value)?)
-        }
-        Commands::Push {} => Ok(push(None)?),
-        Commands::Pull {} => Ok(pull(None)?),
-        Commands::Report {
-            output,
-            separate_by,
-            report_history,
-            measurement,
-            key_value,
-            aggregate_by,
-        } => Ok(report(
-            output,
-            separate_by,
-            report_history.max_count,
-            &measurement,
-            &key_value,
-            aggregate_by,
-        )?),
-        Commands::Audit {
-            measurement,
-            report_history,
-            selectors,
-            min_measurements,
-            aggregate_by,
-            sigma,
-        } => {
-            if report_history.max_count < min_measurements.into() {
-                Cli::command().error(ArgumentConflict, format!("The minimal number of measurements ({}) cannot be more than the maximum number of measurements ({})", min_measurements, report_history.max_count)).exit()
-            }
-            Ok(audit::audit(
-                &measurement,
-                report_history.max_count,
-                min_measurements,
-                &selectors,
-                aggregate_by,
-                sigma,
-            )?)
-        }
-        Commands::BumpEpoch { measurement } => Ok(bump_epoch(&measurement)?),
-        Commands::Prune {} => Ok(prune()?),
-        Commands::Manpage {} => {
-            generate_manpage().expect("Man page generation failed");
-            Ok(())
-        }
-        Commands::Remove { older_than } => remove_measurements_from_commits(older_than),
-    }
-}
-
-fn generate_manpage() -> Result<()> {
-    let man = clap_mangen::Man::new(Cli::command());
-    man.render(&mut std::io::stdout())?;
-
-    // TODO(kaihowl) this does not look very nice. Fix it.
-    for command in Cli::command()
-        .get_subcommands()
-        .filter(|c| !c.is_hide_set())
-    {
-        let man = clap_mangen::Man::new(command.clone());
-        man.render(&mut std::io::stdout())?
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
+    use clap::CommandFactory;
+
     use super::*;
 
     #[test]

@@ -4,11 +4,9 @@ use std::env::set_current_dir;
 
 use utils::{empty_commit, hermetic_git_env, init_repo};
 
+use cli_types::ReductionFunc;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use git_perf::{
-    data::ReductionFunc,
-    measurement_retrieval::{self, summarize_measurements},
-};
+use git_perf::measurement_retrieval::{self, summarize_measurements};
 use tempfile::tempdir;
 
 fn prep_repo(number_commits: usize, number_measurements: usize) -> tempfile::TempDir {

@@ -39,5 +39,5 @@ runs:
       if: ${{ inputs.release == 'branch' }}
       shell: bash
       run: |
-        cargo install --path .
+        cargo install --path git_perf
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
