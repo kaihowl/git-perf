@@ -196,6 +196,8 @@ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc
 
 #[cfg(test)]
 mod test {
+    use clap::CommandFactory;
+
     use super::*;
 
     #[test]
