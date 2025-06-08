@@ -50,7 +50,6 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
         return None;
     }
 
-    // TODO(kaihowl) test this
     let epoch = components[0];
     let epoch = match epoch.parse::<u32>() {
         Ok(e) => e,
