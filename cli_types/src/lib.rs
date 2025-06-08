@@ -119,8 +119,7 @@ pub enum Commands {
         /// more measurements are needed.
         /// A minimum of two historic measurements are needed for proper evaluation of standard
         /// deviation.
-        // TODO(kaihowl) fix up min value and default_value
-        #[arg(long, value_parser=clap::value_parser!(u16).range(1..), default_value="2")]
+        #[arg(long, value_parser=clap::value_parser!(u16).range(2..), default_value="2")]
         min_measurements: u16,
 
         /// What to aggregate the measurements in each group with
