@@ -79,13 +79,36 @@ jobs:
     - name: Build git-perf
       run: ${{ env.CARGO }} build --verbose ${{ env.TARGET_FLAGS }}
 
+    - name: Check man pages presence
+      run: |
+        set -e
+        MAN_DIR="target/man/man1"
+        for page in \
+          git-perf.1 \
+          git-perf-measure.1 \
+          git-perf-add.1 \
+          git-perf-push.1 \
+          git-perf-pull.1 \
+          git-perf-report.1 \
+          git-perf-audit.1 \
+          git-perf-bump-epoch.1 \
+          git-perf-remove.1 \
+          git-perf-prune.1
+        do
+          if [ ! -f "$MAN_DIR/$page" ]; then
+            echo "Missing man page: $MAN_DIR/$page"
+            exit 1
+          fi
+        done
+        echo "All man pages found."
+
     - name: Run tests
       run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }}
 
     - name: Run sample perf measurements
       run: |
           set -x
-          cargo install --path .
+          cargo install --path git_perf
           # Run report on repo with known (n=10) number of measurements
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 0.01
           git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html

@@ -1,9 +1,10 @@
 use crate::{
-    data::{MeasurementData, ReductionFunc},
+    data::MeasurementData,
     measurement_retrieval::{self, summarize_measurements},
     stats,
 };
 use anyhow::{anyhow, bail, Result};
+use cli_types::ReductionFunc;
 use itertools::Itertools;
 use log::error;
 use std::iter;
