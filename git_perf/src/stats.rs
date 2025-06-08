@@ -92,7 +92,6 @@ mod test {
     fn no_floating_error() {
         let measurements = (0..100).map(|_| 0.1).collect_vec();
         let stats = aggregate_measurements(measurements.into_iter());
-        // TODO(kaihowl)
         assert_eq!(stats.mean, 0.1);
         assert_eq!(stats.len, 100);
         let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;

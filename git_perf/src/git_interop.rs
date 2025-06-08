@@ -88,7 +88,7 @@ fn feed_git_command(
     working_dir: &Option<&Path>,
     input: Option<&str>,
 ) -> Result<GitOutput, GitError> {
-    let stdin = input.and_then(|_s| Some(Stdio::piped()));
+    let stdin = input.map(|_| Stdio::piped());
 
     let child = spawn_git_command(args, working_dir, stdin)?;
 
@@ -114,15 +114,14 @@ fn feed_git_command(
 
     if output.status.success() {
         trace!("exec succeeded");
+        Ok(git_output)
     } else {
         trace!("exec failed");
-        return Err(GitError::ExecError {
+        Err(GitError::ExecError {
             command: args.join(" "),
             output: git_output,
-        });
+        })
     }
-
-    Ok(git_output)
 }
 
 // TODO(kaihowl) missing docs
@@ -198,7 +197,7 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     .expect("Deleting our own temp ref for adding should never fail"));
 
     // Test if the repo has any commit checked out at HEAD
-    if let Err(_) = internal_get_head_revision() {
+    if internal_get_head_revision().is_err() {
         return Err(GitError::MissingHead {
             reference: "HEAD".to_string(),
         });
@@ -246,7 +245,7 @@ fn set_git_perf_remote(remote: &str, url: &str) -> Result<(), GitError> {
 }
 
 fn ensure_remote_exists() -> Result<(), GitError> {
-    if let Some(_) = get_git_perf_remote(GIT_PERF_REMOTE) {
+    if get_git_perf_remote(GIT_PERF_REMOTE).is_some() {
         return Ok(());
     }
 
@@ -254,17 +253,16 @@ fn ensure_remote_exists() -> Result<(), GitError> {
         return set_git_perf_remote(GIT_PERF_REMOTE, &x);
     }
 
-    return Err(GitError::NoUpstream {});
+    Err(GitError::NoUpstream {})
 }
 
 fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
-    if let Err(GitError::MissingHead { .. }) = git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF) {
+    if git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).is_err() {
         let suffix = random_suffix();
         let target = format!("{REFS_NOTES_WRITE_TARGET_PREFIX}{suffix}");
 
         git_update_ref(unindent(
             format!(
-                // Commit only if not yet created
                 r#"
                 start
                 symref-create {REFS_NOTES_WRITE_SYMBOLIC_REF} {target}
@@ -275,9 +273,9 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
         ))
         .or_else(|err| {
             if let GitError::RefFailedToLock { .. } = err {
-                return Ok(());
+                Ok(())
             } else {
-                return Err(err);
+                Err(err)
             }
         })?;
     }
@@ -416,7 +414,7 @@ fn create_temp_add_head(current_notes_head: &str) -> Result<String, GitError> {
 }
 
 fn compact_head(target: &str) -> Result<(), GitError> {
-    let new_removal_head = git_rev_parse(&format!("{target}^{{tree}}").as_str())?;
+    let new_removal_head = git_rev_parse(format!("{target}^{{tree}}").as_str())?;
 
     // Orphan compaction commit
     let compaction_head = capture_git_output(
@@ -676,7 +674,7 @@ fn consolidate_write_branches_into(
     }
 
     for reference in &refs {
-        reconcile_branch_with(&target, &reference.oid)?;
+        reconcile_branch_with(target, &reference.oid)?;
     }
 
     Ok(refs)
@@ -689,7 +687,7 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     // This wants to achieve an at-least-once semantic. The exactly-once semantic is ensured by the
     // cat_sort_uniq merge strategy.
 
-    // - Reset the symbolic-ref “write” to a new unique write ref.
+    // - Reset the symbolic-ref "write" to a new unique write ref.
     //     - Allows to continue committing measurements while pushing.
     //     - ?? What happens when a git notes amend concurrently still writes to the old ref?
     let new_write_ref = new_symbolic_write_ref()?;
@@ -766,7 +764,7 @@ fn git_push_notes_ref(
             "origin",
             format!("{push_ref}:{REFS_NOTES_BRANCH}").as_str(),
         ],
-        &working_dir,
+        working_dir,
     );
 
     // - Clean your own temporary merge ref and all others with a merge commit older than x days.
@@ -972,7 +970,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
                     .to_owned(),
             );
 
-            detected_shallow |= info[2..].iter().any(|s| *s == "grafted");
+            detected_shallow |= info[2..].contains(&"grafted");
 
             None
         } else {
@@ -1211,6 +1209,7 @@ mod test {
         );
 
         // Must add a single write as a push without pending local writes just succeeds
+        ensure_symbolic_write_ref_exists().expect("Failed to ensure symbolic write ref exists");
         add_note_line_to_head("test note line").expect("Failed to add note line");
 
         // TODO(kaihowl) duplication, leaks out of this test
