@@ -90,8 +90,22 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
                 let value = value.to_string();
                 match entry {
                     Occupied(mut e) => {
-                        // TODO(kaihowl) reinstate + only emit this (and other) errors once
-                        // eprintln!("Duplicate entries for key {key}");
+                        if e.get() == &value {
+                            static DUPLICATE_KEY_SAME_VALUE: std::sync::Once =
+                                std::sync::Once::new();
+                            DUPLICATE_KEY_SAME_VALUE.call_once(|| {
+                                warn!("Duplicate entries for key {key} with same value");
+                            });
+                        } else {
+                            static DUPLICATE_KEY_CONFLICT: std::sync::Once = std::sync::Once::new();
+                            DUPLICATE_KEY_CONFLICT.call_once(|| {
+                                warn!(
+                                    "Conflicting values for key {key}: '{}' vs '{}'",
+                                    e.get(),
+                                    value
+                                );
+                            });
+                        }
                         e.insert(value);
                     }
                     Vacant(e) => {
