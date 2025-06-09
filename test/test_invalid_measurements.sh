@@ -80,10 +80,20 @@ fi
 echo Duplicate kvs
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value"
+"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=valuekey=valuekey=value"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ -n ${output} ]]; then
-  echo "There should be no output in stderr but instead there is:"
+if [[ ${output} != *'Duplicate entries for key key with same value'* ]]; then
+  echo "Expected warning about 'Duplicate entries for key key with same value' in the output"
+  echo "Output:"
+  echo "$output"
+  exit 1
+fi
+
+# Verify warning is only printed once
+warning_count=$(echo "$output" | grep -c "Duplicate entries for key key with same value")
+if [[ $warning_count -ne 1 ]]; then
+  echo "Expected warning to appear exactly once, but found $warning_count occurrences"
+  echo "Output:"
   echo "$output"
   exit 1
 fi
@@ -93,8 +103,9 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value2"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ -n ${output} ]]; then
-  echo "There should be no output in stderr but instead there is:"
+if [[ ${output} != *'Conflicting values'* ]]; then
+  echo "Expected warning about 'Conflicting values' in the output"
+  echo "Output:"
   echo "$output"
   exit 1
 fi
