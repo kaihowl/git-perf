@@ -48,7 +48,6 @@ pub fn audit(
     let tail_summary = stats::aggregate_measurements(tail.into_iter());
 
     if tail_summary.len < min_count.into() {
-        // TODO(kaihowl) handle with explicit return? Print text somewhere else?
         let number_measurements = tail_summary.len;
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
