@@ -47,8 +47,6 @@ pub fn add_multiple(
 }
 
 pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<()> {
-    // TODO(kaihowl) configure path
-    // TODO(kaihowl) configure
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("Failed to get system time")?;
