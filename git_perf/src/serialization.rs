@@ -50,7 +50,6 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
         return None;
     }
 
-    // TODO(kaihowl) test this
     let epoch = components[0];
     let epoch = match epoch.parse::<u32>() {
         Ok(e) => e,
@@ -193,5 +192,24 @@ mod test {
         };
         let serialized = serialize_single(&md, DELIMITER);
         assert_eq!(serialized, "3Mymeasurement1234567.042.0mykey=myvalue\n");
+    }
+
+    #[test]
+    fn test_epoch_parsing() {
+        // Test valid epoch
+        let valid_line = "42test1234123";
+        let result = deserialize_single(valid_line);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().epoch, 42);
+
+        // Test invalid epoch (non-numeric)
+        let invalid_line = "not_a_numbertest1234123";
+        let result = deserialize_single(invalid_line);
+        assert!(result.is_none());
+
+        // Test invalid epoch (out of range)
+        let out_of_range_line = "4294967296test1234123"; // u32::MAX + 1
+        let result = deserialize_single(out_of_range_line);
+        assert!(result.is_none());
     }
 }

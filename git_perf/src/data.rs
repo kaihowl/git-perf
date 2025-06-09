@@ -17,7 +17,6 @@ pub struct MeasurementData {
     pub epoch: u32,
     pub name: String,
     pub timestamp: f64,
-    // TODO(kaihowl) check size of type
     pub val: f64,
     pub key_values: HashMap<String, String>,
 }
