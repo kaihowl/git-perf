@@ -84,7 +84,6 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
 
     if components.len() > 4 {
         for kv in components.iter().skip(4) {
-            // TODO(kaihowl) different delimiter?
             if let Some((key, value)) = kv.split_once('=') {
                 let entry = key_values.entry(key.to_string());
                 let value = value.to_string();
