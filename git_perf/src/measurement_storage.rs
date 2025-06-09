@@ -25,16 +25,16 @@ pub fn add_multiple(
 
     let timestamp = timestamp.as_secs_f64();
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
+    let epoch = config::determine_epoch_from_config(measurement).unwrap_or(0);
+    let name = measurement.to_owned();
 
-    // TODO(kaihowl) inefficient recopying
     let mds = values
         .iter()
-        .map(|v| MeasurementData {
-            // TODO(hoewelmk)
-            epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
-            name: measurement.to_owned(),
+        .map(|&val| MeasurementData {
+            epoch,
+            name: name.clone(),
             timestamp,
-            val: *v,
+            val,
             key_values: key_values.clone(),
         })
         .collect_vec();
@@ -57,7 +57,6 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
 
     let md = MeasurementData {
-        // TODO(hoewelmk)
         epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
         name: measurement.to_owned(),
         timestamp,
