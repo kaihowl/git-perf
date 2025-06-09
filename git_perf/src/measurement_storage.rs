@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use std::{
     collections::HashMap,
@@ -21,7 +21,7 @@ pub fn add_multiple(
 ) -> Result<()> {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("TODO(kaihowl)");
+        .context("Failed to get system time")?;
 
     let timestamp = timestamp.as_secs_f64();
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
@@ -51,7 +51,7 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
     // TODO(kaihowl) configure
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("TODO(kaihowl)");
+        .context("Failed to get system time")?;
 
     let timestamp = timestamp.as_secs_f64();
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
