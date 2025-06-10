@@ -55,7 +55,6 @@ pub fn audit(
     }
 
     if head_summary.significantly_different_from(&tail_summary, sigma) {
-        // TODO(kaihowl) print details
         bail!(
             "HEAD differs significantly from tail measurements.\nHead: {}\nTail: {}",
             &head_summary,
