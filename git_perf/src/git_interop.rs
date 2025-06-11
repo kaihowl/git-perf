@@ -68,12 +68,12 @@ fn spawn_git_command(
     let stdin = stdin.unwrap_or(Stdio::null());
     debug!("execute: git {}", args.join(" "));
     process::Command::new("git")
-        // TODO(kaihowl) set correct encoding and lang?
-        .env("LANG", "")
+        .env("LANG", "C.UTF-8")
+        .env("LC_ALL", "C.UTF-8")
+        .env("LC_CTYPE", "C.UTF-8")
         .stdin(stdin)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("LC_ALL", "C")
         .current_dir(working_dir)
         .args(args)
         .spawn()
