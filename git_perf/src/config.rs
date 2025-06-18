@@ -7,27 +7,26 @@ use toml_edit::{value, Document};
 
 use crate::git_interop::get_head_revision;
 
-pub fn write_config(conf: &str) -> Result<()> {
-    let mut f = File::create(".gitperfconfig")?;
-    f.write_all(conf.as_bytes())?;
-    Ok(())
+// TODO(kaihowl) proper error handling
+pub fn write_config(conf: &str) {
+    let mut f = File::create(".gitperfconfig").expect("open file for writing failed");
+    f.write_all(conf.as_bytes()).expect("failed to write");
 }
 
-pub fn read_config() -> Option<String> {
+pub fn read_config() -> Result<String> {
     read_config_from_file(".gitperfconfig")
 }
 
-// TODO(kaihowl) proper error handling
-// TODO(kaihowl) proper file type
-fn read_config_from_file(file: &str) -> Option<String> {
+fn read_config_from_file(file: &str) -> Result<String> {
     let mut conf_str = String::new();
-    File::open(file).ok()?.read_to_string(&mut conf_str).ok()?;
-    Some(conf_str)
+    File::open(file)?.read_to_string(&mut conf_str)?;
+    Ok(conf_str)
 }
 
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
     // TODO(hoewelmk) configure path, use different working directory than repo root
-    let conf = read_config()?;
+    // TODO(hoewelmk) proper error handling
+    let conf = read_config().ok()?;
     determine_epoch(measurement, &conf)
 }
 
@@ -62,11 +61,10 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
     Ok(())
 }
 
-// TODO(kaihowl) proper error handling
 pub fn bump_epoch(measurement: &str) -> Result<()> {
     let mut conf_str = read_config().unwrap_or_default();
     bump_epoch_in_conf(measurement, &mut conf_str)?;
-    write_config(&conf_str)?;
+    write_config(&conf_str);
     Ok(())
 }
 
