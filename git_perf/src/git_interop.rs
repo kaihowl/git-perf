@@ -55,6 +55,9 @@ enum GitError {
     #[error("No upstream found. Consider setting origin or {}.", GIT_PERF_REMOTE)]
     NoUpstream {},
 
+    #[error("Remote repository is empty or has never been pushed to. Please push some measurements first.")]
+    EmptyOrNeverPushedRemote {},
+
     #[error("Failed to execute git command")]
     IoError(#[from] io::Error),
 }
@@ -162,6 +165,7 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
         | GitError::MissingHead { .. }
         | GitError::NoRemoteMeasurements { .. }
         | GitError::NoUpstream { .. }
+        | GitError::EmptyOrNeverPushedRemote { .. }
         | GitError::MissingMeasurements => ::backoff::Error::permanent(e),
     }
 }
@@ -338,6 +342,11 @@ fn map_git_error(err: GitError) -> GitError {
         GitError::ExecError { command: _, output } if output.stderr.contains("find remote ref") => {
             GitError::NoRemoteMeasurements {}
         }
+        GitError::ExecError { command: _, output }
+            if output.stderr.contains("repository") && output.stderr.contains("not found") =>
+        {
+            GitError::EmptyOrNeverPushedRemote {}
+        }
         _ => err,
     }
 }
@@ -483,18 +492,19 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
 }
 
 fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(), GitError> {
-    // TODO(kaihowl) flow
     // 1. pull
     // 2. remove measurements
     // 3. compact
     // 4. try to push
-    // TODO(kaihowl) repeat with back off
-    // TODO(kaihowl) clean up branches
-
-    // TODO(kaihowl) better error message for remote empty / never pushed
     fetch(None)?;
 
-    let current_notes_head = git_rev_parse(REFS_NOTES_BRANCH)?;
+    let current_notes_head = match git_rev_parse(REFS_NOTES_BRANCH) {
+        Ok(head) => head,
+        Err(GitError::MissingHead { .. }) => {
+            return Err(GitError::EmptyOrNeverPushedRemote {});
+        }
+        Err(e) => return Err(e),
+    };
 
     let target = create_temp_rewrite_head(&current_notes_head)?;
 
@@ -502,7 +512,6 @@ fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(),
 
     compact_head(&target)?;
 
-    // TODO(kaihowl) actual push needed
     git_push_notes_ref(&current_notes_head, &target, &None)?;
 
     git_update_ref(unindent(
@@ -1275,6 +1284,26 @@ mod test {
             assert_eq!(second.len(), 8);
             assert!(all_hex(&first));
             assert!(all_hex(&second));
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_empty_or_never_pushed_remote_error() {
+        use chrono::Utc;
+        let tempdir = tempdir().unwrap();
+        init_repo(tempdir.path());
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
+        // Add a dummy remote so the code can check for empty remote
+        run_git_command(
+            &["remote", "add", "origin", "https://example.com/empty.git"],
+            tempdir.path(),
+        );
+        // Do not add any notes/measurements or push anything
+        let result = super::raw_remove_measurements_from_commits(Utc::now());
+        match result {
+            Err(GitError::EmptyOrNeverPushedRemote { .. }) => {}
+            other => panic!("Expected EmptyOrNeverPushedRemote error, got: {:?}", other),
         }
     }
 }
