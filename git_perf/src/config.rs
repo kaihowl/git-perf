@@ -7,10 +7,10 @@ use toml_edit::{value, Document};
 
 use crate::git_interop::get_head_revision;
 
-// TODO(kaihowl) proper error handling
-pub fn write_config(conf: &str) {
-    let mut f = File::create(".gitperfconfig").expect("open file for writing failed");
-    f.write_all(conf.as_bytes()).expect("failed to write");
+pub fn write_config(conf: &str) -> Result<()> {
+    let mut f = File::create(".gitperfconfig")?;
+    f.write_all(conf.as_bytes())?;
+    Ok(())
 }
 
 pub fn read_config() -> Option<String> {
@@ -66,7 +66,7 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
 pub fn bump_epoch(measurement: &str) -> Result<()> {
     let mut conf_str = read_config().unwrap_or_default();
     bump_epoch_in_conf(measurement, &mut conf_str)?;
-    write_config(&conf_str);
+    write_config(&conf_str)?;
     Ok(())
 }
 
