@@ -9,7 +9,7 @@ use cli_types::ReductionFunc;
 use anyhow::Result;
 
 // TODO(kaihowl) oh god naming
-pub trait ReductionFuncIterator<'a>: Iterator<Item = &'a MeasurementData> {
+pub trait MeasurementReducer<'a>: Iterator<Item = &'a MeasurementData> {
     fn reduce_by(self, fun: ReductionFunc) -> Option<MeasurementSummary>;
 }
 
@@ -56,7 +56,7 @@ where
     })
 }
 
-impl<'a, T> ReductionFuncIterator<'a> for T
+impl<'a, T> MeasurementReducer<'a> for T
 where
     T: Iterator<Item = &'a MeasurementData>,
 {
