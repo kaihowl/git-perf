@@ -11,12 +11,14 @@ use defer::defer;
 use log::{debug, trace, warn};
 use unindent::unindent;
 
-use ::backoff::ExponentialBackoffBuilder;
 use anyhow::{anyhow, bail, Context, Result};
+use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use itertools::Itertools;
 
 use chrono::prelude::*;
 use rand::{thread_rng, Rng};
+
+use crate::config;
 
 #[derive(Debug)]
 struct GitOutput {
@@ -170,15 +172,20 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     }
 }
 
+/// Central place to configure backoff policy for git-perf operations.
+fn default_backoff() -> ExponentialBackoff {
+    let max_elapsed = config::backoff_max_elapsed_seconds();
+    ExponentialBackoffBuilder::default()
+        .with_max_elapsed_time(Some(Duration::from_secs(max_elapsed)))
+        .build()
+}
+
 pub fn add_note_line_to_head(line: &str) -> Result<()> {
     let op = || -> Result<(), ::backoff::Error<GitError>> {
         raw_add_note_line_to_head(line).map_err(map_git_error_for_backoff)
     };
 
-    // TODO(kaihowl) configure
-    let backoff = ExponentialBackoffBuilder::default()
-        .with_max_elapsed_time(Some(Duration::from_secs(60)))
-        .build();
+    let backoff = default_backoff();
 
     ::backoff::retry(backoff, op).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
@@ -474,10 +481,7 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
         raw_remove_measurements_from_commits(older_than).map_err(map_git_error_for_backoff)
     };
 
-    // TODO(kaihowl) configure
-    let backoff = ExponentialBackoffBuilder::default()
-        .with_max_elapsed_time(Some(Duration::from_secs(60)))
-        .build();
+    let backoff = default_backoff();
 
     ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
@@ -818,15 +822,11 @@ fn git_push_notes_ref(
 
 // TODO(kaihowl) what happens with a git dir supplied with -C?
 pub fn prune() -> Result<()> {
-    // TODO(kaihowl) put the transient / permanent error in its own function, reuse
     let op = || -> Result<(), ::backoff::Error<GitError>> {
         raw_prune().map_err(map_git_error_for_backoff)
     };
 
-    // TODO(kaihowl) configure
-    let backoff = ExponentialBackoffBuilder::default()
-        .with_max_elapsed_time(Some(Duration::from_secs(60)))
-        .build();
+    let backoff = default_backoff();
 
     ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
@@ -1046,7 +1046,6 @@ fn pull_internal(work_dir: Option<&Path>) -> Result<(), GitError> {
 }
 
 pub fn push(work_dir: Option<&Path>) -> Result<()> {
-    // TODO(kaihowl) check transient/permanent error
     let op = || {
         raw_push(work_dir)
             .map_err(map_git_error_for_backoff)
@@ -1061,10 +1060,7 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
             })
     };
 
-    // TODO(kaihowl) configure
-    let backoff = ExponentialBackoffBuilder::default()
-        .with_max_elapsed_time(Some(Duration::from_secs(60)))
-        .build();
+    let backoff = default_backoff();
 
     ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {

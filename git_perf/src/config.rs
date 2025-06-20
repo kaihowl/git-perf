@@ -13,6 +13,7 @@ pub fn write_config(conf: &str) -> Result<()> {
     Ok(())
 }
 
+// TODO(kaihowl) hierachy of config files?
 pub fn read_config() -> Result<String> {
     read_config_from_file(".gitperfconfig")
 }
@@ -67,6 +68,23 @@ pub fn bump_epoch(measurement: &str) -> Result<()> {
     bump_epoch_in_conf(measurement, &mut conf_str)?;
     write_config(&conf_str)?;
     Ok(())
+}
+
+/// Returns the backoff max elapsed seconds from a config string, or 60 if not set.
+pub fn backoff_max_elapsed_seconds_from_str(conf: &str) -> u64 {
+    let doc = conf.parse::<Document>().ok();
+    doc.and_then(|doc| {
+        doc.get("backoff")
+            .and_then(|b| b.get("max_elapsed_seconds"))
+            .and_then(|v| v.as_integer())
+            .map(|v| v as u64)
+    })
+    .unwrap_or(60)
+}
+
+/// Returns the backoff max elapsed seconds from config, or 60 if not set.
+pub fn backoff_max_elapsed_seconds() -> u64 {
+    backoff_max_elapsed_seconds_from_str(read_config().unwrap_or_default().as_str())
 }
 
 #[cfg(test)]
@@ -145,5 +163,16 @@ epoch = "{}"
             println!("YAY: {}", e);
             panic!("stuff");
         }
+    }
+
+    #[test]
+    fn test_backoff_max_elapsed_seconds() {
+        // Case 1: config string with explicit value
+        let configfile = "[backoff]\nmax_elapsed_seconds = 42\n";
+        assert_eq!(super::backoff_max_elapsed_seconds_from_str(configfile), 42);
+
+        // Case 2: config string missing value
+        let configfile = "";
+        assert_eq!(super::backoff_max_elapsed_seconds_from_str(configfile), 60);
     }
 }
