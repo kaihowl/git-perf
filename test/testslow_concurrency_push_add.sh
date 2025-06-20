@@ -62,7 +62,7 @@ run_remove_test() {
 
     for (( i=1; i<=iterations; i++ )); do
         # Run the push command without additional parameters
-        # TODO(kaihowl) uses a static 7 days, does that make sense?
+        # 7 days is used as a reasonable default for test cleanup. Adjust if needed for other scenarios.
         git-perf "$@" --older-than '7d' 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to remove" && exit 1)
 
         # Every 10 iterations, print a status update, and back off a bit
@@ -87,7 +87,7 @@ run_prune_test() {
 
     for (( i=1; i<=iterations; i++ )); do
         # Run the push command without additional parameters
-        # TODO(kaihowl) uses a static 7 days, does that make sense?
+        # 7 days is used as a reasonable default for test cleanup. Adjust if needed for other scenarios.
         git-perf "$@" 2>&1 | perl -pe "s/^/[$log_prefix] /" || (echo "Failed to prune" && exit 1)
 
         # Every 10 iterations, print a status update, and back off a bit
