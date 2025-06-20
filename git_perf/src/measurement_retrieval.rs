@@ -83,7 +83,8 @@ pub struct Commit {
     pub measurements: Vec<MeasurementData>,
 }
 
-// TODO(hoewelmk) copies all measurements, expensive...
+// Copying all measurements is currently necessary due to deserialization from git notes.
+// Optimizing this would require a change in the storage or deserialization model.
 pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Commit>>> {
     let vec = git_interop::walk_commits(num_commits)?;
     Ok(vec
@@ -97,7 +98,4 @@ pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Co
             })
         }))
     // When this fails it is due to a shallow clone.
-    // TODO(kaihowl) proper shallow clone support
-    // https://github.com/libgit2/libgit2/issues/3058 tracks that we fail to revwalk the
-    // last commit because the parent cannot be loooked up.
 }
