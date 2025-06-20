@@ -26,7 +26,11 @@ pub fn audit(
                 .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
     };
 
-    let mut aggregates = summarize_measurements(all, &summarize_by, &filter_by);
+    let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
+        all,
+        &summarize_by,
+        &filter_by,
+    ));
 
     let head = aggregates
         .next()

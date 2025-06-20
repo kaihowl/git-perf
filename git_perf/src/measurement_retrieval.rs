@@ -21,7 +21,7 @@ pub fn summarize_measurements<'a, F>(
 where
     F: Fn(&MeasurementData) -> bool,
 {
-    let measurements = commits.map(move |c| {
+    commits.map(move |c| {
         c.map(|c| {
             let measurement = c
                 .measurements
@@ -34,12 +34,16 @@ where
                 measurement,
             }
         })
-    });
+    })
+}
 
-    let mut first_epoch = None;
-
-    // TODO(kaihowl) this is a second responsibility, move out? "EpochClearing"
-    measurements.take_while(move |m| match &m {
+/// Adapter to take results while the epoch is the same as the first one encountered.
+pub fn take_while_same_epoch<I>(iter: I) -> impl Iterator<Item = Result<CommitSummary>>
+where
+    I: Iterator<Item = Result<CommitSummary>>,
+{
+    let mut first_epoch: Option<u32> = None;
+    iter.take_while(move |m| match m {
         Ok(CommitSummary {
             measurement: Some(m),
             ..
