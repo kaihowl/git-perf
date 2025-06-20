@@ -40,6 +40,16 @@ if [[ ${output} != *'shallow'* ]]; then
 fi
 popd
 
+# Test running git perf prune outside of a git repository
+pushd "$(mktemp -d)"
+output=$(git perf prune 2>&1 1>/dev/null) && exit 1
+if [[ $output != *'not a git repository'* && $output != *'fatal'* ]]; then
+  echo "Expected error for running outside a git repo, got:"
+  echo "$output"
+  exit 1
+fi
+popd
+
 # Normal operations on main repo
 pushd "$(mktemp -d)"
 git init
