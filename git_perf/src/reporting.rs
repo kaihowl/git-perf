@@ -16,7 +16,7 @@ use plotly::{
 // TODO(kaihowl) find central place for the data structures
 use crate::{
     data::{MeasurementData, MeasurementSummary},
-    measurement_retrieval::{self, Commit, ReductionFuncIterator},
+    measurement_retrieval::{self, Commit, MeasurementReducer},
     serialization::{serialize_single, DELIMITER},
 };
 use cli_types::ReductionFunc;
