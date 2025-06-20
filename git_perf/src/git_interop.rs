@@ -396,46 +396,30 @@ fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
     Ok(())
 }
 
-// TODO(kaihowl) duplication
-fn create_temp_rewrite_head(current_notes_head: &str) -> Result<String, GitError> {
+fn create_temp_ref(prefix: &str, current_head: &str) -> Result<String, GitError> {
     let suffix = random_suffix();
-    let target = format!("{REFS_NOTES_REWRITE_TARGET_PREFIX}{suffix}");
-
-    // Clone reference
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            create {target} {current_notes_head}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
-
-    Ok(target)
-}
-
-fn create_temp_add_head(current_notes_head: &str) -> Result<String, GitError> {
-    let suffix = random_suffix();
-    let target = format!("{REFS_NOTES_ADD_TARGET_PREFIX}{suffix}");
-
-    // TODO(kaihowl) humpty dumpty
-    if current_notes_head != EMPTY_OID {
-        // Clone reference
+    let target = format!("{prefix}{suffix}");
+    if current_head != EMPTY_OID {
         git_update_ref(unindent(
             format!(
                 r#"
             start
-            create {target} {current_notes_head}
+            create {target} {current_head}
             commit
             "#
             )
             .as_str(),
         ))?;
     }
-
     Ok(target)
+}
+
+fn create_temp_rewrite_head(current_notes_head: &str) -> Result<String, GitError> {
+    create_temp_ref(REFS_NOTES_REWRITE_TARGET_PREFIX, current_notes_head)
+}
+
+fn create_temp_add_head(current_notes_head: &str) -> Result<String, GitError> {
+    create_temp_ref(REFS_NOTES_ADD_TARGET_PREFIX, current_notes_head)
 }
 
 fn compact_head(target: &str) -> Result<(), GitError> {
