@@ -245,7 +245,6 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     )?;
 
     // Update current write branch with pending write
-    // TODO(kaihowl) duplication
     git_update_ref(unindent(
         format!(
             r#"
