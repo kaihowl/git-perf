@@ -598,9 +598,6 @@ fn remove_measurements_from_reference(
                 writeln!(writer, "{}", line).expect("Failed to write to pipe");
             }
         });
-
-        // TODO(kaihowl) necessary?
-        drop(writer);
     }
 
     removal_handler.join().expect("Failed to join");
