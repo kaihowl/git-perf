@@ -613,11 +613,6 @@ fn new_symbolic_write_ref() -> Result<String, GitError> {
     let suffix = random_suffix();
     let target = format!("{REFS_NOTES_WRITE_TARGET_PREFIX}{suffix}");
 
-    // TODO(kaihowl) can this actually return a failure upon abort?
-    // TODO(kaihowl) does this actually run atomically as it claims?
-    // See https://github.com/libgit2/libgit2/issues/5918 for a counter example
-    // Also source code for the refs/files-backend.c does not look up to the task?
-    // Do we need packed references after all? Or the new reftable format?
     git_update_ref(unindent(
         format!(
             r#"
