@@ -282,10 +282,15 @@ fn ensure_remote_exists() -> Result<(), GitError> {
     Err(GitError::NoUpstream {})
 }
 
+/// Creates a temporary reference name by combining a prefix with a random suffix.
+fn create_temp_ref_name(prefix: &str) -> String {
+    let suffix = random_suffix();
+    format!("{prefix}{suffix}")
+}
+
 fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
     if git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).is_err() {
-        let suffix = random_suffix();
-        let target = format!("{REFS_NOTES_WRITE_TARGET_PREFIX}{suffix}");
+        let target = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
 
         git_update_ref(unindent(
             format!(
@@ -403,8 +408,7 @@ fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
 }
 
 fn create_temp_ref(prefix: &str, current_head: &str) -> Result<String, GitError> {
-    let suffix = random_suffix();
-    let target = format!("{prefix}{suffix}");
+    let target = create_temp_ref_name(prefix);
     if current_head != EMPTY_OID {
         git_update_ref(unindent(
             format!(
@@ -610,8 +614,7 @@ fn remove_measurements_from_reference(
 }
 
 fn new_symbolic_write_ref() -> Result<String, GitError> {
-    let suffix = random_suffix();
-    let target = format!("{REFS_NOTES_WRITE_TARGET_PREFIX}{suffix}");
+    let target = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
 
     git_update_ref(unindent(
         format!(
@@ -696,9 +699,7 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     //     - ?? What happens when a git notes amend concurrently still writes to the old ref?
     let new_write_ref = new_symbolic_write_ref()?;
 
-    // TODO(kaihowl) catch all dupes with this pattern
-    let suffix = random_suffix();
-    let merge_ref = format!("{REFS_NOTES_MERGE_BRANCH_PREFIX}{suffix}");
+    let merge_ref = create_temp_ref_name(REFS_NOTES_MERGE_BRANCH_PREFIX);
 
     defer!(git_update_ref(unindent(
         format!(
