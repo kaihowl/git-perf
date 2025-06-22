@@ -18,8 +18,9 @@ pub fn read_config() -> Result<String> {
     read_config_from_file(".gitperfconfig")
 }
 
-// TODO(kaihowl) proper file type
-fn read_config_from_file(file: &str) -> Result<String> {
+use std::path::Path;
+
+fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
     let mut conf_str = String::new();
     File::open(file)?.read_to_string(&mut conf_str)?;
     Ok(conf_str)
