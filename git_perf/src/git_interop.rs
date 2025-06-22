@@ -729,9 +729,7 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
 
     git_push_notes_ref(&current_upstream_oid, &merge_ref, &work_dir)?;
 
-    // TODO(kaihowl) can git push immediately update the local ref as well?
-    // This might be necessary for a concurrent push in between the last push from here and the now
-    // following fetch. Otherwise, the `verify` will fail in the update-ref call later.
+    // It is acceptable to fetch here independent of the push. Only one concurrent push will succeed.
     fetch(None)?;
 
     // Delete merged-in write references
