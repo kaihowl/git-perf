@@ -1,0 +1,45 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.17.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.16.0...git-perf-v0.17.0) - 2025-06-22
+
+### Added
+
+- add new GitError variant for empty or never pushed remote ([#175](https://github.com/kaihowl/git-perf/pull/175))
+- generate man page with build ([#156](https://github.com/kaihowl/git-perf/pull/156))
+
+### Fixed
+
+- address clippy warnings ([#158](https://github.com/kaihowl/git-perf/pull/158))
+
+### Other
+
+- simplify temporary reference creation by introducing helper function ([#190](https://github.com/kaihowl/git-perf/pull/190))
+- remove outdated TODO comments in new_symbolic_write_ref ([#189](https://github.com/kaihowl/git-perf/pull/189))
+- remove outdated TODO comment in raw_add_note_line_to_head ([#186](https://github.com/kaihowl/git-perf/pull/186))
+- remove unnecessary explicit drop ([#187](https://github.com/kaihowl/git-perf/pull/187))
+- consolidate temporary reference creation functions ([#183](https://github.com/kaihowl/git-perf/pull/183))
+- implement configurable backoff policy for git operations ([#182](https://github.com/kaihowl/git-perf/pull/182))
+- rename ReductionFuncIterator to MeasurementReducer for clarity ([#181](https://github.com/kaihowl/git-perf/pull/181))
+- clean up and clarify outdated TODOs ([#180](https://github.com/kaihowl/git-perf/pull/180))
+- enhance measurement retrieval with epoch filtering ([#179](https://github.com/kaihowl/git-perf/pull/179))
+- remove outdated todo ([#178](https://github.com/kaihowl/git-perf/pull/178))
+- improve error handling in config file operations ([#177](https://github.com/kaihowl/git-perf/pull/177))
+- improve write_config function to return Result ([#176](https://github.com/kaihowl/git-perf/pull/176))
+- add documentation for performance measurement constants in git_interop.rs ([#174](https://github.com/kaihowl/git-perf/pull/174))
+- update environment variables for git command execution ([#173](https://github.com/kaihowl/git-perf/pull/173))
+- remove outdated TODO comment in audit function ([#172](https://github.com/kaihowl/git-perf/pull/172))
+- remove outdated TODO comments in measurement storage ([#168](https://github.com/kaihowl/git-perf/pull/168))
+- remove outdated TODO comment in audit function ([#169](https://github.com/kaihowl/git-perf/pull/169))
+- enhance error handling for system time retrieval in measurement storage ([#166](https://github.com/kaihowl/git-perf/pull/166))
+- optimize MeasurementData creation in add_multiple function ([#167](https://github.com/kaihowl/git-perf/pull/167))
+- remove TODO comment and add epoch parsing tests ([#160](https://github.com/kaihowl/git-perf/pull/160))
+- clean up build script by removing unnecessary print statements ([#162](https://github.com/kaihowl/git-perf/pull/162))
+- use std::sync::Once for one-time warning about duplicate keys ([#164](https://github.com/kaihowl/git-perf/pull/164))
+- remove commented-out TODO in deserialize_single function ([#163](https://github.com/kaihowl/git-perf/pull/163))
