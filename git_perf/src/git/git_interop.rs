@@ -767,7 +767,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
 
             current_commit = Some(
                 info.get(1)
-                    .expect("Could not read commit header.")
+                    .expect("No commit header found before measurement line in git log output")
                     .to_owned(),
             );
 
@@ -777,7 +777,10 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
         } else {
             // TODO(kaihowl) lot's of string copies...
             Some((
-                current_commit.as_ref().expect("TODO(kaihowl)").to_owned(),
+                current_commit
+                    .as_ref()
+                    .expect("No commit header found before measurement line in git log output")
+                    .to_owned(),
                 l,
             ))
         }
