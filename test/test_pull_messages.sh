@@ -41,8 +41,8 @@ git push
 
 # TODO(kaihowl) move functionality for check for output in common function
 output="$(git perf pull 2>&1 1>/dev/null)" && exit 1
-if [[ $output != *'No measurements found on remote'* ]]; then
-  echo "Missing 'No measurements found on remote' in output:"
+if [[ $output != *'Remote repository is empty or has never been pushed to'* ]]; then
+  echo "Missing 'Remote repository is empty or has never been pushed to' in output:"
   echo "$output"
   exit 1
 fi

@@ -92,11 +92,6 @@ pub(super) fn map_git_error(err: GitError) -> GitError {
         GitError::ExecError { command: _, output } if output.stderr.contains("find remote ref") => {
             GitError::NoRemoteMeasurements {}
         }
-        GitError::ExecError { command: _, output }
-            if output.stderr.contains("repository") && output.stderr.contains("not found") =>
-        {
-            GitError::EmptyOrNeverPushedRemote {}
-        }
         _ => err,
     }
 }
