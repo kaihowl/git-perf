@@ -5,7 +5,7 @@ use std::{
 };
 use toml_edit::{value, Document};
 
-use crate::git_interop::get_head_revision;
+use crate::git::git_interop::get_head_revision;
 
 pub fn write_config(conf: &str) -> Result<()> {
     let mut f = File::create(".gitperfconfig")?;

@@ -10,7 +10,7 @@ use chrono::prelude::*;
 use crate::{
     config,
     data::MeasurementData,
-    git_interop::add_note_line_to_head,
+    git::git_interop::add_note_line_to_head,
     serialization::{serialize_multiple, serialize_single, DELIMITER},
 };
 
@@ -70,5 +70,5 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
 }
 
 pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
-    crate::git_interop::remove_measurements_from_commits(older_than)
+    crate::git::git_interop::remove_measurements_from_commits(older_than)
 }

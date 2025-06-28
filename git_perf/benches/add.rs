@@ -1,7 +1,7 @@
 use std::env::set_current_dir;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use git_perf::git_interop::add_note_line_to_head;
+use git_perf::git::git_interop::add_note_line_to_head;
 use tempfile::tempdir;
 use utils::{empty_commit, hermetic_git_env, init_repo};
 

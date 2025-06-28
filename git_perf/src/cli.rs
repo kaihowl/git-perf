@@ -7,8 +7,8 @@ use log::Level;
 use crate::audit;
 use crate::basic_measure::measure;
 use crate::config::bump_epoch;
-use crate::git_interop;
-use crate::git_interop::{prune, pull, push};
+use crate::git::git_interop::check_git_version;
+use crate::git::git_interop::{prune, pull, push};
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
 use cli_types::{Cli, Commands};
@@ -23,7 +23,7 @@ pub fn handle_calls() -> Result<()> {
     };
     env_logger::Builder::from_env(Env::default().default_filter_or(logger_level.as_str())).init();
 
-    git_interop::check_git_version()?;
+    check_git_version()?;
 
     match cli.command {
         Commands::Measure {

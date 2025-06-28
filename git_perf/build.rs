@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut buffer: Vec<u8> = Default::default();
         man.render(&mut buffer).unwrap();
         let subcmd_name = subcmd.get_name();
-        let subcmd_man_path = man_dir.join(format!("git-perf-{}.1", subcmd_name));
+        let subcmd_man_path = man_dir.join(format!("git-perf-{subcmd_name}.1"));
         fs::write(&subcmd_man_path, &buffer).unwrap();
     }
 

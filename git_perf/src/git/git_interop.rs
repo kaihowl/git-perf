@@ -1,14 +1,13 @@
 use std::{
-    env::current_dir,
-    io::{self, BufRead, BufReader, BufWriter, Write},
-    path::{Path, PathBuf},
-    process::{self, Child, Stdio},
+    io::{BufRead, BufReader, BufWriter, Write},
+    path::Path,
+    process::Stdio,
     thread,
     time::Duration,
 };
 
 use defer::defer;
-use log::{debug, trace, warn};
+use log::{debug, warn};
 use unindent::unindent;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -20,141 +19,24 @@ use rand::{thread_rng, Rng};
 
 use crate::config;
 
-#[derive(Debug)]
-struct GitOutput {
-    stdout: String,
-    stderr: String,
-}
+use super::git_definitions::{
+    GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_BRANCH,
+    REFS_NOTES_MERGE_BRANCH_PREFIX, REFS_NOTES_READ_BRANCH, REFS_NOTES_REWRITE_TARGET_PREFIX,
+    REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_WRITE_TARGET_PREFIX,
+};
+use super::git_lowlevel::{
+    capture_git_output, get_git_perf_remote, git_rev_parse, git_rev_parse_symbolic_ref,
+    git_update_ref, internal_get_head_revision, is_shallow_repo, map_git_error,
+    set_git_perf_remote, spawn_git_command,
+};
+use super::git_types::GitError;
+use super::git_types::Reference;
+
+pub use super::git_lowlevel::get_head_revision;
+
+pub use super::git_lowlevel::check_git_version;
 
 // TODO(kaihowl) separate into git low and high level logic
-
-#[derive(Debug, thiserror::Error)]
-enum GitError {
-    #[error("A ref failed to be pushed:\n{0}\n{1}", output.stdout, output.stderr)]
-    RefFailedToPush { output: GitOutput },
-
-    #[error("Missing HEAD for {reference}")]
-    MissingHead { reference: String },
-
-    #[error("A ref failed to be locked:\n{0}\n{1}", output.stdout, output.stderr)]
-    RefFailedToLock { output: GitOutput },
-
-    #[error("Shallow repository. Refusing operation.")]
-    ShallowRepository,
-
-    #[error("This repo does not have any measurements.")]
-    MissingMeasurements,
-
-    #[error("A concurrent change to the ref occurred:\n{0}\n{1}", output.stdout, output.stderr)]
-    RefConcurrentModification { output: GitOutput },
-
-    #[error("Git failed to execute.\n\nstdout:\n{0}\nstderr:\n{1}", output.stdout, output.stderr)]
-    ExecError { command: String, output: GitOutput },
-
-    #[error("No measurements found on remote")]
-    NoRemoteMeasurements {},
-
-    #[error("No upstream found. Consider setting origin or {}.", GIT_PERF_REMOTE)]
-    NoUpstream {},
-
-    #[error("Remote repository is empty or has never been pushed to. Please push some measurements first.")]
-    EmptyOrNeverPushedRemote {},
-
-    #[error("Failed to execute git command")]
-    IoError(#[from] io::Error),
-}
-
-fn spawn_git_command(
-    args: &[&str],
-    working_dir: &Option<&Path>,
-    stdin: Option<Stdio>,
-) -> Result<Child, io::Error> {
-    let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
-    let stdin = stdin.unwrap_or(Stdio::null());
-    debug!("execute: git {}", args.join(" "));
-    process::Command::new("git")
-        .env("LANG", "C.UTF-8")
-        .env("LC_ALL", "C.UTF-8")
-        .env("LC_CTYPE", "C.UTF-8")
-        .stdin(stdin)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .current_dir(working_dir)
-        .args(args)
-        .spawn()
-}
-
-fn capture_git_output(args: &[&str], working_dir: &Option<&Path>) -> Result<GitOutput, GitError> {
-    feed_git_command(args, working_dir, None)
-}
-
-fn feed_git_command(
-    args: &[&str],
-    working_dir: &Option<&Path>,
-    input: Option<&str>,
-) -> Result<GitOutput, GitError> {
-    let stdin = input.map(|_| Stdio::piped());
-
-    let child = spawn_git_command(args, working_dir, stdin)?;
-
-    debug!("input: {}", input.unwrap_or(""));
-
-    let output = match child.stdin {
-        Some(ref stdin) => {
-            let mut writer = BufWriter::new(stdin);
-            writer.write_all(input.unwrap().as_bytes())?;
-            drop(writer);
-            child.wait_with_output()
-        }
-        None => child.wait_with_output(),
-    }?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    trace!("stdout: {}", stdout);
-
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    trace!("stderr: {}", stderr);
-
-    let git_output = GitOutput { stdout, stderr };
-
-    if output.status.success() {
-        trace!("exec succeeded");
-        Ok(git_output)
-    } else {
-        trace!("exec failed");
-        Err(GitError::ExecError {
-            command: args.join(" "),
-            output: git_output,
-        })
-    }
-}
-
-/// The main branch where performance measurements are stored as git notes
-const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
-
-/// Symbolic reference that points to the current write target for performance measurements
-const REFS_NOTES_WRITE_SYMBOLIC_REF: &str = "refs/notes/perf-v3-write";
-
-/// Prefix for temporary write target references used during concurrent operations
-const REFS_NOTES_WRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-write-";
-
-/// Prefix for temporary references used when adding new measurements
-const REFS_NOTES_ADD_TARGET_PREFIX: &str = "refs/notes/perf-v3-add-";
-
-/// Prefix for temporary references used when rewriting existing measurements
-const REFS_NOTES_REWRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-rewrite-";
-
-/// Prefix for temporary references used during merge operations
-const REFS_NOTES_MERGE_BRANCH_PREFIX: &str = "refs/notes/perf-v3-merge-";
-
-/// Branch used for reconciling and then reading performance measurements
-const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
-
-/// The default remote name used for git-perf operations
-const GIT_PERF_REMOTE: &str = "git-perf-origin";
-
-/// The standard git remote name
-const GIT_ORIGIN: &str = "origin";
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
@@ -260,16 +142,6 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     Ok(())
 }
 
-fn get_git_perf_remote(remote: &str) -> Option<String> {
-    capture_git_output(&["remote", "get-url", remote], &None)
-        .ok()
-        .map(|s| s.stdout.trim().to_owned())
-}
-
-fn set_git_perf_remote(remote: &str, url: &str) -> Result<(), GitError> {
-    capture_git_output(&["remote", "add", remote, url], &None).map(|_| ())
-}
-
 fn ensure_remote_exists() -> Result<(), GitError> {
     if get_git_perf_remote(GIT_PERF_REMOTE).is_some() {
         return Ok(());
@@ -315,51 +187,7 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
 
 fn random_suffix() -> String {
     let suffix: u32 = thread_rng().gen();
-    format!("{:08x}", suffix)
-}
-
-fn git_update_ref(commands: impl AsRef<str>) -> Result<(), GitError> {
-    feed_git_command(
-        &[
-            "update-ref",
-            // When updating existing symlinks, we want to update the source symlink and not its target
-            "--no-deref",
-            "--stdin",
-        ],
-        &None,
-        Some(commands.as_ref()),
-    )
-    .map_err(map_git_error)
-    .map(|_| ())
-}
-
-pub fn get_head_revision() -> Result<String> {
-    Ok(internal_get_head_revision()?)
-}
-
-fn internal_get_head_revision() -> Result<String, GitError> {
-    git_rev_parse("HEAD")
-}
-
-fn map_git_error(err: GitError) -> GitError {
-    // TODO(kaihowl) is parsing user facing string such a good idea. Probably not...
-    match err {
-        GitError::ExecError { command: _, output } if output.stderr.contains("cannot lock ref") => {
-            GitError::RefFailedToLock { output }
-        }
-        GitError::ExecError { command: _, output } if output.stderr.contains("but expected") => {
-            GitError::RefConcurrentModification { output }
-        }
-        GitError::ExecError { command: _, output } if output.stderr.contains("find remote ref") => {
-            GitError::NoRemoteMeasurements {}
-        }
-        GitError::ExecError { command: _, output }
-            if output.stderr.contains("repository") && output.stderr.contains("not found") =>
-        {
-            GitError::EmptyOrNeverPushedRemote {}
-        }
-        _ => err,
-    }
+    format!("{suffix:08x}")
 }
 
 fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
@@ -459,7 +287,7 @@ fn compact_head(target: &str) -> Result<(), GitError> {
 }
 
 fn retry_notify(err: GitError, dur: Duration) {
-    debug!("Error happened at {:?}: {}", dur, err);
+    debug!("Error happened at {dur:?}: {err}");
     warn!("Retrying...");
 }
 
@@ -577,7 +405,7 @@ fn remove_measurements_from_reference(
             if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
                 if let Ok(timestamp) = timestamp.parse::<i64>() {
                     if timestamp <= oldest_timestamp {
-                        writeln!(writer, "{}", commit).expect("Could not write to stream");
+                        writeln!(writer, "{commit}").expect("Could not write to stream");
                     }
                 }
             }
@@ -589,7 +417,7 @@ fn remove_measurements_from_reference(
         reader
             .lines()
             .map_while(Result::ok)
-            .for_each(|l| println!("{}", l))
+            .for_each(|l| println!("{l}"))
     });
 
     {
@@ -598,7 +426,7 @@ fn remove_measurements_from_reference(
 
         reader.lines().map_while(Result::ok).for_each(|line| {
             if let Some(line) = line.split_whitespace().nth(1) {
-                writeln!(writer, "{}", line).expect("Failed to write to pipe");
+                writeln!(writer, "{line}").expect("Failed to write to pipe");
             }
         });
     }
@@ -630,20 +458,6 @@ fn new_symbolic_write_ref() -> Result<String, GitError> {
 }
 
 const EMPTY_OID: &str = "0000000000000000000000000000000000000000";
-
-fn git_rev_parse(reference: &str) -> Result<String, GitError> {
-    capture_git_output(&["rev-parse", "--verify", "-q", reference], &None)
-        .map_err(|_e| GitError::MissingHead {
-            reference: reference.into(),
-        })
-        .map(|s| s.stdout.trim().to_owned())
-}
-
-fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
-    capture_git_output(&["symbolic-ref", "-q", reference], &None)
-        .ok()
-        .map(|s| s.stdout.trim().to_owned())
-}
 
 fn consolidate_write_branches_into(
     current_upstream_oid: &str,
@@ -866,18 +680,6 @@ fn raw_prune() -> Result<(), GitError> {
     Ok(())
 }
 
-fn is_shallow_repo() -> Result<bool, GitError> {
-    let output = capture_git_output(&["rev-parse", "--is-shallow-repository"], &None)?;
-
-    Ok(output.stdout.starts_with("true"))
-}
-
-#[derive(Debug, PartialEq)]
-struct Reference {
-    refname: String,
-    oid: String,
-}
-
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
@@ -1046,48 +848,11 @@ pub fn push(work_dir: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
-    let version = version
-        .split_whitespace()
-        .nth(2)
-        .ok_or(anyhow!("Could not find git version in string {version}"))?;
-    match version.split('.').collect_vec()[..] {
-        [major, minor, patch] => Ok((major.parse()?, minor.parse()?, patch.parse()?)),
-        _ => Err(anyhow!("Failed determine semantic version from {version}")),
-    }
-}
-
-fn get_git_version() -> Result<(i32, i32, i32)> {
-    let version = capture_git_output(&["--version"], &None)
-        .context("Determine git version")?
-        .stdout;
-    parse_git_version(&version)
-}
-
-fn concat_version(version_tuple: (i32, i32, i32)) -> String {
-    format!(
-        "{}.{}.{}",
-        version_tuple.0, version_tuple.1, version_tuple.2
-    )
-}
-
-pub fn check_git_version() -> Result<()> {
-    let version_tuple = get_git_version().context("Determining compatible git version")?;
-    let expected_version = (2, 41, 0);
-    if version_tuple < expected_version {
-        bail!(
-            "Version {} is smaller than {}",
-            concat_version(version_tuple),
-            concat_version(expected_version)
-        )
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use std::env::{self, set_current_dir};
+    use std::process;
 
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
@@ -1180,8 +945,6 @@ mod test {
     }
 
     #[test]
-    // TODO(kaihowl) properly pass current working directory into commands and remove serial
-    // execution again
     #[serial]
     fn test_customheader_push() {
         let tempdir = dir_with_repo();
@@ -1215,28 +978,6 @@ mod test {
             .as_ref()
             .expect_err("We have no valid git http server setup -> should fail");
         dbg!(&error);
-    }
-
-    #[test]
-    #[serial]
-    fn test_get_head_revision() {
-        let repo_dir = dir_with_repo();
-        set_current_dir(repo_dir.path()).expect("Failed to change dir");
-        let revision = internal_get_head_revision().unwrap();
-        assert!(
-            &revision.chars().all(|c| c.is_ascii_alphanumeric()),
-            "'{}' contained non alphanumeric or non ASCII characters",
-            &revision
-        )
-    }
-
-    #[test]
-    fn test_parse_git_version() {
-        let version = parse_git_version("git version 2.52.0");
-        assert_eq!(version.unwrap(), (2, 52, 0));
-
-        let version = parse_git_version("git version 2.52.0\n");
-        assert_eq!(version.unwrap(), (2, 52, 0));
     }
 
     #[test]
