@@ -3,7 +3,7 @@ pub mod basic_measure;
 pub mod cli;
 pub mod config;
 pub mod data;
-pub mod git_interop;
+pub mod git;
 pub mod measurement_retrieval;
 pub mod measurement_storage;
 pub mod reporting;

@@ -1,6 +1,6 @@
 use crate::{
     data::{CommitSummary, MeasurementData, MeasurementSummary},
-    git_interop::{self},
+    git::git_interop::{self},
     stats::NumericReductionFunc,
 };
 
