@@ -49,6 +49,7 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
         | GitError::MissingHead { .. }
         | GitError::NoRemoteMeasurements { .. }
         | GitError::NoUpstream { .. }
+        | GitError::EmptyOrNeverPushedRemote { .. }
         | GitError::MissingMeasurements => ::backoff::Error::permanent(e),
     }
 }
@@ -198,7 +199,7 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
         &[
             "fetch",
             "--no-write-fetch-head",
-            "origin",
+            GIT_PERF_REMOTE,
             // Always force overwrite the local reference
             // Separation into write, merge, and read branches ensures that this does not lead to
             // any data loss
@@ -316,7 +317,13 @@ fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(),
     // 4. try to push
     fetch(None)?;
 
-    let current_notes_head = git_rev_parse(REFS_NOTES_BRANCH)?;
+    let current_notes_head = match git_rev_parse(REFS_NOTES_BRANCH) {
+        Ok(head) => head,
+        Err(GitError::MissingHead { .. }) => {
+            return Err(GitError::EmptyOrNeverPushedRemote {});
+        }
+        Err(e) => return Err(e),
+    };
 
     let target = create_temp_rewrite_head(&current_notes_head)?;
 
@@ -567,7 +574,7 @@ fn git_push_notes_ref(
             "push",
             "--porcelain",
             format!("--force-with-lease={REFS_NOTES_BRANCH}:{expected_upstream}").as_str(),
-            "origin",
+            GIT_PERF_REMOTE,
             format!("{push_ref}:{REFS_NOTES_BRANCH}").as_str(),
         ],
         working_dir,
@@ -616,7 +623,9 @@ pub fn prune() -> Result<()> {
 }
 
 fn raw_prune() -> Result<(), GitError> {
+    // TODO(kaihowl) missing raw + retry
     if is_shallow_repo()? {
+        // TODO(kaihowl) is this not already checked by git itself?
         return Err(GitError::ShallowRepository);
     }
 
@@ -998,13 +1007,81 @@ mod test {
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
         // Add a dummy remote so the code can check for empty remote
-        let git_dir_url = format!("file://{}", tempdir.path().display());
-        run_git_command(&["remote", "add", "origin", &git_dir_url], tempdir.path());
+        run_git_command(
+            &["remote", "add", "origin", "https://example.com/empty.git"],
+            tempdir.path(),
+        );
         // Do not add any notes/measurements or push anything
         let result = super::raw_remove_measurements_from_commits(Utc::now());
         match result {
-            Err(GitError::NoRemoteMeasurements { .. }) => {}
+            Err(GitError::EmptyOrNeverPushedRemote { .. }) => {}
             other => panic!("Expected EmptyOrNeverPushedRemote error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_git_perf_remote_is_used() {
+        use std::fs;
+
+        use super::GIT_PERF_REMOTE;
+        let tempdir = dir_with_repo();
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
+
+        // Add both 'origin' and GIT_PERF_REMOTE, but only GIT_PERF_REMOTE should be used
+        run_git_command(
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://example.com/should-not-be-used.git",
+            ],
+            tempdir.path(),
+        );
+        run_git_command(
+            &[
+                "remote",
+                "add",
+                GIT_PERF_REMOTE,
+                "https://example.com/git-perf-remote.git",
+            ],
+            tempdir.path(),
+        );
+
+        // Add a dummy perf notes branch so fetch doesn't fail on missing branch
+        run_git_command(
+            &[
+                "notes",
+                "--ref=refs/notes/perf-v3",
+                "add",
+                "-m",
+                "dummy note",
+                "HEAD",
+            ],
+            tempdir.path(),
+        );
+
+        // Patch git to log the remote used for fetch/push
+        let git_config_path = tempdir.path().join(".git/config");
+        let config_contents = fs::read_to_string(&git_config_path).unwrap();
+        // This is just to show we could inspect config if needed
+        assert!(config_contents.contains(GIT_PERF_REMOTE));
+        assert!(config_contents.contains("origin"));
+
+        // Now, call fetch and ensure it does not fail (should use GIT_PERF_REMOTE)
+        // This will fail due to no real remote, but we want to ensure the code path uses GIT_PERF_REMOTE
+        let result = fetch(None);
+        match result {
+            Err(GitError::ExecError { command, output: _ }) => {
+                // The command should mention GIT_PERF_REMOTE
+                assert!(
+                    command.contains(GIT_PERF_REMOTE),
+                    "Fetch did not use GIT_PERF_REMOTE: {}",
+                    command
+                );
+            }
+            Ok(_) => panic!("Fetch unexpectedly succeeded in test_git_perf_remote_is_used"),
+            Err(e) => panic!("Unexpected error: {:?}", e),
         }
     }
 }
