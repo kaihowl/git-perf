@@ -49,7 +49,6 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
         | GitError::MissingHead { .. }
         | GitError::NoRemoteMeasurements { .. }
         | GitError::NoUpstream { .. }
-        | GitError::EmptyOrNeverPushedRemote { .. }
         | GitError::MissingMeasurements => ::backoff::Error::permanent(e),
     }
 }
@@ -317,13 +316,7 @@ fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(),
     // 4. try to push
     fetch(None)?;
 
-    let current_notes_head = match git_rev_parse(REFS_NOTES_BRANCH) {
-        Ok(head) => head,
-        Err(GitError::MissingHead { .. }) => {
-            return Err(GitError::EmptyOrNeverPushedRemote {});
-        }
-        Err(e) => return Err(e),
-    };
+    let current_notes_head = git_rev_parse(REFS_NOTES_BRANCH)?;
 
     let target = create_temp_rewrite_head(&current_notes_head)?;
 
@@ -1005,14 +998,12 @@ mod test {
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
         // Add a dummy remote so the code can check for empty remote
-        run_git_command(
-            &["remote", "add", "origin", "https://example.com/empty.git"],
-            tempdir.path(),
-        );
+        let git_dir_url = format!("file://{}", tempdir.path().display());
+        run_git_command(&["remote", "add", "origin", &git_dir_url], tempdir.path());
         // Do not add any notes/measurements or push anything
         let result = super::raw_remove_measurements_from_commits(Utc::now());
         match result {
-            Err(GitError::EmptyOrNeverPushedRemote { .. }) => {}
+            Err(GitError::NoRemoteMeasurements { .. }) => {}
             other => panic!("Expected EmptyOrNeverPushedRemote error, got: {:?}", other),
         }
     }
