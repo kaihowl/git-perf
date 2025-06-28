@@ -623,9 +623,7 @@ pub fn prune() -> Result<()> {
 }
 
 fn raw_prune() -> Result<(), GitError> {
-    // TODO(kaihowl) missing raw + retry
     if is_shallow_repo()? {
-        // TODO(kaihowl) is this not already checked by git itself?
         return Err(GitError::ShallowRepository);
     }
 
