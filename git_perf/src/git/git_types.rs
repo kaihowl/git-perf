@@ -31,8 +31,8 @@ pub(super) enum GitError {
     #[error("Git failed to execute.\n\nstdout:\n{0}\nstderr:\n{1}", output.stdout, output.stderr)]
     ExecError { command: String, output: GitOutput },
 
-    #[error("Remote repository is empty or has never been pushed to. Please push some measurements first.")]
-    NoRemoteMeasurements {},
+    #[error("Remote repository is empty or has never been pushed to. Please push some measurements first.\n{0}\n{1}", output.stdout, output.stderr)]
+    NoRemoteMeasurements { output: GitOutput },
 
     #[error("No upstream found. Consider setting origin or {}.", GIT_PERF_REMOTE)]
     NoUpstream {},
