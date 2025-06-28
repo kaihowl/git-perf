@@ -212,6 +212,8 @@ mod test {
                 ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
             ])
             .current_dir(dir)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .expect("Failed to spawn git command")
             .success());

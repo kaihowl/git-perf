@@ -874,6 +874,8 @@ mod test {
                 ("GIT_COMMITTER_NAME", "testuser"),
                 ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
             ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .current_dir(dir)
             .status()
             .expect("Failed to spawn git command")
