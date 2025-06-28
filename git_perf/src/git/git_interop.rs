@@ -198,7 +198,7 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
         &[
             "fetch",
             "--no-write-fetch-head",
-            "origin",
+            GIT_PERF_REMOTE,
             // Always force overwrite the local reference
             // Separation into write, merge, and read branches ensures that this does not lead to
             // any data loss
@@ -567,7 +567,7 @@ fn git_push_notes_ref(
             "push",
             "--porcelain",
             format!("--force-with-lease={REFS_NOTES_BRANCH}:{expected_upstream}").as_str(),
-            "origin",
+            GIT_PERF_REMOTE,
             format!("{push_ref}:{REFS_NOTES_BRANCH}").as_str(),
         ],
         working_dir,
@@ -992,19 +992,58 @@ mod test {
 
     #[test]
     #[serial]
-    fn test_empty_or_never_pushed_remote_error() {
-        use chrono::Utc;
+    fn test_empty_or_never_pushed_remote_error_for_fetch() {
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
         // Add a dummy remote so the code can check for empty remote
         let git_dir_url = format!("file://{}", tempdir.path().display());
         run_git_command(&["remote", "add", "origin", &git_dir_url], tempdir.path());
+
+        // TODO(kaihowl) hack to check where the fetch went to
+        std::env::set_var("GIT_TRACE", "true");
+
         // Do not add any notes/measurements or push anything
-        let result = super::raw_remove_measurements_from_commits(Utc::now());
+        let result = super::fetch(Some(tempdir.path()));
         match result {
-            Err(GitError::NoRemoteMeasurements { .. }) => {}
-            other => panic!("Expected EmptyOrNeverPushedRemote error, got: {:?}", other),
+            Err(GitError::NoRemoteMeasurements { output }) => {
+                assert!(
+                    output.stderr.contains(GIT_PERF_REMOTE),
+                    "Expected output to contain {GIT_PERF_REMOTE}. Output: '{}'",
+                    output.stderr
+                )
+            }
+            other => panic!("Expected NoRemoteMeasurements error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_empty_or_never_pushed_remote_error_for_push() {
+        let tempdir = tempdir().unwrap();
+        init_repo(tempdir.path());
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
+
+        run_git_command(
+            &["remote", "add", "origin", "invalid invalid"],
+            tempdir.path(),
+        );
+
+        // TODO(kaihowl) hack to inspect git commands
+        std::env::set_var("GIT_TRACE", "true");
+
+        add_note_line_to_head("test line, invalid measurement, does not matter").unwrap();
+
+        let result = super::raw_push(Some(tempdir.path()));
+        match result {
+            Err(GitError::RefFailedToPush { output }) => {
+                assert!(
+                    output.stderr.contains(GIT_PERF_REMOTE),
+                    "Expected output to contain {GIT_PERF_REMOTE}, got: {}",
+                    output.stderr
+                )
+            }
+            other => panic!("Expected RefFailedToPush error, got: {:?}", other),
         }
     }
 }
