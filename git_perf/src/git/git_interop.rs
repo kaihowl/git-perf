@@ -187,7 +187,7 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
 
 fn random_suffix() -> String {
     let suffix: u32 = thread_rng().gen();
-    format!("{:08x}", suffix)
+    format!("{suffix:08x}")
 }
 
 fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
@@ -287,7 +287,7 @@ fn compact_head(target: &str) -> Result<(), GitError> {
 }
 
 fn retry_notify(err: GitError, dur: Duration) {
-    debug!("Error happened at {:?}: {}", dur, err);
+    debug!("Error happened at {dur:?}: {err}");
     warn!("Retrying...");
 }
 
@@ -405,7 +405,7 @@ fn remove_measurements_from_reference(
             if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
                 if let Ok(timestamp) = timestamp.parse::<i64>() {
                     if timestamp <= oldest_timestamp {
-                        writeln!(writer, "{}", commit).expect("Could not write to stream");
+                        writeln!(writer, "{commit}").expect("Could not write to stream");
                     }
                 }
             }
@@ -417,7 +417,7 @@ fn remove_measurements_from_reference(
         reader
             .lines()
             .map_while(Result::ok)
-            .for_each(|l| println!("{}", l))
+            .for_each(|l| println!("{l}"))
     });
 
     {
@@ -426,7 +426,7 @@ fn remove_measurements_from_reference(
 
         reader.lines().map_while(Result::ok).for_each(|line| {
             if let Some(line) = line.split_whitespace().nth(1) {
-                writeln!(writer, "{}", line).expect("Failed to write to pipe");
+                writeln!(writer, "{line}").expect("Failed to write to pipe");
             }
         });
     }

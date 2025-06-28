@@ -61,10 +61,10 @@ pub(super) fn feed_git_command(
     }?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    trace!("stdout: {}", stdout);
+    trace!("stdout: {stdout}");
 
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    trace!("stderr: {}", stderr);
+    trace!("stderr: {stderr}");
 
     let git_output = GitOutput { stdout, stderr };
 
