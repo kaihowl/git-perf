@@ -559,8 +559,6 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     git_update_ref(commands)?;
 
     Ok(())
-
-    // TODO(kaihowl) - Clean up all local write refs that have been merged into the upstream branch.
 }
 
 fn git_push_notes_ref(
