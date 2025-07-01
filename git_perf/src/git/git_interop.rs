@@ -559,7 +559,6 @@ fn git_push_notes_ref(
     push_ref: &str,
     working_dir: &Option<&Path>,
 ) -> Result<(), GitError> {
-    // TODO(kaihowl) configure remote?
     // - CAS push the temporary merge ref to upstream using the noted down upstream ref
     //     - In case of concurrent pushes, back off and restart fresh from previous step.
     let output = capture_git_output(

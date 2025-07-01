@@ -174,8 +174,6 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     }
 
     fn as_bytes(&self) -> Vec<u8> {
-        // TODO(kaihowl) write to path directly instead?
-
         self.indexed_measurements
             .iter()
             .map(|(index, measurement_data)| {

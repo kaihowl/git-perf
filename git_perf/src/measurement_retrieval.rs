@@ -8,7 +8,6 @@ use cli_types::ReductionFunc;
 
 use anyhow::Result;
 
-// TODO(kaihowl) oh god naming
 pub trait MeasurementReducer<'a>: Iterator<Item = &'a MeasurementData> {
     fn reduce_by(self, fun: ReductionFunc) -> Option<MeasurementSummary>;
 }
