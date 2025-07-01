@@ -24,13 +24,6 @@ jobs:
   test:
     name: test
     env:
-      # For some builds, we use cross to test on 32-bit and big-endian
-      # systems.
-      CARGO: cargo
-      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
-      TARGET_FLAGS:
-      # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
-      TARGET_DIR: ./target
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
     runs-on: ${{ matrix.os }}
@@ -71,13 +64,8 @@ jobs:
           sudo apt-get install libfaketime
         fi
 
-    - name: Show command used for Cargo
-      run: |
-        echo "cargo command is: ${{ env.CARGO }}"
-        echo "target flag is: ${{ env.TARGET_FLAGS }}"
-
     - name: Build git-perf
-      run: ${{ env.CARGO }} build --verbose ${{ env.TARGET_FLAGS }}
+      run: cargo build --verbose
 
     - name: Check man pages presence
       run: |
@@ -103,7 +91,7 @@ jobs:
         echo "All man pages found."
 
     - name: Run tests
-      run: ${{ env.CARGO }} test --verbose ${{ env.TARGET_FLAGS }}
+      run: cargo test --verbose
 
     - name: Run sample perf measurements
       run: |
