@@ -13,7 +13,6 @@ pub fn write_config(conf: &str) -> Result<()> {
     Ok(())
 }
 
-// TODO(kaihowl) hierachy of config files?
 pub fn read_config() -> Result<String> {
     read_config_from_file(".gitperfconfig")
 }
@@ -34,7 +33,6 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
 }
 
 fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
-    // TODO(kaihowl) buffered reading?
     let config = conf_str
         .parse::<Document>()
         .expect("Failed to parse config");

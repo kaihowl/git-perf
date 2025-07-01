@@ -25,6 +25,9 @@ metrics in a single central location.
 ## Migrate measurements
 TODO document this
 
+# Setup Different Remote
+TODO document this
+
 # Docs
 
 See [manpages](./docs/manpage.md).
