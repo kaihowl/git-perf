@@ -167,7 +167,7 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
             format!(
                 r#"
                 start
-                symref-create {REFS_NOTES_WRITE_SYMBOLIC_REF} {target}
+                symref-update {REFS_NOTES_WRITE_SYMBOLIC_REF} {target} oid {EMPTY_OID}
                 commit
                 "#
             )
