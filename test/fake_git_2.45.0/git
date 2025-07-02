@@ -1,5 +1,5 @@
 #!/bin/bash
 
 if [ $# == 1 ] || [ "$1" == --version ]; then
-  echo git version 2.41.0
+  echo git version 2.45.0
 fi
