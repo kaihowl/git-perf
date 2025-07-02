@@ -1,4 +1,7 @@
-use super::git_types::{GitError, GitOutput};
+use super::{
+    git_definitions::EXPECTED_VERSION,
+    git_types::{GitError, GitOutput},
+};
 
 use std::{
     env::current_dir,
@@ -176,12 +179,11 @@ fn concat_version(version_tuple: (i32, i32, i32)) -> String {
 
 pub fn check_git_version() -> Result<()> {
     let version_tuple = get_git_version().context("Determining compatible git version")?;
-    let expected_version = (2, 41, 0);
-    if version_tuple < expected_version {
+    if version_tuple < EXPECTED_VERSION {
         bail!(
             "Version {} is smaller than {}",
             concat_version(version_tuple),
-            concat_version(expected_version)
+            concat_version(EXPECTED_VERSION)
         )
     }
     Ok(())
