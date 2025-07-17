@@ -1,0 +1,101 @@
+name: Git Compatibility Checks
+
+on: pull_request
+
+jobs:
+  test_with_git_versions:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # TODO(kaihowl) amend
+        git_version:
+          # - "v2.25.1" # Example: An older, but still relevant version
+          # - "v2.30.0" # Example: A mid-range version
+          # - "v2.34.1" # Ubuntu 22.04 LTS version
+          # - "v2.35.0" # Example: A more recent, stable version
+          # - "v2.40.1" # Example: Another common recent version
+          - "v2.45.0" # Example: A fairly recent version
+          - "v2.50.1" # Example: A very recent version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Set Git user and email
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+      - name: Install libfaketime
+        run: |
+          if [[ $(uname -s) = Darwin ]]; then
+            brew install libfaketime
+          else # ubuntu
+            sudo apt-get install libfaketime
+          fi
+
+      - name: Install Git build dependencies
+        # These are common dependencies needed to compile Git on Ubuntu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            make \
+            gcc \
+            libssl-dev \
+            libghc-zlib-dev \
+            libcurl4-gnutls-dev \
+            libexpat1-dev \
+            gettext \
+            unzip \
+            autoconf # For `make configure`
+
+      - name: Compile and install Git ${{ matrix.git_version }}
+        run: |
+          GIT_VERSION_TAG="${{ matrix.git_version }}"
+          # Strip 'v' prefix for directory name
+          GIT_DIR_NAME="${GIT_VERSION_TAG#v}"
+          INSTALL_PATH="/opt/git/${GIT_DIR_NAME}" # Isolated installation path
+
+          echo "Installing Git ${GIT_VERSION_TAG} to ${INSTALL_PATH}"
+
+          # Download the source tarball from GitHub
+          wget "https://github.com/git/git/archive/refs/tags/${GIT_VERSION_TAG}.tar.gz" -O git.tar.gz
+          tar -xzf git.tar.gz
+
+          # Enter the extracted directory
+          cd "git-${GIT_DIR_NAME}"
+
+          # 1. Generate the configure script (if not already in the tarball, or for safety)
+          #    This requires 'autoconf' as a dependency.
+          make configure
+
+          # 2. Configure Git with the desired installation prefix
+          #    --prefix ensures Git knows where its files will be found after installation
+          ./configure --prefix="${INSTALL_PATH}"
+
+          # 3. Compile Git
+          make -j$(nproc) all # 'all' is the default target, explicitly mentioned for clarity
+
+          # 4. Install Git to the specified prefix
+          sudo make install
+
+          # Add the newly installed Git's bin directory to the PATH
+          # for the remainder of this job. This ensures your tool uses *this* git.
+          echo "${INSTALL_PATH}/bin" >> $GITHUB_PATH
+
+      - name: Verify Git version and installation path
+        run: |
+          git --version
+          which git
+
+      - name: Build git-perf
+        run: cargo build --verbose ${{ env.TARGET_FLAGS }}
+
+      - name: Run tests
+        run: cargo test --verbose ${{ env.TARGET_FLAGS }}
+
