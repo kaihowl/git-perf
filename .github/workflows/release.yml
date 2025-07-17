@@ -261,3 +261,19 @@ jobs:
           args: "artifacts/*"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set 'latest' tag
+        # This only works when the latest published release is THE latest release.
+        # Fixes to patch versions won't work.
+        if: ${{ !contains(github.ref_name, '-') }} # Only for non-prerelease tags
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          LATEST_TAG="latest"
+
+          echo "Creating/updating '$LATEST_TAG' tag to point to $TAG_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "$LATEST_TAG" "$TAG_NAME"
+          git push -f origin "$LATEST_TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for pushing tags
