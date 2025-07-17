@@ -1,7 +1,7 @@
 /// Min supported git version
 /// Must be version 2.45.0 at least to support symref-update commands
 /// TODO(kaihowl) check if we can get by with this version
-pub const EXPECTED_VERSION: (i32, i32, i32) = (2, 45, 0);
+pub const EXPECTED_VERSION: (i32, i32, i32) = (2, 46, 0);
 
 /// The main branch where performance measurements are stored as git notes
 pub const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
