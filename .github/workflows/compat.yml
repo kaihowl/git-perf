@@ -1,6 +1,6 @@
 name: Git Compatibility Checks
 
-on: [push, pull_request]
+on: pull_request
 
 jobs:
   test_with_git_versions:

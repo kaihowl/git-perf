@@ -17,7 +17,6 @@ on:
     branches:
       - master
       - build/*
-      - '*/stack'
   pull_request:
     branches:
       - master
