@@ -481,12 +481,6 @@ fn consolidate_write_branches_into(
         .filter(|r| r.refname != except_ref.unwrap_or_default())
         .collect_vec();
 
-    // TODO(kaihowl) explicit test needed, currently only fails in concurrency test
-    // when push is called before the first add.
-    if refs.is_empty() {
-        return Ok([].into());
-    }
-
     for reference in &refs {
         reconcile_branch_with(target, &reference.oid)?;
     }
