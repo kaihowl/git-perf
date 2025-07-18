@@ -194,6 +194,7 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
 
     let ref_before = git_rev_parse(REFS_NOTES_BRANCH).ok();
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
+    // TODO use porcelain and produce our own human-readable output?
     capture_git_output(
         &[
             "fetch",
@@ -488,7 +489,6 @@ fn consolidate_write_branches_into(
     Ok(refs)
 }
 
-//TODO(kaihowl) clean up pub methods
 fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     ensure_remote_exists()?;
     // This might merge concurrently created write branches. There is no protection against that.
