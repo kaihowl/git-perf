@@ -488,7 +488,6 @@ fn consolidate_write_branches_into(
     Ok(refs)
 }
 
-//TODO(kaihowl) clean up pub methods
 fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     ensure_remote_exists()?;
     // This might merge concurrently created write branches. There is no protection against that.
