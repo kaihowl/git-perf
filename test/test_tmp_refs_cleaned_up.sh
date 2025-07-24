@@ -36,8 +36,8 @@ fi
 git perf report
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
 
-if [[ 3 -ne $ref_count ]]; then
-  echo "Expected only the permanent git-perf read ref to be added after the first 'report'"
+if [[ 2 -ne $ref_count ]]; then
+  echo "Expected the symbolic write-ref and the target write ref to be present after the report"
   echo "Current refs:"
   git for-each-ref '**/notes/perf-*'
   exit 1
@@ -46,8 +46,8 @@ fi
 git perf push
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
 
-if [[ 2 -ne $ref_count ]]; then
-  echo "Expected the permanent git perf and the current read ref to be present after first push"
+if [[ 1 -ne $ref_count ]]; then
+  echo "Expected only the permanent git perf ref to be present after the first push"
   echo "Current refs:"
   git for-each-ref '**/notes/perf-*'
   exit 1

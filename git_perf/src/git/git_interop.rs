@@ -21,7 +21,7 @@ use crate::config;
 
 use super::git_definitions::{
     GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_BRANCH,
-    REFS_NOTES_MERGE_BRANCH_PREFIX, REFS_NOTES_READ_BRANCH, REFS_NOTES_REWRITE_TARGET_PREFIX,
+    REFS_NOTES_MERGE_BRANCH_PREFIX, REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX,
     REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_WRITE_TARGET_PREFIX,
 };
 use super::git_lowlevel::{
@@ -92,17 +92,8 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
         .expect("Missing symbolic-ref for target");
     let temp_target = create_temp_add_head(&current_note_head)?;
 
-    defer!(git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            delete {temp_target}
-            commit
-            "#
-        )
-        .as_str(),
-    ))
-    .expect("Deleting our own temp ref for adding should never fail"));
+    defer!(remove_reference(&temp_target)
+        .expect("Deleting our own temp ref for adding should never fail"));
 
     // Test if the repo has any commit checked out at HEAD
     if internal_get_head_revision().is_err() {
@@ -338,16 +329,7 @@ fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(),
     ))?;
 
     // Delete target
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            delete {target}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
+    remove_reference(&target)?;
 
     Ok(())
 }
@@ -488,6 +470,19 @@ fn consolidate_write_branches_into(
     Ok(refs)
 }
 
+fn remove_reference(ref_name: &str) -> Result<(), GitError> {
+    git_update_ref(unindent(
+        format!(
+            r#"
+                    start
+                    delete {ref_name}
+                    commit
+                "#
+        )
+        .as_str(),
+    ))
+}
+
 fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
     ensure_remote_exists()?;
     // This might merge concurrently created write branches. There is no protection against that.
@@ -501,17 +496,7 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
 
     let merge_ref = create_temp_ref_name(REFS_NOTES_MERGE_BRANCH_PREFIX);
 
-    defer!(git_update_ref(unindent(
-        format!(
-            r#"
-                    start
-                    delete {merge_ref}
-                    commit
-                "#
-        )
-        .as_str()
-    ))
-    .expect("Deleting our own branch should never fail"));
+    defer!(remove_reference(&merge_ref).expect("Deleting our own branch should never fail"));
 
     // - Create a temporary merge ref, set to the upstream perf ref, merge in all existing write refs except the newly created one from the previous step.
     //     - Same step (except for filtering of the new ref) happens on local read as well.)
@@ -645,16 +630,7 @@ fn raw_prune() -> Result<(), GitError> {
 
     // - clean up temp branch
     // TODO(kaihowl) clean up old temp branches
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            delete {target}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
+    remove_reference(&target)?;
 
     Ok(())
 }
@@ -678,19 +654,27 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
         .collect_vec())
 }
 
-fn update_read_branch() -> Result<()> {
-    // TODO(kaihowl) use temp branches and return RAII object
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            delete {REFS_NOTES_READ_BRANCH}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
+struct TempRef {
+    ref_name: String,
+}
 
+impl TempRef {
+    fn new(prefix: &str) -> Result<Self, GitError> {
+        Ok(TempRef {
+            ref_name: create_temp_ref(prefix, EMPTY_OID)?,
+        })
+    }
+}
+
+impl Drop for TempRef {
+    fn drop(&mut self) {
+        remove_reference(&self.ref_name)
+            .unwrap_or_else(|_| panic!("Failed to remove reference: {}", self.ref_name))
+    }
+}
+
+fn update_read_branch() -> Result<TempRef, GitError> {
+    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
     // - With the upstream refs/notes/perf-v3
     //     - If not merged into refs/notes/perf-v3-read: set refs/notes/perf-v3-read to refs/notes/perf-v3
     //     - Protect against concurrent invocations by checking that the refs/notes/perf-v3-read has
@@ -707,15 +691,15 @@ fn update_read_branch() -> Result<()> {
 
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
     // TODO(kaihowl) protect against concurrent writes with temp read branch?
-    let _ = consolidate_write_branches_into(&current_upstream_oid, REFS_NOTES_READ_BRANCH, None)?;
+    let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)?;
 
-    Ok(())
+    Ok(temp_ref)
 }
 
 // TODO(kaihowl) return a nested iterator / generator instead?
 pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     // update local read branch
-    update_read_branch()?;
+    let temp_ref = update_read_branch()?;
 
     // TODO(kaihowl) update the local read branch
     let output = capture_git_output(
@@ -729,7 +713,7 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             "--first-parent",
             "--pretty=--,%H,%D%n%N",
             "--decorate=full",
-            format!("--notes={REFS_NOTES_READ_BRANCH}").as_str(),
+            format!("--notes={}", temp_ref.ref_name).as_str(),
             "HEAD",
         ],
         &None,
