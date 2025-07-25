@@ -58,7 +58,7 @@ jobs:
       - name: use commit name as report name
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          echo "REPORT_NAME=${{github.sha}}" >> $GITHUB_ENV
+          echo "REPORT_NAME=$(git rev-parse HEAD)" >> $GITHUB_ENV
       - name: use branch name as report name
         if: ${{ github.event_name != 'pull_request' }}
         run: |
