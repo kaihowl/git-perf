@@ -734,47 +734,28 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     )
     .context("Failed to retrieve commits")?;
 
-    let mut current_commit = None;
+    let mut commits: Vec<(String, Vec<String>)> = Vec::new();
     let mut detected_shallow = false;
+    let mut current_commit: Option<String> = None;
 
-    // TODO(kaihowl) iterator or generator instead / how to propagate exit code?
-    let it = output.stdout.lines().filter_map(|l| {
+    for l in output.stdout.lines() {
         if l.starts_with("--") {
             let info = l.split(',').collect_vec();
-
-            current_commit = Some(
-                info.get(1)
-                    .expect("No commit header found before measurement line in git log output")
-                    .to_owned(),
-            );
-
+            let commit_hash = info
+                .get(1)
+                .expect("No commit header found before measurement line in git log output");
             detected_shallow |= info[2..].contains(&"grafted");
-
-            None
-        } else {
-            // TODO(kaihowl) lot's of string copies...
-            Some((
-                current_commit
-                    .as_ref()
-                    .expect("No commit header found before measurement line in git log output")
-                    .to_owned(),
-                l,
-            ))
+            current_commit = Some(commit_hash.to_string());
+            commits.push((commit_hash.to_string(), Vec::new()));
+        } else if let Some(commit_hash) = current_commit.as_ref() {
+            if let Some(last) = commits.last_mut() {
+                last.1.push(l.to_string());
+            } else {
+                // Should not happen, but just in case
+                commits.push((commit_hash.to_string(), vec![l.to_string()]));
+            }
         }
-    });
-
-    let commits: Vec<_> = it
-        .group_by(|it| it.0.to_owned())
-        .into_iter()
-        .map(|(k, v)| {
-            (
-                k.to_owned(),
-                // TODO(kaihowl) joining what was split above already
-                // TODO(kaihowl) lot's of string copies...
-                v.map(|(_, v)| v.to_owned()).collect::<Vec<_>>(),
-            )
-        })
-        .collect();
+    }
 
     if detected_shallow && commits.len() < num_commits {
         bail!("Refusing to continue as commit log depth was limited by shallow clone");
