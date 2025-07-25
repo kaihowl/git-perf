@@ -712,12 +712,10 @@ fn update_read_branch() -> Result<()> {
     Ok(())
 }
 
-// TODO(kaihowl) return a nested iterator / generator instead?
 pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     // update local read branch
     update_read_branch()?;
 
-    // TODO(kaihowl) update the local read branch
     let output = capture_git_output(
         &[
             "--no-pager",

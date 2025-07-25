@@ -34,10 +34,6 @@ repo2=$(pwd)/repo2
 
 echo Init git perf in two repos independently
 pushd "$repo1"
-# TODO(kaihowl)
-# Only setting the values with envvars fails for libgit2 git_signature_default
-git config user.name "$GIT_COMMITTER_NAME"
-git config user.email "$GIT_COMMITTER_EMAIL"
 
 git perf add -m echo 0.5
 
@@ -46,10 +42,6 @@ git perf push
 popd
 
 pushd "$repo2"
-# TODO(kaihowl)
-# Only setting the values with envvars fails for libgit2 git_signature_default
-git config user.name "$GIT_COMMITTER_NAME"
-git config user.email "$GIT_COMMITTER_EMAIL"
 
 git perf add -m echo 0.5
 

@@ -10,10 +10,6 @@ function set_author_name() {
   local repo
   repo=$1
   pushd "$repo"
-  # TODO(kaihowl)
-  # Only setting the values with envvars fails for libgit2 git_signature_default
-  git config user.name "$GIT_COMMITTER_NAME"
-  git config user.email "$GIT_COMMITTER_EMAIL"
   popd
 }
 
