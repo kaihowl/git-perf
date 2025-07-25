@@ -84,7 +84,8 @@ pub(super) fn feed_git_command(
 }
 
 pub(super) fn map_git_error(err: GitError) -> GitError {
-    // TODO(kaihowl) is parsing user facing string such a good idea. Probably not...
+    // Parsing error messasges is not a very good idea, but(!) there are no consistent + documented error code for these cases.
+    // This is tested by the git compatibility check and we add an explicit LANG to the git invocation.
     match err {
         GitError::ExecError { command: _, output } if output.stderr.contains("cannot lock ref") => {
             GitError::RefFailedToLock { output }
