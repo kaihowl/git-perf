@@ -34,7 +34,6 @@ cd myworkrepo
 
 output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'No commit at HEAD'* ]]; then
-  # TODO(kaihowl) is this the right error message?
   echo "Missing 'No Commit at HEAD' in output:"
   echo "$output"
   exit 1
