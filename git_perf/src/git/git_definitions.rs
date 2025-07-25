@@ -22,7 +22,7 @@ pub const REFS_NOTES_REWRITE_TARGET_PREFIX: &str = "refs/notes/perf-v3-rewrite-"
 pub const REFS_NOTES_MERGE_BRANCH_PREFIX: &str = "refs/notes/perf-v3-merge-";
 
 /// Branch used for reconciling and then reading performance measurements
-pub const REFS_NOTES_READ_BRANCH: &str = "refs/notes/perf-v3-read";
+pub const REFS_NOTES_READ_PREFIX: &str = "refs/notes/perf-v3-read-";
 
 /// The default remote name used for git-perf operations
 pub const GIT_PERF_REMOTE: &str = "git-perf-origin";
