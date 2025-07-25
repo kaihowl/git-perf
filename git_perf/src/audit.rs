@@ -58,9 +58,15 @@ pub fn audit(
         return Ok(());
     }
 
-    if head_summary.significantly_different_from(&tail_summary, sigma) {
+    if head_summary.z_score(&tail_summary) > sigma {
+        let direction = if head_summary.mean > tail_summary.mean {
+            "↑"
+        } else {
+            "↓"
+        };
         bail!(
-            "HEAD differs significantly from tail measurements.\nHead: {}\nTail: {}",
+            "HEAD differs significantly from tail measurements.\nz-score: {direction} {}\nHead: {}\nTail: {}",
+            format!("{:.2}", head_summary.z_score(&tail_summary)),
             &head_summary,
             &tail_summary
         );

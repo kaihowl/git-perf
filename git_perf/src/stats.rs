@@ -42,10 +42,10 @@ impl Display for Stats {
 }
 
 impl Stats {
-    pub fn significantly_different_from(&self, other: &Stats, sigma: f64) -> bool {
+    pub fn z_score(&self, other: &Stats) -> f64 {
         assert!(self.len == 1);
         assert!(other.len >= 1);
-        (self.mean - other.mean).abs() / other.stddev > sigma
+        (self.mean - other.mean).abs() / other.stddev
     }
 }
 
