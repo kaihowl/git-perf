@@ -629,7 +629,6 @@ fn raw_prune() -> Result<(), GitError> {
     ))?;
 
     // - clean up temp branch
-    // TODO(kaihowl) clean up old temp branches
     remove_reference(&target)?;
 
     Ok(())
@@ -690,7 +689,7 @@ fn update_read_branch() -> Result<TempRef, GitError> {
     //   code be ..merged..?
 
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
-    // TODO(kaihowl) protect against concurrent writes with temp read branch?
+
     let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)?;
 
     Ok(temp_ref)
