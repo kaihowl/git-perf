@@ -198,16 +198,16 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
 struct ReporterFactory {}
 
 impl ReporterFactory {
-    fn from_file_name(path: &Path) -> Option<Box<dyn Reporter + '_>> {
+    fn from_file_name(path: &Path) -> Option<Box<dyn Reporter<'_> + '_>> {
         if path == Path::new("-") {
-            return Some(Box::new(CsvReporter::new()) as Box<dyn Reporter>);
+            return Some(Box::new(CsvReporter::new()) as Box<dyn Reporter<'_>>);
         }
         let mut res = None;
         if let Some(ext) = path.extension() {
             let extension = ext.to_ascii_lowercase().into_string().unwrap();
             res = match extension.as_str() {
-                "html" => Some(Box::new(PlotlyReporter::new()) as Box<dyn Reporter>),
-                "csv" => Some(Box::new(CsvReporter::new()) as Box<dyn Reporter>),
+                "html" => Some(Box::new(PlotlyReporter::new()) as Box<dyn Reporter<'_>>),
+                "csv" => Some(Box::new(CsvReporter::new()) as Box<dyn Reporter<'_>>),
                 _ => None,
             }
         }
