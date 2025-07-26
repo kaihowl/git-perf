@@ -24,9 +24,9 @@ pub(super) fn spawn_git_command(
     let stdin = stdin.unwrap_or(Stdio::null());
     debug!("execute: git {}", args.join(" "));
     process::Command::new("git")
-        .env("LANG", "C.UTF-8")
-        .env("LC_ALL", "C.UTF-8")
-        .env("LC_CTYPE", "C.UTF-8")
+        // .env("LANG", "C.UTF-8")
+        // .env("LC_ALL", "C.UTF-8")
+        // .env("LC_CTYPE", "C.UTF-8")
         .stdin(stdin)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
