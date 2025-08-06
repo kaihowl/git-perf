@@ -7,6 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use cli_types::ReductionFunc;
 use itertools::Itertools;
 use log::error;
+use sparklines::spark;
 use std::iter;
 
 #[derive(Debug, PartialEq)]
@@ -27,7 +28,7 @@ pub fn audit_multiple(
 
     for measurement in measurements {
         let result = audit(
-            &measurement,
+            measurement,
             max_count,
             min_count,
             selectors,
@@ -88,8 +89,8 @@ fn audit(
         .take(max_count)
         .try_collect()?;
 
-    let head_summary = stats::aggregate_measurements(iter::once(head));
-    let tail_summary = stats::aggregate_measurements(tail.into_iter());
+    let head_summary = stats::aggregate_measurements(iter::once(&head));
+    let tail_summary = stats::aggregate_measurements(tail.iter());
 
     if tail_summary.len < min_count.into() {
         let number_measurements = tail_summary.len;
@@ -107,28 +108,42 @@ fn audit(
         "↓"
     };
 
+    let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
+    let average = all_measurements.iter().sum::<f64>() / all_measurements.len() as f64;
+    let relative_min = all_measurements
+        .iter()
+        .min_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap()
+        / average
+        - 1.0;
+    let relative_max = all_measurements
+        .iter()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap()
+        / average
+        - 1.0;
+
     let text_summary = format!(
-        "z-score: {direction} {}\nHead: {}\nTail: {}",
-        format!("{:.2}", head_summary.z_score(&tail_summary)),
+        "z-score: {direction} {:.2}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
+        head_summary.z_score(&tail_summary),
         &head_summary,
-        &tail_summary
+        &tail_summary,
+        (relative_min * 100.0),
+        (relative_max * 100.0),
+        spark(all_measurements.as_slice()),
     );
 
     if head_summary.z_score(&tail_summary) > sigma {
         return Ok(AuditResult {
             message: format!(
-                "Measurement '{}' failed audit.\nHEAD differs significantly from tail measurements.\n{text_summary}",
-                measurement
+                "Measurement '{measurement}' failed audit.\nHEAD differs significantly from tail measurements.\n{text_summary}"
             ),
             passed: false,
         });
     }
 
     Ok(AuditResult {
-        message: format!(
-            "Measurement '{}' passed audit.\n{text_summary}",
-            measurement
-        ),
+        message: format!("Measurement '{measurement}' passed audit.\n{text_summary}"),
         passed: true,
     })
 }
