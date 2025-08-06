@@ -9,14 +9,54 @@ use itertools::Itertools;
 use log::error;
 use std::iter;
 
-pub fn audit(
-    measurement: &str,
+#[derive(Debug, PartialEq)]
+struct AuditResult {
+    message: String,
+    passed: bool,
+}
+
+pub fn audit_multiple(
+    measurements: &[String],
     max_count: usize,
     min_count: u16,
     selectors: &[(String, String)],
     summarize_by: ReductionFunc,
     sigma: f64,
 ) -> Result<()> {
+    let mut failed = false;
+
+    for measurement in measurements {
+        let result = audit(
+            &measurement,
+            max_count,
+            min_count,
+            selectors,
+            summarize_by,
+            sigma,
+        )?;
+
+        println!("{}", result.message);
+
+        if !result.passed {
+            failed = true;
+        }
+    }
+
+    if failed {
+        bail!("One or more measurements failed audit.");
+    }
+
+    Ok(())
+}
+
+fn audit(
+    measurement: &str,
+    max_count: usize,
+    min_count: u16,
+    selectors: &[(String, String)],
+    summarize_by: ReductionFunc,
+    sigma: f64,
+) -> Result<AuditResult> {
     let all = measurement_retrieval::walk_commits(max_count)?;
 
     let filter_by = |m: &MeasurementData| {
@@ -55,22 +95,40 @@ pub fn audit(
         let number_measurements = tail_summary.len;
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
-        return Ok(());
+        return Ok(AuditResult {
+            message: format!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."),
+            passed: true,
+        });
     }
+
+    let direction = if head_summary.mean > tail_summary.mean {
+        "↑"
+    } else {
+        "↓"
+    };
+
+    let text_summary = format!(
+        "z-score: {direction} {}\nHead: {}\nTail: {}",
+        format!("{:.2}", head_summary.z_score(&tail_summary)),
+        &head_summary,
+        &tail_summary
+    );
 
     if head_summary.z_score(&tail_summary) > sigma {
-        let direction = if head_summary.mean > tail_summary.mean {
-            "↑"
-        } else {
-            "↓"
-        };
-        bail!(
-            "HEAD differs significantly from tail measurements.\nz-score: {direction} {}\nHead: {}\nTail: {}",
-            format!("{:.2}", head_summary.z_score(&tail_summary)),
-            &head_summary,
-            &tail_summary
-        );
+        return Ok(AuditResult {
+            message: format!(
+                "Measurement '{}' failed audit.\nHEAD differs significantly from tail measurements.\n{text_summary}",
+                measurement
+            ),
+            passed: false,
+        });
     }
 
-    Ok(())
+    Ok(AuditResult {
+        message: format!(
+            "Measurement '{}' passed audit.\n{text_summary}",
+            measurement
+        ),
+        passed: true,
+    })
 }

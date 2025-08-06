@@ -101,12 +101,12 @@ pub enum Commands {
         aggregate_by: Option<ReductionFunc>,
     },
 
-    /// For a given measurement, check perfomance deviations of the HEAD commit
+    /// For given measurements, check perfomance deviations of the HEAD commit
     /// against `<n>` previous commits. Group previous results and aggregate their
     /// results before comparison.
     Audit {
-        #[arg(short, long, value_parser=parse_spaceless_string)]
-        measurement: String,
+        #[arg(short, long, value_parser=parse_spaceless_string, action = clap::ArgAction::Append, required = true)]
+        measurement: Vec<String>,
 
         #[command(flatten)]
         report_history: CliReportHistory,

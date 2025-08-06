@@ -67,7 +67,7 @@ pub fn handle_calls() -> Result<()> {
             if report_history.max_count < min_measurements.into() {
                 Cli::command().error(ArgumentConflict, format!("The minimal number of measurements ({}) cannot be more than the maximum number of measurements ({})", min_measurements, report_history.max_count)).exit()
             }
-            audit::audit(
+            audit::audit_multiple(
                 &measurement,
                 report_history.max_count,
                 min_measurements,
