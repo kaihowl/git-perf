@@ -221,6 +221,7 @@ if [ $PUSH_STATUS -ne 0 ] || [ $ADD_STATUS -ne 0 ] || [ $REMOVE_STATUS -ne 0 ] |
     [ $PUSH_STATUS -ne 0 ] && echo "  'push' test failed with exit code $PUSH_STATUS"
     [ $REMOVE_STATUS -ne 0 ] && echo "  'remove' test failed with exit code $REMOVE_STATUS"
     [ $ADD_STATUS -ne 0 ] && echo "  'add' test failed with exit code $ADD_STATUS"
+    [ $PRUNE_STATUS -ne 0 ] && echo "  'prune' test failed with exit code $PRUNE_STATUS"
     exit_code=1
 fi
 
