@@ -584,7 +584,7 @@ pub fn prune() -> Result<()> {
 
     ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
-            anyhow!(err).context("Permanent failure while pushing refs")
+            anyhow!(err).context("Permanent failure while pruning refs")
         }
         ::backoff::Error::Transient { err, .. } => anyhow!(err).context("Timed out pushing refs"),
     })?;
