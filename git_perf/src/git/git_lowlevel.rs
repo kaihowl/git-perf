@@ -21,8 +21,10 @@ pub(super) fn spawn_git_command(
     stdin: Option<Stdio>,
 ) -> Result<Child, io::Error> {
     let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
+    let default_pre_args = ["-c", "gc.auto=0"];
     let stdin = stdin.unwrap_or(Stdio::null());
-    debug!("execute: git {}", args.join(" "));
+    let all_args: Vec<_> = default_pre_args.iter().chain(args.iter()).collect();
+    debug!("execute: git {}", all_args.iter().join(" "));
     process::Command::new("git")
         .env("LANG", "C.UTF-8")
         .env("LC_ALL", "C.UTF-8")
@@ -31,7 +33,7 @@ pub(super) fn spawn_git_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .current_dir(working_dir)
-        .args(args)
+        .args(all_args)
         .spawn()
 }
 
