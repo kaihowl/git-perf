@@ -102,6 +102,7 @@ jobs:
           git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
           git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
           git perf push
+          
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
           git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
@@ -114,7 +115,6 @@ jobs:
         name: report-${{matrix.os}}-${{matrix.rust}}.html
         path: report.html
         if-no-files-found: error
-
 
   rustfmt:
     name: rustfmt
@@ -169,3 +169,4 @@ jobs:
       additional-args: '-s rust'
       concurrency-token: gh-pages-${{ github.ref }}
       release: 'branch'
+      audit-args: '-m report -m report-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
