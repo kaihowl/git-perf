@@ -100,29 +100,30 @@ jobs:
         run: cargo test --verbose ${{ env.TARGET_FLAGS }}
 
       - name: Test Git language interface compatibility
-        # This test verifies that git-perf correctly sets LANG=C.UTF-8 internally
+        # This test verifies that git-perf correctly sets comprehensive locale settings internally
         # to ensure consistent error message parsing regardless of system locale
+        # LANGUAGE has the highest precedence, so we test it explicitly
         run: |
           echo "Testing git-perf with different Git language settings..."
           
           # Test with default C locale (should work as expected)
           echo "=== Testing with C locale ==="
-          LANG=C LC_ALL=C git --version
+          LANG=C LC_ALL=C LANGUAGE=C git --version
           cargo test --verbose ${{ env.TARGET_FLAGS }}
-          
-          # Test with German locale (should still work due to explicit LANG setting in git-perf)
+                    
+          # Test with German locale (should still work due to explicit locale settings in git-perf)
           echo "=== Testing with German locale ==="
-          LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 git --version
+          LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 LANGUAGE=de_DE git --version
           cargo test --verbose ${{ env.TARGET_FLAGS }}
-          
-          # Test with Japanese locale (should still work due to explicit LANG setting in git-perf)
+                    
+          # Test with Japanese locale (should still work due to explicit locale settings in git-perf)
           echo "=== Testing with Japanese locale ==="
-          LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 git --version
+          LANG=ja_JP.UTF-8 LC_ALL=ja_JP.UTF-8 LANGUAGE=ja_JP git --version
           cargo test --verbose ${{ env.TARGET_FLAGS }}
-          
-          # Test with French locale (should still work due to explicit LANG setting in git-perf)
+                    
+          # Test with French locale (should still work due to explicit locale settings in git-perf)
           echo "=== Testing with French locale ==="
-          LANG=fr_FR.UTF-8 LC_ALL=fr_FR.UTF-8 git --version
+          LANG=fr_FR.UTF-8 LC_ALL=fr_FR.UTF-8 LANGUAGE=fr_FR git --version
           cargo test --verbose ${{ env.TARGET_FLAGS }}
           
           echo "All language compatibility tests passed!"
