@@ -21,7 +21,8 @@ pub(super) fn spawn_git_command(
     stdin: Option<Stdio>,
 ) -> Result<Child, io::Error> {
     let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
-    let default_pre_args = ["-c", "gc.auto=0"];
+    // Disable Git's automatic maintenance to prevent interference with concurrent operations
+    let default_pre_args = ["-c", "gc.auto=0", "-c", "maintenance.auto=0"];
     let stdin = stdin.unwrap_or(Stdio::null());
     let all_args: Vec<_> = default_pre_args.iter().chain(args.iter()).collect();
     debug!("execute: git {}", all_args.iter().join(" "));
