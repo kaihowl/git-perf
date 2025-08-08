@@ -188,6 +188,7 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
     capture_git_output(
         &[
             "fetch",
+            "--atomic",
             "--no-write-fetch-head",
             GIT_PERF_REMOTE,
             // Always force overwrite the local reference
