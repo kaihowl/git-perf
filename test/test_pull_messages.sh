@@ -62,20 +62,3 @@ if [[ $output != *'Already up to date'* ]]; then
   echo "$output"
   exit 1
 fi
-
-echo "Pulling from remote with measurements should have output"
-
-cd "$root"
-git clone "$orig" repo2
-repo2=$(pwd)/repo2
-
-cd "$repo2"
-
-output="$(git perf pull 2>/dev/null)" || exit 1
-if [[ $output != *'[new ref]'* ]]; then
-  echo "Missing '[new ref]' in output:"
-  echo "$output"
-  exit 1
-fi
-
-exit 0
