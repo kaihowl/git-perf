@@ -13,7 +13,7 @@ pub trait VecAggregation {
 
 concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
 
-pub fn aggregate_measurements(measurements: impl Iterator<Item = f64>) -> Stats {
+pub fn aggregate_measurements<'a>(measurements: impl Iterator<Item = &'a f64>) -> Stats {
     let s: AggStats = measurements.collect();
     Stats {
         mean: s.mean(),
@@ -91,7 +91,7 @@ mod test {
     #[test]
     fn no_floating_error() {
         let measurements = (0..100).map(|_| 0.1).collect_vec();
-        let stats = aggregate_measurements(measurements.into_iter());
+        let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.mean, 0.1);
         assert_eq!(stats.len, 100);
         let naive_mean = (0..100).map(|_| 0.1).sum::<f64>() / 100.0;
@@ -101,7 +101,7 @@ mod test {
     #[test]
     fn single_measurement() {
         let measurements = vec![1.0];
-        let stats = aggregate_measurements(measurements.into_iter());
+        let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 1);
         assert_eq!(stats.mean, 1.0);
         assert_eq!(stats.stddev, 0.0);
@@ -110,7 +110,7 @@ mod test {
     #[test]
     fn no_measurement() {
         let measurements = vec![];
-        let stats = aggregate_measurements(measurements.into_iter());
+        let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 0);
         assert_eq!(stats.mean, 0.0);
         assert_eq!(stats.stddev, 0.0);
