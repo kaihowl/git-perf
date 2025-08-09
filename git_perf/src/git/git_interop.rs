@@ -185,6 +185,7 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
 
     let ref_before = git_rev_parse(REFS_NOTES_BRANCH).ok();
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
+    // TODO use porcelain and produce our own human-readable output?
     capture_git_output(
         &[
             "fetch",
@@ -198,7 +199,6 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
         ],
         &work_dir,
     )
-    .map(|output| print!("{}", output.stderr))
     .map_err(map_git_error)?;
 
     let ref_after = git_rev_parse(REFS_NOTES_BRANCH).ok();

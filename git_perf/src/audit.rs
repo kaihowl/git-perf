@@ -8,6 +8,7 @@ use cli_types::ReductionFunc;
 use itertools::Itertools;
 use log::error;
 use sparklines::spark;
+use std::cmp::Ordering;
 use std::iter;
 
 #[derive(Debug, PartialEq)]
@@ -102,10 +103,10 @@ fn audit(
         });
     }
 
-    let direction = if head_summary.mean > tail_summary.mean {
-        "↑"
-    } else {
-        "↓"
+    let direction = match head_summary.mean.partial_cmp(&tail_summary.mean).unwrap() {
+        Ordering::Greater => "↑",
+        Ordering::Less => "↓",
+        Ordering::Equal => "→",
     };
 
     let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
@@ -136,14 +137,14 @@ fn audit(
     if head_summary.z_score(&tail_summary) > sigma {
         return Ok(AuditResult {
             message: format!(
-                "Measurement '{measurement}' failed audit.\nHEAD differs significantly from tail measurements.\n{text_summary}"
+                "❌ '{measurement}'\nHEAD differs significantly from tail measurements.\n{text_summary}"
             ),
             passed: false,
         });
     }
 
     Ok(AuditResult {
-        message: format!("Measurement '{measurement}' passed audit.\n{text_summary}"),
+        message: format!("✅ '{measurement}'\n{text_summary}"),
         passed: true,
     })
 }

@@ -29,7 +29,7 @@ pub(super) fn spawn_git_command(
     process::Command::new("git")
         .env("LANG", "C.UTF-8")
         .env("LC_ALL", "C.UTF-8")
-        .env("LC_CTYPE", "C.UTF-8")
+        .env("LANGUAGE", "C.UTF-8")
         .stdin(stdin)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
