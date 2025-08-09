@@ -198,7 +198,6 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
         ],
         &work_dir,
     )
-    .map(|output| print!("{}", output.stderr))
     .map_err(map_git_error)?;
 
     let ref_after = git_rev_parse(REFS_NOTES_BRANCH).ok();
