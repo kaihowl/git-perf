@@ -102,9 +102,21 @@ jobs:
           git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
           git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
           git perf push
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          
+          # Capture audit output for each measurement
+          echo "=== Audit Results for ${{matrix.os}}-${{matrix.rust}} ===" > audit_output.txt
+          echo "" >> audit_output.txt
+          
+          echo "**test-measure2 measurement:**" >> audit_output.txt
+          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 >> audit_output.txt 2>&1
+          echo "" >> audit_output.txt
+          
+          echo "**report measurement:**" >> audit_output.txt
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 >> audit_output.txt 2>&1
+          echo "" >> audit_output.txt
+          
+          echo "**report-size measurement:**" >> audit_output.txt
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 >> audit_output.txt 2>&1
 
     - name: Archive report
       uses: actions/upload-artifact@v4
@@ -113,6 +125,14 @@ jobs:
         include-hidden-files: true
         name: report-${{matrix.os}}-${{matrix.rust}}.html
         path: report.html
+        if-no-files-found: error
+
+    - name: Archive audit output
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: audit-${{matrix.os}}-${{matrix.rust}}.txt
+        path: audit_output.txt
         if-no-files-found: error
 
 

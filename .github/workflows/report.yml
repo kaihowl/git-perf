@@ -24,6 +24,7 @@ on:
         default: ''
 
 
+
 permissions:
   pages: write
   contents: write
@@ -75,6 +76,23 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./reports
           keep_files: true
+      - name: Download audit artifacts
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: audit-*.txt
+          merge-multiple: true
+      - name: Prepare audit output
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          if ls audit-*.txt 1> /dev/null 2>&1; then
+            cat audit-*.txt > combined_audit_output.txt
+            echo "AUDIT_OUTPUT<<EOF" >> $GITHUB_ENV
+            cat combined_audit_output.txt >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "No audit files found"
+          fi
       - uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
         with:
@@ -86,7 +104,9 @@ jobs:
               repo: context.repo.repo,
             })
             
-            const commentBody = `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
+            const auditOutput = process.env.AUDIT_OUTPUT || ''
+            const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
+            const commentBody = `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)${auditSection}`
             
             // Find existing performance comment
             const comments = await github.rest.issues.listComments({
