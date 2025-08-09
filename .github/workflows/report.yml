@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: ''
+      audit-args:
+        description: 'additional arguments to git-perf audit invocation'
+        required: false
+        type: string
+        default: ''
 
 
 permissions:
@@ -66,9 +71,20 @@ jobs:
       - name: report
         shell: bash
         run: |
-          git perf pull
+          # Add error handling for git perf pull
+          if ! git perf pull; then
+            echo "Warning: git perf pull failed, but continuing with report generation"
+            echo "This may be due to missing git objects in the repository"
+          fi
           mkdir reports/
           git perf report -n ${{ inputs.depth }} -o reports/${{env.REPORT_NAME}}.html ${{ inputs.additional-args }}
+      - name: audit
+        shell: bash
+        if: ${{ inputs.audit-args != '' }}
+        run: |
+          echo "AUDIT_OUTPUT<<EOF" >> $GITHUB_ENV
+          git perf audit -n ${{ inputs.depth }} ${{ inputs.audit-args }} >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -86,7 +102,9 @@ jobs:
               repo: context.repo.repo,
             })
             
-            const commentBody = `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)`
+            const auditOutput = process.env.AUDIT_OUTPUT || ''
+            const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
+            const commentBody = `⏱  [Performance Results](${pages.data.html_url}/${REPORT_NAME}.html)${auditSection}`
             
             // Find existing performance comment
             const comments = await github.rest.issues.listComments({
