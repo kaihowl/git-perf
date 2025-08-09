@@ -136,14 +136,14 @@ fn audit(
     if head_summary.z_score(&tail_summary) > sigma {
         return Ok(AuditResult {
             message: format!(
-                "Measurement '{measurement}' failed audit.\nHEAD differs significantly from tail measurements.\n{text_summary}"
+                "❌ '{measurement}'\nHEAD differs significantly from tail measurements.\n{text_summary}"
             ),
             passed: false,
         });
     }
 
     Ok(AuditResult {
-        message: format!("Measurement '{measurement}' passed audit.\n{text_summary}"),
+        message: format!("✅ '{measurement}'\n{text_summary}"),
         passed: true,
     })
 }
