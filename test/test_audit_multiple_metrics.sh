@@ -52,7 +52,7 @@ if output=$(git perf audit -m timer -m memory -d 2 2>&1); then
   echo "$output"
   exit 1
 fi
-echo "$output" | grep -q "Measurement 'timer' failed" || exit 1
+echo "$output" | grep -q "❌ 'timer'" || exit 1
 echo "$output" | grep -q "One or more measurements failed audit" || exit 1
 echo "PASS: audit failed when one metric is outside the acceptable range"
 
@@ -66,8 +66,8 @@ if output=$(git perf audit -m timer -m memory -d 2 2>&1); then
   echo "$output"
   exit 1
 fi
-echo "$output" | grep -q "Measurement 'timer' failed" || exit 1
-echo "$output" | grep -q "Measurement 'memory' failed" || exit 1
+echo "$output" | grep -q "❌ 'timer'" || exit 1
+echo "$output" | grep -q "❌ 'memory'" || exit 1
 echo "$output" | grep -q "One or more measurements failed audit" || exit 1
 echo "PASS: audit failed when multiple metrics are outside the acceptable range"
 
