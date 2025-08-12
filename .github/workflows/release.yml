@@ -278,34 +278,3 @@ jobs:
 
           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
-  announce:
-    needs:
-      - plan
-      - host
-    # use "always() && ..." to allow us to wait for all publish jobs while
-    # still allowing individual publish jobs to skip themselves (for prereleases).
-    # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' }}
-    runs-on: "ubuntu-22.04"
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - name: Set 'latest' tag
-        # This only works when the latest published release is THE latest release.
-        # Fixes to patch versions won't work.
-        if: ${{ !contains(github.ref_name, '-') }} # Only for non-prerelease tags
-        run: |
-          TAG_NAME="${{ github.ref_name }}"
-          LATEST_TAG="latest"
-
-          echo "Creating/updating '$LATEST_TAG' tag to point to $TAG_NAME"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -f "$LATEST_TAG" "$TAG_NAME"
-          git push -f origin "$LATEST_TAG"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for pushing tags
