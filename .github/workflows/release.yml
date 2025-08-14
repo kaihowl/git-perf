@@ -14,7 +14,9 @@
 # title/body based on your changelogs.
 
 name: Release
-permissions: write-all
+permissions:
+  contents: write
+  id-token: write
   
 # This task will run whenever you push a git tag that looks like a version
 # like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
@@ -273,7 +275,8 @@ jobs:
           ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
           RELEASE_COMMIT: "${{ github.sha }}"
           GH_DEBUG: "api"
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use a PAT if available, otherwise fall back to GITHUB_TOKEN
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           # Write and read notes from a file to avoid quoting breaking things
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
