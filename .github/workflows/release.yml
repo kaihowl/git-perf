@@ -282,15 +282,20 @@ jobs:
         run: |
           # Remove the granular manifests
           rm -f artifacts/*-dist-manifest.json
+          # List what's left for debugging
+          echo "Artifacts after cleanup:"
+          ls -la artifacts/
       # TODO(kaihowl) known race condition:
       # The release will be created after the tag is created.
       # release-plz only offers DRAFT but not PRERELEASES.
       # We cannot upload artifacts to drafts.
       # Ideally, https://github.com/MarcoIeni/release-plz/issues/1219 is resolved.
       - name: Upload release artifacts
-        uses: Roang-zero1/github-upload-release-artifacts-action@v3
-        with:
-          args: "artifacts/*"
+        run: |
+          # Find all files in artifacts directory (excluding manifests)
+          find artifacts/ -type f ! -name "*-dist-manifest.json" -exec echo "Uploading: {}" \;
+          # Upload each file individually
+          find artifacts/ -type f ! -name "*-dist-manifest.json" -exec gh release upload "${{ needs.plan.outputs.tag }}" {} \;
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
