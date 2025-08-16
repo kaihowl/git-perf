@@ -2,6 +2,9 @@
 name = "cli_types"
 version = "0.1.0"
 edition = "2021"
+description = "Shared CLI types for git-perf"
+license = "MIT"
+publish = false
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
