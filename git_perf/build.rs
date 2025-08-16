@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(&man_dir).unwrap();
 
     // Generate manpages for the main command and all subcommands
-    let mut cmd = cli_types::Cli::command();
+    let mut cmd = git_perf_cli_types::Cli::command();
     cmd = cmd.version(version);
     let man = clap_mangen::Man::new(cmd);
     let mut buffer: Vec<u8> = Default::default();
@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(&main_man_path, &buffer).unwrap();
 
     // Generate manpages for subcommands
-    let mut cmd = cli_types::Cli::command();
+    let mut cmd = git_perf_cli_types::Cli::command();
     cmd = cmd.version(version);
     for subcmd in cmd.get_subcommands() {
         let man = clap_mangen::Man::new(subcmd.clone());
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Tell cargo to re-run this if the CLI definition changes
-    println!("cargo:rerun-if-changed=../cli_types/src/lib.rs");
+    println!("cargo:rerun-if-changed=../git_perf_cli_types/src/lib.rs");
 
     Ok(())
 }

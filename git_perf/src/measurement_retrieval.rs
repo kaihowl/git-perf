@@ -4,7 +4,7 @@ use crate::{
     stats::NumericReductionFunc,
 };
 
-use cli_types::ReductionFunc;
+use git_perf_cli_types::ReductionFunc;
 
 use anyhow::Result;
 

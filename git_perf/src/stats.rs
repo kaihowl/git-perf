@@ -3,7 +3,7 @@ use std::fmt::Display;
 use average::{self, concatenate, Estimate, Mean, Variance};
 use itertools::Itertools;
 
-use cli_types::ReductionFunc;
+use git_perf_cli_types::ReductionFunc;
 
 use readable::num::*;
 
