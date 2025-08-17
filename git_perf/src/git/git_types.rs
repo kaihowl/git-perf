@@ -37,6 +37,9 @@ pub(super) enum GitError {
     #[error("No upstream found. Consider setting origin or {}.", GIT_PERF_REMOTE)]
     NoUpstream {},
 
+    #[error("Bad object found in the remote repository:\n{0}\n{1}", output.stdout, output.stderr)]
+    BadObject { output: GitOutput },
+
     #[error("Failed to execute git command")]
     IoError(#[from] io::Error),
 }
