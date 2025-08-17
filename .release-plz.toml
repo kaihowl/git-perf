@@ -1,2 +1,6 @@
 [workspace]
 git_release_draft=true
+
+[[package]]
+name = "git-perf"
+changelog_include = ["git_perf_cli_types"]

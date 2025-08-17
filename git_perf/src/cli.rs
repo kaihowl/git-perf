@@ -11,7 +11,7 @@ use crate::git::git_interop::check_git_version;
 use crate::git::git_interop::{prune, pull, push};
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
-use cli_types::{Cli, Commands};
+use git_perf_cli_types::{Cli, Commands};
 
 pub fn handle_calls() -> Result<()> {
     let cli = Cli::parse();

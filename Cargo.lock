@@ -385,15 +385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli_types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -807,10 +798,10 @@ dependencies = [
  "chrono",
  "clap",
  "clap_mangen",
- "cli_types",
  "criterion",
  "defer",
  "env_logger",
+ "git_perf_cli_types",
  "hex",
  "httptest",
  "itertools",
@@ -825,6 +816,15 @@ dependencies = [
  "toml",
  "toml_edit 0.20.7",
  "unindent",
+]
+
+[[package]]
+name = "git_perf_cli_types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
 ]
 
 [[package]]

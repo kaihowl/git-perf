@@ -4,7 +4,7 @@ use crate::{
     stats,
 };
 use anyhow::{anyhow, bail, Result};
-use cli_types::ReductionFunc;
+use git_perf_cli_types::ReductionFunc;
 use itertools::Itertools;
 use log::error;
 use sparklines::spark;

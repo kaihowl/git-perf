@@ -1,9 +1,9 @@
 [workspace]
-members= [
-  "git_perf",
+members = [
   "cli_types",
+  "git_perf",
 ]
-resolver="2"
+resolver = "2"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
