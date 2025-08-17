@@ -22,7 +22,14 @@ pub(super) fn spawn_git_command(
 ) -> Result<Child, io::Error> {
     let working_dir = working_dir.map(PathBuf::from).unwrap_or(current_dir()?);
     // Disable Git's automatic maintenance to prevent interference with concurrent operations
-    let default_pre_args = ["-c", "gc.auto=0", "-c", "maintenance.auto=0"];
+    let default_pre_args = [
+        "-c",
+        "gc.auto=0",
+        "-c",
+        "maintenance.auto=0",
+        "-c",
+        "fetch.fsckObjects=false",
+    ];
     let stdin = stdin.unwrap_or(Stdio::null());
     let all_args: Vec<_> = default_pre_args.iter().chain(args.iter()).collect();
     debug!("execute: git {}", all_args.iter().join(" "));
@@ -98,6 +105,9 @@ pub(super) fn map_git_error(err: GitError) -> GitError {
         }
         GitError::ExecError { command: _, output } if output.stderr.contains("find remote ref") => {
             GitError::NoRemoteMeasurements { output }
+        }
+        GitError::ExecError { command: _, output } if output.stderr.contains("bad object") => {
+            GitError::BadObject { output }
         }
         _ => err,
     }

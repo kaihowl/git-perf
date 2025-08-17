@@ -42,7 +42,8 @@ fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
         GitError::RefFailedToPush { .. }
         | GitError::RefFailedToLock { .. }
-        | GitError::RefConcurrentModification { .. } => ::backoff::Error::transient(e),
+        | GitError::RefConcurrentModification { .. }
+        | GitError::BadObject { .. } => ::backoff::Error::transient(e),
         GitError::ExecError { .. }
         | GitError::IoError(..)
         | GitError::ShallowRepository
