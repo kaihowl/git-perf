@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+export GIT_TRACE=1
+export RUST_LOG=trace
+export RUST_BACKTRACE=1
+
 # Constants
 NUM_PUSH_ITERATIONS=150
 NUM_REMOVE_ITERATIONS=150
