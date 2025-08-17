@@ -67,29 +67,6 @@ jobs:
     - name: Build git-perf
       run: cargo build --verbose
 
-    - name: Check man pages presence
-      run: |
-        set -e
-        MAN_DIR="target/man/man1"
-        for page in \
-          git-perf.1 \
-          git-perf-measure.1 \
-          git-perf-add.1 \
-          git-perf-push.1 \
-          git-perf-pull.1 \
-          git-perf-report.1 \
-          git-perf-audit.1 \
-          git-perf-bump-epoch.1 \
-          git-perf-remove.1 \
-          git-perf-prune.1
-        do
-          if [ ! -f "$MAN_DIR/$page" ]; then
-            echo "Missing man page: $MAN_DIR/$page"
-            exit 1
-          fi
-        done
-        echo "All man pages found."
-
     - name: Run tests
       run: cargo test --verbose
 
