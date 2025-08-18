@@ -1,0 +1,56 @@
+name: Slow Test Loop
+
+# This workflow runs the slow bash tests in a loop until they fail
+# It's designed to catch intermittent failures that might not show up in single test runs
+# Runs weekly on Saturdays
+
+concurrency:
+  group: slow-test-loop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # Run every Saturday at 2 AM UTC
+    - cron: '0 2 * * 6'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  slow-test-loop:
+    name: Slow Test Loop (until failure)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360  # 6 hours maximum runtime
+    
+    env:
+      # Emit backtraces on panics
+      RUST_BACKTRACE: 1
+      # Set a reasonable timeout for individual test runs
+      CARGO_TEST_TIMEOUT: 300
+      GH_TOKEN: ${{ github.token }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Build git-perf
+      run: cargo build --verbose
+
+    - name: Run slow tests in loop until failure
+      run: |
+        echo "Starting slow test loop - will run until failure..."
+        echo "================================================"
+        
+        # Use the existing script but capture output for PR comments
+        if bash test/run_test_loop.sh; then
+          echo "✅ All iterations passed without failure!"
+        else
+          echo "❌ Test FAILED in the loop!"
+          exit 1
+        fi
