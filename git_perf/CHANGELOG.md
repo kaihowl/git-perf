@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.0...git-perf-v0.17.1) - 2025-08-18
+
+### Fixed
+
+- retry on bad object ([#250](https://github.com/kaihowl/git-perf/pull/250))
+
 ## [0.17.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.16.0...git-perf-v0.17.0) - 2025-08-15
 
 ### Added
