@@ -17,6 +17,7 @@ sequenceDiagram
     participant RP as release-plz.yml
     participant R as release.yml
     participant CD as cargo-dist
+    participant SLT as set-latest-tag.yml
 
     Note over Developer,CD: Continuous Release Tracking
 
@@ -45,7 +46,13 @@ sequenceDiagram
     
     
     R->>GH: Upload all artifacts
-    R->>GH: Set 'latest' tag (if not prerelease)
+
+    Developer->>GH:Publish the draft release
+    GH->>SLT: Trigger set-latest-tag workflow
+    activate SLT
+    SLT->>GH: Set 'latest' tag to release tag
+    deactivate SLT
+    GH->>Developer:New version now active
     
     deactivate R
 
@@ -56,6 +63,7 @@ sequenceDiagram
 
 - **release-plz.yml**: Runs on master branch pushes, creates draft release PRs, and generates tags and creates GitHub release for merged release PRs.
 - **release.yml**: Uses cargo-dist and runs on tag creation, builds artifacts using cargo-dist, and publishes artifacts to GitHub releases.
+- **set-latest-tag.yml**: Runs when a release is published from draft mode, sets the 'latest' tag to point to the published release tag.
 
 ## Tools and Configuration
 

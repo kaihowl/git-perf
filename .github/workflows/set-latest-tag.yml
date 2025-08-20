@@ -1,0 +1,32 @@
+name: Set Latest Tag on Release Publication
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  set-latest-tag:
+    runs-on: ubuntu-22.04
+    # Only run for git-perf releases
+    if: ${{ startsWith(github.event.release.tag_name, 'git-perf-') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Fetch all history to ensure we have the tag
+
+      - name: Set 'latest' tag
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          LATEST_TAG="latest"
+
+          echo "Creating/updating '$LATEST_TAG' tag to point to $TAG_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "$LATEST_TAG" "$TAG_NAME"
+          git push -f origin "$LATEST_TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
