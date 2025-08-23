@@ -217,20 +217,28 @@ jobs:
         
         # Compare with existing manpage
         if ! diff -u docs/manpage.md /tmp/generated_manpage.md > /tmp/manpage.diff; then
-          echo "Error: Manpage is out of date. A patch file has been created and will be uploaded as an artifact."
-          echo ""
-          echo "To fix this, you can either:"
-          echo "1. Run the manpage generation command from README.md:"
-          echo "   for file in target/man/man1/git-perf.1 target/man/man1/git-perf-add.1 target/man/man1/git-perf-audit.1 target/man/man1/git-perf-bump-epoch.1 target/man/man1/git-perf-measure.1 target/man/man1/git-perf-prune.1 target/man/man1/git-perf-pull.1 target/man/man1/git-perf-push.1 target/man/man1/git-perf-remove.1 target/man/man1/git-perf-report.1; do"
-          echo "       echo \"\$(basename \"\$file\" .1)\";"
-          echo "       echo \"================\";"
-          echo "       pandoc -f man -t gfm \"\$file\";"
-          echo "       echo -e \"\\n\\n\";"
-          echo "   done > docs/manpage.md"
-          echo ""
-          echo "2. Or apply the patch file from the CI artifacts:"
-          echo "   patch docs/manpage.md < manpage.diff"
-          exit 1
+          # Check if the diff is only a version change
+          if grep -q '^@@.*VERSION' /tmp/manpage.diff && \
+             grep -c '^[+-]' /tmp/manpage.diff | grep -q '^2$' && \
+             grep -q '^-[0-9]\+\.[0-9]\+\.[0-9]\+' /tmp/manpage.diff && \
+             grep -q '^+[0-9]\+\.[0-9]\+\.[0-9]\+' /tmp/manpage.diff; then
+            echo "Manpage diff detected, but it's only a version change. Allowing this to pass ✓"
+          else
+            echo "Error: Manpage is out of date. A patch file has been created and will be uploaded as an artifact."
+            echo ""
+            echo "To fix this, you can either:"
+            echo "1. Run the manpage generation command from README.md:"
+            echo "   for file in target/man/man1/git-perf.1 target/man/man1/git-perf-add.1 target/man/man1/git-perf-audit.1 target/man/man1/git-perf-bump-epoch.1 target/man/man1/git-perf-measure.1 target/man/man1/git-perf-prune.1 target/man/man1/git-perf-pull.1 target/man/man1/git-perf-push.1 target/man/man1/git-perf-remove.1 target/man/man1/git-perf-report.1; do"
+            echo "       echo \"\$(basename \"\$file\" .1)\";"
+            echo "       echo \"================\";"
+            echo "       pandoc -f man -t gfm \"\$file\";"
+            echo "       echo -e \"\\n\\n\";"
+            echo "   done > docs/manpage.md"
+            echo ""
+            echo "2. Or apply the patch file from the CI artifacts:"
+            echo "   patch docs/manpage.md < manpage.diff"
+            exit 1
+          fi
         fi
         echo "Manpage is up to date ✓"
 
