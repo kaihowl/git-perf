@@ -28,6 +28,54 @@ TODO document this
 # Setup Different Remote
 TODO document this
 
+# Audit Configuration
+
+git-perf includes a powerful audit system that can detect performance regressions
+and improvements. The audit can be configured to filter out noise by setting
+minimum relative deviation thresholds.
+
+## Example Configuration
+
+Create a `.gitperfconfig` file in your repository root:
+
+```toml
+# Global threshold for all measurements
+[audit.global]
+min_relative_deviation = 5.0
+
+# Measurement-specific thresholds (overrides global)
+[audit.measurement."build_time"]
+min_relative_deviation = 10.0
+
+[audit.measurement."memory_usage"]
+min_relative_deviation = 2.0
+```
+
+## Usage
+
+```bash
+# Audit a specific measurement
+git perf audit -m build_time
+
+# Audit multiple measurements
+git perf audit -m build_time -m memory_usage
+
+# Use custom sigma threshold
+git perf audit -m build_time -d 3.0
+```
+
+## How It Works
+
+The audit compares the HEAD measurement against historical measurements:
+- **Z-score**: Statistical significance based on standard deviation
+- **Relative deviation**: Practical significance as percentage change from median
+- **Threshold**: Configurable minimum relative deviation to filter noise
+- **Sparkline**: Visualizes measurement range relative to tail median (historical measurements)
+
+When the relative deviation is below the threshold, the audit passes even if
+the z-score indicates statistical significance. This helps focus on meaningful
+performance changes while ignoring noise.
+
 # Docs
 
 See [manpages](./docs/manpage.md).

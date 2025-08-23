@@ -86,6 +86,40 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
     backoff_max_elapsed_seconds_from_str(read_config().unwrap_or_default().as_str())
 }
 
+/// Returns the minimum relative deviation threshold from a config string, or None if not set.
+/// Follows precedence: measurement-specific > global > None
+pub fn audit_min_relative_deviation_from_str(conf: &str, measurement: &str) -> Option<f64> {
+    let doc = conf.parse::<Document>().ok()?;
+
+    // Check for measurement-specific setting first
+    if let Some(threshold) = doc
+        .get("audit")
+        .and_then(|audit| audit.get("measurement"))
+        .and_then(|measurement_section| measurement_section.get(measurement))
+        .and_then(|config| config.get("min_relative_deviation"))
+        .and_then(|threshold| threshold.as_float())
+    {
+        return Some(threshold);
+    }
+
+    // Check for global setting
+    if let Some(threshold) = doc
+        .get("audit")
+        .and_then(|audit| audit.get("global"))
+        .and_then(|global| global.get("min_relative_deviation"))
+        .and_then(|threshold| threshold.as_float())
+    {
+        return Some(threshold);
+    }
+
+    None
+}
+
+/// Returns the minimum relative deviation threshold from config, or None if not set.
+pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
+    audit_min_relative_deviation_from_str(read_config().unwrap_or_default().as_str(), measurement)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -173,5 +207,70 @@ epoch = "{}"
         // Case 2: config string missing value
         let configfile = "";
         assert_eq!(super::backoff_max_elapsed_seconds_from_str(configfile), 60);
+    }
+
+    #[test]
+    fn test_audit_min_relative_deviation() {
+        // Case 1: measurement-specific setting
+        let configfile = r#"
+[audit.measurement."build_time"]
+min_relative_deviation = 10.0
+
+[audit.measurement."memory_usage"]
+min_relative_deviation = 2.5
+"#;
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "build_time"),
+            Some(10.0)
+        );
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "memory_usage"),
+            Some(2.5)
+        );
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "other_measurement"),
+            None
+        );
+
+        // Case 2: global setting
+        let configfile = r#"
+[audit.global]
+min_relative_deviation = 5.0
+"#;
+        println!("Testing Case 2: global setting");
+        let result = super::audit_min_relative_deviation_from_str(configfile, "any_measurement");
+        println!("Case 2 result: {:?}", result);
+        assert_eq!(result, Some(5.0));
+
+        // Case 3: precedence - measurement-specific overrides global
+        let configfile = r#"
+[audit.global]
+min_relative_deviation = 5.0
+
+[audit.measurement."build_time"]
+min_relative_deviation = 10.0
+"#;
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "build_time"),
+            Some(10.0)
+        );
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "other_measurement"),
+            Some(5.0)
+        );
+
+        // Case 5: no audit configuration
+        let configfile = "";
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "any_measurement"),
+            None
+        );
+
+        // Case 6: invalid config (should return None)
+        let configfile = "[audit]\nmin_relative_deviation = invalid\n";
+        assert_eq!(
+            super::audit_min_relative_deviation_from_str(configfile, "any_measurement"),
+            None
+        );
     }
 }

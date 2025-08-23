@@ -1,7 +1,8 @@
 use crate::{
+    config,
     data::MeasurementData,
     measurement_retrieval::{self, summarize_measurements},
-    stats,
+    stats::{self, VecAggregation},
 };
 use anyhow::{anyhow, bail, Result};
 use git_perf_cli_types::ReductionFunc;
@@ -109,20 +110,32 @@ fn audit(
         Ordering::Equal => "→",
     };
 
+    let mut tail_measurements = tail.clone();
+    let tail_median = tail_measurements.median().unwrap_or(0.0);
+
     let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
-    let average = all_measurements.iter().sum::<f64>() / all_measurements.len() as f64;
     let relative_min = all_measurements
         .iter()
         .min_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap()
-        / average
+        / tail_median
         - 1.0;
     let relative_max = all_measurements
         .iter()
         .max_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap()
-        / average
+        / tail_median
         - 1.0;
+
+    // Calculate relative deviation of HEAD measurement using tail median
+    let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
+
+    // Check if we have a minimum relative deviation threshold configured
+    let min_relative_deviation = config::audit_min_relative_deviation(measurement);
+    let threshold_applied = min_relative_deviation.is_some();
+    let passed_due_to_threshold = min_relative_deviation
+        .map(|threshold| head_relative_deviation < threshold)
+        .unwrap_or(false);
 
     let text_summary = format!(
         "z-score: {direction} {:.2}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
@@ -134,17 +147,34 @@ fn audit(
         spark(all_measurements.as_slice()),
     );
 
-    if head_summary.z_score(&tail_summary) > sigma {
+    // Check if HEAD measurement exceeds sigma threshold
+    let z_score_exceeds_sigma = head_summary.z_score(&tail_summary) > sigma;
+
+    // Determine if audit passes
+    let passed = !z_score_exceeds_sigma || passed_due_to_threshold;
+
+    // Add threshold information to output if applicable
+    let threshold_note = if threshold_applied && passed_due_to_threshold {
+        format!(
+            "\nNote: Passed due to relative deviation ({:.1}%) being below threshold ({:.1}%)",
+            head_relative_deviation,
+            min_relative_deviation.unwrap()
+        )
+    } else {
+        String::new()
+    };
+
+    if !passed {
         return Ok(AuditResult {
             message: format!(
-                "❌ '{measurement}'\nHEAD differs significantly from tail measurements.\n{text_summary}"
+                "❌ '{measurement}'\nHEAD differs significantly from tail measurements.\n{text_summary}{threshold_note}"
             ),
             passed: false,
         });
     }
 
     Ok(AuditResult {
-        message: format!("✅ '{measurement}'\n{text_summary}"),
+        message: format!("✅ '{measurement}'\n{text_summary}{threshold_note}"),
         passed: true,
     })
 }

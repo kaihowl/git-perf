@@ -121,7 +121,25 @@ aggregate their results before comparison
 
 For given measurements, check perfomance deviations of the HEAD commit
 against \`\<n\>\` previous commits. Group previous results and aggregate
-their results before comparison
+their results before comparison.
+
+The audit can be configured to ignore statistically significant
+deviations if they are below a minimum relative deviation threshold.
+This helps filter out noise while still catching meaningful performance
+changes.
+
+Configuration is done via the \`.gitperfconfig\` file: -
+Measurement-specific:
+\`\[audit.measurement."name"\].min\_relative\_deviation = 10.0\` -
+Global: \`\[audit.global\].min\_relative\_deviation = 5.0\`
+
+When the relative deviation is below the threshold, the audit passes
+even if the z-score exceeds the sigma threshold. The relative deviation
+is calculated as: \`|(head\_value / tail\_median - 1.0) \* 100%|\` where
+tail\_median is the median of historical measurements (excluding HEAD).
+
+The sparkline visualization shows the range of measurements relative to
+the tail median (historical measurements only).
 
 # OPTIONS
 
@@ -154,7 +172,7 @@ their results before comparison
     mean+\<d\>\*sigma\]\`, it is considered acceptable
 
   - **-h**, **--help**  
-    Print help
+    Print help (see a summary with -h)
 
 
 

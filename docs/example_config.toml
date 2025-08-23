@@ -1,0 +1,42 @@
+# Example .gitperfconfig file for git-perf
+# This file should be placed in your repository root
+
+# Global audit settings (applies to all measurements)
+[audit.global]
+        # Minimum relative deviation threshold (as percentage)
+        # Measurements with relative deviation below this threshold will be ignored
+        # even if they exceed the sigma threshold
+        # The relative deviation is calculated as: |(head_value / tail_median - 1.0) * 100%|
+        # where tail_median is the median of historical measurements (excluding HEAD)
+        min_relative_deviation = 5.0
+
+# Measurement-specific audit settings (overrides global)
+[audit.measurement."build_time"]
+# Build time measurements can have higher variance, so use a higher threshold
+min_relative_deviation = 10.0
+
+[audit.measurement."memory_usage"]
+# Memory usage should be more stable, so use a lower threshold
+min_relative_deviation = 2.0
+
+        [audit.measurement."test_runtime"]
+        # Test runtime can vary significantly, use a moderate threshold
+        min_relative_deviation = 7.5
+
+# Epoch settings for accepting performance changes
+[measurement."build_time"]
+# Epoch for build_time measurement (hex format)
+epoch = "12345678"
+
+[measurement."memory_usage"]
+# Epoch for memory_usage measurement
+epoch = "abcdef12"
+
+# Global epoch (used as fallback)
+[measurement."*"]
+epoch = "00000000"
+
+# Backoff settings for retry logic
+[backoff]
+# Maximum elapsed seconds for backoff
+max_elapsed_seconds = 60
