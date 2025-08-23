@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.1...git-perf-v0.17.2) - 2025-08-23
+
+### Added
+
+- allow ignoring relative median differences ([#255](https://github.com/kaihowl/git-perf/pull/255))
+
+### Fixed
+
+- ad missing repository key in git_perf_cli_types ([#251](https://github.com/kaihowl/git-perf/pull/251))
+
 ## [0.17.1](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.0...git-perf-v0.17.1) - 2025-08-18
 
 ### Fixed
