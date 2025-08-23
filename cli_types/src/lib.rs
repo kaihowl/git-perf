@@ -104,6 +104,22 @@ pub enum Commands {
     /// For given measurements, check perfomance deviations of the HEAD commit
     /// against `<n>` previous commits. Group previous results and aggregate their
     /// results before comparison.
+    ///
+    /// The audit can be configured to ignore statistically significant deviations
+    /// if they are below a minimum relative deviation threshold. This helps filter
+    /// out noise while still catching meaningful performance changes.
+    ///
+    /// Configuration is done via the `.gitperfconfig` file:
+    /// - Measurement-specific: `[audit.measurement."name"].min_relative_deviation = 10.0`
+    /// - Global: `[audit.global].min_relative_deviation = 5.0`
+    ///
+    /// When the relative deviation is below the threshold, the audit passes even
+    /// if the z-score exceeds the sigma threshold. The relative deviation is
+    /// calculated as: `|(head_value / tail_median - 1.0) * 100%|` where tail_median is
+    /// the median of historical measurements (excluding HEAD).
+    ///
+    /// The sparkline visualization shows the range of measurements relative to
+    /// the tail median (historical measurements only).
     Audit {
         #[arg(short, long, value_parser=parse_spaceless_string, action = clap::ArgAction::Append, required = true)]
         measurement: Vec<String>,
