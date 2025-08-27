@@ -45,6 +45,7 @@ impl Stats {
     pub fn z_score(&self, other: &Stats) -> f64 {
         assert!(self.len == 1);
         assert!(other.len >= 1);
+        // Division by zero is an expected case here: For measurements with no variance
         (self.mean - other.mean).abs() / other.stddev
     }
 }
@@ -118,14 +119,29 @@ mod test {
 
     #[test]
     fn z_score_with_zero_stddev() {
-        let stddev = 0.0;
-        let mean = 30.0;
-        let higher_val = 50.0;
-        let lower_val = 10.0;
-        let z_high = ((higher_val - mean) / stddev as f64).abs();
-        let z_low = ((lower_val - mean) / stddev as f64).abs();
-        assert_eq!(z_high, f64::INFINITY);
-        assert_eq!(z_low, f64::INFINITY);
+        let tail = Stats {
+            mean: 30.0,
+            stddev: 0.0,
+            len: 40,
+        };
+
+        let head_normal = Stats {
+            mean: 30.0,
+            stddev: 0.0,
+            len: 1,
+        };
+
+        let head_low = Stats {
+            mean: 20.0,
+            stddev: 0.0,
+            len: 1,
+        };
+
+        let z_normal = head_normal.z_score(&tail);
+        assert!(z_normal.is_nan());
+
+        let z_low = head_low.z_score(&tail);
+        assert!(z_low.is_infinite());
     }
 
     #[test]
