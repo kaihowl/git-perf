@@ -1,10 +1,8 @@
 use crate::{
     data::{CommitSummary, MeasurementData, MeasurementSummary},
     git::git_interop::{self},
-    stats::NumericReductionFunc,
+    stats::{NumericReductionFunc, ReductionFunc},
 };
-
-use git_perf_cli_types::ReductionFunc;
 
 use anyhow::Result;
 
