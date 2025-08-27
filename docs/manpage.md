@@ -115,7 +115,7 @@ aggregate their results before comparison
 **audit** \<**-m**|**--measurement**\> \[**-n**|**--max-count**\]
 \[**-s**|**--selectors**\] \[**--min-measurements**\]
 \[**-a**|**--aggregate-by**\] \[**-d**|**--sigma**\]
-\[**-h**|**--help**\]
+\[**-D**|**--dispersion-method**\] \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -170,6 +170,14 @@ the tail median (historical measurements only).
     Multiple of the stddev after which a outlier is detected. If the
     HEAD measurement is within \`\[mean-\<d\>\*sigma;
     mean+\<d\>\*sigma\]\`, it is considered acceptable
+
+  - **-D**, **--dispersion-method**=*DISPERSION\_METHOD*  
+    Method for calculating statistical dispersion (stddev or mad). If
+    not specified, uses the value from .gitperfconfig file, or defaults
+    to stddev  
+
+  
+\[*possible values: *stddev, mad\]
 
   - **-h**, **--help**  
     Print help (see a summary with -h)

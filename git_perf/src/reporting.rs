@@ -18,8 +18,8 @@ use crate::{
     data::{MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, Commit, MeasurementReducer},
     serialization::{serialize_single, DELIMITER},
+    stats::ReductionFunc,
 };
-use git_perf_cli_types::ReductionFunc;
 
 trait Reporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]);
