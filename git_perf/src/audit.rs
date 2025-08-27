@@ -12,6 +12,27 @@ use sparklines::spark;
 use std::cmp::Ordering;
 use std::iter;
 
+/// Formats a z-score for display in audit output.
+/// Only finite z-scores are displayed with numeric values.
+/// Infinite and NaN values return an empty string.
+fn format_z_score_display(z_score: f64) -> String {
+    if z_score.is_finite() {
+        format!(" {:.2}", z_score)
+    } else {
+        String::new()
+    }
+}
+
+/// Determines the direction arrow based on comparison of head and tail means.
+/// Returns ↑ for greater, ↓ for less, → for equal.
+fn get_direction_arrow(head_mean: f64, tail_mean: f64) -> &'static str {
+    match head_mean.partial_cmp(&tail_mean).unwrap() {
+        Ordering::Greater => "↑",
+        Ordering::Less => "↓",
+        Ordering::Equal => "→",
+    }
+}
+
 #[derive(Debug, PartialEq)]
 struct AuditResult {
     message: String,
@@ -104,11 +125,7 @@ fn audit(
         });
     }
 
-    let direction = match head_summary.mean.partial_cmp(&tail_summary.mean).unwrap() {
-        Ordering::Greater => "↑",
-        Ordering::Less => "↓",
-        Ordering::Equal => "→",
-    };
+    let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
 
     let mut tail_measurements = tail.clone();
     let tail_median = tail_measurements.median().unwrap_or(0.0);
@@ -137,9 +154,12 @@ fn audit(
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
 
+    let z_score = head_summary.z_score(&tail_summary);
+    let z_score_display = format_z_score_display(z_score);
+
     let text_summary = format!(
-        "z-score: {direction} {:.2}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
-        head_summary.z_score(&tail_summary),
+        "z-score: {direction}{}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
+        z_score_display,
         &head_summary,
         &tail_summary,
         (relative_min * 100.0),
@@ -148,7 +168,7 @@ fn audit(
     );
 
     // Check if HEAD measurement exceeds sigma threshold
-    let z_score_exceeds_sigma = head_summary.z_score(&tail_summary) > sigma;
+    let z_score_exceeds_sigma = z_score > sigma;
 
     // Determine if audit passes
     let passed = !z_score_exceeds_sigma || passed_due_to_threshold;
@@ -177,4 +197,48 @@ fn audit(
         message: format!("✅ '{measurement}'\n{text_summary}{threshold_note}"),
         passed: true,
     })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_format_z_score_display() {
+        // Test cases for z-score display formatting
+        let test_cases = vec![
+            (2.5_f64, " 2.50"),
+            (0.0_f64, " 0.00"),
+            (-1.5_f64, " -1.50"),
+            (999.999_f64, " 1000.00"),
+            (0.001_f64, " 0.00"),
+            (f64::INFINITY, ""),
+            (f64::NEG_INFINITY, ""),
+            (f64::NAN, ""),
+        ];
+
+        for (z_score, expected) in test_cases {
+            let result = format_z_score_display(z_score);
+            assert_eq!(result, expected, "Failed for z_score: {}", z_score);
+        }
+    }
+
+    #[test]
+    fn test_direction_arrows() {
+        // Test cases for direction arrow logic
+        let test_cases = vec![
+            (5.0_f64, 3.0_f64, "↑"), // head > tail
+            (1.0_f64, 3.0_f64, "↓"), // head < tail
+            (3.0_f64, 3.0_f64, "→"), // head == tail
+        ];
+
+        for (head_mean, tail_mean, expected) in test_cases {
+            let result = get_direction_arrow(head_mean, tail_mean);
+            assert_eq!(
+                result, expected,
+                "Failed for head_mean: {}, tail_mean: {}",
+                head_mean, tail_mean
+            );
+        }
+    }
 }
