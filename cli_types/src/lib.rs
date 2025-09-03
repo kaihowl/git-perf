@@ -1,6 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use chrono::prelude::*;
 use chrono::Duration;
@@ -11,6 +12,29 @@ pub enum ReductionFunc {
     Max,
     Median,
     Mean,
+}
+
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DispersionMethod {
+    #[value(name = "stddev")]
+    StandardDeviation,
+    #[value(name = "mad")]
+    MedianAbsoluteDeviation,
+}
+
+impl FromStr for DispersionMethod {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "stddev" => Ok(DispersionMethod::StandardDeviation),
+            "mad" => Ok(DispersionMethod::MedianAbsoluteDeviation),
+            _ => Err(anyhow!(
+                "Invalid dispersion method: {}. Valid values are 'stddev' or 'mad'",
+                s
+            )),
+        }
+    }
 }
 
 #[derive(Parser)]
@@ -147,6 +171,11 @@ pub enum Commands {
         /// it is considered acceptable.
         #[arg(short = 'd', long, default_value = "4.0")]
         sigma: f64,
+
+        /// Method for calculating statistical dispersion (stddev or mad).
+        /// If not specified, uses the value from .gitperfconfig file, or defaults to stddev.
+        #[arg(short = 'D', long, value_enum)]
+        dispersion_method: Option<DispersionMethod>,
     },
 
     /// Accept HEAD commit's measurement for audit, even if outside of range.

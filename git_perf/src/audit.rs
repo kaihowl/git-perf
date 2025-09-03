@@ -2,10 +2,9 @@ use crate::{
     config,
     data::MeasurementData,
     measurement_retrieval::{self, summarize_measurements},
-    stats::{self, VecAggregation},
+    stats::{self, DispersionMethod, ReductionFunc, VecAggregation},
 };
 use anyhow::{anyhow, bail, Result};
-use git_perf_cli_types::ReductionFunc;
 use itertools::Itertools;
 use log::error;
 use sparklines::spark;
@@ -46,6 +45,7 @@ pub fn audit_multiple(
     selectors: &[(String, String)],
     summarize_by: ReductionFunc,
     sigma: f64,
+    dispersion_method: DispersionMethod,
 ) -> Result<()> {
     let mut failed = false;
 
@@ -57,6 +57,7 @@ pub fn audit_multiple(
             selectors,
             summarize_by,
             sigma,
+            dispersion_method,
         )?;
 
         println!("{}", result.message);
@@ -80,6 +81,7 @@ fn audit(
     selectors: &[(String, String)],
     summarize_by: ReductionFunc,
     sigma: f64,
+    dispersion_method: DispersionMethod,
 ) -> Result<AuditResult> {
     let all = measurement_retrieval::walk_commits(max_count)?;
 
@@ -154,11 +156,16 @@ fn audit(
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
 
-    let z_score = head_summary.z_score(&tail_summary);
+    let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
     let z_score_display = format_z_score_display(z_score);
 
+    let method_name = match dispersion_method {
+        DispersionMethod::StandardDeviation => "stddev",
+        DispersionMethod::MedianAbsoluteDeviation => "mad",
+    };
+
     let text_summary = format!(
-        "z-score: {direction}{}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
+        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
         z_score_display,
         &head_summary,
         &tail_summary,
@@ -240,5 +247,51 @@ mod test {
                 head_mean, tail_mean
             );
         }
+    }
+
+    #[test]
+    fn test_audit_with_different_dispersion_methods() {
+        // Test that audit produces different results with different dispersion methods
+
+        // Create mock data that would produce different z-scores with stddev vs MAD
+        let head_value = 35.0;
+        let tail_values = vec![30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 100.0];
+
+        let head_summary = stats::aggregate_measurements(std::iter::once(&head_value));
+        let tail_summary = stats::aggregate_measurements(tail_values.iter());
+
+        // Calculate z-scores with both methods
+        let z_score_stddev =
+            head_summary.z_score_with_method(&tail_summary, DispersionMethod::StandardDeviation);
+        let z_score_mad = head_summary
+            .z_score_with_method(&tail_summary, DispersionMethod::MedianAbsoluteDeviation);
+
+        // With the outlier (100.0), stddev should be much larger than MAD
+        // So z-score with stddev should be smaller than z-score with MAD
+        assert!(
+            z_score_stddev < z_score_mad,
+            "stddev z-score ({}) should be smaller than MAD z-score ({}) with outlier data",
+            z_score_stddev,
+            z_score_mad
+        );
+
+        // Both should be positive since head > tail mean
+        assert!(z_score_stddev > 0.0);
+        assert!(z_score_mad > 0.0);
+    }
+
+    #[test]
+    fn test_dispersion_method_conversion() {
+        // Test that the conversion from CLI types to stats types works correctly
+
+        // Test stddev conversion
+        let cli_stddev = git_perf_cli_types::DispersionMethod::StandardDeviation;
+        let stats_stddev: DispersionMethod = cli_stddev.into();
+        assert_eq!(stats_stddev, DispersionMethod::StandardDeviation);
+
+        // Test MAD conversion
+        let cli_mad = git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation;
+        let stats_mad: DispersionMethod = cli_mad.into();
+        assert_eq!(stats_mad, DispersionMethod::MedianAbsoluteDeviation);
     }
 }
