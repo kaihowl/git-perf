@@ -96,9 +96,9 @@ echo "🔧 Normalizing markdown formatting for comparison..."
 NORMALIZED_EXISTING="/tmp/manpage_existing_normalized.md"
 NORMALIZED_GENERATED="/tmp/manpage_generated_normalized.md"
 
-# Normalize both files by removing leading whitespace and list markers
-sed 's/^[[:space:]]*//' docs/manpage.md | sed 's/^-[[:space:]]*//' > "$NORMALIZED_EXISTING"
-sed 's/^[[:space:]]*//' "$TEMP_MANPAGE" | sed 's/^-[[:space:]]*//' > "$NORMALIZED_GENERATED"
+# Normalize both files by removing leading whitespace, list markers, and underscore escaping
+sed 's/^[[:space:]]*//' docs/manpage.md | sed 's/^-[[:space:]]*//' | sed 's/\\_/_/g' > "$NORMALIZED_EXISTING"
+sed 's/^[[:space:]]*//' "$TEMP_MANPAGE" | sed 's/^-[[:space:]]*//' | sed 's/\\_/_/g' > "$NORMALIZED_GENERATED"
 
 # Compare with existing manpage (ignoring whitespace and markdown formatting differences)
 echo "🔍 Comparing with existing docs/manpage.md (ignoring whitespace and formatting)..."

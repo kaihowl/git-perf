@@ -41,7 +41,7 @@ make help
 ### Scripts
 
 - `scripts/generate-manpage.sh` - Generates `docs/manpage.md` using the exact CI process
-- `scripts/validate-manpage.sh` - Validates that `docs/manpage.md` matches CI expectations (ignores whitespace and markdown formatting differences)
+- `scripts/validate-manpage.sh` - Validates that `docs/manpage.md` matches CI expectations (ignores whitespace, markdown formatting, and underscore escaping differences)
 - `scripts/pre-commit-hook.sh` - Optional pre-commit hook to catch issues early
 
 ## How It Works
@@ -172,7 +172,10 @@ make generate-manpage
 This is expected! The CI uses version `0.0.0` while your local version shows the actual version. The tools handle this automatically.
 
 ### Whitespace and formatting differences
-The validation script ignores whitespace differences (spaces, tabs, line endings) and markdown formatting differences (list markers, indentation) to focus on content differences. This makes the validation more robust against minor formatting variations between environments, including differences in how pandoc formats markdown lists.
+The validation script ignores whitespace differences (spaces, tabs, line endings), markdown formatting differences (list markers, indentation), and underscore escaping differences to focus on content differences. This makes the validation more robust against minor formatting variations between environments, including:
+- Differences in how pandoc formats markdown lists
+- Underscore escaping variations (`SEPARATE_BY` vs `SEPARATE\_BY`)
+- Different pandoc versions with varying escaping behavior
 
 ## Best Practices
 
