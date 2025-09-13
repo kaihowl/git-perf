@@ -2,6 +2,8 @@
 
 This directory contains tools for evaluating the statistical robustness of different dispersion methods used in git-perf's audit functionality.
 
+**Location**: `evaluation/` (moved from project root for better organization)
+
 ## Overview
 
 The `evaluate_dispersion_methods.py` script compares Standard Deviation (stddev) vs Median Absolute Deviation (MAD) for outlier detection in performance measurements. It generates synthetic data with controlled outliers and compares the detection accuracy of both methods.
@@ -11,6 +13,9 @@ The `evaluate_dispersion_methods.py` script compares Standard Deviation (stddev)
 ### Basic Usage
 
 ```bash
+# Navigate to the evaluation directory
+cd evaluation/
+
 # Run the evaluation with default settings
 python3 evaluate_dispersion_methods.py
 

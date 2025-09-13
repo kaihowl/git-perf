@@ -7,6 +7,8 @@ for outlier detection in performance measurements. It generates synthetic data w
 controlled outliers and compares the detection accuracy of both methods.
 
 Based on the MAD Implementation Plan for git-perf.
+
+Location: evaluation/evaluate_dispersion_methods.py
 """
 
 import random

@@ -136,6 +136,10 @@ performance changes while ignoring noise.
 
 See [manpages](./docs/manpage.md).
 
+## Evaluation Tools
+
+For evaluating the statistical robustness of different dispersion methods (stddev vs MAD), see the [evaluation tools](./evaluation/README.md).
+
 ## Manpage Generation
 
 The manpages are automatically generated during the build process using `clap_mangen`. To regenerate the documentation:
