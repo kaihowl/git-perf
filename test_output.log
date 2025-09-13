@@ -1,0 +1,40 @@
+   Compiling git-perf v0.17.2 (/workspace/git_perf)
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: OUT_DIR = /workspace/target/debug/build/git-perf-753f28c98942cca8/out
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Current working directory = /workspace/git_perf
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Workspace root = /workspace/target/debug/build/git-perf-753f28c98942cca8/out/../../../../../
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Man dir = /workspace/target/debug/build/git-perf-753f28c98942cca8/out/../../../../../man/man1
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Docs dir = /workspace/target/debug/build/git-perf-753f28c98942cca8/out/../../../../../docs
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Generated 12 manpages
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Generated markdown at /workspace/target/debug/build/git-perf-753f28c98942cca8/out/../../../../../docs/manpage.md
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Man directory exists after generation: true
+warning: git-perf@0.17.2: BUILD SCRIPT DEBUG: Docs directory exists after generation: true
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.28s
+     Running tests/manpage_tests.rs (target/debug/deps/manpage_tests-1b1f0bf930f09990)
+
+running 4 tests
+=== MANPAGE TEST DEBUG INFO ===
+Current working directory: /workspace/git_perf
+OUT_DIR: /workspace/target/debug/build/git-perf-753f28c98942cca8/out
+Looking for manpages in: /workspace/man/man1
+Man directory exists: true
+Man directory contents:
+  /workspace/man/man1/git-perf-prune.1
+  /workspace/man/man1/git-perf-measure.1
+  /workspace/man/man1/git-perf-audit.1
+  /workspace/man/man1/git-perf-report.1
+  /workspace/man/man1/git-perf-push.1
+  /workspace/man/man1/git-perf-pull.1
+  /workspace/man/man1/git-perf-remove.1
+  /workspace/man/man1/git-perf.1
+  /workspace/man/man1/git-perf-add.1
+  /workspace/man/man1/git-perf-bump-epoch.1
+=== END DEBUG INFO ===
+All 10 commands found in markdown documentation.
+All 10 manpages found and validated.
+test test_markdown_generation ... ok
+test test_manpage_content_validation ... ok
+test test_manpage_generation ... ok
+test test_markdown_content_validation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
