@@ -4,9 +4,9 @@ use std::env::set_current_dir;
 
 use utils::{empty_commit, hermetic_git_env, init_repo};
 
-use cli_types::ReductionFunc;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use git_perf::measurement_retrieval::{self, summarize_measurements};
+use git_perf::stats::ReductionFunc;
 use tempfile::tempdir;
 
 fn prep_repo(number_commits: usize, number_measurements: usize) -> tempfile::TempDir {
@@ -42,9 +42,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                     .expect("Could not get measurements");
                 let summaries =
                     summarize_measurements(measurements, &ReductionFunc::Min, &|_| true);
-                git_perf::stats::aggregate_measurements(
-                    summaries.map(|x| x.unwrap().measurement.unwrap().val),
-                );
+                let values: Vec<f64> = summaries
+                    .filter_map(|x| x.ok())
+                    .filter_map(|x| x.measurement)
+                    .map(|x| x.val)
+                    .collect();
+                git_perf::stats::aggregate_measurements(values.iter());
             })
         });
     }

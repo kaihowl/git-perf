@@ -7,6 +7,9 @@ use toml_edit::{value, Document};
 
 use crate::git::git_interop::get_head_revision;
 
+// Import the CLI types for dispersion method
+use git_perf_cli_types::DispersionMethod;
+
 pub fn write_config(conf: &str) -> Result<()> {
     let mut f = File::create(".gitperfconfig")?;
     f.write_all(conf.as_bytes())?;
@@ -118,6 +121,48 @@ pub fn audit_min_relative_deviation_from_str(conf: &str, measurement: &str) -> O
 /// Returns the minimum relative deviation threshold from config, or None if not set.
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     audit_min_relative_deviation_from_str(read_config().unwrap_or_default().as_str(), measurement)
+}
+
+/// Returns the dispersion method from a config string, or StandardDeviation if not set.
+/// Follows precedence: measurement-specific > global > StandardDeviation
+pub fn audit_dispersion_method_from_str(conf: &str, measurement: &str) -> DispersionMethod {
+    let doc = match conf.parse::<Document>() {
+        Ok(doc) => doc,
+        Err(_) => return DispersionMethod::StandardDeviation,
+    };
+
+    // Check for measurement-specific setting first
+    if let Some(method_str) = doc
+        .get("audit")
+        .and_then(|audit| audit.get("measurement"))
+        .and_then(|measurement_section| measurement_section.get(measurement))
+        .and_then(|config| config.get("dispersion_method"))
+        .and_then(|method| method.as_str())
+    {
+        if let Ok(method) = method_str.parse::<DispersionMethod>() {
+            return method;
+        }
+    }
+
+    // Check for global setting
+    if let Some(method_str) = doc
+        .get("audit")
+        .and_then(|audit| audit.get("global"))
+        .and_then(|global| global.get("dispersion_method"))
+        .and_then(|method| method.as_str())
+    {
+        if let Ok(method) = method_str.parse::<DispersionMethod>() {
+            return method;
+        }
+    }
+
+    // Default to StandardDeviation
+    DispersionMethod::StandardDeviation
+}
+
+/// Returns the dispersion method from config, or StandardDeviation if not set.
+pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
+    audit_dispersion_method_from_str(read_config().unwrap_or_default().as_str(), measurement)
 }
 
 #[cfg(test)]
@@ -271,6 +316,78 @@ min_relative_deviation = 10.0
         assert_eq!(
             super::audit_min_relative_deviation_from_str(configfile, "any_measurement"),
             None
+        );
+    }
+
+    #[test]
+    fn test_audit_dispersion_method() {
+        // Case 1: measurement-specific setting
+        let configfile = r#"
+[audit.measurement."build_time"]
+dispersion_method = "mad"
+
+[audit.measurement."memory_usage"]
+dispersion_method = "stddev"
+"#;
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "build_time"),
+            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+        );
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "memory_usage"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
+        );
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "other_measurement"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
+        );
+
+        // Case 2: global setting
+        let configfile = r#"
+[audit.global]
+dispersion_method = "mad"
+"#;
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
+            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+        );
+
+        // Case 3: precedence - measurement-specific overrides global
+        let configfile = r#"
+[audit.global]
+dispersion_method = "mad"
+
+[audit.measurement."build_time"]
+dispersion_method = "stddev"
+"#;
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "build_time"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
+        );
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "other_measurement"),
+            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+        );
+
+        // Case 4: no audit configuration (should return StandardDeviation)
+        let configfile = "";
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
+        );
+
+        // Case 5: invalid config (should return StandardDeviation)
+        let configfile = "[audit]\ndispersion_method = invalid\n";
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
+        );
+
+        // Case 6: malformed TOML (should return StandardDeviation)
+        let configfile = "[audit\n";
+        assert_eq!(
+            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
         );
     }
 }
