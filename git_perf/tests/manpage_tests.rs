@@ -104,7 +104,6 @@ fn test_manpage_generation() {
     // Get the target directory where manpages should be generated
     let man_dir = find_man_dir();
 
-
     // Check if the man directory exists at all
     if !man_dir.exists() {
         panic!(

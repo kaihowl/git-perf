@@ -3,7 +3,6 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
@@ -44,7 +43,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let main_markdown = clap_markdown::help_markdown::<git_perf_cli_types::Cli>();
     let markdown_path = docs_dir.join("manpage.md");
     fs::write(&markdown_path, &main_markdown).unwrap();
-
 
     // Tell cargo to re-run this if the CLI definition changes
     println!("cargo:rerun-if-changed=../git_perf_cli_types/src/lib.rs");
