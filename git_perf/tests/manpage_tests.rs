@@ -104,38 +104,6 @@ fn test_manpage_generation() {
     // Get the target directory where manpages should be generated
     let man_dir = find_man_dir();
 
-    // Comprehensive debug output for CI troubleshooting
-    println!("=== MANPAGE TEST DEBUG INFO ===");
-    println!(
-        "Current working directory: {}",
-        std::env::current_dir().unwrap().display()
-    );
-    println!("OUT_DIR: {}", env::var("OUT_DIR").unwrap());
-    println!("Looking for manpages in: {}", man_dir.display());
-    println!("Man directory exists: {}", man_dir.exists());
-
-    if man_dir.exists() {
-        println!("Man directory contents:");
-        if let Ok(entries) = std::fs::read_dir(&man_dir) {
-            for entry in entries.flatten() {
-                println!("  {}", entry.path().display());
-            }
-        }
-    } else {
-        println!("Man directory does not exist!");
-        // Check if parent directories exist
-        let parent = man_dir.parent().unwrap();
-        println!("Parent directory exists: {}", parent.exists());
-        if parent.exists() {
-            println!("Parent directory contents:");
-            if let Ok(entries) = std::fs::read_dir(parent) {
-                for entry in entries.flatten() {
-                    println!("  {}", entry.path().display());
-                }
-            }
-        }
-    }
-    println!("=== END DEBUG INFO ===");
 
     // Check if the man directory exists at all
     if !man_dir.exists() {

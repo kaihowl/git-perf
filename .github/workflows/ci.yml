@@ -67,19 +67,6 @@ jobs:
     - name: Build git-perf
       run: cargo build --verbose
 
-    - name: Debug CI Environment
-      run: ./debug_ci.sh
-      continue-on-error: true
-
-    - name: Clean build with debug output
-      run: |
-        cargo clean
-        cargo build --verbose 2>&1 | grep "BUILD SCRIPT DEBUG" || echo "No build script debug output found"
-
-    - name: Run manpage tests with debug output
-      run: cargo test --test manpage_tests -- --nocapture
-      continue-on-error: true
-
     - name: Run tests
       run: cargo test --verbose
 
