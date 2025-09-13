@@ -40,8 +40,8 @@ make help
 
 ### Scripts
 
-- `scripts/generate-manpage.sh` - Generates `docs/manpage.md` using the exact CI process
-- `scripts/validate-manpage.sh` - Validates that `docs/manpage.md` matches CI expectations (ignores whitespace, markdown formatting, underscore escaping, and line wrapping differences)
+- `scripts/generate-manpage-standardized.sh` - Generates `docs/manpage.md` using standardized pandoc configuration
+- `scripts/validate-manpage-standardized.sh` - Validates that `docs/manpage.md` matches CI expectations using standardized pandoc configuration
 - `scripts/pre-commit-hook.sh` - Optional pre-commit hook to catch issues early
 
 ## How It Works
@@ -171,12 +171,14 @@ make generate-manpage
 ### Version differences in diff
 This is expected! The CI uses version `0.0.0` while your local version shows the actual version. The tools handle this automatically.
 
-### Whitespace and formatting differences
-The validation script ignores whitespace differences (spaces, tabs, line endings), markdown formatting differences (list markers, indentation), underscore escaping differences, and line wrapping differences to focus on content differences. This makes the validation more robust against minor formatting variations between environments, including:
-- Differences in how pandoc formats markdown lists
-- Underscore escaping variations (`SEPARATE_BY` vs `SEPARATE\_BY`)
-- Different pandoc versions with varying escaping behavior
-- Line wrapping differences (text wrapped at different points)
+### Standardized pandoc configuration
+The validation script uses standardized pandoc options to ensure consistent output across environments:
+- `--wrap=none`: Prevents line wrapping differences
+- `--columns=120`: Consistent column width
+- `sed 's/\\|/|/g'`: Fixes pipe character escaping to match CI expectations
+- Same pandoc version and options used in both CI and local environments
+
+This approach addresses formatting differences at the source level rather than through post-processing normalization.
 
 ## Best Practices
 

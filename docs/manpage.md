@@ -6,7 +6,7 @@ git-perf
 
 # SYNOPSIS
 
-**git-perf** \[**-v**\|**--verbose**\]... \[**-h**\|**--help**\] \[**-V**\|**--version**\] \<*subcommands*\>
+**git-perf** \[**-v**|**--verbose**\]... \[**-h**|**--help**\] \[**-V**|**--version**\] \<*subcommands*\>
 
 # DESCRIPTION
 
@@ -67,7 +67,7 @@ add - Add single measurement
 
 # SYNOPSIS
 
-**add** \<**-m**\|**--measurement**\> \[**-k**\|**--key-value**\] \[**-h**\|**--help**\] \<*VALUE*\>
+**add** \<**-m**|**--measurement**\> \[**-k**|**--key-value**\] \[**-h**|**--help**\] \<*VALUE*\>
 
 # DESCRIPTION
 
@@ -97,7 +97,7 @@ audit - For given measurements, check perfomance deviations of the HEAD commit a
 
 # SYNOPSIS
 
-**audit** \<**-m**\|**--measurement**\> \[**-n**\|**--max-count**\] \[**-s**\|**--selectors**\] \[**--min-measurements**\] \[**-a**\|**--aggregate-by**\] \[**-d**\|**--sigma**\] \[**-D**\|**--dispersion-method**\] \[**-h**\|**--help**\]
+**audit** \<**-m**|**--measurement**\> \[**-n**|**--max-count**\] \[**-s**|**--selectors**\] \[**--min-measurements**\] \[**-a**|**--aggregate-by**\] \[**-d**|**--sigma**\] \[**-D**|**--dispersion-method**\] \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -107,7 +107,7 @@ The audit can be configured to ignore statistically significant deviations if th
 
 Configuration is done via the \`.gitperfconfig\` file: - Measurement-specific: \`\[audit.measurement."name"\].min_relative_deviation = 10.0\` - Global: \`\[audit.global\].min_relative_deviation = 5.0\`
 
-When the relative deviation is below the threshold, the audit passes even if the z-score exceeds the sigma threshold. The relative deviation is calculated as: \`\|(head_value / tail_median - 1.0) \* 100%\|\` where tail_median is the median of historical measurements (excluding HEAD).
+When the relative deviation is below the threshold, the audit passes even if the z-score exceeds the sigma threshold. The relative deviation is calculated as: \`|(head_value / tail_median - 1.0) \* 100%|\` where tail_median is the median of historical measurements (excluding HEAD).
 
 The sparkline visualization shows the range of measurements relative to the tail median (historical measurements only).
 
@@ -151,7 +151,7 @@ bump-epoch - Accept HEAD commits measurement for audit, even if outside of range
 
 # SYNOPSIS
 
-**bump-epoch** \<**-m**\|**--measurement**\> \[**-h**\|**--help**\]
+**bump-epoch** \<**-m**|**--measurement**\> \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -173,7 +173,7 @@ measure - Measure the runtime of the supplied command (in nanoseconds)
 
 # SYNOPSIS
 
-**measure** \[**-n**\|**--repetitions**\] \<**-m**\|**--measurement**\> \[**-k**\|**--key-value**\] \[**-h**\|**--help**\] \<*COMMAND*\>
+**measure** \[**-n**|**--repetitions**\] \<**-m**|**--measurement**\> \[**-k**|**--key-value**\] \[**-h**|**--help**\] \<*COMMAND*\>
 
 # DESCRIPTION
 
@@ -206,7 +206,7 @@ prune - Remove all performance measurements for non-existent/unreachable objects
 
 # SYNOPSIS
 
-**prune** \[**-h**\|**--help**\]
+**prune** \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -227,7 +227,7 @@ pull - Pull performance results from remote
 
 # SYNOPSIS
 
-**pull** \[**-h**\|**--help**\]
+**pull** \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -248,7 +248,7 @@ push - Publish performance results to remote
 
 # SYNOPSIS
 
-**push** \[**-h**\|**--help**\]
+**push** \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -269,7 +269,7 @@ remove - Remove all performance measurements for commits that have been committe
 
 # SYNOPSIS
 
-**remove** \<**--older-than**\> \[**-h**\|**--help**\]
+**remove** \<**--older-than**\> \[**-h**|**--help**\]
 
 # DESCRIPTION
 
@@ -291,7 +291,7 @@ report - Create an HTML performance report
 
 # SYNOPSIS
 
-**report** \[**-o**\|**--output**\] \[**-n**\|**--max-count**\] \[**-m**\|**--measurement**\] \[**-k**\|**--key-value**\] \[**-s**\|**--separate-by**\] \[**-a**\|**--aggregate-by**\] \[**-h**\|**--help**\]
+**report** \[**-o**|**--output**\] \[**-n**|**--max-count**\] \[**-m**|**--measurement**\] \[**-k**|**--key-value**\] \[**-s**|**--separate-by**\] \[**-a**|**--aggregate-by**\] \[**-h**|**--help**\]
 
 # DESCRIPTION
 

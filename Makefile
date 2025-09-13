@@ -10,16 +10,16 @@ manpage: generate-manpage ## Alias for generate-manpage
 
 generate-manpage: ## Generate docs/manpage.md to match CI expectations
 	@echo "🔧 Generating manpage.md..."
-	@./scripts/generate-manpage.sh
+	@./scripts/generate-manpage-standardized.sh
 
 validate-manpage: ## Validate that docs/manpage.md matches CI expectations
 	@echo "🔍 Validating manpage.md..."
-	@./scripts/validate-manpage.sh
+	@./scripts/validate-manpage-standardized.sh
 
 test-manpage: ## Test manpage generation and validation
 	@echo "🧪 Testing manpage generation..."
-	@./scripts/generate-manpage.sh
-	@./scripts/validate-manpage.sh
+	@./scripts/generate-manpage-standardized.sh
+	@./scripts/validate-manpage-standardized.sh
 	@echo "✅ All manpage tests passed!"
 
 clean-manpage: ## Clean generated manpage files
@@ -38,7 +38,7 @@ check: ## Run all checks (format, clippy, tests, manpage validation)
 	cargo fmt --all --check
 	cargo clippy -- -D warnings
 	cargo test
-	./scripts/validate-manpage.sh
+	./scripts/validate-manpage-standardized.sh
 
 install-deps: ## Install development dependencies
 	@echo "📦 Installing development dependencies..."
