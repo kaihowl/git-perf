@@ -10,11 +10,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let version = env::var("CARGO_PKG_VERSION").unwrap();
     let version: &'static str = Box::leak(version.into_boxed_str());
 
-    // Path calculation to the workspace root's man directory
-    let workspace_root = out_dir.join("../../../../");
+    // Path calculation to the workspace root
+    let workspace_root = out_dir.join("../../../../../");
     let man_dir = workspace_root.join("man").join("man1");
+    let docs_dir = workspace_root.join("docs");
 
     fs::create_dir_all(&man_dir).unwrap();
+    fs::create_dir_all(&docs_dir).unwrap();
 
     // Generate manpages for the main command and all subcommands
     let mut cmd = git_perf_cli_types::Cli::command();
@@ -36,6 +38,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let subcmd_man_path = man_dir.join(format!("git-perf-{subcmd_name}.1"));
         fs::write(&subcmd_man_path, &buffer).unwrap();
     }
+
+    // Generate markdown documentation
+    let main_markdown = clap_markdown::help_markdown::<git_perf_cli_types::Cli>();
+    let markdown_path = docs_dir.join("manpage.md");
+    fs::write(&markdown_path, &main_markdown).unwrap();
 
     // Tell cargo to re-run this if the CLI definition changes
     println!("cargo:rerun-if-changed=../git_perf_cli_types/src/lib.rs");

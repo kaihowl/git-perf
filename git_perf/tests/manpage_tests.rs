@@ -14,6 +14,19 @@ static EXPECTED_PAGES: &[&str] = &[
     "git-perf-prune.1",
 ];
 
+static EXPECTED_COMMANDS: &[&str] = &[
+    "git-perf",
+    "git-perf-measure",
+    "git-perf-add",
+    "git-perf-push",
+    "git-perf-pull",
+    "git-perf-report",
+    "git-perf-audit",
+    "git-perf-bump-epoch",
+    "git-perf-remove",
+    "git-perf-prune",
+];
+
 fn find_man_dir() -> PathBuf {
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir)
@@ -21,16 +34,83 @@ fn find_man_dir() -> PathBuf {
         .find(|p| p.file_name().unwrap_or_default() == "target")
         .unwrap();
 
-    let man_dir = target_dir.join("man").join("man1");
+    // Try multiple possible paths for the man directory
+    let possible_paths = [
+        // Standard path: workspace_root/man/man1
+        target_dir.parent().unwrap().join("man").join("man1"),
+        // Alternative: target/man/man1 (if build script writes there)
+        target_dir.join("man").join("man1"),
+        // Alternative: relative to current working directory
+        std::env::current_dir().unwrap().join("man").join("man1"),
+        // Alternative: relative to workspace root from current dir
+        std::env::current_dir().unwrap().join("../man").join("man1"),
+    ];
 
-    man_dir
+    // Find the first path that exists and contains manpages
+    for path in &possible_paths {
+        if path.exists() {
+            // Check if it contains at least one manpage
+            if let Ok(entries) = std::fs::read_dir(path) {
+                let mut has_manpages = false;
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        if entry.path().extension().map_or(false, |ext| ext == "1") {
+                            has_manpages = true;
+                            break;
+                        }
+                    }
+                }
+                if has_manpages {
+                    return path.clone();
+                }
+            }
+        }
+    }
+
+    // If none found, return the first one (will be used for error reporting)
+    possible_paths[0].clone()
+}
+
+fn find_docs_dir() -> PathBuf {
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let target_dir = Path::new(&out_dir)
+        .ancestors()
+        .find(|p| p.file_name().unwrap_or_default() == "target")
+        .unwrap();
+
+    // Try multiple possible paths for the docs directory
+    let possible_paths = [
+        // Standard path: workspace_root/docs
+        target_dir.parent().unwrap().join("docs"),
+        // Alternative: relative to current working directory
+        std::env::current_dir().unwrap().join("docs"),
+        // Alternative: relative to workspace root from current dir
+        std::env::current_dir().unwrap().join("../docs"),
+    ];
+
+    // Find the first path that exists and contains the markdown file
+    for path in &possible_paths {
+        if path.exists() && path.join("manpage.md").exists() {
+            return path.clone();
+        }
+    }
+
+    // If none found, return the first one (will be used for error reporting)
+    possible_paths[0].clone()
 }
 
 #[test]
 fn test_manpage_generation() {
     // Get the target directory where manpages should be generated
-
     let man_dir = find_man_dir();
+
+    // Check if the man directory exists at all
+    if !man_dir.exists() {
+        panic!(
+            "Man directory does not exist: {}. This suggests the build script did not run or generated files in a different location. Please ensure 'cargo build' is run before 'cargo test'.",
+            man_dir.display()
+        );
+    }
 
     // Check that each expected manpage exists
     for page in EXPECTED_PAGES.iter() {
@@ -81,6 +161,48 @@ fn test_manpage_generation() {
 }
 
 #[test]
+fn test_markdown_generation() {
+    // Get the docs directory where markdown documentation should be generated
+    let docs_dir = find_docs_dir();
+    let markdown_path = docs_dir.join("manpage.md");
+
+    // Check that the markdown documentation exists
+    assert!(
+        markdown_path.exists(),
+        "Missing markdown documentation: {}",
+        markdown_path.display()
+    );
+
+    // Basic content validation - check that the file is not empty
+    let content = std::fs::read_to_string(&markdown_path).unwrap_or_else(|_| {
+        panic!(
+            "Failed to read markdown documentation: {}",
+            markdown_path.display()
+        )
+    });
+
+    assert!(
+        !content.trim().is_empty(),
+        "Markdown documentation {} is empty",
+        markdown_path.display()
+    );
+
+    // Check that each expected command is documented in the markdown
+    for command in EXPECTED_COMMANDS.iter() {
+        assert!(
+            content.contains(command),
+            "Markdown documentation does not contain command: {}",
+            command
+        );
+    }
+
+    println!(
+        "All {} commands found in markdown documentation.",
+        EXPECTED_COMMANDS.len()
+    );
+}
+
+#[test]
 fn test_manpage_content_validation() {
     let man_dir = find_man_dir();
 
@@ -115,6 +237,48 @@ fn test_manpage_content_validation() {
         assert!(
             content.contains(subcommand),
             "Main manpage missing subcommand reference: {}",
+            subcommand
+        );
+    }
+}
+
+#[test]
+fn test_markdown_content_validation() {
+    let docs_dir = find_docs_dir();
+    let markdown_path = docs_dir.join("manpage.md");
+
+    assert!(
+        markdown_path.exists(),
+        "Markdown documentation does not exist"
+    );
+
+    let content =
+        std::fs::read_to_string(&markdown_path).expect("Failed to read markdown documentation");
+
+    // Check for essential sections in clap_markdown format
+    let required_sections = ["# Command-Line Help", "## `git-perf`", "**Usage:**"];
+    for section in &required_sections {
+        assert!(
+            content.contains(section),
+            "Markdown documentation missing required section: {}",
+            section
+        );
+    }
+
+    // Check for subcommand references in markdown format
+    let subcommands = [
+        "git-perf-measure",
+        "git-perf-add",
+        "git-perf-push",
+        "git-perf-pull",
+        "git-perf-report",
+        "git-perf-audit",
+    ];
+
+    for subcommand in &subcommands {
+        assert!(
+            content.contains(subcommand),
+            "Markdown documentation missing subcommand reference: {}",
             subcommand
         );
     }
