@@ -34,12 +34,41 @@ fn find_man_dir() -> PathBuf {
         .find(|p| p.file_name().unwrap_or_default() == "target")
         .unwrap();
 
-    // The build script writes to workspace_root/man/man1
-    // From target_dir, we need to go up to workspace root
-    let workspace_root = target_dir.parent().unwrap();
-    let man_dir = workspace_root.join("man").join("man1");
+    // Try multiple possible paths for the man directory
+    let possible_paths = [
+        // Standard path: workspace_root/man/man1
+        target_dir.parent().unwrap().join("man").join("man1"),
+        // Alternative: target/man/man1 (if build script writes there)
+        target_dir.join("man").join("man1"),
+        // Alternative: relative to current working directory
+        std::env::current_dir().unwrap().join("man").join("man1"),
+        // Alternative: relative to workspace root from current dir
+        std::env::current_dir().unwrap().join("../man").join("man1"),
+    ];
 
-    man_dir
+    // Find the first path that exists and contains manpages
+    for path in &possible_paths {
+        if path.exists() {
+            // Check if it contains at least one manpage
+            if let Ok(entries) = std::fs::read_dir(path) {
+                let mut has_manpages = false;
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        if entry.path().extension().map_or(false, |ext| ext == "1") {
+                            has_manpages = true;
+                            break;
+                        }
+                    }
+                }
+                if has_manpages {
+                    return path.clone();
+                }
+            }
+        }
+    }
+
+    // If none found, return the first one (will be used for error reporting)
+    possible_paths[0].clone()
 }
 
 fn find_docs_dir() -> PathBuf {
@@ -49,18 +78,61 @@ fn find_docs_dir() -> PathBuf {
         .find(|p| p.file_name().unwrap_or_default() == "target")
         .unwrap();
 
-    // The build script writes to workspace_root/docs
-    // From target_dir, we need to go up to workspace root
-    let workspace_root = target_dir.parent().unwrap();
-    let docs_dir = workspace_root.join("docs");
+    // Try multiple possible paths for the docs directory
+    let possible_paths = [
+        // Standard path: workspace_root/docs
+        target_dir.parent().unwrap().join("docs"),
+        // Alternative: relative to current working directory
+        std::env::current_dir().unwrap().join("docs"),
+        // Alternative: relative to workspace root from current dir
+        std::env::current_dir().unwrap().join("../docs"),
+    ];
 
-    docs_dir
+    // Find the first path that exists and contains the markdown file
+    for path in &possible_paths {
+        if path.exists() && path.join("manpage.md").exists() {
+            return path.clone();
+        }
+    }
+
+    // If none found, return the first one (will be used for error reporting)
+    possible_paths[0].clone()
 }
 
 #[test]
 fn test_manpage_generation() {
     // Get the target directory where manpages should be generated
     let man_dir = find_man_dir();
+
+    // Comprehensive debug output for CI troubleshooting
+    println!("=== MANPAGE TEST DEBUG INFO ===");
+    println!("Current working directory: {}", std::env::current_dir().unwrap().display());
+    println!("OUT_DIR: {}", env::var("OUT_DIR").unwrap());
+    println!("Looking for manpages in: {}", man_dir.display());
+    println!("Man directory exists: {}", man_dir.exists());
+    
+    if man_dir.exists() {
+        println!("Man directory contents:");
+        if let Ok(entries) = std::fs::read_dir(&man_dir) {
+            for entry in entries.flatten() {
+                println!("  {}", entry.path().display());
+            }
+        }
+    } else {
+        println!("Man directory does not exist!");
+        // Check if parent directories exist
+        let parent = man_dir.parent().unwrap();
+        println!("Parent directory exists: {}", parent.exists());
+        if parent.exists() {
+            println!("Parent directory contents:");
+            if let Ok(entries) = std::fs::read_dir(parent) {
+                for entry in entries.flatten() {
+                    println!("  {}", entry.path().display());
+                }
+            }
+        }
+    }
+    println!("=== END DEBUG INFO ===");
 
     // Check if the man directory exists at all
     if !man_dir.exists() {
