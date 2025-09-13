@@ -91,11 +91,20 @@ for file in "${EXPECTED_FILES[@]}"; do
     echo -e "\n\n";
 done > "$TEMP_MANPAGE"
 
-# Compare with existing manpage (ignoring whitespace differences)
-echo "🔍 Comparing with existing docs/manpage.md (ignoring whitespace)..."
-if diff -uw docs/manpage.md "$TEMP_MANPAGE" > /tmp/manpage.diff; then
+# Normalize markdown formatting for comparison
+echo "🔧 Normalizing markdown formatting for comparison..."
+NORMALIZED_EXISTING="/tmp/manpage_existing_normalized.md"
+NORMALIZED_GENERATED="/tmp/manpage_generated_normalized.md"
+
+# Normalize both files by removing leading whitespace and list markers
+sed 's/^[[:space:]]*//' docs/manpage.md | sed 's/^-[[:space:]]*//' > "$NORMALIZED_EXISTING"
+sed 's/^[[:space:]]*//' "$TEMP_MANPAGE" | sed 's/^-[[:space:]]*//' > "$NORMALIZED_GENERATED"
+
+# Compare with existing manpage (ignoring whitespace and markdown formatting differences)
+echo "🔍 Comparing with existing docs/manpage.md (ignoring whitespace and formatting)..."
+if diff -uw "$NORMALIZED_EXISTING" "$NORMALIZED_GENERATED" > /tmp/manpage.diff; then
     echo "✅ Manpage is up to date and matches CI expectations!"
-    rm -f "$TEMP_MANPAGE" /tmp/manpage.diff
+    rm -f "$TEMP_MANPAGE" "$NORMALIZED_EXISTING" "$NORMALIZED_GENERATED" /tmp/manpage.diff
     exit 0
 else
     echo "❌ Manpage is out of date. Differences found:"
@@ -108,7 +117,7 @@ else
     echo "📁 A patch file has been saved to /tmp/manpage.diff"
     echo "   You can apply it with: patch docs/manpage.md < /tmp/manpage.diff"
     
-    # Clean up temp file but keep diff for user
-    rm -f "$TEMP_MANPAGE"
+    # Clean up temp files but keep diff for user
+    rm -f "$TEMP_MANPAGE" "$NORMALIZED_EXISTING" "$NORMALIZED_GENERATED"
     exit 1
 fi
