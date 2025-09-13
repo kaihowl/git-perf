@@ -200,8 +200,8 @@ fn test_markdown_content_validation() {
     let content =
         std::fs::read_to_string(&markdown_path).expect("Failed to read markdown documentation");
 
-    // Check for essential sections in markdown format
-    let required_sections = ["# NAME", "# SYNOPSIS", "# DESCRIPTION"];
+    // Check for essential sections in clap_markdown format
+    let required_sections = ["# Command-Line Help", "## `git-perf`", "**Usage:**"];
     for section in &required_sections {
         assert!(
             content.contains(section),

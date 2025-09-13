@@ -1,0 +1,50 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH audit 1  "audit " 
+.SH NAME
+audit \- For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison
+.SH SYNOPSIS
+\fBaudit\fR <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-s\fR|\fB\-\-selectors\fR] [\fB\-\-min\-measurements\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-d\fR|\fB\-\-sigma\fR] [\fB\-D\fR|\fB\-\-dispersion\-method\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison.
+.PP
+The audit can be configured to ignore statistically significant deviations if they are below a minimum relative deviation threshold. This helps filter out noise while still catching meaningful performance changes.
+.PP
+Configuration is done via the `.gitperfconfig` file: \- Measurement\-specific: `[audit.measurement."name"].min_relative_deviation = 10.0` \- Global: `[audit.global].min_relative_deviation = 5.0`
+.PP
+When the relative deviation is below the threshold, the audit passes even if the z\-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median \- 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
+.PP
+The sparkline visualization shows the range of measurements relative to the tail median (historical measurements only).
+.SH OPTIONS
+.TP
+\fB\-m\fR, \fB\-\-measurement\fR \fI<MEASUREMENT>\fR
+
+.TP
+\fB\-n\fR, \fB\-\-max\-count\fR \fI<MAX_COUNT>\fR [default: 40]
+Limit the number of previous commits considered. HEAD is included in this count
+.TP
+\fB\-s\fR, \fB\-\-selectors\fR \fI<SELECTORS>\fR
+Key\-value pair separated by "=" with no whitespaces to subselect measurements
+.TP
+\fB\-\-min\-measurements\fR \fI<MIN_MEASUREMENTS>\fR [default: 2]
+Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation
+.TP
+\fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR [default: min]
+What to aggregate the measurements in each group with
+.br
+
+.br
+[\fIpossible values: \fRmin, max, median, mean]
+.TP
+\fB\-d\fR, \fB\-\-sigma\fR \fI<SIGMA>\fR [default: 4.0]
+Multiple of the stddev after which a outlier is detected. If the HEAD measurement is within `[mean\-<d>*sigma; mean+<d>*sigma]`, it is considered acceptable
+.TP
+\fB\-D\fR, \fB\-\-dispersion\-method\fR \fI<DISPERSION_METHOD>\fR
+Method for calculating statistical dispersion (stddev or mad). If not specified, uses the value from .gitperfconfig file, or defaults to stddev
+.br
+
+.br
+[\fIpossible values: \fRstddev, mad]
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)

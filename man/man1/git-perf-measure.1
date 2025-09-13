@@ -1,0 +1,25 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH measure 1  "measure " 
+.SH NAME
+measure \- Measure the runtime of the supplied command (in nanoseconds)
+.SH SYNOPSIS
+\fBmeasure\fR [\fB\-n\fR|\fB\-\-repetitions\fR] <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fICOMMAND\fR> 
+.SH DESCRIPTION
+Measure the runtime of the supplied command (in nanoseconds)
+.SH OPTIONS
+.TP
+\fB\-n\fR, \fB\-\-repetitions\fR \fI<REPETITIONS>\fR [default: 1]
+Repetitions
+.TP
+\fB\-m\fR, \fB\-\-measurement\fR \fI<NAME>\fR
+Name of the measurement
+.TP
+\fB\-k\fR, \fB\-\-key\-value\fR \fI<KEY_VALUE>\fR
+Key\-value pairs separated by \*(Aq=\*(Aq
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fICOMMAND\fR>
+Command to measure

@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let version: &'static str = Box::leak(version.into_boxed_str());
 
     // Path calculation to the workspace root
-    let workspace_root = out_dir.join("../../../../");
+    let workspace_root = out_dir.join("../../../../../");
     let man_dir = workspace_root.join("man").join("man1");
     let docs_dir = workspace_root.join("docs");
 
