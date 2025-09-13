@@ -147,97 +147,6 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: stable
-    - name: Install pandoc
-      run: sudo apt-get update && sudo apt-get install -y pandoc
-    - name: Build project to generate manpages and markdown
-      run: |
-        # Temporarily set version to 0.0.0 to avoid version-based diffs
-        sed -i 's/^version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "0.0.0"/' git_perf/Cargo.toml
-        cargo build
-        # Restore original version
-        git checkout -- git_perf/Cargo.toml
-    - name: Check manpages are up to date
-      run: |
-        # Define expected manpage files (explicit list to avoid globbing issues)
-        expected_files=(
-          "target/man/man1/git-perf.1"
-          "target/man/man1/git-perf-add.1"
-          "target/man/man1/git-perf-audit.1"
-          "target/man/man1/git-perf-bump-epoch.1"
-          "target/man/man1/git-perf-measure.1"
-          "target/man/man1/git-perf-prune.1"
-          "target/man/man1/git-perf-pull.1"
-          "target/man/man1/git-perf-push.1"
-          "target/man/man1/git-perf-remove.1"
-          "target/man/man1/git-perf-report.1"
-        )
-        
-        # Check that all expected files exist
-        missing_files=()
-        for file in "${expected_files[@]}"; do
-          if [[ ! -f "$file" ]]; then
-            missing_files+=("$file")
-          fi
-        done
-        
-        # Check for unexpected files (new subcommands that aren't in our list)
-        unexpected_files=()
-        for file in target/man/man1/git-perf*.1; do
-          if [[ -f "$file" ]]; then
-            # Check if this file is in our expected list
-            found=false
-            for expected_file in "${expected_files[@]}"; do
-              if [[ "$file" == "$expected_file" ]]; then
-                found=true
-                break
-              fi
-            done
-            if [[ "$found" == "false" ]]; then
-              unexpected_files+=("$file")
-            fi
-          fi
-        done
-        
-        # Report any issues
-        if [[ ${#missing_files[@]} -gt 0 ]]; then
-          echo "Error: Missing manpage files:"
-          printf '%s\n' "${missing_files[@]}"
-          exit 1
-        fi
-        
-        if [[ ${#unexpected_files[@]} -gt 0 ]]; then
-          echo "Error: Unexpected manpage files found (new subcommands?):"
-          printf '%s\n' "${unexpected_files[@]}"
-          echo "Please update the expected_files array in .github/workflows/ci.yml to include these new files."
-          exit 1
-        fi
-        
-        # Generate complete manpage from current build (including all subcommands)
-        for file in "${expected_files[@]}"; do
-            echo "$(basename "$file" .1)";
-            echo "================";
-            pandoc -f man -t gfm "$file";
-            echo -e "\n\n";
-        done > /tmp/generated_manpage.md
-        
-        # Compare with existing manpage
-        if ! diff -u docs/manpage.md /tmp/generated_manpage.md > /tmp/manpage.diff; then
-          echo "Error: Manpage is out of date. A patch file has been created and will be uploaded as an artifact."
-          echo ""
-          echo "To fix this, you can either:"
-          echo "1. Run the manpage generation command from README.md:"
-          echo "   for file in target/man/man1/git-perf.1 target/man/man1/git-perf-add.1 target/man/man1/git-perf-audit.1 target/man/man1/git-perf-bump-epoch.1 target/man/man1/git-perf-measure.1 target/man/man1/git-perf-prune.1 target/man/man1/git-perf-pull.1 target/man/man1/git-perf-push.1 target/man/man1/git-perf-remove.1 target/man/man1/git-perf-report.1; do"
-          echo "       echo \"\$(basename \"\$file\" .1)\";"
-          echo "       echo \"================\";"
-          echo "       pandoc -f man -t gfm \"\$file\";"
-          echo "       echo -e \"\\n\\n\";"
-          echo "   done > docs/manpage.md"
-          echo ""
-          echo "2. Or apply the patch file from the CI artifacts:"
-          echo "   patch docs/manpage.md < manpage.diff"
-          exit 1
-        fi
-        echo "Manpages are up to date ✓"
     - name: Check markdown is up to date
       run: |
         # Check that the generated markdown file exists
@@ -262,18 +171,10 @@ jobs:
           echo "To fix this, run:"
           echo "   cargo build"
           echo ""
-          echo "The markdown documentation is automatically generated during the build process."
+          echo "The markdown documentation is automatically generated during the build process using clap_markdown."
           exit 1
         fi
         echo "Markdown documentation is up to date ✓"
-
-    - name: Upload manpage patch artifact
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: manpage-patch
-        path: /tmp/manpage.diff
-        if-no-files-found: error
 
     - name: Upload markdown patch artifact
       uses: actions/upload-artifact@v4

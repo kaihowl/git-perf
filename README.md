@@ -93,7 +93,7 @@ The documentation is automatically generated during the build process:
 - Manpages are written to `target/man/man1/` directory
 - Markdown documentation is written to `docs/manpage.md`
 
-No additional steps are required.
+No additional steps are required. The CI automatically validates that the markdown documentation is up-to-date with the current CLI definition.
 
 # Development
 
