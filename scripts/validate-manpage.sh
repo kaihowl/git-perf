@@ -96,9 +96,94 @@ echo "🔧 Normalizing markdown formatting for comparison..."
 NORMALIZED_EXISTING="/tmp/manpage_existing_normalized.md"
 NORMALIZED_GENERATED="/tmp/manpage_generated_normalized.md"
 
-# Normalize both files by removing leading whitespace, list markers, and underscore escaping
-sed 's/^[[:space:]]*//' docs/manpage.md | sed 's/^-[[:space:]]*//' | sed 's/\\_/_/g' > "$NORMALIZED_EXISTING"
-sed 's/^[[:space:]]*//' "$TEMP_MANPAGE" | sed 's/^-[[:space:]]*//' | sed 's/\\_/_/g' > "$NORMALIZED_GENERATED"
+# Normalize both files by removing leading whitespace, list markers, underscore escaping, and line wrapping
+# First normalize basic formatting
+sed 's/^[[:space:]]*//' docs/manpage.md | sed 's/^-[[:space:]]*//' | sed 's/\\_/_/g' > /tmp/manpage_existing_temp.md
+sed 's/^[[:space:]]*//' "$TEMP_MANPAGE" | sed 's/^-[[:space:]]*//' | sed 's/\\_/_/g' > /tmp/manpage_generated_temp.md
+
+# Normalize line wrapping by joining continuation lines and re-wrapping consistently
+awk '
+BEGIN { 
+    line = "" 
+    in_description = 0
+}
+/^#/ { 
+    if (line != "") print line
+    line = $0
+    in_description = 0
+    next
+}
+/^$/ { 
+    if (line != "") print line
+    print ""
+    line = ""
+    in_description = 0
+    next
+}
+/^[[:space:]]*$/ { 
+    if (line != "") print line
+    print ""
+    line = ""
+    in_description = 0
+    next
+}
+{
+    if (in_description && $0 !~ /^[[:space:]]*$/) {
+        # This is a continuation line, join it with previous line
+        line = line " " $0
+    } else {
+        # This is a new line, print previous line if exists
+        if (line != "") print line
+        line = $0
+        in_description = 1
+    }
+}
+END { 
+    if (line != "") print line
+}' /tmp/manpage_existing_temp.md > "$NORMALIZED_EXISTING"
+
+awk '
+BEGIN { 
+    line = "" 
+    in_description = 0
+}
+/^#/ { 
+    if (line != "") print line
+    line = $0
+    in_description = 0
+    next
+}
+/^$/ { 
+    if (line != "") print line
+    print ""
+    line = ""
+    in_description = 0
+    next
+}
+/^[[:space:]]*$/ { 
+    if (line != "") print line
+    print ""
+    line = ""
+    in_description = 0
+    next
+}
+{
+    if (in_description && $0 !~ /^[[:space:]]*$/) {
+        # This is a continuation line, join it with previous line
+        line = line " " $0
+    } else {
+        # This is a new line, print previous line if exists
+        if (line != "") print line
+        line = $0
+        in_description = 1
+    }
+}
+END { 
+    if (line != "") print line
+}' /tmp/manpage_generated_temp.md > "$NORMALIZED_GENERATED"
+
+# Clean up temp files
+rm -f /tmp/manpage_existing_temp.md /tmp/manpage_generated_temp.md
 
 # Compare with existing manpage (ignoring whitespace and markdown formatting differences)
 echo "🔍 Comparing with existing docs/manpage.md (ignoring whitespace and formatting)..."
