@@ -41,7 +41,7 @@ make help
 ### Scripts
 
 - `scripts/generate-manpage.sh` - Generates `docs/manpage.md` using the exact CI process
-- `scripts/validate-manpage.sh` - Validates that `docs/manpage.md` matches CI expectations
+- `scripts/validate-manpage.sh` - Validates that `docs/manpage.md` matches CI expectations (ignores whitespace differences)
 - `scripts/pre-commit-hook.sh` - Optional pre-commit hook to catch issues early
 
 ## How It Works
@@ -170,6 +170,9 @@ make generate-manpage
 
 ### Version differences in diff
 This is expected! The CI uses version `0.0.0` while your local version shows the actual version. The tools handle this automatically.
+
+### Whitespace differences
+The validation script ignores whitespace differences (spaces, tabs, line endings) to focus on content differences. This makes the validation more robust against minor formatting variations between environments.
 
 ## Best Practices
 

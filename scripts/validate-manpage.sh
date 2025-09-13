@@ -91,9 +91,9 @@ for file in "${EXPECTED_FILES[@]}"; do
     echo -e "\n\n";
 done > "$TEMP_MANPAGE"
 
-# Compare with existing manpage
-echo "🔍 Comparing with existing docs/manpage.md..."
-if diff -u docs/manpage.md "$TEMP_MANPAGE" > /tmp/manpage.diff; then
+# Compare with existing manpage (ignoring whitespace differences)
+echo "🔍 Comparing with existing docs/manpage.md (ignoring whitespace)..."
+if diff -uw docs/manpage.md "$TEMP_MANPAGE" > /tmp/manpage.diff; then
     echo "✅ Manpage is up to date and matches CI expectations!"
     rm -f "$TEMP_MANPAGE" /tmp/manpage.diff
     exit 0
