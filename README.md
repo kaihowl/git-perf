@@ -82,14 +82,18 @@ See [manpages](./docs/manpage.md).
 
 ## Manpage Generation
 
-The manpages are automatically generated during the build process using `clap_markdown`. To regenerate the documentation:
+Both manpages and markdown documentation are automatically generated during the build process using `clap_mangen` and `clap_markdown`. To regenerate the documentation:
 
 ```bash
-# Build the project to generate markdown documentation
+# Build the project to generate both manpages and markdown documentation
 cargo build
 ```
 
-The markdown documentation is automatically generated and written to `docs/manpage.md` during the build process. No additional steps are required.
+The documentation is automatically generated during the build process:
+- Manpages are written to `target/man/man1/` directory
+- Markdown documentation is written to `docs/manpage.md`
+
+No additional steps are required.
 
 # Development
 
