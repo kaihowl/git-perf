@@ -119,8 +119,12 @@ fn test_markdown_generation() {
     );
 
     // Basic content validation - check that the file is not empty
-    let content = std::fs::read_to_string(&markdown_path)
-        .unwrap_or_else(|_| panic!("Failed to read markdown documentation: {}", markdown_path.display()));
+    let content = std::fs::read_to_string(&markdown_path).unwrap_or_else(|_| {
+        panic!(
+            "Failed to read markdown documentation: {}",
+            markdown_path.display()
+        )
+    });
 
     assert!(
         !content.trim().is_empty(),
@@ -137,7 +141,10 @@ fn test_markdown_generation() {
         );
     }
 
-    println!("All {} commands found in markdown documentation.", EXPECTED_COMMANDS.len());
+    println!(
+        "All {} commands found in markdown documentation.",
+        EXPECTED_COMMANDS.len()
+    );
 }
 
 #[test]
@@ -185,9 +192,13 @@ fn test_markdown_content_validation() {
     let docs_dir = find_docs_dir();
     let markdown_path = docs_dir.join("manpage.md");
 
-    assert!(markdown_path.exists(), "Markdown documentation does not exist");
+    assert!(
+        markdown_path.exists(),
+        "Markdown documentation does not exist"
+    );
 
-    let content = std::fs::read_to_string(&markdown_path).expect("Failed to read markdown documentation");
+    let content =
+        std::fs::read_to_string(&markdown_path).expect("Failed to read markdown documentation");
 
     // Check for essential sections in markdown format
     let required_sections = ["# NAME", "# SYNOPSIS", "# DESCRIPTION"];
