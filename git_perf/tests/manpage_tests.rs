@@ -34,7 +34,10 @@ fn find_man_dir() -> PathBuf {
         .find(|p| p.file_name().unwrap_or_default() == "target")
         .unwrap();
 
-    let man_dir = target_dir.join("man").join("man1");
+    // The build script writes to workspace_root/man/man1
+    // From target_dir, we need to go up to workspace root
+    let workspace_root = target_dir.parent().unwrap();
+    let man_dir = workspace_root.join("man").join("man1");
 
     man_dir
 }
@@ -46,8 +49,10 @@ fn find_docs_dir() -> PathBuf {
         .find(|p| p.file_name().unwrap_or_default() == "target")
         .unwrap();
 
-    // From target directory, go up to workspace root, then to docs
-    let docs_dir = target_dir.join("../docs");
+    // The build script writes to workspace_root/docs
+    // From target_dir, we need to go up to workspace root
+    let workspace_root = target_dir.parent().unwrap();
+    let docs_dir = workspace_root.join("docs");
 
     docs_dir
 }
@@ -56,6 +61,14 @@ fn find_docs_dir() -> PathBuf {
 fn test_manpage_generation() {
     // Get the target directory where manpages should be generated
     let man_dir = find_man_dir();
+
+    // Check if the man directory exists at all
+    if !man_dir.exists() {
+        panic!(
+            "Man directory does not exist: {}. This suggests the build script did not run or generated files in a different location. Please ensure 'cargo build' is run before 'cargo test'.",
+            man_dir.display()
+        );
+    }
 
     // Check that each expected manpage exists
     for page in EXPECTED_PAGES.iter() {
