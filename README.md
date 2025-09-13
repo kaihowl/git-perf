@@ -82,7 +82,28 @@ See [manpages](./docs/manpage.md).
 
 ## Manpage Generation
 
-The manpages are automatically generated during the build process using `clap_mangen`. To regenerate the documentation:
+The manpages are automatically generated during the build process using `clap_mangen`. The CI system validates that `docs/manpage.md` matches the generated manpages.
+
+### Quick Commands
+
+```bash
+# Generate manpage.md to match CI expectations
+make generate-manpage
+# or
+./scripts/generate-manpage.sh
+
+# Validate that manpage.md matches CI expectations
+make validate-manpage
+# or
+./scripts/validate-manpage.sh
+
+# Test both generation and validation
+make test-manpage
+```
+
+### Manual Process
+
+If you need to regenerate manually (not recommended for CI consistency):
 
 ```bash
 # Build the project to generate manpages
@@ -99,6 +120,8 @@ for file in target/man/man1/git-perf.1 target/man/man1/git-perf-add.1 target/man
     echo -e "\n\n";
 done > docs/manpage.md
 ```
+
+**Note**: The automated scripts ensure consistency with CI by temporarily setting the version to `0.0.0` during generation, which matches the CI behavior.
 
 # Development
 
