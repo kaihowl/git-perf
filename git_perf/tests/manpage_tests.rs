@@ -106,11 +106,14 @@ fn test_manpage_generation() {
 
     // Comprehensive debug output for CI troubleshooting
     println!("=== MANPAGE TEST DEBUG INFO ===");
-    println!("Current working directory: {}", std::env::current_dir().unwrap().display());
+    println!(
+        "Current working directory: {}",
+        std::env::current_dir().unwrap().display()
+    );
     println!("OUT_DIR: {}", env::var("OUT_DIR").unwrap());
     println!("Looking for manpages in: {}", man_dir.display());
     println!("Man directory exists: {}", man_dir.exists());
-    
+
     if man_dir.exists() {
         println!("Man directory contents:");
         if let Ok(entries) = std::fs::read_dir(&man_dir) {
