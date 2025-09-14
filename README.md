@@ -142,23 +142,18 @@ For evaluating the statistical robustness of different dispersion methods (stdde
 
 ## Manpage Generation
 
-The manpages are automatically generated during the build process using `clap_mangen`. To regenerate the documentation:
+Both manpages and markdown documentation are automatically generated during the build process using `clap_mangen` and `clap_markdown`. To regenerate the documentation:
 
 ```bash
-# Build the project to generate manpages
+# Build the project to generate both manpages and markdown documentation
 cargo build
-
-# Convert main manpage to markdown
-pandoc -f man -t gfm target/man/man1/git-perf.1 > docs/manpage.md
-
-# Or convert the main and all subcommand manpages to markdown
-for file in target/man/man1/git-perf.1 target/man/man1/git-perf-add.1 target/man/man1/git-perf-audit.1 target/man/man1/git-perf-bump-epoch.1 target/man/man1/git-perf-measure.1 target/man/man1/git-perf-prune.1 target/man/man1/git-perf-pull.1 target/man/man1/git-perf-push.1 target/man/man1/git-perf-remove.1 target/man/man1/git-perf-report.1; do
-    echo "$(basename "$file" .1)";
-    echo "================";
-    pandoc -f man -t gfm "$file";
-    echo -e "\n\n";
-done > docs/manpage.md
 ```
+
+The documentation is automatically generated during the build process:
+- Manpages are written to `target/man/man1/` directory
+- Markdown documentation is written to `docs/manpage.md`
+
+No additional steps are required. The CI automatically validates that the markdown documentation is up-to-date with the current CLI definition.
 
 # Development
 
