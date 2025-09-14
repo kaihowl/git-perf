@@ -41,6 +41,7 @@ unindent = "0.2.3"
 [build-dependencies]
 clap = { version="4", features=["derive"] }
 clap_mangen = "0.2.5"
+clap-markdown = "0.1.0"
 git_perf_cli_types = { version = "0.1.1", path = "../cli_types" }
 
 [dev-dependencies]

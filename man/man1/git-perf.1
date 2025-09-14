@@ -1,0 +1,51 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH git-perf 1  "git-perf 0.0.0" 
+.SH NAME
+git\-perf
+.SH SYNOPSIS
+\fBgit\-perf\fR [\fB\-v\fR|\fB\-\-verbose\fR]... [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+.SH OPTIONS
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Increase verbosity level (can be specified multiple times.) The first level sets level "info", second sets level "debug", and third sets level "trace" for the logger
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH SUBCOMMANDS
+.TP
+git\-perf\-measure(1)
+Measure the runtime of the supplied command (in nanoseconds)
+.TP
+git\-perf\-add(1)
+Add single measurement
+.TP
+git\-perf\-push(1)
+Publish performance results to remote
+.TP
+git\-perf\-pull(1)
+Pull performance results from remote
+.TP
+git\-perf\-report(1)
+Create an HTML performance report
+.TP
+git\-perf\-audit(1)
+For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison
+.TP
+git\-perf\-bump\-epoch(1)
+Accept HEAD commit\*(Aqs measurement for audit, even if outside of range. This is allows to accept expected performance changes. This is accomplished by starting a new epoch for the given measurement. The epoch is configured in the git perf config file. A change to the epoch therefore has to be committed and will result in a new HEAD for which new measurements have to be taken
+.TP
+git\-perf\-remove(1)
+Remove all performance measurements for commits that have been committed before the specified time period
+.TP
+git\-perf\-prune(1)
+Remove all performance measurements for non\-existent/unreachable objects. Will refuse to work if run on a shallow clone
+.TP
+git\-perf\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH VERSION
+v0.0.0

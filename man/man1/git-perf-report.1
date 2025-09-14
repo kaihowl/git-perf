@@ -1,0 +1,35 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH report 1  "report " 
+.SH NAME
+report \- Create an HTML performance report
+.SH SYNOPSIS
+\fBreport\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-s\fR|\fB\-\-separate\-by\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Create an HTML performance report
+.SH OPTIONS
+.TP
+\fB\-o\fR, \fB\-\-output\fR \fI<OUTPUT>\fR [default: output.html]
+HTML output file
+.TP
+\fB\-n\fR, \fB\-\-max\-count\fR \fI<MAX_COUNT>\fR [default: 40]
+Limit the number of previous commits considered. HEAD is included in this count
+.TP
+\fB\-m\fR, \fB\-\-measurement\fR \fI<MEASUREMENT>\fR
+Select an individual measurements instead of all
+.TP
+\fB\-k\fR, \fB\-\-key\-value\fR \fI<KEY_VALUE>\fR
+Key\-value pairs separated by \*(Aq=\*(Aq, select only matching measurements
+.TP
+\fB\-s\fR, \fB\-\-separate\-by\fR \fI<SEPARATE_BY>\fR
+Create individual traces in the graph by grouping with the value of this selector
+.TP
+\fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR
+What to aggregate the measurements in each group with
+.br
+
+.br
+[\fIpossible values: \fRmin, max, median, mean]
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
