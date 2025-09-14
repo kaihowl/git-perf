@@ -1,0 +1,193 @@
+{
+  "analysis": {
+    "total_scenarios": 14,
+    "scenarios_with_true_regression": 8,
+    "scenarios_without_true_regression": 6,
+    "stddev": {
+      "true_positive_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 1.0,
+      "precision": 0
+    },
+    "mad": {
+      "true_positive_rate": 0.125,
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.875,
+      "precision": 1.0
+    },
+    "average_z_scores": {
+      "stddev": 0.6964330992906692,
+      "mad": 1.4171058156598444
+    }
+  },
+  "scenarios": [
+    {
+      "scenario_name": "clean_data",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.0,
+      "outlier_magnitude": 0.0,
+      "stddev_z_score": 0.08554151271009798,
+      "mad_z_score": 0.10664259993045902,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": false
+    },
+    {
+      "scenario_name": "single_outlier_1pct",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.01,
+      "outlier_magnitude": 3.0,
+      "stddev_z_score": 0.7674388058443776,
+      "mad_z_score": 0.9853722124249554,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": false
+    },
+    {
+      "scenario_name": "single_outlier_5pct",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.05,
+      "outlier_magnitude": 3.0,
+      "stddev_z_score": 0.9721405846039834,
+      "mad_z_score": 2.6543974765249874,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": false
+    },
+    {
+      "scenario_name": "multiple_outliers_5pct",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.05,
+      "outlier_magnitude": 2.0,
+      "stddev_z_score": 0.752243071759627,
+      "mad_z_score": 0.8610705453790892,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": false
+    },
+    {
+      "scenario_name": "multiple_outliers_10pct",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.1,
+      "outlier_magnitude": 2.0,
+      "stddev_z_score": 0.09174771141843009,
+      "mad_z_score": 0.1332868667339515,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "multiple_outliers_20pct",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.2,
+      "outlier_magnitude": 2.0,
+      "stddev_z_score": 1.30924667354863,
+      "mad_z_score": 2.2122893306940172,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "extreme_outliers",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.05,
+      "outlier_magnitude": 5.0,
+      "stddev_z_score": 0.11613571248515672,
+      "mad_z_score": 0.09299016880487805,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": false
+    },
+    {
+      "scenario_name": "very_extreme_outliers",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.05,
+      "outlier_magnitude": 8.0,
+      "stddev_z_score": 0.255356891523129,
+      "mad_z_score": 0.13523622698155258,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": false
+    },
+    {
+      "scenario_name": "high_noise",
+      "base_value": 100.0,
+      "noise_level": 15.0,
+      "outlier_ratio": 0.1,
+      "outlier_magnitude": 2.0,
+      "stddev_z_score": 0.7528975759544583,
+      "mad_z_score": 0.7964676821499077,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "low_noise",
+      "base_value": 100.0,
+      "noise_level": 2.0,
+      "outlier_ratio": 0.1,
+      "outlier_magnitude": 2.0,
+      "stddev_z_score": 2.5538125713967608,
+      "mad_z_score": 6.986182323518808,
+      "stddev_detected": false,
+      "mad_detected": true,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "different_base",
+      "base_value": 50.0,
+      "noise_level": 3.0,
+      "outlier_ratio": 0.1,
+      "outlier_magnitude": 2.0,
+      "stddev_z_score": 0.08286170945976577,
+      "mad_z_score": 0.8150640279736986,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "clear_regression",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.15,
+      "outlier_magnitude": 3.0,
+      "stddev_z_score": 1.2838041517046843,
+      "mad_z_score": 2.3782959706212146,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "moderate_regression",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.1,
+      "outlier_magnitude": 2.5,
+      "stddev_z_score": 0.510147904252119,
+      "mad_z_score": 0.6479988882030282,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    },
+    {
+      "scenario_name": "strong_regression",
+      "base_value": 100.0,
+      "noise_level": 5.0,
+      "outlier_ratio": 0.2,
+      "outlier_magnitude": 4.0,
+      "stddev_z_score": 0.21668851340815043,
+      "mad_z_score": 1.034187099297275,
+      "stddev_detected": false,
+      "mad_detected": false,
+      "true_regression": true
+    }
+  ]
+}

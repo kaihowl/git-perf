@@ -9,19 +9,40 @@
         # The relative deviation is calculated as: |(head_value / tail_median - 1.0) * 100%|
         # where tail_median is the median of historical measurements (excluding HEAD)
         min_relative_deviation = 5.0
+        
+        # Statistical dispersion method for outlier detection
+        # Options: "stddev" (standard deviation) or "mad" (median absolute deviation)
+        # MAD is more robust to outliers, stddev is more sensitive
+        dispersion_method = "mad"
 
 # Measurement-specific audit settings (overrides global)
 [audit.measurement."build_time"]
 # Build time measurements can have higher variance, so use a higher threshold
+# Use MAD for build times as they can have occasional outliers from system load
 min_relative_deviation = 10.0
+dispersion_method = "mad"
 
 [audit.measurement."memory_usage"]
 # Memory usage should be more stable, so use a lower threshold
+# Use stddev for memory as it's typically more consistent
 min_relative_deviation = 2.0
+dispersion_method = "stddev"
 
-        [audit.measurement."test_runtime"]
-        # Test runtime can vary significantly, use a moderate threshold
-        min_relative_deviation = 7.5
+[audit.measurement."test_runtime"]
+# Test runtime can vary significantly, use a moderate threshold
+# Use MAD for test times as they can have outliers from system performance
+min_relative_deviation = 7.5
+dispersion_method = "mad"
+
+[audit.measurement."cpu_usage"]
+# CPU usage measurements - use stddev for more sensitive detection
+min_relative_deviation = 3.0
+dispersion_method = "stddev"
+
+[audit.measurement."network_latency"]
+# Network latency can have spikes, use MAD for robustness
+min_relative_deviation = 8.0
+dispersion_method = "mad"
 
 # Epoch settings for accepting performance changes
 [measurement."build_time"]
