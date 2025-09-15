@@ -1,0 +1,17 @@
+---
+description: Standard commands to run before submissions
+globs: ["**/*"]
+alwaysApply: false
+---
+
+```bash
+# Format code
+cargo fmt
+
+# Run tests (excluding slow ones)
+cargo test -- --skip slow
+
+# Optional: Run clippy for additional checks
+cargo clippy
+```
+

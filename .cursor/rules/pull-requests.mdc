@@ -1,0 +1,9 @@
+---
+description: Conventional Commits policy for pull request titles
+globs: ["**/*"]
+alwaysApply: true
+---
+
+- Pull Request titles must follow the Conventional Commits specification (e.g., `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `test:`, `perf:`, `build:`, `ci:`, `revert:`)
+- Use scope when helpful (e.g., `feat(cli_types): ...`)
+

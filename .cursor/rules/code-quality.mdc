@@ -1,0 +1,17 @@
+---
+description: Rust code quality and idiomatic practices
+globs: ["**/*.rs", "**/Cargo.toml"]
+alwaysApply: true
+---
+
+- Follow Rust best practices and idiomatic code patterns
+- Use `cargo clippy` for additional linting and suggestions
+- Ensure proper error handling with `Result` and `Option` types
+- Use meaningful variable and function names
+
+Recommended command:
+
+```bash
+cargo clippy
+```
+
