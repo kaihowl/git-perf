@@ -308,7 +308,10 @@ epoch = "{}"
         assert_eq!(actual, expected);
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
@@ -360,7 +363,10 @@ epoch = "{}"
         assert!(epoch.is_some());
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
@@ -554,10 +560,14 @@ dispersion_method = "stddev"
         assert_eq!(found_path.unwrap(), config_path);
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_find_config_path_xdg_config_home() {
         let temp_dir = TempDir::new().unwrap();
         let xdg_config_dir = temp_dir.path().join("git-perf");
@@ -570,6 +580,12 @@ dispersion_method = "stddev"
         )
         .unwrap();
 
+        // Change to a clean directory to avoid finding workspace .gitperfconfig
+        let original_dir = env::current_dir().unwrap();
+        let clean_dir = temp_dir.path().join("clean");
+        fs::create_dir_all(&clean_dir).unwrap();
+        env::set_current_dir(&clean_dir).unwrap();
+
         // Set XDG_CONFIG_HOME and test
         env::set_var("XDG_CONFIG_HOME", temp_dir.path());
         let found_path = find_config_path();
@@ -578,9 +594,17 @@ dispersion_method = "stddev"
 
         // Clean up
         env::remove_var("XDG_CONFIG_HOME");
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
+        }
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_find_config_path_home_fallback() {
         let temp_dir = TempDir::new().unwrap();
         let home_config_dir = temp_dir.path().join(".config").join("git-perf");
@@ -592,6 +616,12 @@ dispersion_method = "stddev"
             "[measurement.\"test\"]\nepoch = \"12345678\"\n",
         )
         .unwrap();
+
+        // Change to a clean directory to avoid finding workspace .gitperfconfig
+        let original_dir = env::current_dir().unwrap();
+        let clean_dir = temp_dir.path().join("clean");
+        fs::create_dir_all(&clean_dir).unwrap();
+        env::set_current_dir(&clean_dir).unwrap();
 
         // Mock home directory by setting both HOME and XDG_CONFIG_HOME to empty
         let original_home = env::var("HOME").ok();
@@ -612,9 +642,14 @@ dispersion_method = "stddev"
         if let Some(xdg) = original_xdg {
             env::set_var("XDG_CONFIG_HOME", xdg);
         }
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_find_config_path_not_found() {
         // Ensure no config exists in current directory or XDG locations
         let original_dir = env::current_dir().unwrap();
@@ -628,10 +663,14 @@ dispersion_method = "stddev"
         assert!(found_path.is_none());
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_determine_epoch_from_config_with_missing_file() {
         // Test that missing config file doesn't panic and returns None
         let original_dir = env::current_dir().unwrap();
@@ -643,10 +682,14 @@ dispersion_method = "stddev"
         assert!(epoch.is_none());
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_determine_epoch_from_config_with_invalid_toml() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".gitperfconfig");
@@ -660,10 +703,14 @@ dispersion_method = "stddev"
         assert!(epoch.is_none());
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_write_config_creates_directories() {
         let temp_dir = TempDir::new().unwrap();
         let nested_dir = temp_dir.path().join("a").join("b").join("c");
@@ -682,6 +729,9 @@ dispersion_method = "stddev"
         assert_eq!(content, config_content);
 
         // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
+        // Ensure original directory still exists before changing back
+        if original_dir.exists() {
+            env::set_current_dir(original_dir).unwrap();
+        }
     }
 }
