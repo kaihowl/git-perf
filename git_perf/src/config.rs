@@ -1,7 +1,9 @@
 use anyhow::Result;
 use std::{
-    fs::File,
+    env,
+    fs::{self, File},
     io::{Read, Write},
+    path::{Path, PathBuf},
 };
 use toml_edit::{value, Document};
 
@@ -11,16 +13,55 @@ use crate::git::git_interop::get_head_revision;
 use git_perf_cli_types::DispersionMethod;
 
 pub fn write_config(conf: &str) -> Result<()> {
-    let mut f = File::create(".gitperfconfig")?;
+    let path = find_config_path().unwrap_or_else(|| PathBuf::from(".gitperfconfig"));
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    let mut f = File::create(path)?;
     f.write_all(conf.as_bytes())?;
     Ok(())
 }
 
 pub fn read_config() -> Result<String> {
+    if let Some(path) = find_config_path() {
+        return read_config_from_file(path);
+    }
     read_config_from_file(".gitperfconfig")
 }
 
-use std::path::Path;
+fn find_config_path() -> Option<PathBuf> {
+    if let Ok(mut current_dir) = env::current_dir() {
+        loop {
+            let candidate = current_dir.join(".gitperfconfig");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            if !current_dir.pop() {
+                break;
+            }
+        }
+    }
+
+    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
+        let candidate = Path::new(&xdg_config_home)
+            .join("git-perf")
+            .join("config.toml");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+
+    if let Some(home) = dirs_next::home_dir() {
+        let candidate = home.join(".config").join("git-perf").join("config.toml");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
 
 fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
     let mut conf_str = String::new();
@@ -29,8 +70,6 @@ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
 }
 
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
-    // TODO(hoewelmk) configure path, use different working directory than repo root
-    // TODO(hoewelmk) proper error handling
     let conf = read_config().ok()?;
     determine_epoch(measurement, &conf)
 }

@@ -37,6 +37,7 @@ thiserror = "1.0.51"
 toml = "0.8.6"
 toml_edit = "0.20.4"
 unindent = "0.2.3"
+dirs-next = "2.0.0"
 
 [build-dependencies]
 clap = { version="4", features=["derive"] }
