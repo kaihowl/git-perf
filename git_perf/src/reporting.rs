@@ -147,6 +147,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 struct CsvReporter<'a> {
     hashes: Vec<String>,
     indexed_measurements: Vec<(usize, &'a MeasurementData)>,
+    summarized_measurements: Vec<(usize, String, Option<String>, MeasurementSummary)>,
 }
 
 impl CsvReporter<'_> {
@@ -154,6 +155,7 @@ impl CsvReporter<'_> {
         CsvReporter {
             hashes: Vec::new(),
             indexed_measurements: Vec::new(),
+            summarized_measurements: Vec::new(),
         }
     }
 }
@@ -174,15 +176,40 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     }
 
     fn as_bytes(&self) -> Vec<u8> {
-        self.indexed_measurements
-            .iter()
-            .map(|(index, measurement_data)| {
-                let ser_measurement = serialize_single(measurement_data, "\t");
+        let mut lines = Vec::new();
+
+        // Raw measurements
+        lines.extend(
+            self.indexed_measurements
+                .iter()
+                .map(|(index, measurement_data)| {
+                    let ser_measurement = serialize_single(measurement_data, "\t");
+                    let commit = &self.hashes[*index];
+                    format!("{commit}{DELIMITER}{ser_measurement}")
+                }),
+        );
+
+        // Summarized measurements: synthesize a MeasurementData so we can reuse serialize_single
+        lines.extend(self.summarized_measurements.iter().map(
+            |(index, measurement_name, group_value, summary)| {
+                let mut key_values = std::collections::HashMap::new();
+                if let Some(gv) = group_value.as_ref() {
+                    key_values.insert("group".to_string(), gv.clone());
+                }
+                let synthesized = MeasurementData {
+                    epoch: summary.epoch,
+                    name: measurement_name.clone(),
+                    timestamp: 0.0,
+                    val: summary.val,
+                    key_values,
+                };
+                let ser_measurement = serialize_single(&synthesized, "\t");
                 let commit = &self.hashes[*index];
                 format!("{commit}{DELIMITER}{ser_measurement}")
-            })
-            .join("")
-            .into_bytes()
+            },
+        ));
+
+        lines.join("").into_bytes()
     }
 
     fn add_summarized_trace(
@@ -191,7 +218,15 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         _measurement_name: &str,
         _group_value: Option<&String>,
     ) {
-        todo!()
+        // Store summarized data to be serialized in as_bytes
+        for (index, summary) in _indexed_measurements.into_iter() {
+            self.summarized_measurements.push((
+                index,
+                _measurement_name.to_string(),
+                _group_value.cloned(),
+                summary,
+            ));
+        }
     }
 }
 
