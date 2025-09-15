@@ -120,7 +120,25 @@ For given measurements, check perfomance deviations of the HEAD commit against `
 
 The audit can be configured to ignore statistically significant deviations if they are below a minimum relative deviation threshold. This helps filter out noise while still catching meaningful performance changes.
 
-Configuration is done via the `.gitperfconfig` file: - Measurement-specific: `[audit.measurement."name"].min_relative_deviation = 10.0` - Global: `[audit.global].min_relative_deviation = 5.0`
+## Statistical Dispersion Methods
+
+The audit supports two methods for calculating statistical dispersion:
+
+**Standard Deviation (stddev)**: Traditional method that is sensitive to outliers. Use when your performance data is normally distributed and you want to detect all performance changes, including those caused by outliers.
+
+**Median Absolute Deviation (MAD)**: Robust method that is less sensitive to outliers. Use when your performance data has occasional outliers or spikes, or when you want to focus on typical performance changes rather than extreme values.
+
+## Configuration
+
+Configuration is done via the `.gitperfconfig` file:
+
+**Global settings:** - `[audit.global].min_relative_deviation = 5.0` - `[audit.global].dispersion_method = "mad"`
+
+**Measurement-specific settings (overrides global):** - `[audit.measurement."name"].min_relative_deviation = 10.0` - `[audit.measurement."name"].dispersion_method = "stddev"`
+
+## Precedence
+
+The dispersion method is determined in this order: 1. CLI option (`--dispersion-method` or `-D`) - highest priority 2. Measurement-specific config - overrides global 3. Global config - overrides default 4. Default (stddev) - lowest priority
 
 When the relative deviation is below the threshold, the audit passes even if the z-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median - 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
 
@@ -147,7 +165,13 @@ The sparkline visualization shows the range of measurements relative to the tail
 * `-d`, `--sigma <SIGMA>` — Multiple of the stddev after which a outlier is detected. If the HEAD measurement is within `[mean-<d>*sigma; mean+<d>*sigma]`, it is considered acceptable
 
   Default value: `4.0`
-* `-D`, `--dispersion-method <DISPERSION_METHOD>` — Method for calculating statistical dispersion (stddev or mad). If not specified, uses the value from .gitperfconfig file, or defaults to stddev
+* `-D`, `--dispersion-method <DISPERSION_METHOD>` — Method for calculating statistical dispersion. Choose between:
+
+   **stddev**: Standard deviation - sensitive to outliers, use for normally distributed data where you want to detect all changes.
+
+   **mad**: Median Absolute Deviation - robust to outliers, use when data has occasional spikes or you want to focus on typical changes.
+
+   If not specified, uses the value from .gitperfconfig file, or defaults to stddev.
 
   Possible values: `stddev`, `mad`
 
