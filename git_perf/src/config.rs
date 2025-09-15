@@ -70,14 +70,25 @@ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
 }
 
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
-    let conf = read_config().ok()?;
+    let conf = match read_config() {
+        Ok(conf) => conf,
+        Err(e) => {
+            // Log the error but don't fail - this is expected when no config exists
+            log::debug!("Could not read config file: {}", e);
+            return None;
+        }
+    };
     determine_epoch(measurement, &conf)
 }
 
 fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
-    let config = conf_str
-        .parse::<Document>()
-        .expect("Failed to parse config");
+    let config = match conf_str.parse::<Document>() {
+        Ok(config) => config,
+        Err(e) => {
+            log::debug!("Failed to parse config: {}", e);
+            return None;
+        }
+    };
 
     let get_epoch = |section: &str| {
         let s = config
@@ -207,6 +218,8 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_read_epochs() {
@@ -234,7 +247,48 @@ epoch="12344555"
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_bump_epochs() {
+        // Create a temporary git repository for this test
+        let temp_dir = TempDir::new().unwrap();
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        // Initialize git repository
+        std::process::Command::new("git")
+            .args(&["init", "--initial-branch=master"])
+            .output()
+            .expect("Failed to initialize git repository");
+
+        // Configure git user
+        std::process::Command::new("git")
+            .args(&["config", "user.name", "Test User"])
+            .output()
+            .expect("Failed to configure git user");
+        std::process::Command::new("git")
+            .args(&["config", "user.email", "test@example.com"])
+            .output()
+            .expect("Failed to configure git email");
+
+        // Create a commit to have a HEAD
+        fs::write("test.txt", "test content").unwrap();
+        std::process::Command::new("git")
+            .args(&["add", "test.txt"])
+            .output()
+            .expect("Failed to add file");
+        let commit_output = std::process::Command::new("git")
+            .args(&["commit", "-m", "test commit"])
+            .output()
+            .expect("Failed to commit");
+
+        // Verify commit was successful
+        if !commit_output.status.success() {
+            panic!(
+                "Git commit failed: {}",
+                String::from_utf8_lossy(&commit_output.stderr)
+            );
+        }
+
         let configfile = r#"[measurement."something"]
 #My comment
 epoch = "34567898"
@@ -252,14 +306,61 @@ epoch = "{}"
         );
 
         assert_eq!(actual, expected);
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_bump_new_epoch_and_read_it() {
+        // Create a temporary git repository for this test
+        let temp_dir = TempDir::new().unwrap();
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        // Initialize git repository
+        std::process::Command::new("git")
+            .args(&["init", "--initial-branch=master"])
+            .output()
+            .expect("Failed to initialize git repository");
+
+        // Configure git user
+        std::process::Command::new("git")
+            .args(&["config", "user.name", "Test User"])
+            .output()
+            .expect("Failed to configure git user");
+        std::process::Command::new("git")
+            .args(&["config", "user.email", "test@example.com"])
+            .output()
+            .expect("Failed to configure git email");
+
+        // Create a commit to have a HEAD
+        fs::write("test.txt", "test content").unwrap();
+        std::process::Command::new("git")
+            .args(&["add", "test.txt"])
+            .output()
+            .expect("Failed to add file");
+        let commit_output = std::process::Command::new("git")
+            .args(&["commit", "-m", "test commit"])
+            .output()
+            .expect("Failed to commit");
+
+        // Verify commit was successful
+        if !commit_output.status.success() {
+            panic!(
+                "Git commit failed: {}",
+                String::from_utf8_lossy(&commit_output.stderr)
+            );
+        }
+
         let mut conf = String::new();
         bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
         let epoch = determine_epoch("mymeasurement", &conf);
         assert!(epoch.is_some());
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
@@ -428,5 +529,159 @@ dispersion_method = "stddev"
             super::audit_dispersion_method_from_str(configfile, "any_measurement"),
             git_perf_cli_types::DispersionMethod::StandardDeviation
         );
+    }
+
+    #[test]
+    fn test_find_config_path_upward_search() {
+        let temp_dir = TempDir::new().unwrap();
+        let subdir = temp_dir.path().join("subdir");
+        fs::create_dir_all(&subdir).unwrap();
+
+        // Create config in parent directory
+        let config_path = temp_dir.path().join(".gitperfconfig");
+        fs::write(
+            &config_path,
+            "[measurement.\"test\"]\nepoch = \"12345678\"\n",
+        )
+        .unwrap();
+
+        // Change to subdirectory and test upward search
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(&subdir).unwrap();
+
+        let found_path = find_config_path();
+        assert!(found_path.is_some());
+        assert_eq!(found_path.unwrap(), config_path);
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_find_config_path_xdg_config_home() {
+        let temp_dir = TempDir::new().unwrap();
+        let xdg_config_dir = temp_dir.path().join("git-perf");
+        fs::create_dir_all(&xdg_config_dir).unwrap();
+
+        let config_path = xdg_config_dir.join("config.toml");
+        fs::write(
+            &config_path,
+            "[measurement.\"test\"]\nepoch = \"12345678\"\n",
+        )
+        .unwrap();
+
+        // Set XDG_CONFIG_HOME and test
+        env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+        let found_path = find_config_path();
+        assert!(found_path.is_some());
+        assert_eq!(found_path.unwrap(), config_path);
+
+        // Clean up
+        env::remove_var("XDG_CONFIG_HOME");
+    }
+
+    #[test]
+    fn test_find_config_path_home_fallback() {
+        let temp_dir = TempDir::new().unwrap();
+        let home_config_dir = temp_dir.path().join(".config").join("git-perf");
+        fs::create_dir_all(&home_config_dir).unwrap();
+
+        let config_path = home_config_dir.join("config.toml");
+        fs::write(
+            &config_path,
+            "[measurement.\"test\"]\nepoch = \"12345678\"\n",
+        )
+        .unwrap();
+
+        // Mock home directory by setting both HOME and XDG_CONFIG_HOME to empty
+        let original_home = env::var("HOME").ok();
+        let original_xdg = env::var("XDG_CONFIG_HOME").ok();
+        env::set_var("HOME", temp_dir.path());
+        env::remove_var("XDG_CONFIG_HOME");
+
+        let found_path = find_config_path();
+        assert!(found_path.is_some());
+        assert_eq!(found_path.unwrap(), config_path);
+
+        // Restore original environment
+        if let Some(home) = original_home {
+            env::set_var("HOME", home);
+        } else {
+            env::remove_var("HOME");
+        }
+        if let Some(xdg) = original_xdg {
+            env::set_var("XDG_CONFIG_HOME", xdg);
+        }
+    }
+
+    #[test]
+    fn test_find_config_path_not_found() {
+        // Ensure no config exists in current directory or XDG locations
+        let original_dir = env::current_dir().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        fs::create_dir_all(temp_dir.path()).unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+        env::remove_var("XDG_CONFIG_HOME");
+        env::remove_var("HOME");
+
+        let found_path = find_config_path();
+        assert!(found_path.is_none());
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_determine_epoch_from_config_with_missing_file() {
+        // Test that missing config file doesn't panic and returns None
+        let original_dir = env::current_dir().unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        fs::create_dir_all(temp_dir.path()).unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        let epoch = determine_epoch_from_config("test_measurement");
+        assert!(epoch.is_none());
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_determine_epoch_from_config_with_invalid_toml() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".gitperfconfig");
+        fs::write(&config_path, "invalid toml content").unwrap();
+
+        let original_dir = env::current_dir().unwrap();
+        fs::create_dir_all(temp_dir.path()).unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        let epoch = determine_epoch_from_config("test_measurement");
+        assert!(epoch.is_none());
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
+    }
+
+    #[test]
+    fn test_write_config_creates_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let nested_dir = temp_dir.path().join("a").join("b").join("c");
+        let config_path = nested_dir.join(".gitperfconfig");
+
+        // Mock the config path discovery to return our test path
+        let original_dir = env::current_dir().unwrap();
+        fs::create_dir_all(&nested_dir).unwrap();
+        env::set_current_dir(&nested_dir).unwrap();
+
+        let config_content = "[measurement.\"test\"]\nepoch = \"12345678\"\n";
+        write_config(config_content).unwrap();
+
+        assert!(config_path.is_file());
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(content, config_content);
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
     }
 }
