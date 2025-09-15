@@ -713,8 +713,17 @@ dispersion_method = "stddev"
         let nested_dir = temp_dir.path().join("a").join("b").join("c");
         let config_path = nested_dir.join(".gitperfconfig");
 
-        // Mock the config path discovery to return our test path
-        let original_dir = env::current_dir().unwrap();
+        // Store original directory before any changes
+        let original_dir = match env::current_dir() {
+            Ok(dir) => dir,
+            Err(_) => {
+                // If current directory is invalid, use a safe fallback
+                std::env::var("HOME")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| "/tmp".into())
+            }
+        };
+
         fs::create_dir_all(&nested_dir).unwrap();
         env::set_current_dir(&nested_dir).unwrap();
 
@@ -728,7 +737,7 @@ dispersion_method = "stddev"
         // Restore original directory - keep temp_dir alive until after we change back
         let _keep_temp_dir = temp_dir;
         if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
+            let _ = env::set_current_dir(&original_dir);
         }
     }
 }
