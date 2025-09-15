@@ -218,6 +218,7 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
 #[cfg(test)]
 mod test {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
@@ -247,7 +248,7 @@ epoch="12344555"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_bump_epochs() {
         // Create a temporary git repository for this test
         let temp_dir = TempDir::new().unwrap();
@@ -260,15 +261,13 @@ epoch="12344555"
             .output()
             .expect("Failed to initialize git repository");
 
-        // Configure git user
-        std::process::Command::new("git")
-            .args(&["config", "user.name", "Test User"])
-            .output()
-            .expect("Failed to configure git user");
-        std::process::Command::new("git")
-            .args(&["config", "user.email", "test@example.com"])
-            .output()
-            .expect("Failed to configure git email");
+        // Set up hermetic git environment
+        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+        env::set_var("GIT_AUTHOR_NAME", "testuser");
+        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+        env::set_var("GIT_COMMITTER_NAME", "testuser");
+        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
         // Create a commit to have a HEAD
         fs::write("test.txt", "test content").unwrap();
@@ -315,7 +314,7 @@ epoch = "{}"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_bump_new_epoch_and_read_it() {
         // Create a temporary git repository for this test
         let temp_dir = TempDir::new().unwrap();
@@ -328,15 +327,13 @@ epoch = "{}"
             .output()
             .expect("Failed to initialize git repository");
 
-        // Configure git user
-        std::process::Command::new("git")
-            .args(&["config", "user.name", "Test User"])
-            .output()
-            .expect("Failed to configure git user");
-        std::process::Command::new("git")
-            .args(&["config", "user.email", "test@example.com"])
-            .output()
-            .expect("Failed to configure git email");
+        // Set up hermetic git environment
+        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+        env::set_var("GIT_AUTHOR_NAME", "testuser");
+        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+        env::set_var("GIT_COMMITTER_NAME", "testuser");
+        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
         // Create a commit to have a HEAD
         fs::write("test.txt", "test content").unwrap();
@@ -567,7 +564,7 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_find_config_path_xdg_config_home() {
         let temp_dir = TempDir::new().unwrap();
         let xdg_config_dir = temp_dir.path().join("git-perf");
@@ -597,14 +594,14 @@ dispersion_method = "stddev"
         // Ensure original directory still exists before changing back
         if original_dir.exists() {
             // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
+            if original_dir.exists() {
+                env::set_current_dir(original_dir).unwrap();
+            }
         }
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_find_config_path_home_fallback() {
         let temp_dir = TempDir::new().unwrap();
         let home_config_dir = temp_dir.path().join(".config").join("git-perf");
@@ -649,7 +646,7 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_find_config_path_not_found() {
         // Ensure no config exists in current directory or XDG locations
         let original_dir = env::current_dir().unwrap();
@@ -670,7 +667,7 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_determine_epoch_from_config_with_missing_file() {
         // Test that missing config file doesn't panic and returns None
         let original_dir = env::current_dir().unwrap();
@@ -689,7 +686,7 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_determine_epoch_from_config_with_invalid_toml() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".gitperfconfig");
@@ -710,7 +707,7 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial_test::serial]
+    #[serial]
     fn test_write_config_creates_directories() {
         let temp_dir = TempDir::new().unwrap();
         let nested_dir = temp_dir.path().join("a").join("b").join("c");
@@ -728,8 +725,8 @@ dispersion_method = "stddev"
         let content = fs::read_to_string(&config_path).unwrap();
         assert_eq!(content, config_content);
 
-        // Restore original directory
-        // Ensure original directory still exists before changing back
+        // Restore original directory - keep temp_dir alive until after we change back
+        let _keep_temp_dir = temp_dir;
         if original_dir.exists() {
             env::set_current_dir(original_dir).unwrap();
         }
