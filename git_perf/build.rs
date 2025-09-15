@@ -6,9 +6,8 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
-    // Get version from Cargo.toml
-    let version = env::var("CARGO_PKG_VERSION").unwrap();
-    let version: &'static str = Box::leak(version.into_boxed_str());
+    // Note: Version information is intentionally omitted from documentation
+    // to maintain consistency between markdown and manpage formats
 
     // Path calculation to the workspace root
     let workspace_root = out_dir.join("../../../../../");
@@ -20,7 +19,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate manpages for the main command and all subcommands
     let mut cmd = git_perf_cli_types::Cli::command();
-    cmd = cmd.version(version);
     let man = clap_mangen::Man::new(cmd);
     let mut buffer: Vec<u8> = Default::default();
     man.render(&mut buffer).unwrap();
@@ -29,7 +27,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate manpages for subcommands
     let mut cmd = git_perf_cli_types::Cli::command();
-    cmd = cmd.version(version);
     for subcmd in cmd.get_subcommands() {
         let man = clap_mangen::Man::new(subcmd.clone());
         let mut buffer: Vec<u8> = Default::default();
