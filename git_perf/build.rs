@@ -6,8 +6,9 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
-    // Note: Version information is intentionally omitted from documentation
-    // to maintain consistency between markdown and manpage formats
+    // Use 0.0.0 for documentation generation to avoid version-based diffs
+    // This matches the approach used in the GitHub CI workflow
+    let version = "0.0.0";
 
     // Path calculation to the workspace root
     let workspace_root = out_dir.join("../../../../../");
@@ -19,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate manpages for the main command and all subcommands
     let mut cmd = git_perf_cli_types::Cli::command();
+    cmd = cmd.version(version);
     let man = clap_mangen::Man::new(cmd);
     let mut buffer: Vec<u8> = Default::default();
     man.render(&mut buffer).unwrap();
@@ -27,6 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate manpages for subcommands
     let mut cmd = git_perf_cli_types::Cli::command();
+    cmd = cmd.version(version);
     for subcmd in cmd.get_subcommands() {
         let man = clap_mangen::Man::new(subcmd.clone());
         let mut buffer: Vec<u8> = Default::default();
@@ -37,7 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Generate markdown documentation
-    let main_markdown = clap_markdown::help_markdown::<git_perf_cli_types::Cli>();
+    let mut cmd = git_perf_cli_types::Cli::command();
+    cmd = cmd.version(version);
+    let main_markdown = clap_markdown::help_markdown(cmd);
     let markdown_path = docs_dir.join("manpage.md");
     fs::write(&markdown_path, &main_markdown).unwrap();
 
