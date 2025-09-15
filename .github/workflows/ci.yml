@@ -176,12 +176,49 @@ jobs:
         fi
         echo "Markdown documentation is up to date ✓"
 
+    - name: Check manpages are up to date
+      run: |
+        # Check that the generated manpage files exist
+        if [[ ! -f "man/man1/git-perf.1" ]]; then
+          echo "Error: Generated manpage documentation not found at man/man1/git-perf.1"
+          exit 1
+        fi
+        
+        # Create a backup of the original manpage files for comparison
+        cp -r man/man1 /tmp/original_manpages
+        
+        # Temporarily set version to 0.0.0 to avoid version-based diffs
+        sed -i 's/^version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "0.0.0"/' git_perf/Cargo.toml
+        cargo build
+        # Restore original version
+        git checkout -- git_perf/Cargo.toml
+        
+        # Compare with the newly generated version
+        if ! diff -r /tmp/original_manpages man/man1 > /tmp/manpages.diff; then
+          echo "Error: Manpage documentation is out of date. A patch file has been created and will be uploaded as an artifact."
+          echo ""
+          echo "To fix this, run:"
+          echo "   cargo build"
+          echo ""
+          echo "The manpage documentation is automatically generated during the build process using clap_mangen."
+          exit 1
+        fi
+        echo "Manpage documentation is up to date ✓"
+
     - name: Upload markdown patch artifact
       uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: markdown-patch
         path: /tmp/markdown.diff
+        if-no-files-found: error
+
+    - name: Upload manpage patch artifact
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: manpage-patch
+        path: /tmp/manpages.diff
         if-no-files-found: error
 
   report:

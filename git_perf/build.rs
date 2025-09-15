@@ -6,9 +6,9 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
-    // Use 0.0.0 for documentation generation to avoid version-based diffs
-    // This matches the approach used in the GitHub CI workflow
-    let version = "0.0.0";
+    // Get version from Cargo.toml
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+    let version: &'static str = Box::leak(version.into_boxed_str());
 
     // Path calculation to the workspace root
     let workspace_root = out_dir.join("../../../../../");
@@ -40,9 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Generate markdown documentation
-    let mut cmd = git_perf_cli_types::Cli::command();
-    cmd = cmd.version(version);
-    let main_markdown = clap_markdown::help_markdown(cmd);
+    let main_markdown = clap_markdown::help_markdown::<git_perf_cli_types::Cli>();
     let markdown_path = docs_dir.join("manpage.md");
     fs::write(&markdown_path, &main_markdown).unwrap();
 
