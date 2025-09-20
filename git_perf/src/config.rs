@@ -258,22 +258,52 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
 #[cfg(test)]
 mod test {
     use super::*;
-    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
-    #[test]
-    #[serial]
-    fn test_read_epochs() {
+    /// Test helper to set up an independent HOME directory
+    /// This eliminates the need for #[serial] tests by ensuring each test
+    /// has its own isolated environment
+    fn with_isolated_home<F, R>(f: F) -> R
+    where
+        F: FnOnce(&Path) -> R,
+    {
         let temp_dir = TempDir::new().unwrap();
-        let original_dir = env::current_dir().unwrap();
+        let original_home = env::var("HOME").ok();
+        let original_xdg = env::var("XDG_CONFIG_HOME").ok();
 
-        // Create local config with epochs
-        let local_config_dir = temp_dir.path().join("repo");
-        fs::create_dir_all(&local_config_dir).unwrap();
-        let local_config_path = local_config_dir.join(".gitperfconfig");
+        // Set up isolated HOME directory
+        env::set_var("HOME", temp_dir.path());
+        env::remove_var("XDG_CONFIG_HOME");
 
-        let configfile = r#"[measurement."something"]
+        let result = f(temp_dir.path());
+
+        // Restore original environment
+        if let Some(home) = original_home {
+            env::set_var("HOME", home);
+        } else {
+            env::remove_var("HOME");
+        }
+        if let Some(xdg) = original_xdg {
+            env::set_var("XDG_CONFIG_HOME", xdg);
+        } else {
+            env::remove_var("XDG_CONFIG_HOME");
+        }
+
+        result
+    }
+
+    #[test]
+    fn test_read_epochs() {
+        with_isolated_home(|temp_dir| {
+            let original_dir = env::current_dir().unwrap();
+
+            // Create local config with epochs
+            let local_config_dir = temp_dir.join("repo");
+            fs::create_dir_all(&local_config_dir).unwrap();
+            let local_config_path = local_config_dir.join(".gitperfconfig");
+
+            let configfile = r#"[measurement."something"]
 #My comment
 epoch="34567898"
 
@@ -284,171 +314,165 @@ epoch="a3dead"
 # General performance regression
 epoch="12344555"
 "#;
-        fs::write(&local_config_path, configfile).unwrap();
+            fs::write(&local_config_path, configfile).unwrap();
 
-        // Set up environment
-        env::set_var("HOME", temp_dir.path());
-        env::remove_var("XDG_CONFIG_HOME");
-        env::set_current_dir(&local_config_dir).unwrap();
+            env::set_current_dir(&local_config_dir).unwrap();
 
-        // Initialize git repository so get_main_config_path works
-        std::process::Command::new("git")
-            .args(&["init", "--initial-branch=master"])
-            .current_dir(&local_config_dir)
-            .output()
-            .expect("Failed to initialize git repository");
+            // Initialize git repository so get_main_config_path works
+            std::process::Command::new("git")
+                .args(&["init", "--initial-branch=master"])
+                .current_dir(&local_config_dir)
+                .output()
+                .expect("Failed to initialize git repository");
 
-        let epoch = determine_epoch_from_config("something");
-        assert_eq!(epoch, Some(0x34567898));
+            let epoch = determine_epoch_from_config("something");
+            assert_eq!(epoch, Some(0x34567898));
 
-        let epoch = determine_epoch_from_config("somethingelse");
-        assert_eq!(epoch, Some(0xa3dead));
+            let epoch = determine_epoch_from_config("somethingelse");
+            assert_eq!(epoch, Some(0xa3dead));
 
-        let epoch = determine_epoch_from_config("unspecified");
-        assert_eq!(epoch, Some(0x12344555));
+            let epoch = determine_epoch_from_config("unspecified");
+            assert_eq!(epoch, Some(0x12344555));
 
-        // Clean up
-        env::remove_var("HOME");
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).unwrap();
-        }
+            // Clean up
+            if original_dir.exists() {
+                env::set_current_dir(&original_dir).unwrap();
+            }
+        });
     }
 
     #[test]
-    #[serial]
     fn test_bump_epochs() {
-        // Create a temporary git repository for this test
-        let temp_dir = TempDir::new().unwrap();
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
+        with_isolated_home(|temp_dir| {
+            // Create a temporary git repository for this test
+            let original_dir = env::current_dir().unwrap();
+            env::set_current_dir(temp_dir).unwrap();
 
-        // Initialize git repository
-        std::process::Command::new("git")
-            .args(&["init", "--initial-branch=master"])
-            .output()
-            .expect("Failed to initialize git repository");
+            // Initialize git repository
+            std::process::Command::new("git")
+                .args(&["init", "--initial-branch=master"])
+                .output()
+                .expect("Failed to initialize git repository");
 
-        // Set up hermetic git environment
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-        env::set_var("GIT_COMMITTER_NAME", "testuser");
-        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+            // Set up hermetic git environment
+            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            env::set_var("GIT_AUTHOR_NAME", "testuser");
+            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+            env::set_var("GIT_COMMITTER_NAME", "testuser");
+            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-        // Create a commit to have a HEAD
-        fs::write("test.txt", "test content").unwrap();
-        std::process::Command::new("git")
-            .args(&["add", "test.txt"])
-            .output()
-            .expect("Failed to add file");
-        let commit_output = std::process::Command::new("git")
-            .args(&["commit", "-m", "test commit"])
-            .output()
-            .expect("Failed to commit");
+            // Create a commit to have a HEAD
+            fs::write("test.txt", "test content").unwrap();
+            std::process::Command::new("git")
+                .args(&["add", "test.txt"])
+                .current_dir(temp_dir)
+                .output()
+                .expect("Failed to add file");
+            let commit_output = std::process::Command::new("git")
+                .args(&["commit", "-m", "test commit"])
+                .current_dir(temp_dir)
+                .output()
+                .expect("Failed to commit");
 
-        // Verify commit was successful
-        if !commit_output.status.success() {
-            panic!(
-                "Git commit failed: {}",
-                String::from_utf8_lossy(&commit_output.stderr)
-            );
-        }
+            // Verify commit was successful
+            if !commit_output.status.success() {
+                panic!(
+                    "Git commit failed: {}",
+                    String::from_utf8_lossy(&commit_output.stderr)
+                );
+            }
 
-        let configfile = r#"[measurement."something"]
+            let configfile = r#"[measurement."something"]
 #My comment
 epoch = "34567898"
 "#;
 
-        let mut actual = String::from(configfile);
-        bump_epoch_in_conf("something", &mut actual).expect("Failed to bump epoch");
+            let mut actual = String::from(configfile);
+            bump_epoch_in_conf("something", &mut actual).expect("Failed to bump epoch");
 
-        let expected = format!(
-            r#"[measurement."something"]
+            let expected = format!(
+                r#"[measurement."something"]
 #My comment
 epoch = "{}"
 "#,
-            &get_head_revision().expect("get_head_revision failed")[0..8],
-        );
+                &get_head_revision().expect("get_head_revision failed")[0..8],
+            );
 
-        assert_eq!(actual, expected);
+            assert_eq!(actual, expected);
 
-        // Restore original directory
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
+            // Restore original directory
+            // Ensure original directory still exists before changing back
+            if original_dir.exists() {
+                env::set_current_dir(original_dir).unwrap();
+            }
+        });
     }
 
     #[test]
-    #[serial]
     fn test_bump_new_epoch_and_read_it() {
-        // Create a temporary git repository for this test
-        let temp_dir = TempDir::new().unwrap();
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
+        with_isolated_home(|temp_dir| {
+            // Create a temporary git repository for this test
+            let original_dir = env::current_dir().unwrap();
+            env::set_current_dir(temp_dir).unwrap();
 
-        // Initialize git repository
-        std::process::Command::new("git")
-            .args(&["init", "--initial-branch=master"])
-            .output()
-            .expect("Failed to initialize git repository");
+            // Initialize git repository
+            std::process::Command::new("git")
+                .args(&["init", "--initial-branch=master"])
+                .output()
+                .expect("Failed to initialize git repository");
 
-        // Set up hermetic git environment
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-        env::set_var("GIT_COMMITTER_NAME", "testuser");
-        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+            // Set up hermetic git environment
+            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            env::set_var("GIT_AUTHOR_NAME", "testuser");
+            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+            env::set_var("GIT_COMMITTER_NAME", "testuser");
+            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-        // Create a commit to have a HEAD
-        fs::write("test.txt", "test content").unwrap();
-        std::process::Command::new("git")
-            .args(&["add", "test.txt"])
-            .output()
-            .expect("Failed to add file");
-        let commit_output = std::process::Command::new("git")
-            .args(&["commit", "-m", "test commit"])
-            .output()
-            .expect("Failed to commit");
+            // Create a commit to have a HEAD
+            fs::write("test.txt", "test content").unwrap();
+            std::process::Command::new("git")
+                .args(&["add", "test.txt"])
+                .output()
+                .expect("Failed to add file");
+            let commit_output = std::process::Command::new("git")
+                .args(&["commit", "-m", "test commit"])
+                .output()
+                .expect("Failed to commit");
 
-        // Verify commit was successful
-        if !commit_output.status.success() {
-            panic!(
-                "Git commit failed: {}",
-                String::from_utf8_lossy(&commit_output.stderr)
-            );
-        }
+            // Verify commit was successful
+            if !commit_output.status.success() {
+                panic!(
+                    "Git commit failed: {}",
+                    String::from_utf8_lossy(&commit_output.stderr)
+                );
+            }
 
-        let mut conf = String::new();
-        bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
+            let mut conf = String::new();
+            bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
 
-        // Write the config to a file and test reading it
-        let config_path = temp_dir.path().join(".gitperfconfig");
-        fs::write(&config_path, &conf).unwrap();
+            // Write the config to a file and test reading it
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(&config_path, &conf).unwrap();
 
-        // Set up environment for hierarchical config
-        env::set_var("HOME", temp_dir.path());
-        env::remove_var("XDG_CONFIG_HOME");
+            let epoch = determine_epoch_from_config("mymeasurement");
+            assert!(epoch.is_some());
 
-        let epoch = determine_epoch_from_config("mymeasurement");
-        assert!(epoch.is_some());
+            // Clean up environment
+            env::remove_var("GIT_CONFIG_NOSYSTEM");
+            env::remove_var("GIT_CONFIG_GLOBAL");
+            env::remove_var("GIT_AUTHOR_NAME");
+            env::remove_var("GIT_AUTHOR_EMAIL");
+            env::remove_var("GIT_COMMITTER_NAME");
+            env::remove_var("GIT_COMMITTER_EMAIL");
 
-        // Clean up environment
-        env::remove_var("HOME");
-        env::remove_var("GIT_CONFIG_NOSYSTEM");
-        env::remove_var("GIT_CONFIG_GLOBAL");
-        env::remove_var("GIT_AUTHOR_NAME");
-        env::remove_var("GIT_AUTHOR_EMAIL");
-        env::remove_var("GIT_COMMITTER_NAME");
-        env::remove_var("GIT_COMMITTER_EMAIL");
-
-        // Restore original directory
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
+            // Restore original directory
+            // Ensure original directory still exists before changing back
+            if original_dir.exists() {
+                env::set_current_dir(original_dir).unwrap();
+            }
+        });
     }
 
     #[test]
@@ -472,7 +496,6 @@ epoch = "{}"
     }
 
     #[test]
-    #[serial]
     fn test_backoff_max_elapsed_seconds() {
         let temp_dir = TempDir::new().unwrap();
         let original_dir = env::current_dir().unwrap();
@@ -505,86 +528,81 @@ epoch = "{}"
     }
 
     #[test]
-    #[serial]
     fn test_audit_min_relative_deviation() {
-        let temp_dir = TempDir::new().unwrap();
-        let original_dir = env::current_dir().unwrap();
+        with_isolated_home(|temp_dir| {
+            let original_dir = env::current_dir().unwrap();
 
-        // Create local config with measurement-specific settings
-        let local_config_dir = temp_dir.path().join("repo");
-        fs::create_dir_all(&local_config_dir).unwrap();
-        let local_config_path = local_config_dir.join(".gitperfconfig");
+            // Create local config with measurement-specific settings
+            let local_config_dir = temp_dir.join("repo");
+            fs::create_dir_all(&local_config_dir).unwrap();
+            let local_config_path = local_config_dir.join(".gitperfconfig");
 
-        let local_config = r#"
+            let local_config = r#"
 [audit.measurement."build_time"]
 min_relative_deviation = 10.0
 
 [audit.measurement."memory_usage"]
 min_relative_deviation = 2.5
 "#;
-        fs::write(&local_config_path, local_config).unwrap();
+            fs::write(&local_config_path, local_config).unwrap();
 
-        // Set up environment
-        env::set_var("HOME", temp_dir.path());
-        env::remove_var("XDG_CONFIG_HOME");
-        env::set_current_dir(&local_config_dir).unwrap();
+            env::set_current_dir(&local_config_dir).unwrap();
 
-        // Test measurement-specific settings
-        assert_eq!(
-            super::audit_min_relative_deviation("build_time"),
-            Some(10.0)
-        );
-        assert_eq!(
-            super::audit_min_relative_deviation("memory_usage"),
-            Some(2.5)
-        );
-        assert_eq!(
-            super::audit_min_relative_deviation("other_measurement"),
-            None
-        );
+            // Test measurement-specific settings
+            assert_eq!(
+                super::audit_min_relative_deviation("build_time"),
+                Some(10.0)
+            );
+            assert_eq!(
+                super::audit_min_relative_deviation("memory_usage"),
+                Some(2.5)
+            );
+            assert_eq!(
+                super::audit_min_relative_deviation("other_measurement"),
+                None
+            );
 
-        // Test global setting
-        let global_config = r#"
+            // Test global setting
+            let global_config = r#"
 [audit.global]
 min_relative_deviation = 5.0
 "#;
-        fs::write(&local_config_path, global_config).unwrap();
-        assert_eq!(
-            super::audit_min_relative_deviation("any_measurement"),
-            Some(5.0)
-        );
+            fs::write(&local_config_path, global_config).unwrap();
+            assert_eq!(
+                super::audit_min_relative_deviation("any_measurement"),
+                Some(5.0)
+            );
 
-        // Test precedence - measurement-specific overrides global
-        let precedence_config = r#"
+            // Test precedence - measurement-specific overrides global
+            let precedence_config = r#"
 [audit.global]
 min_relative_deviation = 5.0
 
 [audit.measurement."build_time"]
 min_relative_deviation = 10.0
 "#;
-        fs::write(&local_config_path, precedence_config).unwrap();
-        assert_eq!(
-            super::audit_min_relative_deviation("build_time"),
-            Some(10.0)
-        );
-        assert_eq!(
-            super::audit_min_relative_deviation("other_measurement"),
-            Some(5.0)
-        );
+            fs::write(&local_config_path, precedence_config).unwrap();
+            assert_eq!(
+                super::audit_min_relative_deviation("build_time"),
+                Some(10.0)
+            );
+            assert_eq!(
+                super::audit_min_relative_deviation("other_measurement"),
+                Some(5.0)
+            );
 
-        // Test no config
-        fs::remove_file(&local_config_path).unwrap();
-        assert_eq!(super::audit_min_relative_deviation("any_measurement"), None);
+            // Test no config
+            fs::remove_file(&local_config_path).unwrap();
+            assert_eq!(super::audit_min_relative_deviation("any_measurement"), None);
 
-        // Clean up
-        env::remove_var("HOME");
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).unwrap();
-        }
+            // Clean up
+            if original_dir.exists() {
+                env::set_current_dir(&original_dir).unwrap();
+            }
+        });
     }
 
     #[test]
-    #[serial]
     fn test_audit_dispersion_method() {
         let temp_dir = TempDir::new().unwrap();
         let original_dir = env::current_dir().unwrap();
@@ -695,7 +713,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_find_config_path_xdg_config_home() {
         let temp_dir = TempDir::new().unwrap();
         let xdg_config_dir = temp_dir.path().join("git-perf");
@@ -732,7 +749,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_find_config_path_home_fallback() {
         let temp_dir = TempDir::new().unwrap();
         let home_config_dir = temp_dir.path().join(".config").join("git-perf");
@@ -784,7 +800,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_find_config_path_not_found() {
         // Ensure no config exists in current directory or XDG locations
         let original_dir = env::current_dir().unwrap();
@@ -805,7 +820,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_determine_epoch_from_config_with_missing_file() {
         // Test that missing config file doesn't panic and returns None
         let original_dir = env::current_dir().unwrap();
@@ -824,7 +838,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_determine_epoch_from_config_with_invalid_toml() {
         let temp_dir = TempDir::new().unwrap();
         let config_path = temp_dir.path().join(".gitperfconfig");
@@ -845,7 +858,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_write_config_creates_directories() {
         let temp_dir = TempDir::new().unwrap();
         let nested_dir = temp_dir.path().join("a").join("b").join("c");
@@ -880,7 +892,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_hierarchical_config_system_override() {
         let temp_dir = TempDir::new().unwrap();
         let original_dir = env::current_dir().unwrap();
@@ -977,7 +988,6 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    #[serial]
     fn test_write_config_always_goes_to_repo_root() {
         let temp_dir = TempDir::new().unwrap();
         let original_dir = env::current_dir().unwrap();
