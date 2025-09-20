@@ -25,7 +25,7 @@ cp docs/manpage.md /tmp/original_markdown.md
 cp man/man1/git-perf.1 /tmp/original_manpage.1
 
 # Generate manpages and markdown documentation with normalized version
-CARGO_PKG_VERSION="$NORMALIZED_VERSION" cargo build
+GIT_PERF_DOC_VERSION="$NORMALIZED_VERSION" cargo build --package git_perf_cli_types --package git-perf
 
 # Compare markdown documentation
 if ! diff -u /tmp/original_markdown.md docs/manpage.md > /tmp/markdown.diff; then
