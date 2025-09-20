@@ -40,6 +40,14 @@ cargo nextest run --skip slow
 - Run `./scripts/generate-manpages.sh` and commit regenerated documentation
 - Commit the regenerated docs alongside the code changes
 
+### Manpage Documentation
+
+- **Always update manpages** when making CLI changes (commands, arguments, descriptions)
+- Run `./scripts/generate-manpages.sh` to regenerate manpages and markdown docs
+- Manpages are automatically generated using `clap_mangen` and `clap_markdown`
+- CI validates that documentation stays up-to-date with CLI definitions
+- Use `GIT_PERF_VERSION=1.0.0 ./scripts/generate-manpages.sh` for custom versioning
+
 ## Pull Request Standards
 
 - Pull Request titles must follow the Conventional Commits specification:
