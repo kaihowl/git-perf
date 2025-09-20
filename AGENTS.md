@@ -115,4 +115,4 @@ cargo fmt --check
 cargo clippy --version
 ```
 
-The project includes a `rustfmt.toml` configuration file to ensure consistent formatting across all environments.
+The project uses the default rustfmt configuration for consistent formatting across all environments.
