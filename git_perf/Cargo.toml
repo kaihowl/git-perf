@@ -38,6 +38,7 @@ toml = "0.8.6"
 toml_edit = "0.20.4"
 unindent = "0.2.3"
 dirs-next = "2.0.0"
+config = "0.14"
 
 [build-dependencies]
 clap = { version="4", features=["derive"] }
