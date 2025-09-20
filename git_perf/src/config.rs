@@ -232,28 +232,12 @@ mod test {
         F: FnOnce(&Path) -> R,
     {
         let temp_dir = TempDir::new().unwrap();
-        let original_home = env::var("HOME").ok();
-        let original_xdg = env::var("XDG_CONFIG_HOME").ok();
 
         // Set up isolated HOME directory
         env::set_var("HOME", temp_dir.path());
         env::remove_var("XDG_CONFIG_HOME");
 
-        let result = f(temp_dir.path());
-
-        // Restore original environment
-        if let Some(home) = original_home {
-            env::set_var("HOME", home);
-        } else {
-            env::remove_var("HOME");
-        }
-        if let Some(xdg) = original_xdg {
-            env::set_var("XDG_CONFIG_HOME", xdg);
-        } else {
-            env::remove_var("XDG_CONFIG_HOME");
-        }
-
-        result
+        f(temp_dir.path())
     }
 
     #[test]
