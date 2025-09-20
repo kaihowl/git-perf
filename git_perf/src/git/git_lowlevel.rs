@@ -243,7 +243,6 @@ mod test {
     #[test]
     fn test_get_head_revision() {
         let repo_dir = dir_with_repo();
-        set_current_dir(repo_dir.path()).expect("Failed to change dir");
         let revision = internal_get_head_revision().unwrap();
         assert!(
             &revision.chars().all(|c| c.is_ascii_alphanumeric()),
