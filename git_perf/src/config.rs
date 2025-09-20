@@ -70,34 +70,15 @@ pub fn read_hierarchical_config() -> Result<Config, ConfigError> {
 }
 
 fn find_config_path() -> Option<PathBuf> {
-    if let Ok(mut current_dir) = env::current_dir() {
-        loop {
-            let candidate = current_dir.join(".gitperfconfig");
+    // Only look for .gitperfconfig in the git repository root
+    if let Ok(repo_root) = get_repository_root() {
+        if !repo_root.is_empty() {
+            let candidate = PathBuf::from(repo_root).join(".gitperfconfig");
             if candidate.is_file() {
                 return Some(candidate);
             }
-            if !current_dir.pop() {
-                break;
-            }
         }
     }
-
-    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
-        let candidate = Path::new(&xdg_config_home)
-            .join("git-perf")
-            .join("config.toml");
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-
-    if let Some(home) = dirs_next::home_dir() {
-        let candidate = home.join(".config").join("git-perf").join("config.toml");
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-
     None
 }
 
@@ -624,113 +605,106 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    fn test_find_config_path_upward_search() {
-        let temp_dir = TempDir::new().unwrap();
-        let subdir = temp_dir.path().join("subdir");
-        fs::create_dir_all(&subdir).unwrap();
+    fn test_find_config_path_in_git_root() {
+        with_isolated_home(|temp_dir| {
+            // Create a git repository
+            env::set_current_dir(temp_dir).unwrap();
 
-        // Create config in parent directory
-        let config_path = temp_dir.path().join(".gitperfconfig");
-        fs::write(
-            &config_path,
-            "[measurement.\"test\"]\nepoch = \"12345678\"\n",
-        )
-        .unwrap();
+            // Initialize git repository
+            std::process::Command::new("git")
+                .args(&["init", "--initial-branch=master"])
+                .output()
+                .expect("Failed to initialize git repository");
 
-        // Change to subdirectory and test upward search
-        let original_dir = env::current_dir().unwrap();
-        env::set_current_dir(&subdir).unwrap();
+            // Create config in git root
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[measurement.\"test\"]\nepoch = \"12345678\"\n",
+            )
+            .unwrap();
 
-        let found_path = find_config_path();
-        assert!(found_path.is_some());
-        assert_eq!(found_path.unwrap(), config_path);
-    }
-
-    #[test]
-    fn test_find_config_path_xdg_config_home() {
-        let temp_dir = TempDir::new().unwrap();
-        let xdg_config_dir = temp_dir.path().join("git-perf");
-        fs::create_dir_all(&xdg_config_dir).unwrap();
-
-        let config_path = xdg_config_dir.join("config.toml");
-        fs::write(
-            &config_path,
-            "[measurement.\"test\"]\nepoch = \"12345678\"\n",
-        )
-        .unwrap();
-
-        // Change to a clean directory to avoid finding workspace .gitperfconfig
-        let original_dir = env::current_dir().unwrap();
-        let clean_dir = temp_dir.path().join("clean");
-        fs::create_dir_all(&clean_dir).unwrap();
-        env::set_current_dir(&clean_dir).unwrap();
-
-        // Set XDG_CONFIG_HOME and test
-        env::set_var("XDG_CONFIG_HOME", temp_dir.path());
-        let found_path = find_config_path();
-        assert!(found_path.is_some());
-        assert_eq!(found_path.unwrap(), config_path);
-    }
-
-    #[test]
-    fn test_find_config_path_home_fallback() {
-        let temp_dir = TempDir::new().unwrap();
-        let home_config_dir = temp_dir.path().join(".config").join("git-perf");
-        fs::create_dir_all(&home_config_dir).unwrap();
-
-        let config_path = home_config_dir.join("config.toml");
-        fs::write(
-            &config_path,
-            "[measurement.\"test\"]\nepoch = \"12345678\"\n",
-        )
-        .unwrap();
-
-        // Change to a clean directory to avoid finding workspace .gitperfconfig
-        let original_dir = env::current_dir().unwrap();
-        let clean_dir = temp_dir.path().join("clean");
-        fs::create_dir_all(&clean_dir).unwrap();
-        env::set_current_dir(&clean_dir).unwrap();
-
-        // Initialize git repository in clean directory to avoid finding workspace config
-        std::process::Command::new("git")
-            .args(&["init", "--initial-branch=master"])
-            .current_dir(&clean_dir)
-            .output()
-            .expect("Failed to initialize git repository");
-
-        // Mock home directory by setting both HOME and XDG_CONFIG_HOME to empty
-        let original_home = env::var("HOME").ok();
-        let original_xdg = env::var("XDG_CONFIG_HOME").ok();
-        env::set_var("HOME", temp_dir.path());
-        env::remove_var("XDG_CONFIG_HOME");
-
-        let found_path = find_config_path();
-        assert!(found_path.is_some());
-        assert_eq!(found_path.unwrap(), config_path);
-
-        // Restore original environment
-        if let Some(home) = original_home {
-            env::set_var("HOME", home);
-        } else {
-            env::remove_var("HOME");
-        }
-        if let Some(xdg) = original_xdg {
-            env::set_var("XDG_CONFIG_HOME", xdg);
-        }
+            // Test that find_config_path finds it
+            let found_path = find_config_path();
+            assert!(found_path.is_some());
+            assert_eq!(found_path.unwrap(), config_path);
+        });
     }
 
     #[test]
     fn test_find_config_path_not_found() {
-        // Ensure no config exists in current directory or XDG locations
-        let original_dir = env::current_dir().unwrap();
-        let temp_dir = TempDir::new().unwrap();
-        fs::create_dir_all(temp_dir.path()).unwrap();
-        env::set_current_dir(temp_dir.path()).unwrap();
-        env::remove_var("XDG_CONFIG_HOME");
-        env::remove_var("HOME");
+        with_isolated_home(|temp_dir| {
+            // Create a git repository but no .gitperfconfig
+            env::set_current_dir(temp_dir).unwrap();
 
-        let found_path = find_config_path();
-        assert!(found_path.is_none());
+            // Initialize git repository
+            std::process::Command::new("git")
+                .args(&["init", "--initial-branch=master"])
+                .output()
+                .expect("Failed to initialize git repository");
+
+            // Test that find_config_path returns None when no .gitperfconfig exists
+            let found_path = find_config_path();
+            assert!(found_path.is_none());
+        });
+    }
+
+    #[test]
+    fn test_hierarchical_config_workspace_overrides_home() {
+        with_isolated_home(|temp_dir| {
+            // Create a git repository
+            env::set_current_dir(temp_dir).unwrap();
+
+            // Initialize git repository
+            std::process::Command::new("git")
+                .args(&["init", "--initial-branch=master"])
+                .output()
+                .expect("Failed to initialize git repository");
+
+            // Create home config
+            let home_config_dir = temp_dir.join(".config").join("git-perf");
+            fs::create_dir_all(&home_config_dir).unwrap();
+            let home_config_path = home_config_dir.join("config.toml");
+            fs::write(
+                &home_config_path,
+                r#"
+[measurement."test"]
+backoff_max_elapsed_seconds = 30
+audit_min_relative_deviation = 1.0
+"#,
+            )
+            .unwrap();
+
+            // Create workspace config that overrides some values
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &workspace_config_path,
+                r#"
+[measurement."test"]
+backoff_max_elapsed_seconds = 60
+"#,
+            )
+            .unwrap();
+
+            // Set HOME to our temp directory
+            env::set_var("HOME", temp_dir);
+            env::remove_var("XDG_CONFIG_HOME");
+
+            // Read hierarchical config and verify workspace overrides home
+            let config = read_hierarchical_config().unwrap();
+
+            // backoff_max_elapsed_seconds should be overridden by workspace config
+            let backoff: i32 = config
+                .get("measurement.test.backoff_max_elapsed_seconds")
+                .unwrap();
+            assert_eq!(backoff, 60);
+
+            // audit_min_relative_deviation should come from home config
+            let deviation: f64 = config
+                .get("measurement.test.audit_min_relative_deviation")
+                .unwrap();
+            assert_eq!(deviation, 1.0);
+        });
     }
 
     #[test]
