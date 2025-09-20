@@ -865,7 +865,6 @@ mod test {
 
     #[test]
     fn test_customheader_pull() {
-        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
 
@@ -894,7 +893,6 @@ mod test {
 
     #[test]
     fn test_customheader_push() {
-        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
 
