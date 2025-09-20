@@ -294,6 +294,7 @@ epoch="12344555"
         // Initialize git repository so get_main_config_path works
         std::process::Command::new("git")
             .args(&["init", "--initial-branch=master"])
+            .current_dir(&local_config_dir)
             .output()
             .expect("Failed to initialize git repository");
 
@@ -750,6 +751,13 @@ dispersion_method = "stddev"
         fs::create_dir_all(&clean_dir).unwrap();
         env::set_current_dir(&clean_dir).unwrap();
 
+        // Initialize git repository in clean directory to avoid finding workspace config
+        std::process::Command::new("git")
+            .args(&["init", "--initial-branch=master"])
+            .current_dir(&clean_dir)
+            .output()
+            .expect("Failed to initialize git repository");
+
         // Mock home directory by setting both HOME and XDG_CONFIG_HOME to empty
         let original_home = env::var("HOME").ok();
         let original_xdg = env::var("XDG_CONFIG_HOME").ok();
@@ -1002,13 +1010,15 @@ dispersion_method = "stddev"
         env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
         // Create a commit to have a HEAD
-        fs::write("test.txt", "test content").unwrap();
+        fs::write(repo_root.join("test.txt"), "test content").unwrap();
         std::process::Command::new("git")
             .args(&["add", "test.txt"])
+            .current_dir(&repo_root)
             .output()
             .expect("Failed to add file");
         std::process::Command::new("git")
             .args(&["commit", "-m", "test commit"])
+            .current_dir(&repo_root)
             .output()
             .expect("Failed to commit");
 
