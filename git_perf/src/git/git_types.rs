@@ -3,13 +3,13 @@ use std::io;
 use super::git_definitions::GIT_PERF_REMOTE;
 
 #[derive(Debug)]
-pub struct GitOutput {
+pub(super) struct GitOutput {
     pub stdout: String,
     pub stderr: String,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum GitError {
+pub(super) enum GitError {
     #[error("A ref failed to be pushed:\n{0}\n{1}", output.stdout, output.stderr)]
     RefFailedToPush { output: GitOutput },
 

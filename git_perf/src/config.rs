@@ -61,21 +61,27 @@ pub fn read_hierarchical_config() -> Result<Config, ConfigError> {
         let system_config_path = Path::new(&xdg_config_home)
             .join("git-perf")
             .join("config.toml");
-        if system_config_path.is_file() {
-            builder = builder.add_source(File::from(system_config_path).format(FileFormat::Toml));
-        }
+        builder = builder.add_source(
+            File::from(system_config_path)
+                .format(FileFormat::Toml)
+                .required(false),
+        );
     } else if let Some(home) = dirs_next::home_dir() {
         let system_config_path = home.join(".config").join("git-perf").join("config.toml");
-        if system_config_path.is_file() {
-            builder = builder.add_source(File::from(system_config_path).format(FileFormat::Toml));
-        }
+        builder = builder.add_source(
+            File::from(system_config_path)
+                .format(FileFormat::Toml)
+                .required(false),
+        );
     }
 
     // 2. Local config (repository .gitperfconfig) - this overrides system config
     if let Some(local_path) = find_config_path() {
-        if local_path.is_file() {
-            builder = builder.add_source(File::from(local_path).format(FileFormat::Toml));
-        }
+        builder = builder.add_source(
+            File::from(local_path)
+                .format(FileFormat::Toml)
+                .required(false),
+        );
     }
 
     builder.build()
