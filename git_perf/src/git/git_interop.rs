@@ -806,7 +806,6 @@ mod test {
         responders::status_code,
         Expectation, Server,
     };
-    use serial_test::serial;
     use tempfile::{tempdir, TempDir};
 
     fn run_git_command(args: &[&str], dir: &Path) {
@@ -864,7 +863,6 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_customheader_pull() {
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
@@ -893,7 +891,6 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_customheader_push() {
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
@@ -947,7 +944,6 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_empty_or_never_pushed_remote_error_for_fetch() {
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
@@ -974,7 +970,6 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_empty_or_never_pushed_remote_error_for_push() {
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
