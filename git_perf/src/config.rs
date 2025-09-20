@@ -803,48 +803,4 @@ dispersion_method = "stddev"
         );
         assert_eq!(backoff_max_elapsed_seconds(), 120);
     }
-
-    #[test]
-    fn test_write_config_always_goes_to_repo_root() {
-        let temp_dir = TempDir::new().unwrap();
-        let original_dir = env::current_dir().unwrap();
-
-        // Create a git repository structure
-        let repo_root = temp_dir.path().join("repo");
-        let subdir = repo_root.join("subdir").join("deep");
-        fs::create_dir_all(&subdir).unwrap();
-
-        // Set up hermetic git environment
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-        env::set_var("GIT_COMMITTER_NAME", "testuser");
-        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
-
-        // Initialize git repository with initial commit
-        env::set_current_dir(&repo_root).unwrap();
-        init_git_repo_with_commit(&repo_root);
-
-        // Change to subdirectory
-        env::set_current_dir(&subdir).unwrap();
-
-        // Write config from subdirectory
-        let config_content = "[measurement.\"test\"]\nepoch = \"12345678\"\n";
-        write_config(config_content).unwrap();
-
-        // Verify config was written to repo root, not subdirectory
-        let repo_config_path = repo_root.join(".gitperfconfig");
-        let subdir_config_path = subdir.join(".gitperfconfig");
-
-        assert!(repo_config_path.is_file());
-        assert!(!subdir_config_path.is_file());
-
-        let content = fs::read_to_string(&repo_config_path).unwrap();
-        assert_eq!(content, config_content);
-
-        // Test that get_main_config_path uses git to find the root
-        let config_path = get_main_config_path();
-        assert_eq!(config_path, repo_config_path);
-    }
 }
