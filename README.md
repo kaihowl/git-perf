@@ -145,9 +145,14 @@ For evaluating the statistical robustness of different dispersion methods (stdde
 Both manpages and markdown documentation are automatically generated during the build process using `clap_mangen` and `clap_markdown`. To regenerate the documentation:
 
 ```bash
-# Build the project to generate both manpages and markdown documentation
-cargo build
+# Generate manpages and markdown documentation with normalized version (defaults to 0.0.0)
+./scripts/generate-manpages.sh
+
+# Or with a custom version
+GIT_PERF_VERSION=1.0.0 ./scripts/generate-manpages.sh
 ```
+
+The script uses the `GIT_PERF_VERSION` environment variable to set a normalized version for documentation generation, avoiding version-based diffs. If not specified, it defaults to `0.0.0`.
 
 The documentation is automatically generated during the build process:
 - Manpages are written to `target/man/man1/` directory
@@ -171,11 +176,44 @@ fi
 ```
 
 ## Rust tests
+
+This project uses [nextest](https://nexte.st/) for faster, more reliable test execution.
+
+### Running Tests with Nextest
+
+**Basic test run:**
+```bash
+cargo nextest run
 ```
+
+**Skip slow tests (recommended for development):**
+```bash
+cargo nextest run --skip slow
+```
+
+**Run specific test patterns:**
+```bash
+cargo nextest run --test-pattern "git_interop"
+```
+
+**Run tests with verbose output:**
+```bash
+cargo nextest run --verbose
+```
+
+**Run tests in a specific package:**
+```bash
+cargo nextest run -p git-perf
+```
+
+### Legacy Cargo Test Commands
+
+If you prefer to use the standard cargo test runner:
+```bash
 cargo test
 ```
 
-Exclude slow integration tests with:
-```
+Exclude slow integration tests:
+```bash
 cargo test -- --skip slow
 ```

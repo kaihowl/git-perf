@@ -1,0 +1,10 @@
+[profile.default]
+# Use the default profile for fast, parallel test execution
+retries = 0
+test-threads = "num-cpus"
+slow-timeout = "60s"
+leak-timeout = "5s"
+
+# Test output configuration
+failure-output = "immediate-final"
+success-output = "immediate"
