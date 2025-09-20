@@ -217,7 +217,3 @@ Exclude slow integration tests:
 ```bash
 cargo test -- --skip slow
 ```
-
-### Test Configuration
-
-The project has been migrated to use nextest for parallel test execution. Tests that previously required serial execution due to shared resources now are properly isolated into separate processes.
