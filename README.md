@@ -145,8 +145,8 @@ For evaluating the statistical robustness of different dispersion methods (stdde
 Both manpages and markdown documentation are automatically generated during the build process using `clap_mangen` and `clap_markdown`. To regenerate the documentation:
 
 ```bash
-# Build the project to generate both manpages and markdown documentation
-cargo build
+# Generate manpages and markdown documentation with version normalization
+./scripts/generate-manpages.sh
 ```
 
 The documentation is automatically generated during the build process:

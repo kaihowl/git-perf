@@ -149,32 +149,7 @@ jobs:
         toolchain: stable
     - name: Check markdown is up to date
       run: |
-        # Check that the generated markdown file exists
-        if [[ ! -f "docs/manpage.md" ]]; then
-          echo "Error: Generated markdown documentation not found at docs/manpage.md"
-          exit 1
-        fi
-        
-        # Create a backup of the original file for comparison
-        cp docs/manpage.md /tmp/original_markdown.md
-        
-        # Temporarily set version to 0.0.0 to avoid version-based diffs
-        sed -i 's/^version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/version = "0.0.0"/' git_perf/Cargo.toml
-        cargo build
-        # Restore original version
-        git checkout -- git_perf/Cargo.toml
-        
-        # Compare with the newly generated version
-        if ! diff -u /tmp/original_markdown.md docs/manpage.md > /tmp/markdown.diff; then
-          echo "Error: Markdown documentation is out of date. A patch file has been created and will be uploaded as an artifact."
-          echo ""
-          echo "To fix this, run:"
-          echo "   cargo build"
-          echo ""
-          echo "The markdown documentation is automatically generated during the build process using clap_markdown."
-          exit 1
-        fi
-        echo "Markdown documentation is up to date ✓"
+        ./scripts/generate-manpages.sh
 
     - name: Upload markdown patch artifact
       uses: actions/upload-artifact@v4
