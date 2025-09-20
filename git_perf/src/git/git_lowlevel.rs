@@ -208,8 +208,8 @@ mod test {
     use super::*;
     use std::env::set_current_dir;
 
-    use tempfile::{tempdir, TempDir};
     use crate::test_utils::TEST_MUTEX;
+    use tempfile::{tempdir, TempDir};
 
     fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")

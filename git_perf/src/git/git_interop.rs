@@ -800,6 +800,7 @@ mod test {
     use std::env::{self, set_current_dir};
     use std::process;
 
+    use crate::test_utils::TEST_MUTEX;
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
         matchers::{self, request},
@@ -807,7 +808,6 @@ mod test {
         Expectation, Server,
     };
     use tempfile::{tempdir, TempDir};
-    use crate::test_utils::TEST_MUTEX;
 
     fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")
