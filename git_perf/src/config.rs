@@ -1,7 +1,8 @@
 use anyhow::Result;
+use config::{Config, ConfigError, File, FileFormat};
 use std::{
     env,
-    fs::{self, File},
+    fs::{self, File as StdFile},
     io::{Read, Write},
     path::{Path, PathBuf},
 };
@@ -12,18 +13,70 @@ use crate::git::git_interop::get_head_revision;
 // Import the CLI types for dispersion method
 use git_perf_cli_types::DispersionMethod;
 
+/// Get the main repository config path (always in repo root)
+fn get_main_config_path() -> PathBuf {
+    if let Ok(mut current_dir) = env::current_dir() {
+        loop {
+            let candidate = current_dir.join(".gitperfconfig");
+            if candidate.is_file() {
+                return candidate;
+            }
+            // Check if we're in a git repository
+            if current_dir.join(".git").is_dir() {
+                return candidate;
+            }
+            if !current_dir.pop() {
+                break;
+            }
+        }
+    }
+    // Fallback to current directory
+    PathBuf::from(".gitperfconfig")
+}
+
+/// Write config to the main repository directory (always in repo root)
 pub fn write_config(conf: &str) -> Result<()> {
-    let path = find_config_path().unwrap_or_else(|| PathBuf::from(".gitperfconfig"));
+    let path = get_main_config_path();
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent)?;
         }
     }
-    let mut f = File::create(path)?;
+    let mut f = StdFile::create(path)?;
     f.write_all(conf.as_bytes())?;
     Ok(())
 }
 
+/// Read hierarchical configuration (system -> local override)
+pub fn read_hierarchical_config() -> Result<Config, ConfigError> {
+    let mut builder = Config::builder();
+
+    // 1. System-wide config (XDG_CONFIG_HOME or ~/.config/git-perf/config.toml)
+    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
+        let system_config_path = Path::new(&xdg_config_home)
+            .join("git-perf")
+            .join("config.toml");
+        if system_config_path.is_file() {
+            builder = builder.add_source(File::from(system_config_path).format(FileFormat::Toml));
+        }
+    } else if let Some(home) = dirs_next::home_dir() {
+        let system_config_path = home.join(".config").join("git-perf").join("config.toml");
+        if system_config_path.is_file() {
+            builder = builder.add_source(File::from(system_config_path).format(FileFormat::Toml));
+        }
+    }
+
+    // 2. Local config (repository .gitperfconfig) - this overrides system config
+    if let Some(local_path) = find_config_path() {
+        if local_path.is_file() {
+            builder = builder.add_source(File::from(local_path).format(FileFormat::Toml));
+        }
+    }
+
+    builder.build()
+}
+
+/// Read config as string (for backward compatibility)
 pub fn read_config() -> Result<String> {
     if let Some(path) = find_config_path() {
         return read_config_from_file(path);
@@ -65,11 +118,27 @@ fn find_config_path() -> Option<PathBuf> {
 
 fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
     let mut conf_str = String::new();
-    File::open(file)?.read_to_string(&mut conf_str)?;
+    StdFile::open(file)?.read_to_string(&mut conf_str)?;
     Ok(conf_str)
 }
 
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
+    // Try hierarchical config first
+    if let Ok(config) = read_hierarchical_config() {
+        if let Ok(epoch_str) = config.get_string(&format!("measurement.{}.epoch", measurement)) {
+            if let Ok(epoch) = u32::from_str_radix(&epoch_str, 16) {
+                return Some(epoch);
+            }
+        }
+        // Try wildcard fallback
+        if let Ok(epoch_str) = config.get_string("measurement.*.epoch") {
+            if let Ok(epoch) = u32::from_str_radix(&epoch_str, 16) {
+                return Some(epoch);
+            }
+        }
+    }
+
+    // Fallback to old method for backward compatibility
     let conf = match read_config() {
         Ok(conf) => conf,
         Err(e) => {
@@ -136,6 +205,14 @@ pub fn backoff_max_elapsed_seconds_from_str(conf: &str) -> u64 {
 
 /// Returns the backoff max elapsed seconds from config, or 60 if not set.
 pub fn backoff_max_elapsed_seconds() -> u64 {
+    // Try hierarchical config first
+    if let Ok(config) = read_hierarchical_config() {
+        if let Ok(seconds) = config.get_int("backoff.max_elapsed_seconds") {
+            return seconds as u64;
+        }
+    }
+
+    // Fallback to old method
     backoff_max_elapsed_seconds_from_str(read_config().unwrap_or_default().as_str())
 }
 
@@ -170,6 +247,22 @@ pub fn audit_min_relative_deviation_from_str(conf: &str, measurement: &str) -> O
 
 /// Returns the minimum relative deviation threshold from config, or None if not set.
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
+    // Try hierarchical config first
+    if let Ok(config) = read_hierarchical_config() {
+        // Check measurement-specific setting first
+        if let Ok(threshold) = config.get_float(&format!(
+            "audit.measurement.{}.min_relative_deviation",
+            measurement
+        )) {
+            return Some(threshold);
+        }
+        // Check global setting
+        if let Ok(threshold) = config.get_float("audit.global.min_relative_deviation") {
+            return Some(threshold);
+        }
+    }
+
+    // Fallback to old method
     audit_min_relative_deviation_from_str(read_config().unwrap_or_default().as_str(), measurement)
 }
 
@@ -212,6 +305,26 @@ pub fn audit_dispersion_method_from_str(conf: &str, measurement: &str) -> Disper
 
 /// Returns the dispersion method from config, or StandardDeviation if not set.
 pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
+    // Try hierarchical config first
+    if let Ok(config) = read_hierarchical_config() {
+        // Check measurement-specific setting first
+        if let Ok(method_str) = config.get_string(&format!(
+            "audit.measurement.{}.dispersion_method",
+            measurement
+        )) {
+            if let Ok(method) = method_str.parse::<DispersionMethod>() {
+                return method;
+            }
+        }
+        // Check global setting
+        if let Ok(method_str) = config.get_string("audit.global.dispersion_method") {
+            if let Ok(method) = method_str.parse::<DispersionMethod>() {
+                return method;
+            }
+        }
+    }
+
+    // Fallback to old method
     audit_dispersion_method_from_str(read_config().unwrap_or_default().as_str(), measurement)
 }
 
@@ -738,6 +851,169 @@ dispersion_method = "stddev"
         let _keep_temp_dir = temp_dir;
         if original_dir.exists() {
             let _ = env::set_current_dir(&original_dir);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_hierarchical_config_system_override() {
+        let temp_dir = TempDir::new().unwrap();
+        let original_dir = env::current_dir().unwrap();
+
+        // Create system config directory
+        let system_config_dir = temp_dir.path().join(".config").join("git-perf");
+        fs::create_dir_all(&system_config_dir).unwrap();
+        let system_config_path = system_config_dir.join("config.toml");
+
+        // Create system config
+        let system_config = r#"
+[audit.global]
+min_relative_deviation = 5.0
+dispersion_method = "mad"
+
+[backoff]
+max_elapsed_seconds = 120
+"#;
+        fs::write(&system_config_path, system_config).unwrap();
+
+        // Create local config that overrides system config
+        let local_config_dir = temp_dir.path().join("repo");
+        fs::create_dir_all(&local_config_dir).unwrap();
+        let local_config_path = local_config_dir.join(".gitperfconfig");
+
+        let local_config = r#"
+[audit.global]
+min_relative_deviation = 10.0
+
+[audit.measurement."build_time"]
+min_relative_deviation = 15.0
+dispersion_method = "stddev"
+"#;
+        fs::write(&local_config_path, local_config).unwrap();
+
+        // Set up environment
+        env::set_var("HOME", temp_dir.path());
+        env::remove_var("XDG_CONFIG_HOME");
+        env::set_current_dir(&local_config_dir).unwrap();
+
+        // Test hierarchical config reading
+        let config = read_hierarchical_config().unwrap();
+
+        // Test that local config overrides system config
+        assert_eq!(
+            config
+                .get_float("audit.global.min_relative_deviation")
+                .unwrap(),
+            10.0
+        );
+        assert_eq!(
+            config.get_string("audit.global.dispersion_method").unwrap(),
+            "mad"
+        ); // Not overridden in local
+
+        // Test measurement-specific override
+        assert_eq!(
+            config
+                .get_float("audit.measurement.build_time.min_relative_deviation")
+                .unwrap(),
+            15.0
+        );
+        assert_eq!(
+            config
+                .get_string("audit.measurement.build_time.dispersion_method")
+                .unwrap(),
+            "stddev"
+        );
+
+        // Test that system config is still available for non-overridden values
+        assert_eq!(config.get_int("backoff.max_elapsed_seconds").unwrap(), 120);
+
+        // Test the convenience functions
+        assert_eq!(audit_min_relative_deviation("build_time"), Some(15.0));
+        assert_eq!(
+            audit_min_relative_deviation("other_measurement"),
+            Some(10.0)
+        );
+        assert_eq!(
+            audit_dispersion_method("build_time"),
+            git_perf_cli_types::DispersionMethod::StandardDeviation
+        );
+        assert_eq!(
+            audit_dispersion_method("other_measurement"),
+            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+        );
+        assert_eq!(backoff_max_elapsed_seconds(), 120);
+
+        // Clean up
+        env::remove_var("HOME");
+        if original_dir.exists() {
+            env::set_current_dir(&original_dir).unwrap();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_write_config_always_goes_to_repo_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let original_dir = env::current_dir().unwrap();
+
+        // Create a git repository structure
+        let repo_root = temp_dir.path().join("repo");
+        let subdir = repo_root.join("subdir").join("deep");
+        fs::create_dir_all(&subdir).unwrap();
+
+        // Initialize git repository
+        env::set_current_dir(&repo_root).unwrap();
+        std::process::Command::new("git")
+            .args(&["init", "--initial-branch=master"])
+            .output()
+            .expect("Failed to initialize git repository");
+
+        // Set up hermetic git environment
+        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+        env::set_var("GIT_AUTHOR_NAME", "testuser");
+        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+        env::set_var("GIT_COMMITTER_NAME", "testuser");
+        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+
+        // Create a commit to have a HEAD
+        fs::write("test.txt", "test content").unwrap();
+        std::process::Command::new("git")
+            .args(&["add", "test.txt"])
+            .output()
+            .expect("Failed to add file");
+        std::process::Command::new("git")
+            .args(&["commit", "-m", "test commit"])
+            .output()
+            .expect("Failed to commit");
+
+        // Change to subdirectory
+        env::set_current_dir(&subdir).unwrap();
+
+        // Write config from subdirectory
+        let config_content = "[measurement.\"test\"]\nepoch = \"12345678\"\n";
+        write_config(config_content).unwrap();
+
+        // Verify config was written to repo root, not subdirectory
+        let repo_config_path = repo_root.join(".gitperfconfig");
+        let subdir_config_path = subdir.join(".gitperfconfig");
+
+        assert!(repo_config_path.is_file());
+        assert!(!subdir_config_path.is_file());
+
+        let content = fs::read_to_string(&repo_config_path).unwrap();
+        assert_eq!(content, config_content);
+
+        // Clean up
+        env::remove_var("GIT_CONFIG_NOSYSTEM");
+        env::remove_var("GIT_CONFIG_GLOBAL");
+        env::remove_var("GIT_AUTHOR_NAME");
+        env::remove_var("GIT_AUTHOR_EMAIL");
+        env::remove_var("GIT_COMMITTER_NAME");
+        env::remove_var("GIT_COMMITTER_EMAIL");
+        if original_dir.exists() {
+            env::set_current_dir(&original_dir).unwrap();
         }
     }
 }
