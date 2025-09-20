@@ -15,28 +15,15 @@ use git_perf_cli_types::DispersionMethod;
 
 /// Get the main repository config path (always in repo root)
 fn get_main_config_path() -> PathBuf {
-    // Use git to find the repository root
-    if let Ok(repo_root) = get_repository_root() {
-        if !repo_root.is_empty() {
-            return PathBuf::from(repo_root).join(".gitperfconfig");
-        }
+    // Use git to find the repository root - hard fail if not found
+    let repo_root = get_repository_root()
+        .expect("Failed to determine repository root - must be run from within a git repository");
+
+    if repo_root.is_empty() {
+        panic!("Repository root is empty - must be run from within a git repository");
     }
 
-    // Fallback: search upward for git directory
-    if let Ok(mut current_dir) = env::current_dir() {
-        loop {
-            let candidate = current_dir.join(".gitperfconfig");
-            if current_dir.join(".git").is_dir() {
-                return candidate;
-            }
-            if !current_dir.pop() {
-                break;
-            }
-        }
-    }
-
-    // Final fallback to current directory
-    PathBuf::from(".gitperfconfig")
+    PathBuf::from(repo_root).join(".gitperfconfig")
 }
 
 /// Write config to the main repository directory (always in repo root)
