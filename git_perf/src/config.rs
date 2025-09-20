@@ -252,7 +252,7 @@ mod test {
     /// Initialize a git repository with an initial commit in the given directory
     fn init_git_repo_with_commit(dir: &Path) {
         init_git_repo(dir);
-        
+
         // Create a test file and commit it
         fs::write(dir.join("test.txt"), "test content").unwrap();
         std::process::Command::new("git")
@@ -577,7 +577,7 @@ dispersion_method = "stddev"
         with_isolated_home(|temp_dir| {
             // Create a git repository
             env::set_current_dir(temp_dir).unwrap();
-            
+
             // Initialize git repository
             init_git_repo(temp_dir);
 
@@ -601,7 +601,7 @@ dispersion_method = "stddev"
         with_isolated_home(|temp_dir| {
             // Create a git repository but no .gitperfconfig
             env::set_current_dir(temp_dir).unwrap();
-            
+
             // Initialize git repository
             init_git_repo(temp_dir);
 
@@ -722,9 +722,7 @@ backoff_max_elapsed_seconds = 60
         let original_dir = env::current_dir().unwrap();
 
         // Create system config directory
-        let system_config_dir = temp_dir.path().join(".config").join("git-perf");
-        fs::create_dir_all(&system_config_dir).unwrap();
-        let system_config_path = system_config_dir.join("config.toml");
+        let system_config_path = create_home_config_dir(temp_dir.path());
 
         // Create system config
         let system_config = r#"
@@ -816,20 +814,6 @@ dispersion_method = "stddev"
         let subdir = repo_root.join("subdir").join("deep");
         fs::create_dir_all(&subdir).unwrap();
 
-        // Initialize git repository
-        env::set_current_dir(&repo_root).unwrap();
-        let git_init_output = std::process::Command::new("git")
-            .args(&["init", "--initial-branch=master"])
-            .output()
-            .expect("Failed to initialize git repository");
-
-        if !git_init_output.status.success() {
-            panic!(
-                "Git init failed: {}",
-                String::from_utf8_lossy(&git_init_output.stderr)
-            );
-        }
-
         // Set up hermetic git environment
         env::set_var("GIT_CONFIG_NOSYSTEM", "true");
         env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
@@ -838,18 +822,9 @@ dispersion_method = "stddev"
         env::set_var("GIT_COMMITTER_NAME", "testuser");
         env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-        // Create a commit to have a HEAD
-        fs::write(repo_root.join("test.txt"), "test content").unwrap();
-        std::process::Command::new("git")
-            .args(&["add", "test.txt"])
-            .current_dir(&repo_root)
-            .output()
-            .expect("Failed to add file");
-        std::process::Command::new("git")
-            .args(&["commit", "-m", "test commit"])
-            .current_dir(&repo_root)
-            .output()
-            .expect("Failed to commit");
+        // Initialize git repository with initial commit
+        env::set_current_dir(&repo_root).unwrap();
+        init_git_repo_with_commit(&repo_root);
 
         // Change to subdirectory
         env::set_current_dir(&subdir).unwrap();
