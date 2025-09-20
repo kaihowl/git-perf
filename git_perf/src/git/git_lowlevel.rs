@@ -209,6 +209,7 @@ mod test {
     use std::env::set_current_dir;
 
     use tempfile::{tempdir, TempDir};
+    use serial_test::serial;
 
     fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")
@@ -241,8 +242,10 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn test_get_head_revision() {
         let repo_dir = dir_with_repo();
+        set_current_dir(repo_dir.path()).expect("Failed to change dir");
         let revision = internal_get_head_revision().unwrap();
         assert!(
             &revision.chars().all(|c| c.is_ascii_alphanumeric()),

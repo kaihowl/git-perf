@@ -807,6 +807,7 @@ mod test {
         Expectation, Server,
     };
     use tempfile::{tempdir, TempDir};
+    use serial_test::serial;
 
     fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")
@@ -863,8 +864,10 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn test_customheader_pull() {
         let tempdir = dir_with_repo();
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
 
         let test_server = Server::run();
         add_server_remote(
@@ -886,12 +889,14 @@ mod test {
         // We only want to verify that a call on the server with the authorization header was
         // received.
         hermetic_git_env();
-        pull(Some(tempdir.path())).expect_err("We have no valid git http server setup -> should fail");
+        pull(None).expect_err("We have no valid git http server setup -> should fail");
     }
 
     #[test]
+    #[serial]
     fn test_customheader_push() {
         let tempdir = dir_with_repo();
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
 
         let test_server = Server::run();
         add_server_remote(
@@ -916,7 +921,7 @@ mod test {
         // TODO(kaihowl) duplication, leaks out of this test
         hermetic_git_env();
 
-        let error = push(Some(tempdir.path()));
+        let error = push(None);
         error
             .as_ref()
             .expect_err("We have no valid git http server setup -> should fail");
@@ -942,9 +947,11 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn test_empty_or_never_pushed_remote_error_for_fetch() {
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
         // Add a dummy remote so the code can check for empty remote
         let git_dir_url = format!("file://{}", tempdir.path().display());
         run_git_command(&["remote", "add", "origin", &git_dir_url], tempdir.path());
@@ -967,9 +974,11 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn test_empty_or_never_pushed_remote_error_for_push() {
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
+        set_current_dir(tempdir.path()).expect("Failed to change dir");
 
         run_git_command(
             &["remote", "add", "origin", "invalid invalid"],
