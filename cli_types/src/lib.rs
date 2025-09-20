@@ -38,7 +38,7 @@ impl FromStr for DispersionMethod {
 }
 
 #[derive(Parser)]
-#[command(name = "git-perf")]
+#[command(version, name = "git-perf")]
 pub struct Cli {
     /// Increase verbosity level (can be specified multiple times.) The first level sets level
     /// "info", second sets level "debug", and third sets level "trace" for the logger.
