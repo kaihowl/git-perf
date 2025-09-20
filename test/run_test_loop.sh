@@ -14,8 +14,8 @@ while [ $iteration -le $max_iterations ]; do
     echo "Running slow bash tests..."
     echo "=========================="
     
-    # Run the test using cargo test
-    if cargo test run_slow_bash_tests_with_binary --lib --test bash_tests; then
+    # Run the test using cargo nextest
+    if cargo nextest run run_slow_bash_tests_with_binary --lib --test bash_tests; then
         echo "✅ Test passed on iteration $iteration"
         echo "Continuing to next iteration..."
         ((iteration++))
