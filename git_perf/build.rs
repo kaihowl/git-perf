@@ -6,8 +6,8 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
-    // Get version from environment variable or fallback to Cargo.toml
-    let version = env::var("GIT_PERF_VERSION").unwrap_or_else(|_| env::var("CARGO_PKG_VERSION").unwrap());
+    // Get version from Cargo.toml
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
     let version: &'static str = Box::leak(version.into_boxed_str());
 
     // Path calculation to the workspace root
