@@ -807,7 +807,7 @@ mod test {
         Expectation, Server,
     };
     use tempfile::{tempdir, TempDir};
-    use serial_test::serial;
+    use crate::test_utils::TEST_MUTEX;
 
     fn run_git_command(args: &[&str], dir: &Path) {
         assert!(process::Command::new("git")
@@ -864,8 +864,8 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_customheader_pull() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
 
@@ -893,8 +893,8 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_customheader_push() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
 
@@ -947,8 +947,8 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_empty_or_never_pushed_remote_error_for_fetch() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
@@ -974,8 +974,8 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_empty_or_never_pushed_remote_error_for_push() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");

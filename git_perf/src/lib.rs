@@ -9,3 +9,6 @@ pub mod measurement_storage;
 pub mod reporting;
 pub mod serialization;
 pub mod stats;
+
+#[cfg(test)]
+mod test_utils;

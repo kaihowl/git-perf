@@ -171,11 +171,48 @@ fi
 ```
 
 ## Rust tests
+
+This project uses [nextest](https://nexte.st/) for faster, more reliable test execution.
+
+### Running Tests with Nextest
+
+**Basic test run:**
+```bash
+cargo nextest run
 ```
+
+**Skip slow tests (recommended for development):**
+```bash
+cargo nextest run --skip slow
+```
+
+**Run specific test patterns:**
+```bash
+cargo nextest run --test-pattern "git_interop"
+```
+
+**Run tests with verbose output:**
+```bash
+cargo nextest run --verbose
+```
+
+**Run tests in a specific package:**
+```bash
+cargo nextest run -p git-perf
+```
+
+### Legacy Cargo Test Commands
+
+If you prefer to use the standard cargo test runner:
+```bash
 cargo test
 ```
 
-Exclude slow integration tests with:
-```
+Exclude slow integration tests:
+```bash
 cargo test -- --skip slow
 ```
+
+### Test Configuration
+
+The project has been migrated to use nextest for parallel test execution. Tests that previously required serial execution due to shared resources now use mutex-based synchronization to ensure proper isolation while maintaining parallel execution benefits.
