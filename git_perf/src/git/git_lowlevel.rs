@@ -208,7 +208,6 @@ mod test {
     use super::*;
     use std::env::set_current_dir;
 
-    use serial_test::serial;
     use tempfile::{tempdir, TempDir};
 
     fn run_git_command(args: &[&str], dir: &Path) {
@@ -242,7 +241,6 @@ mod test {
     }
 
     #[test]
-    #[serial]
     fn test_get_head_revision() {
         let repo_dir = dir_with_repo();
         set_current_dir(repo_dir.path()).expect("Failed to change dir");

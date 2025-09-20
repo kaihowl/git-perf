@@ -67,8 +67,11 @@ jobs:
     - name: Build git-perf
       run: cargo build --verbose
 
+    - name: Install nextest
+      run: cargo install cargo-nextest --locked
+
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo nextest run --verbose
 
     - name: Run sample perf measurements
       run: |
