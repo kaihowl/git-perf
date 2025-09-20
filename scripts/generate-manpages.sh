@@ -27,12 +27,6 @@ cp man/man1/git-perf.1 /tmp/original_manpage.1
 # Generate manpages and markdown documentation with normalized version
 GIT_PERF_DOC_VERSION="$NORMALIZED_VERSION" cargo build --package git_perf_cli_types --package git-perf
 
-# Function to normalize version in manpage files (replace any version with 0.0.0 for comparison)
-normalize_manpage_version() {
-  local file="$1"
-  sed -E 's/"git-perf [0-9]+\.[0-9]+\.[0-9]+"/"git-perf 0.0.0"/g' "$file"
-}
-
 # Compare markdown documentation
 if ! diff -u /tmp/original_markdown.md docs/manpage.md > /tmp/markdown.diff; then
   echo "Error: Markdown documentation is out of date. A patch file has been created at /tmp/markdown.diff"
@@ -48,8 +42,8 @@ if ! diff -u /tmp/original_markdown.md docs/manpage.md > /tmp/markdown.diff; the
 fi
 echo "Markdown documentation is up to date ✓"
 
-# Compare manpage documentation (normalizing versions for comparison)
-if ! diff -u <(normalize_manpage_version /tmp/original_manpage.1) <(normalize_manpage_version man/man1/git-perf.1) > /tmp/manpage.diff; then
+# Compare manpage documentation
+if ! diff -u /tmp/original_manpage.1 man/man1/git-perf.1 > /tmp/manpage.diff; then
   echo "Error: Manpage documentation is out of date. A patch file has been created at /tmp/manpage.diff"
   echo ""
   echo "To fix this, run:"
