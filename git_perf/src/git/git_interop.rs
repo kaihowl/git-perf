@@ -918,7 +918,6 @@ mod test {
             .respond_with(status_code(200)),
         );
 
-        // TODO(kaihowl) duplication, leaks out of this test
         hermetic_git_env();
 
         // Must add a single write as a push without pending local writes just succeeds
