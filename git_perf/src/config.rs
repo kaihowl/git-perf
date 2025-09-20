@@ -315,11 +315,6 @@ epoch="12344555"
 
             let epoch = determine_epoch_from_config("unspecified");
             assert_eq!(epoch, Some(0x12344555));
-
-            // Clean up
-            if original_dir.exists() {
-                env::set_current_dir(&original_dir).unwrap();
-            }
         });
     }
 
@@ -382,12 +377,6 @@ epoch = "{}"
             );
 
             assert_eq!(actual, expected);
-
-            // Restore original directory
-            // Ensure original directory still exists before changing back
-            if original_dir.exists() {
-                env::set_current_dir(original_dir).unwrap();
-            }
         });
     }
 
@@ -440,20 +429,6 @@ epoch = "{}"
 
             let epoch = determine_epoch_from_config("mymeasurement");
             assert!(epoch.is_some());
-
-            // Clean up environment
-            env::remove_var("GIT_CONFIG_NOSYSTEM");
-            env::remove_var("GIT_CONFIG_GLOBAL");
-            env::remove_var("GIT_AUTHOR_NAME");
-            env::remove_var("GIT_AUTHOR_EMAIL");
-            env::remove_var("GIT_COMMITTER_NAME");
-            env::remove_var("GIT_COMMITTER_EMAIL");
-
-            // Restore original directory
-            // Ensure original directory still exists before changing back
-            if original_dir.exists() {
-                env::set_current_dir(original_dir).unwrap();
-            }
         });
     }
 
@@ -501,12 +476,6 @@ epoch = "{}"
         // Remove config file and test default
         fs::remove_file(&local_config_path).unwrap();
         assert_eq!(super::backoff_max_elapsed_seconds(), 60);
-
-        // Clean up
-        env::remove_var("HOME");
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -576,11 +545,6 @@ min_relative_deviation = 10.0
             // Test no config
             fs::remove_file(&local_config_path).unwrap();
             assert_eq!(super::audit_min_relative_deviation("any_measurement"), None);
-
-            // Clean up
-            if original_dir.exists() {
-                env::set_current_dir(&original_dir).unwrap();
-            }
         });
     }
 
@@ -657,12 +621,6 @@ dispersion_method = "stddev"
             super::audit_dispersion_method("any_measurement"),
             git_perf_cli_types::DispersionMethod::StandardDeviation
         );
-
-        // Clean up
-        env::remove_var("HOME");
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -686,12 +644,6 @@ dispersion_method = "stddev"
         let found_path = find_config_path();
         assert!(found_path.is_some());
         assert_eq!(found_path.unwrap(), config_path);
-
-        // Restore original directory
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -718,16 +670,6 @@ dispersion_method = "stddev"
         let found_path = find_config_path();
         assert!(found_path.is_some());
         assert_eq!(found_path.unwrap(), config_path);
-
-        // Clean up
-        env::remove_var("XDG_CONFIG_HOME");
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            // Ensure original directory still exists before changing back
-            if original_dir.exists() {
-                env::set_current_dir(original_dir).unwrap();
-            }
-        }
     }
 
     #[test]
@@ -775,10 +717,6 @@ dispersion_method = "stddev"
         if let Some(xdg) = original_xdg {
             env::set_var("XDG_CONFIG_HOME", xdg);
         }
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -793,30 +731,17 @@ dispersion_method = "stddev"
 
         let found_path = find_config_path();
         assert!(found_path.is_none());
-
-        // Restore original directory
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
     }
 
     #[test]
     fn test_determine_epoch_from_config_with_missing_file() {
         // Test that missing config file doesn't panic and returns None
-        let original_dir = env::current_dir().unwrap();
         let temp_dir = TempDir::new().unwrap();
         fs::create_dir_all(temp_dir.path()).unwrap();
         env::set_current_dir(temp_dir.path()).unwrap();
 
         let epoch = determine_epoch_from_config("test_measurement");
         assert!(epoch.is_none());
-
-        // Restore original directory
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -825,18 +750,11 @@ dispersion_method = "stddev"
         let config_path = temp_dir.path().join(".gitperfconfig");
         fs::write(&config_path, "invalid toml content").unwrap();
 
-        let original_dir = env::current_dir().unwrap();
         fs::create_dir_all(temp_dir.path()).unwrap();
         env::set_current_dir(temp_dir.path()).unwrap();
 
         let epoch = determine_epoch_from_config("test_measurement");
         assert!(epoch.is_none());
-
-        // Restore original directory
-        // Ensure original directory still exists before changing back
-        if original_dir.exists() {
-            env::set_current_dir(original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -865,12 +783,6 @@ dispersion_method = "stddev"
         assert!(config_path.is_file());
         let content = fs::read_to_string(&config_path).unwrap();
         assert_eq!(content, config_content);
-
-        // Restore original directory - keep temp_dir alive until after we change back
-        let _keep_temp_dir = temp_dir;
-        if original_dir.exists() {
-            let _ = env::set_current_dir(&original_dir);
-        }
     }
 
     #[test]
@@ -961,12 +873,6 @@ dispersion_method = "stddev"
             git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
         );
         assert_eq!(backoff_max_elapsed_seconds(), 120);
-
-        // Clean up
-        env::remove_var("HOME");
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).unwrap();
-        }
     }
 
     #[test]
@@ -1034,16 +940,5 @@ dispersion_method = "stddev"
         // Test that get_main_config_path uses git to find the root
         let config_path = get_main_config_path();
         assert_eq!(config_path, repo_config_path);
-
-        // Clean up
-        env::remove_var("GIT_CONFIG_NOSYSTEM");
-        env::remove_var("GIT_CONFIG_GLOBAL");
-        env::remove_var("GIT_AUTHOR_NAME");
-        env::remove_var("GIT_AUTHOR_EMAIL");
-        env::remove_var("GIT_COMMITTER_NAME");
-        env::remove_var("GIT_COMMITTER_EMAIL");
-        if original_dir.exists() {
-            env::set_current_dir(&original_dir).unwrap();
-        }
     }
 }
