@@ -24,14 +24,16 @@ cargo fmt
 cargo clippy
 
 # Run tests (excluding slow ones)
-cargo nextest run --skip slow
+cargo nextest run --skip slow  # Preferred
+# cargo test -- --skip slow    # Fallback if nextest not available
 ```
 
 ## Testing Policy
 
-- **Primary test command**: `cargo nextest run --skip slow` (excludes slow tests)
+- **Preferred test command**: `cargo nextest run --skip slow` (excludes slow tests)
+- **Fallback test command**: `cargo test -- --skip slow` (if nextest not available)
 - Ensure all tests pass before submitting code
-- Use `cargo nextest run` for full test suite when needed
+- Use `cargo nextest run` or `cargo test` for full test suite when needed
 - This is the standard command for CI and local pre-submit
 
 ## Documentation & Build Process
@@ -68,7 +70,7 @@ cargo nextest run --skip slow
 Before submitting any code, ensure:
 
 1. ✅ Run `cargo fmt` to format code
-2. ✅ Run `cargo nextest run --skip slow` to verify tests pass
+2. ✅ Run `cargo nextest run --skip slow` (or `cargo test -- --skip slow`) to verify tests pass
 3. ✅ Run `cargo clippy` for additional code quality checks
 4. ✅ Ensure all changes compile without warnings
 5. ✅ If `cli_types` changed, run `./scripts/generate-manpages.sh` and commit regenerated documentation
