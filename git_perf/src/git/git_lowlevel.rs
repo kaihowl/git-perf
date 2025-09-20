@@ -208,7 +208,6 @@ mod test {
     use super::*;
     use std::env::set_current_dir;
 
-    use crate::test_utils::TEST_MUTEX;
     use tempfile::{tempdir, TempDir};
 
     fn run_git_command(args: &[&str], dir: &Path) {
@@ -243,7 +242,6 @@ mod test {
 
     #[test]
     fn test_get_head_revision() {
-        let _guard = TEST_MUTEX.lock().unwrap();
         let repo_dir = dir_with_repo();
         set_current_dir(repo_dir.path()).expect("Failed to change dir");
         let revision = internal_get_head_revision().unwrap();

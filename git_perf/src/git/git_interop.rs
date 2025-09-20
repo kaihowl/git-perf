@@ -800,7 +800,6 @@ mod test {
     use std::env::{self, set_current_dir};
     use std::process;
 
-    use crate::test_utils::TEST_MUTEX;
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
         matchers::{self, request},
@@ -946,7 +945,6 @@ mod test {
 
     #[test]
     fn test_empty_or_never_pushed_remote_error_for_fetch() {
-        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
@@ -973,7 +971,6 @@ mod test {
 
     #[test]
     fn test_empty_or_never_pushed_remote_error_for_push() {
-        let _guard = TEST_MUTEX.lock().unwrap();
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
