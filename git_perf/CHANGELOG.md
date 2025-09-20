@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.2...git-perf-v0.18.0) - 2025-09-20
+
+### Added
+
+- implement summarize measurement for csv  ([#276](https://github.com/kaihowl/git-perf/pull/276))
+- MAD dispersion method ([#261](https://github.com/kaihowl/git-perf/pull/261))
+
+### Fixed
+
+- only show finite z-scores ([#259](https://github.com/kaihowl/git-perf/pull/259))
+
+### Other
+
+- migrate to nextest ([#280](https://github.com/kaihowl/git-perf/pull/280))
+- proper version check for manpage docs ([#286](https://github.com/kaihowl/git-perf/pull/286))
+- MAD documentation ([#263](https://github.com/kaihowl/git-perf/pull/263))
+- manpage generation with clap_markdown ([#269](https://github.com/kaihowl/git-perf/pull/269))
+- Add MAD dispersion method documentation and improve CLI help ([#272](https://github.com/kaihowl/git-perf/pull/272))
+
 ## [0.17.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.1...git-perf-v0.17.2) - 2025-08-23
 
 ### Added
