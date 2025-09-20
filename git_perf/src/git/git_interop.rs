@@ -36,6 +36,12 @@ pub use super::git_lowlevel::get_head_revision;
 
 pub use super::git_lowlevel::check_git_version;
 
+/// Get the repository root directory using git
+pub fn get_repository_root() -> Result<String, GitError> {
+    let output = capture_git_output(&["rev-parse", "--show-toplevel"], &None)?;
+    Ok(output.stdout.trim().to_string())
+}
+
 // TODO(kaihowl) separate into git low and high level logic
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {

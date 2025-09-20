@@ -9,7 +9,7 @@ pub(super) struct GitOutput {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub(super) enum GitError {
+pub enum GitError {
     #[error("A ref failed to be pushed:\n{0}\n{1}", output.stdout, output.stderr)]
     RefFailedToPush { output: GitOutput },
 
