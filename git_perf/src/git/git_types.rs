@@ -3,7 +3,7 @@ use std::io;
 use super::git_definitions::GIT_PERF_REMOTE;
 
 #[derive(Debug)]
-pub(super) struct GitOutput {
+pub struct GitOutput {
     pub stdout: String,
     pub stderr: String,
 }
