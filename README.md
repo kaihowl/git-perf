@@ -145,9 +145,14 @@ For evaluating the statistical robustness of different dispersion methods (stdde
 Both manpages and markdown documentation are automatically generated during the build process using `clap_mangen` and `clap_markdown`. To regenerate the documentation:
 
 ```bash
-# Build the project to generate both manpages and markdown documentation
-cargo build
+# Generate manpages and markdown documentation with normalized version (defaults to 0.0.0)
+./scripts/generate-manpages.sh
+
+# Or with a custom version
+GIT_PERF_VERSION=1.0.0 ./scripts/generate-manpages.sh
 ```
+
+The script uses the `GIT_PERF_VERSION` environment variable to set a normalized version for documentation generation, avoiding version-based diffs. If not specified, it defaults to `0.0.0`.
 
 The documentation is automatically generated during the build process:
 - Manpages are written to `target/man/man1/` directory
