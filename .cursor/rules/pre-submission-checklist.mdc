@@ -10,5 +10,5 @@ Before submitting code, ensure:
 2. Run `cargo test -- --skip slow` to verify tests pass
 3. Run `cargo clippy` for additional code quality checks
 4. Ensure all changes compile without warnings
-5. If `cli_types` changed, commit regenerated documentation produced by the build
+5. If `cli_types` changed, run `./scripts/generate-manpages.sh` (optionally with `GIT_PERF_VERSION=1.0.0`) and commit regenerated documentation
 
