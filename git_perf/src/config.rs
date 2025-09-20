@@ -2,7 +2,7 @@ use anyhow::Result;
 use config::{Config, ConfigError, File, FileFormat};
 use std::{
     env,
-    fs::{self, File as StdFile},
+    fs::File as StdFile,
     io::{Read, Write},
     path::{Path, PathBuf},
 };
@@ -29,11 +29,6 @@ fn get_main_config_path() -> PathBuf {
 /// Write config to the main repository directory (always in repo root)
 pub fn write_config(conf: &str) -> Result<()> {
     let path = get_main_config_path();
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)?;
-        }
-    }
     let mut f = StdFile::create(path)?;
     f.write_all(conf.as_bytes())?;
     Ok(())
