@@ -240,6 +240,40 @@ mod test {
         f(temp_dir.path())
     }
 
+    /// Initialize a git repository in the given directory
+    fn init_git_repo(dir: &Path) {
+        std::process::Command::new("git")
+            .args(&["init", "--initial-branch=master"])
+            .current_dir(dir)
+            .output()
+            .expect("Failed to initialize git repository");
+    }
+
+    /// Initialize a git repository with an initial commit in the given directory
+    fn init_git_repo_with_commit(dir: &Path) {
+        init_git_repo(dir);
+        
+        // Create a test file and commit it
+        fs::write(dir.join("test.txt"), "test content").unwrap();
+        std::process::Command::new("git")
+            .args(&["add", "test.txt"])
+            .current_dir(dir)
+            .output()
+            .expect("Failed to add file");
+        std::process::Command::new("git")
+            .args(&["commit", "-m", "test commit"])
+            .current_dir(dir)
+            .output()
+            .expect("Failed to commit");
+    }
+
+    /// Create a HOME config directory structure and return the config path
+    fn create_home_config_dir(home_dir: &Path) -> PathBuf {
+        let config_dir = home_dir.join(".config").join("git-perf");
+        fs::create_dir_all(&config_dir).unwrap();
+        config_dir.join("config.toml")
+    }
+
     #[test]
     fn test_read_epochs() {
         with_isolated_home(|temp_dir| {
@@ -266,11 +300,7 @@ epoch="12344555"
             env::set_current_dir(&local_config_dir).unwrap();
 
             // Initialize git repository so get_main_config_path works
-            std::process::Command::new("git")
-                .args(&["init", "--initial-branch=master"])
-                .current_dir(&local_config_dir)
-                .output()
-                .expect("Failed to initialize git repository");
+            init_git_repo(&local_config_dir);
 
             let epoch = determine_epoch_from_config("something");
             assert_eq!(epoch, Some(0x34567898));
@@ -290,12 +320,6 @@ epoch="12344555"
             let original_dir = env::current_dir().unwrap();
             env::set_current_dir(temp_dir).unwrap();
 
-            // Initialize git repository
-            std::process::Command::new("git")
-                .args(&["init", "--initial-branch=master"])
-                .output()
-                .expect("Failed to initialize git repository");
-
             // Set up hermetic git environment
             env::set_var("GIT_CONFIG_NOSYSTEM", "true");
             env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
@@ -304,26 +328,8 @@ epoch="12344555"
             env::set_var("GIT_COMMITTER_NAME", "testuser");
             env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-            // Create a commit to have a HEAD
-            fs::write("test.txt", "test content").unwrap();
-            std::process::Command::new("git")
-                .args(&["add", "test.txt"])
-                .current_dir(temp_dir)
-                .output()
-                .expect("Failed to add file");
-            let commit_output = std::process::Command::new("git")
-                .args(&["commit", "-m", "test commit"])
-                .current_dir(temp_dir)
-                .output()
-                .expect("Failed to commit");
-
-            // Verify commit was successful
-            if !commit_output.status.success() {
-                panic!(
-                    "Git commit failed: {}",
-                    String::from_utf8_lossy(&commit_output.stderr)
-                );
-            }
+            // Initialize git repository with initial commit
+            init_git_repo_with_commit(temp_dir);
 
             let configfile = r#"[measurement."something"]
 #My comment
@@ -352,12 +358,6 @@ epoch = "{}"
             let original_dir = env::current_dir().unwrap();
             env::set_current_dir(temp_dir).unwrap();
 
-            // Initialize git repository
-            std::process::Command::new("git")
-                .args(&["init", "--initial-branch=master"])
-                .output()
-                .expect("Failed to initialize git repository");
-
             // Set up hermetic git environment
             env::set_var("GIT_CONFIG_NOSYSTEM", "true");
             env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
@@ -366,24 +366,8 @@ epoch = "{}"
             env::set_var("GIT_COMMITTER_NAME", "testuser");
             env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-            // Create a commit to have a HEAD
-            fs::write("test.txt", "test content").unwrap();
-            std::process::Command::new("git")
-                .args(&["add", "test.txt"])
-                .output()
-                .expect("Failed to add file");
-            let commit_output = std::process::Command::new("git")
-                .args(&["commit", "-m", "test commit"])
-                .output()
-                .expect("Failed to commit");
-
-            // Verify commit was successful
-            if !commit_output.status.success() {
-                panic!(
-                    "Git commit failed: {}",
-                    String::from_utf8_lossy(&commit_output.stderr)
-                );
-            }
+            // Initialize git repository with initial commit
+            init_git_repo_with_commit(temp_dir);
 
             let mut conf = String::new();
             bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
@@ -593,12 +577,9 @@ dispersion_method = "stddev"
         with_isolated_home(|temp_dir| {
             // Create a git repository
             env::set_current_dir(temp_dir).unwrap();
-
+            
             // Initialize git repository
-            std::process::Command::new("git")
-                .args(&["init", "--initial-branch=master"])
-                .output()
-                .expect("Failed to initialize git repository");
+            init_git_repo(temp_dir);
 
             // Create config in git root
             let config_path = temp_dir.join(".gitperfconfig");
@@ -620,12 +601,9 @@ dispersion_method = "stddev"
         with_isolated_home(|temp_dir| {
             // Create a git repository but no .gitperfconfig
             env::set_current_dir(temp_dir).unwrap();
-
+            
             // Initialize git repository
-            std::process::Command::new("git")
-                .args(&["init", "--initial-branch=master"])
-                .output()
-                .expect("Failed to initialize git repository");
+            init_git_repo(temp_dir);
 
             // Test that find_config_path returns None when no .gitperfconfig exists
             let found_path = find_config_path();
@@ -640,15 +618,10 @@ dispersion_method = "stddev"
             env::set_current_dir(temp_dir).unwrap();
 
             // Initialize git repository
-            std::process::Command::new("git")
-                .args(&["init", "--initial-branch=master"])
-                .output()
-                .expect("Failed to initialize git repository");
+            init_git_repo(temp_dir);
 
             // Create home config
-            let home_config_dir = temp_dir.join(".config").join("git-perf");
-            fs::create_dir_all(&home_config_dir).unwrap();
-            let home_config_path = home_config_dir.join("config.toml");
+            let home_config_path = create_home_config_dir(temp_dir);
             fs::write(
                 &home_config_path,
                 r#"
