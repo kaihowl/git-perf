@@ -685,10 +685,10 @@ backoff_max_elapsed_seconds = 60
             // Config should be written to repo root, not subdirectory
             let repo_config_path = temp_dir.join(".gitperfconfig");
             let subdir_config_path = subdir.join(".gitperfconfig");
-            
+
             assert!(repo_config_path.is_file());
             assert!(!subdir_config_path.is_file());
-            
+
             let content = fs::read_to_string(&repo_config_path).unwrap();
             assert_eq!(content, config_content);
         });
