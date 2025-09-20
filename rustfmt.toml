@@ -1,0 +1,20 @@
+# Rustfmt configuration for consistent formatting
+# This ensures all agents and developers use the same formatting rules
+# Using only stable features to avoid nightly channel requirements
+
+# Basic formatting options
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+
+# Import formatting (stable features only)
+reorder_imports = true
+
+# Function formatting
+fn_params_layout = "Tall"
+
+# Other formatting options (stable features only)
+use_field_init_shorthand = true
+use_try_shorthand = true
+force_explicit_abi = true
