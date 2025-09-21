@@ -14,21 +14,27 @@ use crate::git::git_interop::{get_head_revision, get_repository_root};
 use git_perf_cli_types::DispersionMethod;
 
 /// Get the main repository config path (always in repo root)
-fn get_main_config_path() -> PathBuf {
-    // Use git to find the repository root - hard fail if not found
-    let repo_root = get_repository_root()
-        .expect("Failed to determine repository root - must be run from within a git repository");
+fn get_main_config_path() -> Result<PathBuf> {
+    // Use git to find the repository root
+    let repo_root = get_repository_root().map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to determine repository root - must be run from within a git repository: {}",
+            e
+        )
+    })?;
 
     if repo_root.is_empty() {
-        panic!("Repository root is empty - must be run from within a git repository");
+        return Err(anyhow::anyhow!(
+            "Repository root is empty - must be run from within a git repository"
+        ));
     }
 
-    PathBuf::from(repo_root).join(".gitperfconfig")
+    Ok(PathBuf::from(repo_root).join(".gitperfconfig"))
 }
 
 /// Write config to the main repository directory (always in repo root)
 pub fn write_config(conf: &str) -> Result<()> {
-    let path = get_main_config_path();
+    let path = get_main_config_path()?;
     let mut f = StdFile::create(path)?;
     f.write_all(conf.as_bytes())?;
     Ok(())
@@ -143,7 +149,7 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
 
 pub fn bump_epoch(measurement: &str) -> Result<()> {
     // Read existing config from the main config path
-    let config_path = get_main_config_path();
+    let config_path = get_main_config_path()?;
     let mut conf_str = if config_path.is_file() {
         read_config_from_file(&config_path).unwrap_or_default()
     } else {
