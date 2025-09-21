@@ -130,7 +130,7 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
 pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()> {
     let mut conf = conf_str
         .parse::<Document>()
-        .expect("failed to parse config");
+        .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
 
     let head_revision = get_head_revision()?;
     // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
