@@ -379,16 +379,17 @@ epoch = "{}"
 
         let doc = toml_str.parse::<Document>().expect("sfdfdf");
 
-        let measurement = "test";
+        let measurement = "test2";
 
-        if let Some(e) = doc
+        let epoch = doc
             .get("measurement")
             .and_then(|m| m.get(measurement))
             .and_then(|m| m.get("epoch"))
-        {
-            println!("YAY: {}", e);
-            panic!("stuff");
-        }
+            .and_then(|e| e.as_str())
+            .expect("Expected to find epoch for measurement");
+
+        // Should be able to parse the epoch
+        assert_eq!(epoch, "834ae670e2ecd5c87020fde23378b890832d6076");
     }
 
     #[test]
