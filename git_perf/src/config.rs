@@ -97,14 +97,12 @@ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
 }
 
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
-    let config = match read_hierarchical_config() {
-        Ok(config) => config,
-        Err(e) => {
+    let config = read_hierarchical_config()
+        .map_err(|e| {
             // Log the error but don't fail - this is expected when no config exists
             log::debug!("Could not read hierarchical config: {}", e);
-            return None;
-        }
-    };
+        })
+        .ok()?;
 
     // Try measurement-specific epoch first
     if let Ok(epoch_str) = config.get_string(&format!("measurement.{}.epoch", measurement)) {
@@ -177,10 +175,7 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
 
 /// Returns the minimum relative deviation threshold from config, or None if not set.
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
-    let config = match read_hierarchical_config() {
-        Ok(config) => config,
-        Err(_) => return None,
-    };
+    let config = read_hierarchical_config().ok()?;
 
     // Check measurement-specific setting first
     if let Ok(threshold) = config.get_float(&format!(
@@ -200,9 +195,8 @@ pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
 
 /// Returns the dispersion method from config, or StandardDeviation if not set.
 pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
-    let config = match read_hierarchical_config() {
-        Ok(config) => config,
-        Err(_) => return DispersionMethod::StandardDeviation,
+    let Some(config) = read_hierarchical_config().ok() else {
+        return DispersionMethod::StandardDeviation;
     };
 
     // Check measurement-specific setting first
