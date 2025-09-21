@@ -1,4 +1,4 @@
-# Test TOML file with asterisk in name and wildcard path selection
+# Test TOML file with literal asterisks in key names
 [database]
 host = "localhost"
 port = 5432
@@ -8,18 +8,20 @@ name = "test_db"
 base_url = "https://api.example.com"
 timeout = 30
 
-# Main section with nested structures for wildcard testing
+# Main section with literal asterisk as a key name
 [main]
 foo = { value = "foo_value", priority = 1 }
 bar = { value = "bar_value", priority = 2 }
 baz = { value = "baz_value", priority = 3 }
 qux = { value = "qux_value", priority = 4 }
+"*" = { value = "asterisk_value", priority = 5 }
 
-# Another section for wildcard testing
+# Another section with literal asterisk keys
 [services]
 web = { port = 8080, host = "localhost" }
 api = { port = 3000, host = "0.0.0.0" }
 db = { port = 5432, host = "localhost" }
+"*" = { port = 9999, host = "asterisk_host" }
 
 # Config value with asterisk in the middle (literal asterisk)
 [special_config]
