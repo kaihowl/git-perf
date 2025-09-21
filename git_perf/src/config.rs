@@ -70,16 +70,18 @@ pub fn read_hierarchical_config() -> Result<Config, ConfigError> {
 }
 
 fn find_config_path() -> Option<PathBuf> {
-    // Only look for .gitperfconfig in the git repository root
-    if let Ok(repo_root) = get_repository_root() {
-        if !repo_root.is_empty() {
-            let candidate = PathBuf::from(repo_root).join(".gitperfconfig");
-            if candidate.is_file() {
-                return Some(candidate);
+    // Reuse get_main_config_path logic but handle errors gracefully
+    match get_repository_root() {
+        Ok(repo_root) if !repo_root.is_empty() => {
+            let path = PathBuf::from(repo_root).join(".gitperfconfig");
+            if path.is_file() {
+                Some(path)
+            } else {
+                None
             }
         }
+        _ => None,
     }
-    None
 }
 
 fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
