@@ -148,11 +148,7 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
 pub fn bump_epoch(measurement: &str) -> Result<()> {
     // Read existing config from the main config path
     let config_path = get_main_config_path()?;
-    let mut conf_str = if config_path.is_file() {
-        read_config_from_file(&config_path).unwrap_or_default()
-    } else {
-        String::new()
-    };
+    let mut conf_str = read_config_from_file(&config_path).unwrap_or_default();
 
     bump_epoch_in_conf(measurement, &mut conf_str)?;
     write_config(&conf_str)?;
