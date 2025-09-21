@@ -1,9 +1,0 @@
----
-description: Policy for committing regenerated documentation for cli_types
-globs: ["cli_types/**", "docs/**"]
-alwaysApply: true
----
-
-- If changes are made to the `cli_types` crate, ensure that any documentation regenerated as part of the build process is included in the commit
-- Commit the regenerated docs alongside the code changes
-
