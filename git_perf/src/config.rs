@@ -107,7 +107,7 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
         }
     }
 
-    // Try wildcard fallback using toml_edit since config crate doesn't handle quoted keys well
+    // Try wildcard fallback - config crate cannot access keys with special characters like '*' using dotted notation
     if let Some(local_path) = find_config_path() {
         if let Ok(content) = read_config_from_file(local_path) {
             if let Ok(doc) = content.parse::<Document>() {
