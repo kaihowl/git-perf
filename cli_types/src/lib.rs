@@ -49,6 +49,15 @@ pub struct Cli {
     pub command: Commands,
 }
 
+impl Cli {
+    /// Create a versionless command for manpage generation
+    pub fn command_without_version() -> clap::Command {
+        let mut cmd = Self::command();
+        cmd = cmd.version(None::<&str>);
+        cmd
+    }
+}
+
 #[derive(Args)]
 pub struct CliMeasurement {
     /// Name of the measurement

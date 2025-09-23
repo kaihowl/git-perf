@@ -6,11 +6,7 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
-    // Use normalized version for documentation to avoid version-based diffs
-    let version = env::var("GIT_PERF_DOC_VERSION")
-        .or_else(|_| env::var("CARGO_PKG_VERSION"))
-        .unwrap_or_else(|_| "0.0.0".to_string());
-    let version: &'static str = Box::leak(version.into_boxed_str());
+    // Version normalization is no longer needed since manpages exclude version entirely
 
     // Path calculation to the workspace root
     let workspace_root = out_dir.join("../../../../../");
@@ -20,18 +16,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(&man_dir).unwrap();
     fs::create_dir_all(&docs_dir).unwrap();
 
-    // Generate manpages for the main command and all subcommands
-    let mut cmd = git_perf_cli_types::Cli::command();
-    cmd = cmd.version(version);
+    // Generate manpages for the main command and all subcommands (without version)
+    let cmd = git_perf_cli_types::Cli::command_without_version();
     let man = clap_mangen::Man::new(cmd);
     let mut buffer: Vec<u8> = Default::default();
     man.render(&mut buffer).unwrap();
     let main_man_path = man_dir.join("git-perf.1");
     fs::write(&main_man_path, &buffer).unwrap();
 
-    // Generate manpages for subcommands
-    let mut cmd = git_perf_cli_types::Cli::command();
-    cmd = cmd.version(version);
+    // Generate manpages for subcommands (without version)
+    let cmd = git_perf_cli_types::Cli::command_without_version();
     for subcmd in cmd.get_subcommands() {
         let man = clap_mangen::Man::new(subcmd.clone());
         let mut buffer: Vec<u8> = Default::default();
