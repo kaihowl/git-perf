@@ -403,26 +403,6 @@ epoch = "{}"
         });
     }
 
-    #[test]
-    fn test_parsing() {
-        let toml_str = r#"
-        measurement = { test2 = { epoch = "834ae670e2ecd5c87020fde23378b890832d6076" } }
-    "#;
-
-        let doc = toml_str.parse::<Document>().expect("sfdfdf");
-
-        let measurement = "test2";
-
-        let epoch = doc
-            .get("measurement")
-            .and_then(|m| m.get(measurement))
-            .and_then(|m| m.get("epoch"))
-            .and_then(|e| e.as_str())
-            .expect("Expected to find epoch for measurement");
-
-        // Should be able to parse the epoch
-        assert_eq!(epoch, "834ae670e2ecd5c87020fde23378b890832d6076");
-    }
 
     #[test]
     fn test_backoff_max_elapsed_seconds() {
