@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -47,6 +47,15 @@ pub struct Cli {
 
     #[command(subcommand)]
     pub command: Commands,
+}
+
+impl Cli {
+    /// Create a versionless command for manpage generation
+    pub fn command_without_version() -> clap::Command {
+        let mut cmd = Self::command();
+        cmd = cmd.version(None::<&str>);
+        cmd
+    }
 }
 
 #[derive(Args)]
