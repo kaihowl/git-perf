@@ -13,6 +13,68 @@ use crate::git::git_interop::{get_head_revision, get_repository_root};
 // Import the CLI types for dispersion method
 use git_perf_cli_types::DispersionMethod;
 
+/// Extension trait to get values with an asterisk fallback.
+///
+/// This provides a consistent way to retrieve a value for a given logical name
+/// (e.g., measurement name or "global") and fall back to an asterisk entry "*"
+/// when the specific name is not present. This is needed because the config
+/// crate cannot access keys containing '*' via dotted notation.
+pub trait ConfigAsteriskExt {
+    /// Returns a string value for `{prefix}.{name}.{key}` if available.
+    /// Otherwise falls back to `{prefix}.*.{key}` by parsing the local TOML.
+    ///
+    /// The `prefix` is a dotted path that leads to the collection where `name`
+    /// resides (e.g., "measurement" or "audit.measurement" or "audit.global").
+    /// The `name` can be a specific identifier or "global"; the fallback will
+    /// replace it with "*".
+    fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String>;
+}
+
+impl ConfigAsteriskExt for Config {
+    fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String> {
+        // Try exact first when name is not the asterisk or global.
+        let exact_key = format!("{}{}.{}",
+            if prefix.is_empty() { String::new() } else { format!("{}.", prefix) },
+            name,
+            key,
+        );
+
+        if name != "*" {
+            if let Ok(v) = self.get_string(&exact_key) {
+                return Some(v);
+            }
+        }
+
+        // Fallback: replace name (including "global") by "*" and read via TOML directly.
+        // Build segments for TOML navigation: prefix.split('.') + name + key
+        let mut segments: Vec<&str> = if prefix.is_empty() {
+            Vec::new()
+        } else {
+            prefix.split('.').collect()
+        };
+        segments.push("*");
+        segments.push(key);
+
+        // Only local repo config is considered for wildcard fallback (same as current behavior)
+        if let Some(local_path) = find_config_path() {
+            if let Ok(content) = read_config_from_file(local_path) {
+                if let Ok(value) = toml::from_str::<toml::Value>(&content) {
+                    let mut cur = &value;
+                    for seg in segments {
+                        match cur.get(seg) {
+                            Some(next) => cur = next,
+                            None => return None,
+                        }
+                    }
+                    return cur.as_str().map(|s| s.to_string());
+                }
+            }
+        }
+
+        None
+    }
+}
+
 /// Get the main repository config path (always in repo root)
 fn get_main_config_path() -> Result<PathBuf> {
     // Use git to find the repository root
@@ -99,34 +161,10 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
         })
         .ok()?;
 
-    // Try measurement-specific epoch first
-    if let Ok(epoch_str) = config.get_string(&format!("measurement.{}.epoch", measurement)) {
-        if let Ok(epoch) = u32::from_str_radix(&epoch_str, 16) {
-            return Some(epoch);
-        }
-    }
-
-    // Try wildcard fallback - read as a map and access the "*" key directly
-    if let Some(local_path) = find_config_path() {
-        if let Ok(content) = read_config_from_file(local_path) {
-            if let Ok(value) = toml::from_str::<toml::Value>(&content) {
-                if let Some(epoch_str) = value
-                    .get("measurement")
-                    .and_then(|m| m.as_table())
-                    .and_then(|t| t.get("*"))
-                    .and_then(|v| v.as_table())
-                    .and_then(|t| t.get("epoch"))
-                    .and_then(|e| e.as_str())
-                {
-                    if let Ok(epoch) = u32::from_str_radix(epoch_str, 16) {
-                        return Some(epoch);
-                    }
-                }
-            }
-        }
-    }
-
-    None
+    // Use the asterisk fallback helper on the "measurement" prefix
+    config
+        .get_with_asterisk_default("measurement", measurement, "epoch")
+        .and_then(|s| u32::from_str_radix(&s, 16).ok())
 }
 
 pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()> {
@@ -170,17 +208,20 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
-    // Check measurement-specific setting first
-    if let Ok(threshold) = config.get_float(&format!(
-        "audit.measurement.{}.min_relative_deviation",
-        measurement
-    )) {
-        return Some(threshold);
+    if let Some(s) = config.get_with_asterisk_default(
+        "audit.measurement",
+        measurement,
+        "min_relative_deviation",
+    ) {
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
     }
 
-    // Check global setting
-    if let Ok(threshold) = config.get_float("audit.global.min_relative_deviation") {
-        return Some(threshold);
+    if let Some(s) = config.get_with_asterisk_default("audit", "global", "min_relative_deviation") {
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
     }
 
     None
@@ -192,19 +233,18 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         return DispersionMethod::StandardDeviation;
     };
 
-    // Check measurement-specific setting first
-    if let Ok(method_str) = config.get_string(&format!(
-        "audit.measurement.{}.dispersion_method",
-        measurement
-    )) {
-        if let Ok(method) = method_str.parse::<DispersionMethod>() {
+    if let Some(s) = config.get_with_asterisk_default(
+        "audit.measurement",
+        measurement,
+        "dispersion_method",
+    ) {
+        if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
     }
 
-    // Check global setting
-    if let Ok(method_str) = config.get_string("audit.global.dispersion_method") {
-        if let Ok(method) = method_str.parse::<DispersionMethod>() {
+    if let Some(s) = config.get_with_asterisk_default("audit", "global", "dispersion_method") {
+        if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
     }
