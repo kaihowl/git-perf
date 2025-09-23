@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use std::str::FromStr;
 

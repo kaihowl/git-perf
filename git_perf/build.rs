@@ -1,4 +1,3 @@
-use clap::CommandFactory;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
