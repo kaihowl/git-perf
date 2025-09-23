@@ -1,6 +1,6 @@
 [package]
 name = "git-perf"
-version = "0.17.2"
+version = "0.0.0"
 edition = "2021"
 description = "Track, plot, and statistically validate simple measurements using git-notes for storage"
 license = "MIT"
