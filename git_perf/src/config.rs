@@ -106,15 +106,16 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
         }
     }
 
-    // Try wildcard fallback - config crate cannot access keys with special characters like '*' using dotted notation
-    // Escaping approaches (\"*\", '*', \\*, [*], *) all fail, so we must use toml_edit
+    // Try wildcard fallback - read as a map and access the "*" key directly
     if let Some(local_path) = find_config_path() {
         if let Ok(content) = read_config_from_file(local_path) {
-            if let Ok(doc) = content.parse::<Document>() {
-                if let Some(epoch_str) = doc
+            if let Ok(value) = toml::from_str::<toml::Value>(&content) {
+                if let Some(epoch_str) = value
                     .get("measurement")
-                    .and_then(|m| m.get("*"))
-                    .and_then(|m| m.get("epoch"))
+                    .and_then(|m| m.as_table())
+                    .and_then(|t| t.get("*"))
+                    .and_then(|v| v.as_table())
+                    .and_then(|t| t.get("epoch"))
                     .and_then(|e| e.as_str())
                 {
                     if let Ok(epoch) = u32::from_str_radix(epoch_str, 16) {
