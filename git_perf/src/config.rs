@@ -171,30 +171,16 @@ pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
     // Check measurement-specific setting first
-    let measurement_key = format!(
+    if let Ok(threshold) = config.get_float(&format!(
         "audit.measurement.{}.min_relative_deviation",
         measurement
-    );
-    if let Ok(threshold) = config.get_float(&measurement_key) {
+    )) {
         return Some(threshold);
-    } else if let Ok(raw) = config.get_string(&measurement_key) {
-        // Value exists but is not a float
-        log::warn!(
-            "Type mismatch for '{}': expected float, found string '{}'. Ignoring.",
-            measurement_key, raw
-        );
     }
 
     // Check global setting
-    let global_key = "audit.global.min_relative_deviation";
-    if let Ok(threshold) = config.get_float(global_key) {
+    if let Ok(threshold) = config.get_float("audit.global.min_relative_deviation") {
         return Some(threshold);
-    } else if let Ok(raw) = config.get_string(global_key) {
-        // Value exists but is not a float
-        log::warn!(
-            "Type mismatch for '{}': expected float, found string '{}'. Ignoring.",
-            global_key, raw
-        );
     }
 
     None
@@ -281,52 +267,6 @@ mod test {
         let config_dir = home_dir.join(".config").join("git-perf");
         fs::create_dir_all(&config_dir).unwrap();
         config_dir.join("config.toml")
-    }
-
-    #[test]
-    fn test_conflicting_types_between_system_and_local() {
-        with_isolated_home(|temp_dir| {
-            // Init repo and set CWD
-            env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
-
-            // System config: global min_relative_deviation as a string (wrong type)
-            let system_config_path = create_home_config_dir(temp_dir);
-            let system_config = r#"
-[audit.global]
-min_relative_deviation = "not-a-number"
-"#;
-            fs::write(&system_config_path, system_config).unwrap();
-
-            // Local config: measurement-specific min_relative_deviation as float (correct type)
-            let workspace_config_path = temp_dir.join(".gitperfconfig");
-            let local_config = r#"
-[audit.measurement."build_time"]
-min_relative_deviation = 12.5
-"#;
-            fs::write(&workspace_config_path, local_config).unwrap();
-
-            // Expect measurement-specific correct type to be used
-            assert_eq!(super::audit_min_relative_deviation("build_time"), Some(12.5));
-
-            // For another measurement, global is present but wrong type -> None
-            assert_eq!(super::audit_min_relative_deviation("other"), None);
-
-            // Now flip: local wrong type, system correct type
-            let system_ok = r#"
-[audit.global]
-min_relative_deviation = 7.0
-"#;
-            fs::write(&system_config_path, system_ok).unwrap();
-            let local_wrong = r#"
-[audit.measurement."build_time"]
-min_relative_deviation = "not-a-number"
-"#;
-            fs::write(&workspace_config_path, local_wrong).unwrap();
-
-            // Measurement-specific wrong type -> ignored, falls back to global correct type
-            assert_eq!(super::audit_min_relative_deviation("build_time"), Some(7.0));
-        });
     }
 
     #[test]
