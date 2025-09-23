@@ -994,6 +994,7 @@ dependencies = [
  "plotly",
  "rand",
  "readable",
+ "serde_json",
  "sparklines",
  "tempfile",
  "thiserror 1.0.56",

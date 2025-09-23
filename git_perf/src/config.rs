@@ -21,7 +21,8 @@ use git_perf_cli_types::DispersionMethod;
 /// crate cannot access keys containing '*' via dotted notation.
 pub trait ConfigAsteriskExt {
     /// Returns a string value for `{prefix}.{name}.{key}` if available.
-    /// Otherwise falls back to `{prefix}.*.{key}` by parsing the local TOML.
+    /// Otherwise falls back to `{prefix}.*.{key}` using only the current
+    /// in-memory config instance (no file IO).
     ///
     /// The `prefix` is a dotted path that leads to the collection where `name`
     /// resides (e.g., "measurement" or "audit.measurement" or "audit.global").
@@ -32,45 +33,39 @@ pub trait ConfigAsteriskExt {
 
 impl ConfigAsteriskExt for Config {
     fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String> {
-        // Try exact first when name is not the asterisk or global.
-        let exact_key = format!("{}{}.{}",
-            if prefix.is_empty() { String::new() } else { format!("{}.", prefix) },
-            name,
-            key,
-        );
-
+        // Try exact first when name is not the asterisk
         if name != "*" {
+            let exact_key = format!(
+                "{}{}.{}",
+                if prefix.is_empty() { String::new() } else { format!("{}.", prefix) },
+                name,
+                key
+            );
             if let Ok(v) = self.get_string(&exact_key) {
                 return Some(v);
             }
         }
 
-        // Fallback: replace name (including "global") by "*" and read via TOML directly.
-        // Build segments for TOML navigation: prefix.split('.') + name + key
-        let mut segments: Vec<&str> = if prefix.is_empty() {
-            Vec::new()
-        } else {
-            prefix.split('.').collect()
+        // Fallback: replace name by "*" and traverse the in-memory config via deserialization
+        let root: serde_json::Value = match self.clone().try_deserialize() {
+            Ok(v) => v,
+            Err(_) => return None,
         };
-        segments.push("*");
-        segments.push(key);
 
-        // Only local repo config is considered for wildcard fallback (same as current behavior)
-        if let Some(local_path) = find_config_path() {
-            if let Ok(content) = read_config_from_file(local_path) {
-                if let Ok(value) = toml::from_str::<toml::Value>(&content) {
-                    let mut cur = &value;
-                    for seg in segments {
-                        match cur.get(seg) {
-                            Some(next) => cur = next,
-                            None => return None,
-                        }
-                    }
-                    return cur.as_str().map(|s| s.to_string());
-                }
+        let mut cur = &root;
+        if !prefix.is_empty() {
+            for seg in prefix.split('.') {
+                cur = cur.get(seg)?;
             }
         }
-
+        cur = cur.get("*")?;
+        let v = cur.get(key)?;
+        if let Some(s) = v.as_str() {
+            return Some(s.to_string());
+        }
+        if v.is_number() || v.is_boolean() {
+            return Some(v.to_string());
+        }
         None
     }
 }
@@ -218,7 +213,7 @@ pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
         }
     }
 
-    if let Some(s) = config.get_with_asterisk_default("audit", "global", "min_relative_deviation") {
+    if let Some(s) = config.get_with_asterisk_default("audit", "*", "min_relative_deviation") {
         if let Ok(v) = s.parse::<f64>() {
             return Some(v);
         }
@@ -243,7 +238,7 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         }
     }
 
-    if let Some(s) = config.get_with_asterisk_default("audit", "global", "dispersion_method") {
+    if let Some(s) = config.get_with_asterisk_default("audit", "*", "dispersion_method") {
         if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
@@ -482,9 +477,9 @@ min_relative_deviation = 2.5
                 None
             );
 
-            // Test global setting
+            // Test global (now asterisk) setting
             let global_config = r#"
-[audit.global]
+[audit."*"]
 min_relative_deviation = 5.0
 "#;
             fs::write(&workspace_config_path, global_config).unwrap();
@@ -495,7 +490,7 @@ min_relative_deviation = 5.0
 
             // Test precedence - measurement-specific overrides global
             let precedence_config = r#"
-[audit.global]
+[audit."*"]
 min_relative_deviation = 5.0
 
 [audit.measurement."build_time"]
@@ -549,9 +544,9 @@ dispersion_method = "stddev"
                 git_perf_cli_types::DispersionMethod::StandardDeviation
             );
 
-            // Test global setting
+            // Test global (now asterisk) setting
             let global_config = r#"
-[audit.global]
+[audit."*"]
 dispersion_method = "mad"
 "#;
             fs::write(&workspace_config_path, global_config).unwrap();
@@ -562,7 +557,7 @@ dispersion_method = "mad"
 
             // Test precedence - measurement-specific overrides global
             let precedence_config = r#"
-[audit.global]
+[audit."*"]
 dispersion_method = "mad"
 
 [audit.measurement."build_time"]
@@ -736,7 +731,7 @@ backoff_max_elapsed_seconds = 60
             // Create system config (home directory config)
             let system_config_path = create_home_config_dir(temp_dir);
             let system_config = r#"
-[audit.global]
+[audit."*"]
 min_relative_deviation = 5.0
 dispersion_method = "mad"
 
@@ -752,7 +747,7 @@ max_elapsed_seconds = 120
             // Create workspace config that overrides system config
             let workspace_config_path = temp_dir.join(".gitperfconfig");
             let local_config = r#"
-[audit.global]
+[audit."*"]
 min_relative_deviation = 10.0
 
 [audit.measurement."build_time"]
@@ -764,17 +759,22 @@ dispersion_method = "stddev"
             // Test hierarchical config reading
             let config = read_hierarchical_config().unwrap();
 
-            // Test that local config overrides system config
+            // Test that local asterisk overrides system config via helper
+            use super::ConfigAsteriskExt;
             assert_eq!(
                 config
-                    .get_float("audit.global.min_relative_deviation")
+                    .get_with_asterisk_default("audit", "*", "min_relative_deviation")
+                    .unwrap()
+                    .parse::<f64>()
                     .unwrap(),
                 10.0
             );
             assert_eq!(
-                config.get_string("audit.global.dispersion_method").unwrap(),
+                config
+                    .get_with_asterisk_default("audit", "*", "dispersion_method")
+                    .unwrap(),
                 "mad"
-            ); // Not overridden in local
+            ); // Not overridden in local for global fallback
 
             // Test measurement-specific override
             assert_eq!(

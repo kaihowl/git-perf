@@ -2,7 +2,7 @@
 # This file should be placed in your repository root
 
 # Global audit settings (applies to all measurements)
-[audit.global]
+[audit."*"]
         # Minimum relative deviation threshold (as percentage)
         # Measurements with relative deviation below this threshold will be ignored
         # even if they exceed the sigma threshold
@@ -15,7 +15,7 @@
         # MAD is more robust to outliers, stddev is more sensitive
         dispersion_method = "mad"
 
-# Measurement-specific audit settings (overrides global)
+# Measurement-specific audit settings (overrides global/asterisk)
 [audit.measurement."build_time"]
 # Build time measurements can have higher variance, so use a higher threshold
 # Use MAD for build times as they can have occasional outliers from system load
