@@ -37,7 +37,11 @@ impl ConfigAsteriskExt for Config {
         if name != "*" {
             let exact_key = format!(
                 "{}{}.{}",
-                if prefix.is_empty() { String::new() } else { format!("{}.", prefix) },
+                if prefix.is_empty() {
+                    String::new()
+                } else {
+                    format!("{}.", prefix)
+                },
                 name,
                 key
             );
@@ -203,11 +207,9 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
-    if let Some(s) = config.get_with_asterisk_default(
-        "audit.measurement",
-        measurement,
-        "min_relative_deviation",
-    ) {
+    if let Some(s) =
+        config.get_with_asterisk_default("audit.measurement", measurement, "min_relative_deviation")
+    {
         if let Ok(v) = s.parse::<f64>() {
             return Some(v);
         }
@@ -228,11 +230,9 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         return DispersionMethod::StandardDeviation;
     };
 
-    if let Some(s) = config.get_with_asterisk_default(
-        "audit.measurement",
-        measurement,
-        "dispersion_method",
-    ) {
+    if let Some(s) =
+        config.get_with_asterisk_default("audit.measurement", measurement, "dispersion_method")
+    {
         if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
