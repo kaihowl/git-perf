@@ -403,7 +403,6 @@ epoch = "{}"
         });
     }
 
-
     #[test]
     fn test_backoff_max_elapsed_seconds() {
         with_isolated_home(|temp_dir| {
