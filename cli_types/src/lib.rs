@@ -259,8 +259,6 @@ fn parse_key_value(s: &str) -> Result<(String, String)> {
 fn parse_spaceless_string(s: &str) -> Result<String> {
     if s.split_whitespace().count() > 1 {
         Err(anyhow!("invalid string/key/value: found space in '{}'", s))
-    } else if s == "*" {
-        Err(anyhow!("invalid measurement name: '*' is reserved for global settings"))
     } else {
         Ok(String::from(s))
     }
@@ -321,22 +319,5 @@ mod test {
         assert!(parse_datetime_value(&now, "").is_err());
 
         assert!(parse_datetime_value(&now, "945kjfg").is_err());
-    }
-
-    #[test]
-    fn test_asterisk_validation() {
-        // Test that "*" is rejected as a measurement name
-        assert!(parse_spaceless_string("*").is_err());
-        
-        // Test that valid measurement names still work
-        assert_eq!(parse_spaceless_string("build_time").unwrap(), "build_time");
-        assert_eq!(parse_spaceless_string("memory_usage").unwrap(), "memory_usage");
-        
-        // Test that strings with spaces are still rejected
-        assert!(parse_spaceless_string("build time").is_err());
-        
-        // Test that other special characters work fine
-        assert_eq!(parse_spaceless_string("test-name").unwrap(), "test-name");
-        assert_eq!(parse_spaceless_string("test_name_123").unwrap(), "test_name_123");
     }
 }
