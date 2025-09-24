@@ -1,7 +1,1 @@
-[measurement]
-min_relative_deviation = 5.0
-dispersion_method = "mad"
-
-[measurement."build_time"]
-min_relative_deviation = 10.0
-dispersion_method = "stddev"
+measurement = { report-size = { epoch = "f3709134" } , report = { epoch = "fe6d0205" } , test-measure2 = { epoch = "b5f56987" } }
