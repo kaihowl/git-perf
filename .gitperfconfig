@@ -1,19 +1,7 @@
-# Default settings for all measurements (parent table)
 [measurement]
 min_relative_deviation = 5.0
 dispersion_method = "mad"
-epoch = "00000000"
 
-# Measurement-specific settings (override defaults)
 [measurement."build_time"]
 min_relative_deviation = 10.0
 dispersion_method = "stddev"
-epoch = "12345678"
-
-[measurement."memory_usage"]
-min_relative_deviation = 2.0
-dispersion_method = "stddev"
-
-# Other settings
-[backoff]
-max_elapsed_seconds = 60
