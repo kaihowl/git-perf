@@ -159,21 +159,21 @@ pub enum Commands {
     ///
     /// Configuration is done via the `.gitperfconfig` file:
     ///
-    /// **Global settings:**
-    /// - `[audit.global].min_relative_deviation = 5.0`
-    /// - `[audit.global].dispersion_method = "mad"`
+    /// **Default settings:**
+    /// - `[measurement].min_relative_deviation = 5.0`
+    /// - `[measurement].dispersion_method = "mad"`
     ///
-    /// **Measurement-specific settings (overrides global):**
-    /// - `[audit.measurement."name"].min_relative_deviation = 10.0`
-    /// - `[audit.measurement."name"].dispersion_method = "stddev"`
+    /// **Measurement-specific settings (override defaults):**
+    /// - `[measurement."name"].min_relative_deviation = 10.0`
+    /// - `[measurement."name"].dispersion_method = "stddev"`
     ///
     /// ## Precedence
     ///
     /// The dispersion method is determined in this order:
     /// 1. CLI option (`--dispersion-method` or `-D`) - highest priority
-    /// 2. Measurement-specific config - overrides global
-    /// 3. Global config - overrides default
-    /// 4. Default (stddev) - lowest priority
+    /// 2. Measurement-specific config - overrides default
+    /// 3. Default config - overrides built-in default
+    /// 4. Built-in default (stddev) - lowest priority
     ///
     /// When the relative deviation is below the threshold, the audit passes even
     /// if the z-score exceeds the sigma threshold. The relative deviation is

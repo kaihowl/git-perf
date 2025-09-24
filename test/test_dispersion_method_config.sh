@@ -57,7 +57,7 @@ echo "✅ CLI option correctly overrides default"
 # Test 3: Global configuration overrides default
 echo "Test 3: Global configuration overrides default"
 cat > .gitperfconfig << 'EOF'
-[audit."*"]
+[measurement]
 dispersion_method = "mad"
 EOF
 
@@ -76,10 +76,10 @@ echo "✅ Global configuration correctly overrides default"
 # Test 4: Measurement-specific configuration overrides global
 echo "Test 4: Measurement-specific configuration overrides global"
 cat > .gitperfconfig << 'EOF'
-[audit."*"]
+[measurement]
 dispersion_method = "mad"
 
-[audit.measurement."build_time"]
+[measurement."build_time"]
 dispersion_method = "stddev"
 EOF
 
@@ -112,7 +112,7 @@ git perf add -m memory_usage 45
 
 # Set global config to MAD
 cat > .gitperfconfig << 'EOF'
-[audit."*"]
+[measurement]
 dispersion_method = "mad"
 EOF
 
@@ -154,7 +154,7 @@ echo "✅ Empty configuration correctly falls back to default"
 echo "Test 10: Verify dispersion method differences"
 # Set global config to MAD
 cat > .gitperfconfig << 'EOF'
-[audit."*"]
+[measurement]
 dispersion_method = "mad"
 EOF
 
