@@ -132,7 +132,7 @@ The audit supports two methods for calculating statistical dispersion:
 
 Configuration is done via the `.gitperfconfig` file:
 
-**Global settings:** - `[audit.global].min_relative_deviation = 5.0` - `[audit.global].dispersion_method = "mad"`
+**Global settings:** - `[audit."*"].min_relative_deviation = 5.0` - `[audit."*"].dispersion_method = "mad"`
 
 **Measurement-specific settings (overrides global):** - `[audit.measurement."name"].min_relative_deviation = 10.0` - `[audit.measurement."name"].dispersion_method = "stddev"`
 
