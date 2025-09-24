@@ -1,8 +1,0 @@
-name: deprecated-release-binary-size
-on:
-  workflow_dispatch:
-jobs:
-  noop:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "This workflow is deprecated; metric is handled in ci.yml"
