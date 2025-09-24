@@ -60,21 +60,24 @@ git-perf supports two methods for calculating statistical dispersion:
 Create a `.gitperfconfig` file in your repository root:
 
 ```toml
-# Global settings for all measurements
-[audit."*"]
+# Default settings for all measurements (parent table)
+[measurement]
 min_relative_deviation = 5.0
 dispersion_method = "mad"  # Use MAD for all measurements by default
+epoch = "00000000"  # Default epoch for performance changes
 
-# Measurement-specific settings (overrides global)
-[audit.measurement."build_time"]
+# Measurement-specific settings (override defaults)
+[measurement."build_time"]
 min_relative_deviation = 10.0
 dispersion_method = "mad"  # Build times can have outliers, use MAD
+epoch = "12345678"
 
-[audit.measurement."memory_usage"]
+[measurement."memory_usage"]
 min_relative_deviation = 2.0
 dispersion_method = "stddev"  # Memory usage is more stable, use stddev
+epoch = "abcdef12"
 
-[audit.measurement."test_runtime"]
+[measurement."test_runtime"]
 min_relative_deviation = 7.5
 dispersion_method = "mad"  # Test times can vary significantly
 ```
@@ -113,9 +116,9 @@ The audit compares the HEAD measurement against historical measurements:
 
 The dispersion method is determined in this order:
 1. **CLI option** (`--dispersion-method` or `-D`) - highest priority
-2. **Measurement-specific config** (`[audit.measurement."name"].dispersion_method`)
-3. **Global config** (`[audit."*"].dispersion_method`)
-4. **Default** (stddev) - lowest priority
+2. **Measurement-specific config** (`[measurement."name"].dispersion_method`)
+3. **Default config** (`[measurement].dispersion_method`)
+4. **Built-in default** (stddev) - lowest priority
 
 ### Example Output
 

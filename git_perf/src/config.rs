@@ -13,63 +13,33 @@ use crate::git::git_interop::{get_head_revision, get_repository_root};
 // Import the CLI types for dispersion method
 use git_perf_cli_types::DispersionMethod;
 
-/// Extension trait to get values with an asterisk fallback.
+/// Extension trait to get values with parent table fallback.
 ///
 /// This provides a consistent way to retrieve a value for a given logical name
-/// (e.g., measurement name or "global") and fall back to an asterisk entry "*"
-/// when the specific name is not present. This is needed because the config
-/// crate cannot access keys containing '*' via dotted notation.
-pub trait ConfigAsteriskExt {
-    /// Returns a string value for `{prefix}.{name}.{key}` if available.
-    /// Otherwise falls back to `{prefix}.*.{key}` using only the current
-    /// in-memory config instance (no file IO).
+/// and fall back to the parent table when the specific name is not present.
+pub trait ConfigParentFallbackExt {
+    /// Returns a string value for `{parent}.{name}.{key}` if available.
+    /// Otherwise falls back to `{parent}.{key}` (parent table defaults).
     ///
-    /// The `prefix` is a dotted path that leads to the collection where `name`
-    /// resides (e.g., "measurement" or "audit.measurement" or "audit.global").
-    /// The `name` can be a specific identifier or "global"; the fallback will
-    /// replace it with "*".
-    fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String>;
+    /// The `parent` is the parent table name (e.g., "measurement").
+    /// The `name` is the specific identifier within that parent.
+    fn get_with_parent_fallback(&self, parent: &str, name: &str, key: &str) -> Option<String>;
 }
 
-impl ConfigAsteriskExt for Config {
-    fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String> {
-        // Try exact first when name is not the asterisk
-        if name != "*" {
-            let exact_key = format!(
-                "{}{}.{}",
-                if prefix.is_empty() {
-                    String::new()
-                } else {
-                    format!("{}.", prefix)
-                },
-                name,
-                key
-            );
-            if let Ok(v) = self.get_string(&exact_key) {
-                return Some(v);
-            }
+impl ConfigParentFallbackExt for Config {
+    fn get_with_parent_fallback(&self, parent: &str, name: &str, key: &str) -> Option<String> {
+        // Try specific measurement first: parent.name.key
+        let specific_key = format!("{}.{}.{}", parent, name, key);
+        if let Ok(v) = self.get_string(&specific_key) {
+            return Some(v);
         }
 
-        // Fallback: replace name by "*" and traverse the in-memory config via deserialization
-        let root: serde_json::Value = match self.clone().try_deserialize() {
-            Ok(v) => v,
-            Err(_) => return None,
-        };
+        // Fallback to parent table: parent.key
+        let parent_key = format!("{}.{}", parent, key);
+        if let Ok(v) = self.get_string(&parent_key) {
+            return Some(v);
+        }
 
-        let mut cur = &root;
-        if !prefix.is_empty() {
-            for seg in prefix.split('.') {
-                cur = cur.get(seg)?;
-            }
-        }
-        cur = cur.get("*")?;
-        let v = cur.get(key)?;
-        if let Some(s) = v.as_str() {
-            return Some(s.to_string());
-        }
-        if v.is_number() || v.is_boolean() {
-            return Some(v.to_string());
-        }
         None
     }
 }
@@ -160,9 +130,9 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
         })
         .ok()?;
 
-    // Use the asterisk fallback helper on the "measurement" prefix
+    // Use parent fallback for measurement epoch
     config
-        .get_with_asterisk_default("measurement", measurement, "epoch")
+        .get_with_parent_fallback("measurement", measurement, "epoch")
         .and_then(|s| u32::from_str_radix(&s, 16).ok())
 }
 
@@ -207,15 +177,7 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
-    if let Some(s) =
-        config.get_with_asterisk_default("audit.measurement", measurement, "min_relative_deviation")
-    {
-        if let Ok(v) = s.parse::<f64>() {
-            return Some(v);
-        }
-    }
-
-    if let Some(s) = config.get_with_asterisk_default("audit", "*", "min_relative_deviation") {
+    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "min_relative_deviation") {
         if let Ok(v) = s.parse::<f64>() {
             return Some(v);
         }
@@ -230,15 +192,7 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         return DispersionMethod::StandardDeviation;
     };
 
-    if let Some(s) =
-        config.get_with_asterisk_default("audit.measurement", measurement, "dispersion_method")
-    {
-        if let Ok(method) = s.parse::<DispersionMethod>() {
-            return method;
-        }
-    }
-
-    if let Some(s) = config.get_with_asterisk_default("audit", "*", "dispersion_method") {
+    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "dispersion_method") {
         if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
@@ -434,10 +388,13 @@ epoch = "{}"
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
             let local_config = r#"
-[audit.measurement."build_time"]
+[measurement]
+min_relative_deviation = 5.0
+
+[measurement."build_time"]
 min_relative_deviation = 10.0
 
-[audit.measurement."memory_usage"]
+[measurement."memory_usage"]
 min_relative_deviation = 2.5
 "#;
             fs::write(&workspace_config_path, local_config).unwrap();
@@ -453,12 +410,12 @@ min_relative_deviation = 2.5
             );
             assert_eq!(
                 super::audit_min_relative_deviation("other_measurement"),
-                None
+                Some(5.0)  // Now falls back to parent table
             );
 
-            // Test global (now asterisk) setting
+            // Test global (now parent table) setting
             let global_config = r#"
-[audit."*"]
+[measurement]
 min_relative_deviation = 5.0
 "#;
             fs::write(&workspace_config_path, global_config).unwrap();
@@ -469,10 +426,10 @@ min_relative_deviation = 5.0
 
             // Test precedence - measurement-specific overrides global
             let precedence_config = r#"
-[audit."*"]
+[measurement]
 min_relative_deviation = 5.0
 
-[audit.measurement."build_time"]
+[measurement."build_time"]
 min_relative_deviation = 10.0
 "#;
             fs::write(&workspace_config_path, precedence_config).unwrap();
@@ -501,10 +458,13 @@ min_relative_deviation = 10.0
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
             let local_config = r#"
-[audit.measurement."build_time"]
+[measurement]
+dispersion_method = "stddev"
+
+[measurement."build_time"]
 dispersion_method = "mad"
 
-[audit.measurement."memory_usage"]
+[measurement."memory_usage"]
 dispersion_method = "stddev"
 "#;
             fs::write(&workspace_config_path, local_config).unwrap();
@@ -523,9 +483,9 @@ dispersion_method = "stddev"
                 git_perf_cli_types::DispersionMethod::StandardDeviation
             );
 
-            // Test global (now asterisk) setting
+            // Test global (now parent table) setting
             let global_config = r#"
-[audit."*"]
+[measurement]
 dispersion_method = "mad"
 "#;
             fs::write(&workspace_config_path, global_config).unwrap();
@@ -536,10 +496,10 @@ dispersion_method = "mad"
 
             // Test precedence - measurement-specific overrides global
             let precedence_config = r#"
-[audit."*"]
+[measurement]
 dispersion_method = "mad"
 
-[audit.measurement."build_time"]
+[measurement."build_time"]
 dispersion_method = "stddev"
 "#;
             fs::write(&workspace_config_path, precedence_config).unwrap();
@@ -710,7 +670,7 @@ backoff_max_elapsed_seconds = 60
             // Create system config (home directory config)
             let system_config_path = create_home_config_dir(temp_dir);
             let system_config = r#"
-[audit."*"]
+[measurement]
 min_relative_deviation = 5.0
 dispersion_method = "mad"
 
@@ -726,10 +686,10 @@ max_elapsed_seconds = 120
             // Create workspace config that overrides system config
             let workspace_config_path = temp_dir.join(".gitperfconfig");
             let local_config = r#"
-[audit."*"]
+[measurement]
 min_relative_deviation = 10.0
 
-[audit.measurement."build_time"]
+[measurement."build_time"]
 min_relative_deviation = 15.0
 dispersion_method = "stddev"
 "#;
@@ -738,11 +698,11 @@ dispersion_method = "stddev"
             // Test hierarchical config reading
             let config = read_hierarchical_config().unwrap();
 
-            // Test that local asterisk overrides system config via helper
-            use super::ConfigAsteriskExt;
+            // Test that local parent table overrides system config via helper
+            use super::ConfigParentFallbackExt;
             assert_eq!(
                 config
-                    .get_with_asterisk_default("audit", "*", "min_relative_deviation")
+                    .get_with_parent_fallback("measurement", "any_measurement", "min_relative_deviation")
                     .unwrap()
                     .parse::<f64>()
                     .unwrap(),
@@ -750,21 +710,21 @@ dispersion_method = "stddev"
             );
             assert_eq!(
                 config
-                    .get_with_asterisk_default("audit", "*", "dispersion_method")
+                    .get_with_parent_fallback("measurement", "any_measurement", "dispersion_method")
                     .unwrap(),
                 "mad"
-            ); // Not overridden in local for global fallback
+            ); // Not overridden in local for parent fallback
 
             // Test measurement-specific override
             assert_eq!(
                 config
-                    .get_float("audit.measurement.build_time.min_relative_deviation")
+                    .get_float("measurement.build_time.min_relative_deviation")
                     .unwrap(),
                 15.0
             );
             assert_eq!(
                 config
-                    .get_string("audit.measurement.build_time.dispersion_method")
+                    .get_string("measurement.build_time.dispersion_method")
                     .unwrap(),
                 "stddev"
             );
