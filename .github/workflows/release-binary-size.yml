@@ -1,0 +1,77 @@
+name: release-binary-size
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  release-binary-size:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build optimized binary
+        run: |
+          cargo build --locked --release -p git-perf
+
+      - name: Determine binary path and size
+        id: size
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN=target/release/git-perf
+          if [ ! -f "$BIN" ]; then
+            echo "Binary not found at $BIN" >&2
+            ls -la target/release || true
+            exit 1
+          fi
+          # Size in bytes
+          BYTES=$(stat -c%s "$BIN")
+          echo "bytes=$BYTES" >> $GITHUB_OUTPUT
+          mkdir -p metrics
+          echo "$BYTES" > metrics/release_binary_size.txt
+          echo "Binary size (bytes): $BYTES"
+
+      - name: Upload size artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binary-size
+          path: metrics/release_binary_size.txt
+
+      - name: Upload binary artifact (optional)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-perf-binary
+          path: target/release/git-perf
+
+      - name: Report to git-perf (push only)
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BYTES=$(cat metrics/release_binary_size.txt)
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          ./target/release/git-perf add -m release-binary-size "$BYTES"
+          ./target/release/git-perf push
