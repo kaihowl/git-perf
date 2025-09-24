@@ -1,8 +1,8 @@
 # Example .gitperfconfig file for git-perf
 # This file should be placed in your repository root
 
-# Global audit settings (applies to all measurements)
-[audit."*"]
+# Default settings for all measurements (parent table)
+[measurement]
         # Minimum relative deviation threshold (as percentage)
         # Measurements with relative deviation below this threshold will be ignored
         # even if they exceed the sigma threshold
@@ -14,48 +14,40 @@
         # Options: "stddev" (standard deviation) or "mad" (median absolute deviation)
         # MAD is more robust to outliers, stddev is more sensitive
         dispersion_method = "mad"
+        
+        # Default epoch for accepting performance changes (hex format)
+        epoch = "00000000"
 
-# Measurement-specific audit settings (overrides global/asterisk)
-[audit.measurement."build_time"]
+# Measurement-specific settings (override parent defaults)
+[measurement."build_time"]
 # Build time measurements can have higher variance, so use a higher threshold
 # Use MAD for build times as they can have occasional outliers from system load
 min_relative_deviation = 10.0
 dispersion_method = "mad"
+epoch = "12345678"
 
-[audit.measurement."memory_usage"]
+[measurement."memory_usage"]
 # Memory usage should be more stable, so use a lower threshold
 # Use stddev for memory as it's typically more consistent
 min_relative_deviation = 2.0
 dispersion_method = "stddev"
+epoch = "abcdef12"
 
-[audit.measurement."test_runtime"]
+[measurement."test_runtime"]
 # Test runtime can vary significantly, use a moderate threshold
 # Use MAD for test times as they can have outliers from system performance
 min_relative_deviation = 7.5
 dispersion_method = "mad"
 
-[audit.measurement."cpu_usage"]
+[measurement."cpu_usage"]
 # CPU usage measurements - use stddev for more sensitive detection
 min_relative_deviation = 3.0
 dispersion_method = "stddev"
 
-[audit.measurement."network_latency"]
+[measurement."network_latency"]
 # Network latency can have spikes, use MAD for robustness
 min_relative_deviation = 8.0
 dispersion_method = "mad"
-
-# Epoch settings for accepting performance changes
-[measurement."build_time"]
-# Epoch for build_time measurement (hex format)
-epoch = "12345678"
-
-[measurement."memory_usage"]
-# Epoch for memory_usage measurement
-epoch = "abcdef12"
-
-# Global epoch (used as fallback)
-[measurement."*"]
-epoch = "00000000"
 
 # Backoff settings for retry logic
 [backoff]

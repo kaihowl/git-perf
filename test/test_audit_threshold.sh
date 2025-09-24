@@ -12,11 +12,11 @@ cd_empty_repo
 
 # Create a config file with threshold settings
 cat > .gitperfconfig << 'EOF'
-[audit.measurement."build_time"]
-min_relative_deviation = 10.0
-
-[audit."*"]
+[measurement]
 min_relative_deviation = 5.0
+
+[measurement."build_time"]
+min_relative_deviation = 10.0
 EOF
 
 # Create some commits with measurements

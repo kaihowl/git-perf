@@ -15,7 +15,7 @@ cd_empty_repo
 
 # Create a config file with threshold settings
 cat > .gitperfconfig << 'EOF'
-[audit.measurement."build_time"]
+[measurement."build_time"]
 min_relative_deviation = 10.0
 EOF
 
