@@ -177,7 +177,9 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
-    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "min_relative_deviation") {
+    if let Some(s) =
+        config.get_with_parent_fallback("measurement", measurement, "min_relative_deviation")
+    {
         if let Ok(v) = s.parse::<f64>() {
             return Some(v);
         }
@@ -192,7 +194,9 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         return DispersionMethod::StandardDeviation;
     };
 
-    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "dispersion_method") {
+    if let Some(s) =
+        config.get_with_parent_fallback("measurement", measurement, "dispersion_method")
+    {
         if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
@@ -267,16 +271,16 @@ mod test {
 
             // Create workspace config with epochs
             let workspace_config_path = temp_dir.join(".gitperfconfig");
-            let configfile = r#"[measurement."something"]
+            let configfile = r#"[measurement]
+# General performance regression
+epoch="12344555"
+
+[measurement."something"]
 #My comment
 epoch="34567898"
 
 [measurement."somethingelse"]
 epoch="a3dead"
-
-[measurement."*"]
-# General performance regression
-epoch="12344555"
 "#;
             fs::write(&workspace_config_path, configfile).unwrap();
 
@@ -410,7 +414,7 @@ min_relative_deviation = 2.5
             );
             assert_eq!(
                 super::audit_min_relative_deviation("other_measurement"),
-                Some(5.0)  // Now falls back to parent table
+                Some(5.0) // Now falls back to parent table
             );
 
             // Test global (now parent table) setting
@@ -702,7 +706,11 @@ dispersion_method = "stddev"
             use super::ConfigParentFallbackExt;
             assert_eq!(
                 config
-                    .get_with_parent_fallback("measurement", "any_measurement", "min_relative_deviation")
+                    .get_with_parent_fallback(
+                        "measurement",
+                        "any_measurement",
+                        "min_relative_deviation"
+                    )
                     .unwrap()
                     .parse::<f64>()
                     .unwrap(),
