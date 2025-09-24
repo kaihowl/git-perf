@@ -165,10 +165,52 @@ jobs:
   report:
     name: git-perf
     if: always()
-    needs: [test, rustfmt, clippy, rustdoc, documentation-check]
+    needs: [test, rustfmt, clippy, rustdoc, documentation-check, release-binary-size]
     uses: ./.github/workflows/report.yml
     with:
       additional-args: '-s rust'
       concurrency-token: gh-pages-${{ github.ref }}
       release: 'branch'
-      audit-args: '-m report -m report-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+      audit-args: '-m report -m report-size -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+
+  release-binary-size:
+    name: release-binary-size
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 40
+
+    - name: Set Git user and email
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Install Rust (stable)
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Build optimized git-perf binary
+      run: cargo build --locked --release -p git-perf
+
+    - name: Measure binary size and push metric
+      run: |
+        set -euo pipefail
+        BIN=target/release/git-perf
+        if [ ! -f "$BIN" ]; then
+          echo "Binary not found at $BIN" >&2
+          ls -la target/release || true
+          exit 1
+        fi
+        BYTES=$(stat -c%s "$BIN")
+        echo "$BYTES" > metrics/release_binary_size.txt
+        ./target/release/git-perf add -m release-binary-size -k os=ubuntu-22.04 -k rust=stable "$BYTES"
+        ./target/release/git-perf push
+
+    - name: Upload size artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-binary-size
+        path: metrics/release_binary_size.txt
