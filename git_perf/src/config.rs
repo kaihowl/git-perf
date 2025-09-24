@@ -1,61 +1,175 @@
 use anyhow::Result;
+use config::{Config, ConfigError, File, FileFormat};
 use std::{
-    fs::File,
+    env,
+    fs::File as StdFile,
     io::{Read, Write},
+    path::{Path, PathBuf},
 };
 use toml_edit::{value, Document};
 
-use crate::git::git_interop::get_head_revision;
+use crate::git::git_interop::{get_head_revision, get_repository_root};
 
 // Import the CLI types for dispersion method
 use git_perf_cli_types::DispersionMethod;
 
+/// Extension trait to get values with an asterisk fallback.
+///
+/// This provides a consistent way to retrieve a value for a given logical name
+/// (e.g., measurement name or "global") and fall back to an asterisk entry "*"
+/// when the specific name is not present. This is needed because the config
+/// crate cannot access keys containing '*' via dotted notation.
+pub trait ConfigAsteriskExt {
+    /// Returns a string value for `{prefix}.{name}.{key}` if available.
+    /// Otherwise falls back to `{prefix}.*.{key}` using only the current
+    /// in-memory config instance (no file IO).
+    ///
+    /// The `prefix` is a dotted path that leads to the collection where `name`
+    /// resides (e.g., "measurement" or "audit.measurement" or "audit.global").
+    /// The `name` can be a specific identifier or "global"; the fallback will
+    /// replace it with "*".
+    fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String>;
+}
+
+impl ConfigAsteriskExt for Config {
+    fn get_with_asterisk_default(&self, prefix: &str, name: &str, key: &str) -> Option<String> {
+        // Try exact first when name is not the asterisk
+        if name != "*" {
+            let exact_key = format!(
+                "{}{}.{}",
+                if prefix.is_empty() {
+                    String::new()
+                } else {
+                    format!("{}.", prefix)
+                },
+                name,
+                key
+            );
+            if let Ok(v) = self.get_string(&exact_key) {
+                return Some(v);
+            }
+        }
+
+        // Fallback: replace name by "*" and traverse the in-memory config via deserialization
+        let root: serde_json::Value = match self.clone().try_deserialize() {
+            Ok(v) => v,
+            Err(_) => return None,
+        };
+
+        let mut cur = &root;
+        if !prefix.is_empty() {
+            for seg in prefix.split('.') {
+                cur = cur.get(seg)?;
+            }
+        }
+        cur = cur.get("*")?;
+        let v = cur.get(key)?;
+        if let Some(s) = v.as_str() {
+            return Some(s.to_string());
+        }
+        if v.is_number() || v.is_boolean() {
+            return Some(v.to_string());
+        }
+        None
+    }
+}
+
+/// Get the main repository config path (always in repo root)
+fn get_main_config_path() -> Result<PathBuf> {
+    // Use git to find the repository root
+    let repo_root = get_repository_root().map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to determine repository root - must be run from within a git repository: {}",
+            e
+        )
+    })?;
+
+    if repo_root.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Repository root is empty - must be run from within a git repository"
+        ));
+    }
+
+    Ok(PathBuf::from(repo_root).join(".gitperfconfig"))
+}
+
+/// Write config to the main repository directory (always in repo root)
 pub fn write_config(conf: &str) -> Result<()> {
-    let mut f = File::create(".gitperfconfig")?;
+    let path = get_main_config_path()?;
+    let mut f = StdFile::create(path)?;
     f.write_all(conf.as_bytes())?;
     Ok(())
 }
 
-pub fn read_config() -> Result<String> {
-    read_config_from_file(".gitperfconfig")
+/// Read hierarchical configuration (system -> local override)
+pub fn read_hierarchical_config() -> Result<Config, ConfigError> {
+    let mut builder = Config::builder();
+
+    // 1. System-wide config (XDG_CONFIG_HOME or ~/.config/git-perf/config.toml)
+    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
+        let system_config_path = Path::new(&xdg_config_home)
+            .join("git-perf")
+            .join("config.toml");
+        builder = builder.add_source(
+            File::from(system_config_path)
+                .format(FileFormat::Toml)
+                .required(false),
+        );
+    } else if let Some(home) = dirs_next::home_dir() {
+        let system_config_path = home.join(".config").join("git-perf").join("config.toml");
+        builder = builder.add_source(
+            File::from(system_config_path)
+                .format(FileFormat::Toml)
+                .required(false),
+        );
+    }
+
+    // 2. Local config (repository .gitperfconfig) - this overrides system config
+    if let Some(local_path) = find_config_path() {
+        builder = builder.add_source(
+            File::from(local_path)
+                .format(FileFormat::Toml)
+                .required(false),
+        );
+    }
+
+    builder.build()
 }
 
-use std::path::Path;
+fn find_config_path() -> Option<PathBuf> {
+    // Use get_main_config_path but handle errors gracefully
+    let path = get_main_config_path().ok()?;
+    if path.is_file() {
+        Some(path)
+    } else {
+        None
+    }
+}
 
 fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
     let mut conf_str = String::new();
-    File::open(file)?.read_to_string(&mut conf_str)?;
+    StdFile::open(file)?.read_to_string(&mut conf_str)?;
     Ok(conf_str)
 }
 
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
-    // TODO(hoewelmk) configure path, use different working directory than repo root
-    // TODO(hoewelmk) proper error handling
-    let conf = read_config().ok()?;
-    determine_epoch(measurement, &conf)
-}
+    let config = read_hierarchical_config()
+        .map_err(|e| {
+            // Log the error but don't fail - this is expected when no config exists
+            log::debug!("Could not read hierarchical config: {}", e);
+        })
+        .ok()?;
 
-fn determine_epoch(measurement: &str, conf_str: &str) -> Option<u32> {
-    let config = conf_str
-        .parse::<Document>()
-        .expect("Failed to parse config");
-
-    let get_epoch = |section: &str| {
-        let s = config
-            .get("measurement")?
-            .get(section)?
-            .get("epoch")?
-            .as_str()?;
-        u32::from_str_radix(s, 16).ok()
-    };
-
-    get_epoch(measurement).or_else(|| get_epoch("*"))
+    // Use the asterisk fallback helper on the "measurement" prefix
+    config
+        .get_with_asterisk_default("measurement", measurement, "epoch")
+        .and_then(|s| u32::from_str_radix(&s, 16).ok())
 }
 
 pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()> {
     let mut conf = conf_str
         .parse::<Document>()
-        .expect("failed to parse config");
+        .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
 
     let head_revision = get_head_revision()?;
     // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
@@ -66,92 +180,66 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
 }
 
 pub fn bump_epoch(measurement: &str) -> Result<()> {
-    let mut conf_str = read_config().unwrap_or_default();
+    // Read existing config from the main config path
+    let config_path = get_main_config_path()?;
+    let mut conf_str = read_config_from_file(&config_path).unwrap_or_default();
+
     bump_epoch_in_conf(measurement, &mut conf_str)?;
     write_config(&conf_str)?;
     Ok(())
 }
 
-/// Returns the backoff max elapsed seconds from a config string, or 60 if not set.
-pub fn backoff_max_elapsed_seconds_from_str(conf: &str) -> u64 {
-    let doc = conf.parse::<Document>().ok();
-    doc.and_then(|doc| {
-        doc.get("backoff")
-            .and_then(|b| b.get("max_elapsed_seconds"))
-            .and_then(|v| v.as_integer())
-            .map(|v| v as u64)
-    })
-    .unwrap_or(60)
-}
-
 /// Returns the backoff max elapsed seconds from config, or 60 if not set.
 pub fn backoff_max_elapsed_seconds() -> u64 {
-    backoff_max_elapsed_seconds_from_str(read_config().unwrap_or_default().as_str())
+    match read_hierarchical_config() {
+        Ok(config) => {
+            if let Ok(seconds) = config.get_int("backoff.max_elapsed_seconds") {
+                seconds as u64
+            } else {
+                60 // Default value
+            }
+        }
+        Err(_) => 60, // Default value when no config exists
+    }
 }
 
-/// Returns the minimum relative deviation threshold from a config string, or None if not set.
-/// Follows precedence: measurement-specific > global > None
-pub fn audit_min_relative_deviation_from_str(conf: &str, measurement: &str) -> Option<f64> {
-    let doc = conf.parse::<Document>().ok()?;
+/// Returns the minimum relative deviation threshold from config, or None if not set.
+pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
+    let config = read_hierarchical_config().ok()?;
 
-    // Check for measurement-specific setting first
-    if let Some(threshold) = doc
-        .get("audit")
-        .and_then(|audit| audit.get("measurement"))
-        .and_then(|measurement_section| measurement_section.get(measurement))
-        .and_then(|config| config.get("min_relative_deviation"))
-        .and_then(|threshold| threshold.as_float())
+    if let Some(s) =
+        config.get_with_asterisk_default("audit.measurement", measurement, "min_relative_deviation")
     {
-        return Some(threshold);
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
     }
 
-    // Check for global setting
-    if let Some(threshold) = doc
-        .get("audit")
-        .and_then(|audit| audit.get("global"))
-        .and_then(|global| global.get("min_relative_deviation"))
-        .and_then(|threshold| threshold.as_float())
-    {
-        return Some(threshold);
+    if let Some(s) = config.get_with_asterisk_default("audit", "*", "min_relative_deviation") {
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
     }
 
     None
 }
 
-/// Returns the minimum relative deviation threshold from config, or None if not set.
-pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
-    audit_min_relative_deviation_from_str(read_config().unwrap_or_default().as_str(), measurement)
-}
-
-/// Returns the dispersion method from a config string, or StandardDeviation if not set.
-/// Follows precedence: measurement-specific > global > StandardDeviation
-pub fn audit_dispersion_method_from_str(conf: &str, measurement: &str) -> DispersionMethod {
-    let doc = match conf.parse::<Document>() {
-        Ok(doc) => doc,
-        Err(_) => return DispersionMethod::StandardDeviation,
+/// Returns the dispersion method from config, or StandardDeviation if not set.
+pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
+    let Some(config) = read_hierarchical_config().ok() else {
+        return DispersionMethod::StandardDeviation;
     };
 
-    // Check for measurement-specific setting first
-    if let Some(method_str) = doc
-        .get("audit")
-        .and_then(|audit| audit.get("measurement"))
-        .and_then(|measurement_section| measurement_section.get(measurement))
-        .and_then(|config| config.get("dispersion_method"))
-        .and_then(|method| method.as_str())
+    if let Some(s) =
+        config.get_with_asterisk_default("audit.measurement", measurement, "dispersion_method")
     {
-        if let Ok(method) = method_str.parse::<DispersionMethod>() {
+        if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
     }
 
-    // Check for global setting
-    if let Some(method_str) = doc
-        .get("audit")
-        .and_then(|audit| audit.get("global"))
-        .and_then(|global| global.get("dispersion_method"))
-        .and_then(|method| method.as_str())
-    {
-        if let Ok(method) = method_str.parse::<DispersionMethod>() {
+    if let Some(s) = config.get_with_asterisk_default("audit", "*", "dispersion_method") {
+        if let Ok(method) = s.parse::<DispersionMethod>() {
             return method;
         }
     }
@@ -160,19 +248,72 @@ pub fn audit_dispersion_method_from_str(conf: &str, measurement: &str) -> Disper
     DispersionMethod::StandardDeviation
 }
 
-/// Returns the dispersion method from config, or StandardDeviation if not set.
-pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
-    audit_dispersion_method_from_str(read_config().unwrap_or_default().as_str(), measurement)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// Test helper to set up an independent HOME directory
+    /// This eliminates the need for #[serial] tests by ensuring each test
+    /// has its own isolated environment
+    fn with_isolated_home<F, R>(f: F) -> R
+    where
+        F: FnOnce(&Path) -> R,
+    {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Set up isolated HOME directory
+        env::set_var("HOME", temp_dir.path());
+        env::remove_var("XDG_CONFIG_HOME");
+
+        f(temp_dir.path())
+    }
+
+    /// Initialize a git repository in the given directory
+    fn init_git_repo(dir: &Path) {
+        std::process::Command::new("git")
+            .args(&["init", "--initial-branch=master"])
+            .current_dir(dir)
+            .output()
+            .expect("Failed to initialize git repository");
+    }
+
+    /// Initialize a git repository with an initial commit in the given directory
+    fn init_git_repo_with_commit(dir: &Path) {
+        init_git_repo(dir);
+
+        // Create a test file and commit it
+        fs::write(dir.join("test.txt"), "test content").unwrap();
+        std::process::Command::new("git")
+            .args(&["add", "test.txt"])
+            .current_dir(dir)
+            .output()
+            .expect("Failed to add file");
+        std::process::Command::new("git")
+            .args(&["commit", "-m", "test commit"])
+            .current_dir(dir)
+            .output()
+            .expect("Failed to commit");
+    }
+
+    /// Create a HOME config directory structure and return the config path
+    fn create_home_config_dir(home_dir: &Path) -> PathBuf {
+        let config_dir = home_dir.join(".config").join("git-perf");
+        fs::create_dir_all(&config_dir).unwrap();
+        config_dir.join("config.toml")
+    }
 
     #[test]
     fn test_read_epochs() {
-        // TODO(hoewelmk) order unspecified in serialization...
-        let configfile = r#"[measurement."something"]
+        with_isolated_home(|temp_dir| {
+            // Create a git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with epochs
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let configfile = r#"[measurement."something"]
 #My comment
 epoch="34567898"
 
@@ -183,211 +324,469 @@ epoch="a3dead"
 # General performance regression
 epoch="12344555"
 "#;
+            fs::write(&workspace_config_path, configfile).unwrap();
 
-        let epoch = determine_epoch("something", configfile);
-        assert_eq!(epoch, Some(0x34567898));
+            let epoch = determine_epoch_from_config("something");
+            assert_eq!(epoch, Some(0x34567898));
 
-        let epoch = determine_epoch("somethingelse", configfile);
-        assert_eq!(epoch, Some(0xa3dead));
+            let epoch = determine_epoch_from_config("somethingelse");
+            assert_eq!(epoch, Some(0xa3dead));
 
-        let epoch = determine_epoch("unspecified", configfile);
-        assert_eq!(epoch, Some(0x12344555));
+            let epoch = determine_epoch_from_config("unspecified");
+            assert_eq!(epoch, Some(0x12344555));
+        });
     }
 
     #[test]
     fn test_bump_epochs() {
-        let configfile = r#"[measurement."something"]
+        with_isolated_home(|temp_dir| {
+            // Create a temporary git repository for this test
+            env::set_current_dir(temp_dir).unwrap();
+
+            // Set up hermetic git environment
+            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            env::set_var("GIT_AUTHOR_NAME", "testuser");
+            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+            env::set_var("GIT_COMMITTER_NAME", "testuser");
+            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+
+            // Initialize git repository with initial commit
+            init_git_repo_with_commit(temp_dir);
+
+            let configfile = r#"[measurement."something"]
 #My comment
 epoch = "34567898"
 "#;
 
-        let mut actual = String::from(configfile);
-        bump_epoch_in_conf("something", &mut actual).expect("Failed to bump epoch");
+            let mut actual = String::from(configfile);
+            bump_epoch_in_conf("something", &mut actual).expect("Failed to bump epoch");
 
-        let expected = format!(
-            r#"[measurement."something"]
+            let expected = format!(
+                r#"[measurement."something"]
 #My comment
 epoch = "{}"
 "#,
-            &get_head_revision().expect("get_head_revision failed")[0..8],
-        );
+                &get_head_revision().expect("get_head_revision failed")[0..8],
+            );
 
-        assert_eq!(actual, expected);
+            assert_eq!(actual, expected);
+        });
     }
 
     #[test]
     fn test_bump_new_epoch_and_read_it() {
-        let mut conf = String::new();
-        bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
-        let epoch = determine_epoch("mymeasurement", &conf);
-        assert!(epoch.is_some());
-    }
+        with_isolated_home(|temp_dir| {
+            // Create a temporary git repository for this test
+            env::set_current_dir(temp_dir).unwrap();
 
-    #[test]
-    fn test_parsing() {
-        let toml_str = r#"
-        measurement = { test2 = { epoch = "834ae670e2ecd5c87020fde23378b890832d6076" } }
-    "#;
+            // Set up hermetic git environment
+            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            env::set_var("GIT_AUTHOR_NAME", "testuser");
+            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+            env::set_var("GIT_COMMITTER_NAME", "testuser");
+            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-        let doc = toml_str.parse::<Document>().expect("sfdfdf");
+            // Initialize git repository with initial commit
+            init_git_repo_with_commit(temp_dir);
 
-        let measurement = "test";
+            let mut conf = String::new();
+            bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
 
-        if let Some(e) = doc
-            .get("measurement")
-            .and_then(|m| m.get(measurement))
-            .and_then(|m| m.get("epoch"))
-        {
-            println!("YAY: {}", e);
-            panic!("stuff");
-        }
+            // Write the config to a file and test reading it
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(&config_path, &conf).unwrap();
+
+            let epoch = determine_epoch_from_config("mymeasurement");
+            assert!(epoch.is_some());
+        });
     }
 
     #[test]
     fn test_backoff_max_elapsed_seconds() {
-        // Case 1: config string with explicit value
-        let configfile = "[backoff]\nmax_elapsed_seconds = 42\n";
-        assert_eq!(super::backoff_max_elapsed_seconds_from_str(configfile), 42);
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
 
-        // Case 2: config string missing value
-        let configfile = "";
-        assert_eq!(super::backoff_max_elapsed_seconds_from_str(configfile), 60);
+            // Create workspace config with explicit value
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = "[backoff]\nmax_elapsed_seconds = 42\n";
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test with explicit value
+            assert_eq!(super::backoff_max_elapsed_seconds(), 42);
+
+            // Remove config file and test default
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::backoff_max_elapsed_seconds(), 60);
+        });
     }
 
     #[test]
     fn test_audit_min_relative_deviation() {
-        // Case 1: measurement-specific setting
-        let configfile = r#"
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
 [audit.measurement."build_time"]
 min_relative_deviation = 10.0
 
 [audit.measurement."memory_usage"]
 min_relative_deviation = 2.5
 "#;
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "build_time"),
-            Some(10.0)
-        );
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "memory_usage"),
-            Some(2.5)
-        );
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "other_measurement"),
-            None
-        );
+            fs::write(&workspace_config_path, local_config).unwrap();
 
-        // Case 2: global setting
-        let configfile = r#"
-[audit.global]
+            // Test measurement-specific settings
+            assert_eq!(
+                super::audit_min_relative_deviation("build_time"),
+                Some(10.0)
+            );
+            assert_eq!(
+                super::audit_min_relative_deviation("memory_usage"),
+                Some(2.5)
+            );
+            assert_eq!(
+                super::audit_min_relative_deviation("other_measurement"),
+                None
+            );
+
+            // Test global (now asterisk) setting
+            let global_config = r#"
+[audit."*"]
 min_relative_deviation = 5.0
 "#;
-        println!("Testing Case 2: global setting");
-        let result = super::audit_min_relative_deviation_from_str(configfile, "any_measurement");
-        println!("Case 2 result: {:?}", result);
-        assert_eq!(result, Some(5.0));
+            fs::write(&workspace_config_path, global_config).unwrap();
+            assert_eq!(
+                super::audit_min_relative_deviation("any_measurement"),
+                Some(5.0)
+            );
 
-        // Case 3: precedence - measurement-specific overrides global
-        let configfile = r#"
-[audit.global]
+            // Test precedence - measurement-specific overrides global
+            let precedence_config = r#"
+[audit."*"]
 min_relative_deviation = 5.0
 
 [audit.measurement."build_time"]
 min_relative_deviation = 10.0
 "#;
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "build_time"),
-            Some(10.0)
-        );
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "other_measurement"),
-            Some(5.0)
-        );
+            fs::write(&workspace_config_path, precedence_config).unwrap();
+            assert_eq!(
+                super::audit_min_relative_deviation("build_time"),
+                Some(10.0)
+            );
+            assert_eq!(
+                super::audit_min_relative_deviation("other_measurement"),
+                Some(5.0)
+            );
 
-        // Case 5: no audit configuration
-        let configfile = "";
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "any_measurement"),
-            None
-        );
-
-        // Case 6: invalid config (should return None)
-        let configfile = "[audit]\nmin_relative_deviation = invalid\n";
-        assert_eq!(
-            super::audit_min_relative_deviation_from_str(configfile, "any_measurement"),
-            None
-        );
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_min_relative_deviation("any_measurement"), None);
+        });
     }
 
     #[test]
     fn test_audit_dispersion_method() {
-        // Case 1: measurement-specific setting
-        let configfile = r#"
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
 [audit.measurement."build_time"]
 dispersion_method = "mad"
 
 [audit.measurement."memory_usage"]
 dispersion_method = "stddev"
 "#;
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "build_time"),
-            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
-        );
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "memory_usage"),
-            git_perf_cli_types::DispersionMethod::StandardDeviation
-        );
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "other_measurement"),
-            git_perf_cli_types::DispersionMethod::StandardDeviation
-        );
+            fs::write(&workspace_config_path, local_config).unwrap();
 
-        // Case 2: global setting
-        let configfile = r#"
-[audit.global]
+            // Test measurement-specific settings
+            assert_eq!(
+                super::audit_dispersion_method("build_time"),
+                git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+            );
+            assert_eq!(
+                super::audit_dispersion_method("memory_usage"),
+                git_perf_cli_types::DispersionMethod::StandardDeviation
+            );
+            assert_eq!(
+                super::audit_dispersion_method("other_measurement"),
+                git_perf_cli_types::DispersionMethod::StandardDeviation
+            );
+
+            // Test global (now asterisk) setting
+            let global_config = r#"
+[audit."*"]
 dispersion_method = "mad"
 "#;
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
-            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
-        );
+            fs::write(&workspace_config_path, global_config).unwrap();
+            assert_eq!(
+                super::audit_dispersion_method("any_measurement"),
+                git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+            );
 
-        // Case 3: precedence - measurement-specific overrides global
-        let configfile = r#"
-[audit.global]
+            // Test precedence - measurement-specific overrides global
+            let precedence_config = r#"
+[audit."*"]
 dispersion_method = "mad"
 
 [audit.measurement."build_time"]
 dispersion_method = "stddev"
 "#;
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "build_time"),
-            git_perf_cli_types::DispersionMethod::StandardDeviation
-        );
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "other_measurement"),
-            git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
-        );
+            fs::write(&workspace_config_path, precedence_config).unwrap();
+            assert_eq!(
+                super::audit_dispersion_method("build_time"),
+                git_perf_cli_types::DispersionMethod::StandardDeviation
+            );
+            assert_eq!(
+                super::audit_dispersion_method("other_measurement"),
+                git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+            );
 
-        // Case 4: no audit configuration (should return StandardDeviation)
-        let configfile = "";
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
-            git_perf_cli_types::DispersionMethod::StandardDeviation
-        );
+            // Test no config (should return StandardDeviation)
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(
+                super::audit_dispersion_method("any_measurement"),
+                git_perf_cli_types::DispersionMethod::StandardDeviation
+            );
+        });
+    }
 
-        // Case 5: invalid config (should return StandardDeviation)
-        let configfile = "[audit]\ndispersion_method = invalid\n";
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
-            git_perf_cli_types::DispersionMethod::StandardDeviation
-        );
+    #[test]
+    fn test_find_config_path_in_git_root() {
+        with_isolated_home(|temp_dir| {
+            // Create a git repository
+            env::set_current_dir(temp_dir).unwrap();
 
-        // Case 6: malformed TOML (should return StandardDeviation)
-        let configfile = "[audit\n";
-        assert_eq!(
-            super::audit_dispersion_method_from_str(configfile, "any_measurement"),
-            git_perf_cli_types::DispersionMethod::StandardDeviation
-        );
+            // Initialize git repository
+            init_git_repo(temp_dir);
+
+            // Create config in git root
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[measurement.\"test\"]\nepoch = \"12345678\"\n",
+            )
+            .unwrap();
+
+            // Test that find_config_path finds it
+            let found_path = find_config_path();
+            assert!(found_path.is_some());
+            assert_eq!(found_path.unwrap(), config_path);
+        });
+    }
+
+    #[test]
+    fn test_find_config_path_not_found() {
+        with_isolated_home(|temp_dir| {
+            // Create a git repository but no .gitperfconfig
+            env::set_current_dir(temp_dir).unwrap();
+
+            // Initialize git repository
+            init_git_repo(temp_dir);
+
+            // Test that find_config_path returns None when no .gitperfconfig exists
+            let found_path = find_config_path();
+            assert!(found_path.is_none());
+        });
+    }
+
+    #[test]
+    fn test_hierarchical_config_workspace_overrides_home() {
+        with_isolated_home(|temp_dir| {
+            // Create a git repository
+            env::set_current_dir(temp_dir).unwrap();
+
+            // Initialize git repository
+            init_git_repo(temp_dir);
+
+            // Create home config
+            let home_config_path = create_home_config_dir(temp_dir);
+            fs::write(
+                &home_config_path,
+                r#"
+[measurement."test"]
+backoff_max_elapsed_seconds = 30
+audit_min_relative_deviation = 1.0
+"#,
+            )
+            .unwrap();
+
+            // Create workspace config that overrides some values
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &workspace_config_path,
+                r#"
+[measurement."test"]
+backoff_max_elapsed_seconds = 60
+"#,
+            )
+            .unwrap();
+
+            // Set HOME to our temp directory
+            env::set_var("HOME", temp_dir);
+            env::remove_var("XDG_CONFIG_HOME");
+
+            // Read hierarchical config and verify workspace overrides home
+            let config = read_hierarchical_config().unwrap();
+
+            // backoff_max_elapsed_seconds should be overridden by workspace config
+            let backoff: i32 = config
+                .get("measurement.test.backoff_max_elapsed_seconds")
+                .unwrap();
+            assert_eq!(backoff, 60);
+
+            // audit_min_relative_deviation should come from home config
+            let deviation: f64 = config
+                .get("measurement.test.audit_min_relative_deviation")
+                .unwrap();
+            assert_eq!(deviation, 1.0);
+        });
+    }
+
+    #[test]
+    fn test_determine_epoch_from_config_with_missing_file() {
+        // Test that missing config file doesn't panic and returns None
+        let temp_dir = TempDir::new().unwrap();
+        fs::create_dir_all(temp_dir.path()).unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        let epoch = determine_epoch_from_config("test_measurement");
+        assert!(epoch.is_none());
+    }
+
+    #[test]
+    fn test_determine_epoch_from_config_with_invalid_toml() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join(".gitperfconfig");
+        fs::write(&config_path, "invalid toml content").unwrap();
+
+        fs::create_dir_all(temp_dir.path()).unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        let epoch = determine_epoch_from_config("test_measurement");
+        assert!(epoch.is_none());
+    }
+
+    #[test]
+    fn test_write_config_creates_file() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create a subdirectory to test that config is written to repo root
+            let subdir = temp_dir.join("a").join("b").join("c");
+            fs::create_dir_all(&subdir).unwrap();
+            env::set_current_dir(&subdir).unwrap();
+
+            let config_content = "[measurement.\"test\"]\nepoch = \"12345678\"\n";
+            write_config(config_content).unwrap();
+
+            // Config should be written to repo root, not subdirectory
+            let repo_config_path = temp_dir.join(".gitperfconfig");
+            let subdir_config_path = subdir.join(".gitperfconfig");
+
+            assert!(repo_config_path.is_file());
+            assert!(!subdir_config_path.is_file());
+
+            let content = fs::read_to_string(&repo_config_path).unwrap();
+            assert_eq!(content, config_content);
+        });
+    }
+
+    #[test]
+    fn test_hierarchical_config_system_override() {
+        with_isolated_home(|temp_dir| {
+            // Create system config (home directory config)
+            let system_config_path = create_home_config_dir(temp_dir);
+            let system_config = r#"
+[audit."*"]
+min_relative_deviation = 5.0
+dispersion_method = "mad"
+
+[backoff]
+max_elapsed_seconds = 120
+"#;
+            fs::write(&system_config_path, system_config).unwrap();
+
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config that overrides system config
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[audit."*"]
+min_relative_deviation = 10.0
+
+[audit.measurement."build_time"]
+min_relative_deviation = 15.0
+dispersion_method = "stddev"
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test hierarchical config reading
+            let config = read_hierarchical_config().unwrap();
+
+            // Test that local asterisk overrides system config via helper
+            use super::ConfigAsteriskExt;
+            assert_eq!(
+                config
+                    .get_with_asterisk_default("audit", "*", "min_relative_deviation")
+                    .unwrap()
+                    .parse::<f64>()
+                    .unwrap(),
+                10.0
+            );
+            assert_eq!(
+                config
+                    .get_with_asterisk_default("audit", "*", "dispersion_method")
+                    .unwrap(),
+                "mad"
+            ); // Not overridden in local for global fallback
+
+            // Test measurement-specific override
+            assert_eq!(
+                config
+                    .get_float("audit.measurement.build_time.min_relative_deviation")
+                    .unwrap(),
+                15.0
+            );
+            assert_eq!(
+                config
+                    .get_string("audit.measurement.build_time.dispersion_method")
+                    .unwrap(),
+                "stddev"
+            );
+
+            // Test that system config is still available for non-overridden values
+            assert_eq!(config.get_int("backoff.max_elapsed_seconds").unwrap(), 120);
+
+            // Test the convenience functions
+            assert_eq!(audit_min_relative_deviation("build_time"), Some(15.0));
+            assert_eq!(
+                audit_min_relative_deviation("other_measurement"),
+                Some(10.0)
+            );
+            assert_eq!(
+                audit_dispersion_method("build_time"),
+                git_perf_cli_types::DispersionMethod::StandardDeviation
+            );
+            assert_eq!(
+                audit_dispersion_method("other_measurement"),
+                git_perf_cli_types::DispersionMethod::MedianAbsoluteDeviation
+            );
+            assert_eq!(backoff_max_elapsed_seconds(), 120);
+        });
     }
 }

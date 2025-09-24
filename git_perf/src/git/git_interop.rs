@@ -36,6 +36,13 @@ pub use super::git_lowlevel::get_head_revision;
 
 pub use super::git_lowlevel::check_git_version;
 
+/// Get the repository root directory using git
+pub fn get_repository_root() -> Result<String, String> {
+    let output = capture_git_output(&["rev-parse", "--show-toplevel"], &None)
+        .map_err(|e| format!("Failed to get repository root: {}", e))?;
+    Ok(output.stdout.trim().to_string())
+}
+
 // TODO(kaihowl) separate into git low and high level logic
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
@@ -911,12 +918,11 @@ mod test {
             .respond_with(status_code(200)),
         );
 
+        hermetic_git_env();
+
         // Must add a single write as a push without pending local writes just succeeds
         ensure_symbolic_write_ref_exists().expect("Failed to ensure symbolic write ref exists");
         add_note_line_to_head("test note line").expect("Failed to add note line");
-
-        // TODO(kaihowl) duplication, leaks out of this test
-        hermetic_git_env();
 
         let error = push(None);
         error
@@ -974,6 +980,8 @@ mod test {
         let tempdir = tempdir().unwrap();
         init_repo(tempdir.path());
         set_current_dir(tempdir.path()).expect("Failed to change dir");
+
+        hermetic_git_env();
 
         run_git_command(
             &["remote", "add", "origin", "invalid invalid"],

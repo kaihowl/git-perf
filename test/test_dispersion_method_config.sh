@@ -57,7 +57,7 @@ echo "✅ CLI option correctly overrides default"
 # Test 3: Global configuration overrides default
 echo "Test 3: Global configuration overrides default"
 cat > .gitperfconfig << 'EOF'
-[audit.global]
+[audit."*"]
 dispersion_method = "mad"
 EOF
 
@@ -76,7 +76,7 @@ echo "✅ Global configuration correctly overrides default"
 # Test 4: Measurement-specific configuration overrides global
 echo "Test 4: Measurement-specific configuration overrides global"
 cat > .gitperfconfig << 'EOF'
-[audit.global]
+[audit."*"]
 dispersion_method = "mad"
 
 [audit.measurement."build_time"]
@@ -112,7 +112,7 @@ git perf add -m memory_usage 45
 
 # Set global config to MAD
 cat > .gitperfconfig << 'EOF'
-[audit.global]
+[audit."*"]
 dispersion_method = "mad"
 EOF
 
@@ -123,7 +123,7 @@ echo "✅ Other measurements correctly use global configuration"
 # Test 7: Invalid configuration falls back to default
 echo "Test 7: Invalid configuration falls back to default"
 cat > .gitperfconfig << 'EOF'
-[audit.global]
+[audit."*"]
 dispersion_method = "invalid_value"
 EOF
 
@@ -134,7 +134,7 @@ echo "✅ Invalid configuration correctly falls back to default"
 # Test 8: Malformed TOML falls back to default
 echo "Test 8: Malformed TOML falls back to default"
 cat > .gitperfconfig << 'EOF'
-[audit.global
+[audit.*
 dispersion_method = "mad"
 EOF
 
@@ -154,7 +154,7 @@ echo "✅ Empty configuration correctly falls back to default"
 echo "Test 10: Verify dispersion method differences"
 # Set global config to MAD
 cat > .gitperfconfig << 'EOF'
-[audit.global]
+[audit."*"]
 dispersion_method = "mad"
 EOF
 

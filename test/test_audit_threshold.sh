@@ -15,7 +15,7 @@ cat > .gitperfconfig << 'EOF'
 [audit.measurement."build_time"]
 min_relative_deviation = 10.0
 
-[audit.global]
+[audit."*"]
 min_relative_deviation = 5.0
 EOF
 
