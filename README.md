@@ -41,21 +41,34 @@ git fetch origin refs/notes/perf-v3:refs/notes/perf-v3
 ```
 
 # Setup Different Remote
-`git-perf push`/`pull` operate on Git notes. To use a different remote than
-`origin`, create or select the remote and push/pull the notes ref explicitly:
+`git-perf push`/`pull` automatically use a special remote called `git-perf-origin`.
+If this remote doesn't exist, git-perf will automatically create it using your
+`origin` remote's URL.
+
+To use a different remote for performance measurements:
 
 ```bash
-# Add a new remote (example)
+# Option 1: Set the git-perf-origin remote to a different URL
+git remote set-url git-perf-origin git@github.com:org/repo.git
+
+# Option 2: Add a new remote and set git-perf-origin to use it
 git remote add perf-upstream git@github.com:org/repo.git
+git remote set-url git-perf-origin git@github.com:org/repo.git
 
-# Push current performance notes to the remote
-git push perf-upstream refs/notes/perf-v3
-
-# Fetch performance notes from the remote
-git fetch perf-upstream refs/notes/perf-v3:refs/notes/perf-v3
+# Now git-perf push/pull will use the new remote
+git perf push
+git perf pull
 ```
 
-Replace `perf-v3` with the notes namespace you use (e.g., `perf` or `perf-v2`).
+You can also manually push/pull notes refs to any remote:
+
+```bash
+# Push to a specific remote
+git push perf-upstream refs/notes/perf-v3
+
+# Fetch from a specific remote  
+git fetch perf-upstream refs/notes/perf-v3:refs/notes/perf-v3
+```
 
 # Audit Configuration
 
