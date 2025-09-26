@@ -6,7 +6,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
 };
-use toml_edit::{value, Document};
+use toml_edit::{value, Document, Item, Table};
 
 use crate::git::git_interop::{get_head_revision, get_repository_root};
 
@@ -142,7 +142,19 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
         .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
 
     let head_revision = get_head_revision()?;
-    // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
+
+    // Ensure that non-inline tables are written in an empty config file
+    if !conf.contains_key("measurement") {
+        conf["measurement"] = Item::Table(Table::new());
+    }
+    if !conf["measurement"]
+        .as_table()
+        .unwrap()
+        .contains_key(measurement)
+    {
+        conf["measurement"][measurement] = Item::Table(Table::new());
+    }
+
     conf["measurement"][measurement]["epoch"] = value(&head_revision[0..8]);
     *conf_str = conf.to_string();
 
@@ -523,6 +535,40 @@ dispersion_method = "stddev"
                 git_perf_cli_types::DispersionMethod::StandardDeviation
             );
         });
+    }
+
+    #[test]
+    fn test_toml_table_creation_from_empty() {
+        // Test the core logic without git dependencies
+        use toml_edit::{value, Document, Item, Table};
+
+        // Start with empty config string
+        let conf_str = String::new();
+        let mut conf = conf_str.parse::<Document>().unwrap();
+
+        let measurement = "mymeasurement";
+        let epoch_value = "12345678";
+
+        // Apply the same logic as bump_epoch_in_conf
+        if !conf.contains_key("measurement") {
+            conf["measurement"] = Item::Table(Table::new());
+        }
+        if !conf["measurement"].as_table().unwrap().contains_key(measurement) {
+            conf["measurement"][measurement] = Item::Table(Table::new());
+        }
+
+        conf["measurement"][measurement]["epoch"] = value(epoch_value);
+        let result = conf.to_string();
+
+        // Verify that proper table structure is created (not inline tables)
+        assert!(result.contains("[measurement]"));
+        assert!(result.contains("[measurement.mymeasurement]"));
+        assert!(result.contains("epoch = \"12345678\""));
+        // Ensure it's NOT using inline table syntax
+        assert!(!result.contains("measurement = {"));
+        assert!(!result.contains("mymeasurement = {"));
+
+        println!("Generated config:\n{}", result);
     }
 
     #[test]
