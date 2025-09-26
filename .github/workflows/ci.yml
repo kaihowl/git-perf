@@ -1,7 +1,6 @@
 name: ci
 
 # TODO(kaihowl) deeper test with merge-based PR workflow (HEAD == merge commit)
-# TODO(kaihowl) clean up old reports / do we want commit based reports anyway?
 
 concurrency:
   group: ci-${{ github.ref }}

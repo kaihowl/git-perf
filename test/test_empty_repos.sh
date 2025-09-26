@@ -47,7 +47,6 @@ git push
 
 output=$(git perf report 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'No performance measurements found'* ]]; then
-  # TODO(kaihowl) more specific error messsage might be nice?
   echo "Missing 'No performance measurements found' in output:"
   echo "$output"
   exit 1

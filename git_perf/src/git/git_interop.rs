@@ -116,7 +116,6 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
             "--ref",
             &temp_target,
             "append",
-            // TODO(kaihowl) disabled until #96 is solved
             // "--no-separator",
             "-m",
             line,
@@ -193,7 +192,6 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
 
     let ref_before = git_rev_parse(REFS_NOTES_BRANCH).ok();
     // Use git directly to avoid having to implement ssh-agent and/or extraHeader handling
-    // TODO use porcelain and produce our own human-readable output?
     capture_git_output(
         &[
             "fetch",
@@ -583,7 +581,6 @@ fn git_push_notes_ref(
     Ok(())
 }
 
-// TODO(kaihowl) what happens with a git dir supplied with -C?
 pub fn prune() -> Result<()> {
     let op = || -> Result<(), ::backoff::Error<GitError>> {
         raw_prune().map_err(map_git_error_for_backoff)
