@@ -1,0 +1,144 @@
+name: Mutation Testing
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  # Allow manual triggering
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-testing-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  mutation-testing:
+    name: Mutation Testing
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 1
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-mutation-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-mutation-
+          ${{ runner.os }}-cargo-
+
+    - name: Install cargo-mutants
+      run: |
+        cargo install cargo-mutants --version 25.3.1
+
+    - name: Run mutation testing
+      run: |
+        cd git_perf
+        cargo mutants --output mutation-report.json --jobs 4 --timeout 60
+      continue-on-error: true
+
+    - name: Generate mutation report summary
+      run: |
+        cd git_perf
+        if [ -f mutation-report.json ]; then
+          echo "## Mutation Testing Results" > mutation-summary.md
+          echo "" >> mutation-summary.md
+
+          # Extract key metrics from the JSON report
+          total_mutants=$(jq '.summary.total_mutants // 0' mutation-report.json)
+          caught_mutants=$(jq '.summary.caught // 0' mutation-report.json)
+          missed_mutants=$(jq '.summary.missed // 0' mutation-report.json)
+          timeout_mutants=$(jq '.summary.timeout // 0' mutation-report.json)
+
+          if [ "$total_mutants" != "null" ] && [ "$total_mutants" -gt 0 ]; then
+            score=$(echo "scale=2; $caught_mutants * 100 / $total_mutants" | bc -l)
+            echo "- **Total Mutants:** $total_mutants" >> mutation-summary.md
+            echo "- **Caught:** $caught_mutants" >> mutation-summary.md
+            echo "- **Missed:** $missed_mutants" >> mutation-summary.md
+            echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
+            echo "- **Mutation Score:** ${score}%" >> mutation-summary.md
+          else
+            echo "- **Status:** No mutation results available" >> mutation-summary.md
+          fi
+
+          echo "" >> mutation-summary.md
+          echo "Full report available in artifacts." >> mutation-summary.md
+        else
+          echo "## Mutation Testing Results" > mutation-summary.md
+          echo "" >> mutation-summary.md
+          echo "- **Status:** Mutation testing failed to generate report" >> mutation-summary.md
+        fi
+
+    - name: Upload mutation testing artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: mutation-testing-report-${{ github.run_number }}
+        path: |
+          git_perf/mutation-report.json
+          git_perf/mutation-summary.md
+        retention-days: 30
+
+    - name: Comment mutation results on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = './git_perf/mutation-summary.md';
+
+          if (fs.existsSync(path)) {
+            const summary = fs.readFileSync(path, 'utf8');
+
+            // Find existing mutation testing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes('Mutation Testing Results'));
+
+            const body = `${summary}\n\n<!-- mutation-testing-comment -->`;
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+          }
