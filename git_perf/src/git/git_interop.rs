@@ -116,6 +116,7 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
             "--ref",
             &temp_target,
             "append",
+            // TODO #96
             // "--no-separator",
             "-m",
             line,
