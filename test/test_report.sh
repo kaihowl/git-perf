@@ -34,8 +34,6 @@ git perf report -o all_result.html
 git perf report -o separated_result.html -s os
 git perf report -o single_result.html -m timer
 git perf report -o separated_single_result.html -m timer -s os
-# TODO(kaihowl) kill group by
-# git perf report -o single_result_different_group.html -m timer -g os
 
 output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
 if [[ ${output} != *'no performance measurements'* ]]; then
@@ -51,10 +49,3 @@ if [[ ${output} != *'invalid separator'* ]]; then
   exit 1
 fi
 
-# TODO(kaihowl) kill with group by
-# output=$(git perf report -g does-not-exist 2>&1 1>/dev/null) && exit 1
-# if [[ ${output} != *'does-not-exist'* ]]; then
-#   echo No warning for invalid grouper 'does-not-exist'
-#   echo "$output"
-#   exit 1
-# fi
