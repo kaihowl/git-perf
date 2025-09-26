@@ -16,6 +16,17 @@ permissions:
 jobs:
   critical-module-mutation-check:
     name: Critical Module Mutation Check
+    env:
+      # Emit backtraces on panics (matching main CI)
+      RUST_BACKTRACE: 1
+      # Git author/committer for hermetic test environment
+      GIT_AUTHOR_NAME: testuser
+      GIT_AUTHOR_EMAIL: testuser@example.com
+      GIT_COMMITTER_NAME: testuser
+      GIT_COMMITTER_EMAIL: testuser@example.com
+      # Hermetic git config
+      GIT_CONFIG_NOSYSTEM: true
+      GIT_CONFIG_GLOBAL: /dev/null
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
