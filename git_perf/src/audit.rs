@@ -122,7 +122,7 @@ fn audit(
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
         return Ok(AuditResult {
-            message: format!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."),
+            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."),
             passed: true,
         });
     }
