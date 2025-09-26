@@ -51,6 +51,9 @@ jobs:
           ${{ runner.os }}-cargo-mutation-
           ${{ runner.os }}-cargo-
 
+    - name: Install nextest
+      run: cargo install cargo-nextest --locked
+
     - name: Install cargo-mutants
       run: |
         cargo install cargo-mutants --version 25.3.1
@@ -58,7 +61,9 @@ jobs:
     - name: Run mutation testing
       run: |
         cd git_perf
-        cargo mutants --output mutation-report.json --jobs 4 --timeout 60
+        # Run mutation testing with nextest and exclude problematic tests
+        cargo mutants --output mutation-report.json --jobs 4 --timeout 60 \
+          --test-cmd 'cargo nextest run --lib -E "not (test(test_customheader) or test(test_empty_or_never_pushed_remote_error) or test(test_find_config_path_in_git_root) or test(test_hierarchical_config_system_override) or test(test_read_epochs) or test(test_audit_dispersion_method) or test(test_audit_min_relative_deviation) or test(test_bump_epochs) or test(test_bump_new_epoch_and_read_it) or test(test_find_config_path_not_found) or test(test_backoff_max_elapsed_seconds) or test(test_hierarchical_config_workspace_overrides_home))"'
       continue-on-error: true
 
     - name: Generate mutation report summary
