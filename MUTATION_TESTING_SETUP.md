@@ -14,6 +14,7 @@ This document provides instructions for completing the mutation testing setup fo
 2. **GitHub Actions Workflows**
    - `mutation-testing.yml` - Full mutation testing on push/PR
    - `mutation-check.yml` - Critical module checks for PRs
+   - Updated to use latest action versions (v4 for artifacts, v7 for github-script)
 
 3. **Artifact Storage** - Configured in workflows
    - Mutation reports stored for 30 days

@@ -38,7 +38,7 @@ jobs:
         components: rustfmt, clippy
 
     - name: Cache Rust dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/bin/
@@ -94,7 +94,7 @@ jobs:
         fi
 
     - name: Upload mutation testing artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: mutation-testing-report-${{ github.run_number }}
@@ -105,7 +105,7 @@ jobs:
 
     - name: Comment mutation results on PR
       if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');

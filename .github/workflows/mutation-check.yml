@@ -32,7 +32,7 @@ jobs:
         override: true
 
     - name: Cache Rust dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/bin/
@@ -121,7 +121,7 @@ jobs:
         exit 1
 
     - name: Upload critical module mutation reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: critical-module-mutation-reports-${{ github.run_number }}
