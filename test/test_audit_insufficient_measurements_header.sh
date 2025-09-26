@@ -10,10 +10,21 @@ source "$script_dir/common.sh"
 echo "Test audit insufficient measurements header format"
 cd_temp_repo
 
-# Add a single measurement (insufficient for default min_measurements=10)
+# Add measurements to multiple commits to create some history, but still insufficient for min_measurements=10
 git perf add -m test-metric 100
 
-# Run audit and capture output - this should show the skip message with header
+# Go to previous commit and add measurement there
+git checkout HEAD~1
+git perf add -m test-metric 95
+
+# Go to another previous commit and add measurement
+git checkout HEAD~1
+git perf add -m test-metric 98
+
+# Return to master for audit
+git checkout master
+
+# Run audit and capture output - this should show the skip message with header (3 measurements < 10)
 output=$(git perf audit -m test-metric --min-measurements 10 2>&1) || true
 
 echo "Audit output: $output"
@@ -28,11 +39,13 @@ else
     exit 1
 fi
 
-# Verify the output contains the skip message
-if [[ $output == *"Only 1 measurement found"* ]]; then
+# Verify the output contains the skip message (should be 2 tail measurements + 1 head = 3 total, but only 2 in tail)
+if [[ $output == *"Only 2 measurement"* ]]; then
     echo "✅ Skip message found"
 else
     echo "❌ Skip message NOT found"
+    echo "Expected: Only 2 measurement"
+    echo "Got: $output"
     exit 1
 fi
 
