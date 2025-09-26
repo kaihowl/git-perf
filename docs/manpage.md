@@ -14,6 +14,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf bump-epoch`↴](#git-perf-bump-epoch)
 * [`git-perf remove`↴](#git-perf-remove)
 * [`git-perf prune`↴](#git-perf-prune)
+* [`git-perf config`↴](#git-perf-config)
 
 ## `git-perf`
 
@@ -30,6 +31,7 @@ This document contains the help content for the `git-perf` command-line program.
 * `bump-epoch` — Accept HEAD commit's measurement for audit, even if outside of range. This is allows to accept expected performance changes. This is accomplished by starting a new epoch for the given measurement. The epoch is configured in the git perf config file. A change to the epoch therefore has to be committed and will result in a new HEAD for which new measurements have to be taken
 * `remove` — Remove all performance measurements for commits that have been committed before the specified time period
 * `prune` — Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
+* `config` — Show configuration information including current branch and config file locations
 
 ###### **Options:**
 
@@ -207,6 +209,14 @@ Remove all performance measurements for commits that have been committed before 
 Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
 
 **Usage:** `git-perf prune`
+
+
+
+## `git-perf config`
+
+Show configuration information including current branch and config file locations
+
+**Usage:** `git-perf config`
 
 
 

@@ -8,7 +8,7 @@ use crate::audit;
 use crate::basic_measure::measure;
 use crate::config::bump_epoch;
 use crate::git::git_interop::check_git_version;
-use crate::git::git_interop::{prune, pull, push};
+use crate::git::git_interop::{get_repository_root, prune, pull, push};
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
 use crate::stats::ReductionFunc;
@@ -86,6 +86,7 @@ pub fn handle_calls() -> Result<()> {
         Commands::BumpEpoch { measurement } => bump_epoch(&measurement),
         Commands::Prune {} => prune(),
         Commands::Remove { older_than } => remove_measurements_from_commits(older_than),
+        Commands::Config {} => show_config_info(),
     }
 }
 
@@ -110,4 +111,73 @@ fn determine_dispersion_method(
             crate::stats::DispersionMethod::from(config_method)
         }
     }
+}
+
+/// Show configuration information including branch name and config paths
+fn show_config_info() -> Result<()> {
+    use std::path::Path;
+
+    println!("Git Performance Configuration Information");
+    println!("=======================================");
+
+    // Get current branch
+    let current_branch = get_current_branch().unwrap_or_else(|_| "unknown".to_string());
+    println!("Current branch: {}", current_branch);
+
+    // Get repository root
+    match get_repository_root() {
+        Ok(repo_root) => {
+            println!("Repository root: {}", repo_root);
+
+            // Check for config file
+            let config_path = Path::new(&repo_root).join(".gitperfconfig");
+            if config_path.exists() {
+                println!("Config file: {} (exists)", config_path.display());
+            } else {
+                println!("Config file: {} (not found)", config_path.display());
+            }
+        }
+        Err(e) => {
+            println!("Repository root: Error - {}", e);
+        }
+    }
+
+    // Try to load and display config
+    match crate::config::read_hierarchical_config() {
+        Ok(config) => {
+            println!("\nConfiguration loaded successfully");
+
+            // Show some key config values if they exist
+            if let Ok(min_rel_dev) = config.get_string("measurement.min_relative_deviation") {
+                println!("  Default min_relative_deviation: {}", min_rel_dev);
+            }
+            if let Ok(dispersion) = config.get_string("measurement.dispersion_method") {
+                println!("  Default dispersion_method: {}", dispersion);
+            }
+        }
+        Err(e) => {
+            println!("\nConfiguration: Error loading - {}", e);
+        }
+    }
+
+    Ok(())
+}
+
+/// Get the current branch name
+fn get_current_branch() -> Result<String> {
+    use std::process::Command;
+
+    let output = Command::new("git")
+        .args(&["branch", "--show-current"])
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to run git command: {}", e))?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "Git command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
