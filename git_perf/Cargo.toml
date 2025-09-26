@@ -64,6 +64,6 @@ harness = false
 path = "benches/add.rs"
 
 [package.metadata.mutants]
-skip = ["tests", "examples", "benches"]
+skip = ["examples", "benches"]
 timeout = 60
 jobs = 4

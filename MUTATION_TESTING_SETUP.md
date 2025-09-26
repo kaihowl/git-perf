@@ -98,19 +98,16 @@ After completing Phase 1 setup:
 
 ## Troubleshooting
 
-### Test Failures in CI
-The mutation testing workflows exclude problematic tests that fail in CI due to environment differences:
+### Environment Setup
+The mutation testing workflows now match the main CI environment setup to ensure all tests pass:
 
-**Excluded tests:**
-- `test_customheader*` - Git version compatibility issues
-- `test_empty_or_never_pushed_remote_error*` - Git environment setup issues
-- Config tests that depend on specific file system setups
-- Tests requiring git repository initialization
+**Environment setup included:**
+- Git user configuration for tests that require git operations
+- libfaketime installation for time-based tests
+- Extended git fetch depth (40 commits) for git history tests
+- Using `cargo nextest run --verbose` to match main CI exactly
 
-**Solution implemented:**
-```bash
---test-cmd 'cargo nextest run --lib -E "not (test(test_customheader) or test(test_empty_or_never_pushed_remote_error) [...])"'
-```
+**No test exclusions** - All tests run in mutation testing
 
 ### Slow Installation
 If `cargo install cargo-mutants` is slow:
@@ -134,15 +131,14 @@ To run the same tests that mutation testing uses, first install nextest:
 cargo install cargo-nextest --locked
 ```
 
-Then run the tests with exclusions:
+Then run all tests (matching the CI environment):
 ```bash
-cargo nextest run --lib -E "not (test(test_customheader) or test(test_empty_or_never_pushed_remote_error) or test(test_find_config_path_in_git_root) or test(test_hierarchical_config_system_override) or test(test_read_epochs) or test(test_audit_dispersion_method) or test(test_audit_min_relative_deviation) or test(test_bump_epochs) or test(test_bump_new_epoch_and_read_it) or test(test_find_config_path_not_found) or test(test_backoff_max_elapsed_seconds) or test(test_hierarchical_config_workspace_overrides_home))"
+cargo nextest run --verbose
 ```
 
-Or for a simpler command using regular cargo test:
-```bash
-cargo test --lib -- --skip test_customheader --skip test_empty_or_never_pushed_remote_error --skip test_find_config_path_in_git_root --skip test_hierarchical_config_system_override --skip test_read_epochs --skip test_audit_dispersion_method --skip test_audit_min_relative_deviation --skip test_bump_epochs --skip test_bump_new_epoch_and_read_it --skip test_find_config_path_not_found --skip test_backoff_max_elapsed_seconds --skip test_hierarchical_config_workspace_overrides_home
-```
+Make sure you have the same environment setup as CI:
+- Git user configured: `git config --global user.name "Test User" && git config --global user.email "test@example.com"`
+- libfaketime installed (on Ubuntu: `sudo apt-get install libfaketime`)
 
 ## Monitoring
 

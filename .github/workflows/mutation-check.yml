@@ -23,13 +23,23 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v5
       with:
-        fetch-depth: 1
+        fetch-depth: 40
+
+    - name: Set Git user and email
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
 
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
+
+    - name: Install libfaketime
+      run: |
+        sudo apt-get update
+        sudo apt-get install libfaketime
 
     - name: Cache Rust dependencies
       uses: actions/cache@v4
@@ -50,7 +60,7 @@ jobs:
 
     - name: Install cargo-mutants
       run: |
-        cargo install cargo-mutants --version 25.3.1
+        cargo install cargo-mutants --version 25.3.1 --force
 
     - name: Run mutation testing on critical modules
       run: |
@@ -71,9 +81,9 @@ jobs:
           module_name=$(basename "$file" .rs)
           echo "Testing module: $module_name"
 
-          # Run mutation testing on specific module using nextest
+          # Run mutation testing on specific module using nextest (matching main CI)
           cargo mutants --file "src/$file" --output "${module_name}-mutation.json" --timeout 30 \
-            --test-cmd 'cargo nextest run --lib -E "not (test(test_customheader) or test(test_empty_or_never_pushed_remote_error) or test(test_find_config_path_in_git_root) or test(test_hierarchical_config_system_override) or test(test_read_epochs) or test(test_audit_dispersion_method) or test(test_audit_min_relative_deviation) or test(test_bump_epochs) or test(test_bump_new_epoch_and_read_it) or test(test_find_config_path_not_found) or test(test_backoff_max_elapsed_seconds) or test(test_hierarchical_config_workspace_overrides_home))"'
+            --test-cmd 'cargo nextest run --verbose'
 
           # Check mutation score against targets
           if [ -f "${module_name}-mutation.json" ]; then
