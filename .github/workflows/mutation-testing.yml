@@ -32,6 +32,7 @@ jobs:
 
     - name: Set Git user and email
       run: |
+        set -euo pipefail
         git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
 
@@ -44,6 +45,7 @@ jobs:
 
     - name: Install libfaketime
       run: |
+        set -euo pipefail
         sudo apt-get update
         sudo apt-get install libfaketime
 
@@ -66,18 +68,20 @@ jobs:
 
     - name: Install cargo-mutants
       run: |
+        set -euo pipefail
         cargo install cargo-mutants --version 25.3.1 --force
 
     - name: Run mutation testing
       run: |
+        set -euo pipefail
         cd git_perf
-        # Run mutation testing with nextest (matching main CI)
-        cargo mutants --output mutation-report.json --jobs 4 --timeout 60 \
-          --test-cmd 'cargo nextest run --verbose'
+        # Run mutation testing (nextest configured in Cargo.toml)
+        cargo mutants --output mutation-report.json --jobs 4 --timeout 60
       continue-on-error: true
 
     - name: Generate mutation report summary
       run: |
+        set -euo pipefail
         cd git_perf
         if [ -f mutation-report.json ]; then
           echo "## Mutation Testing Results" > mutation-summary.md
