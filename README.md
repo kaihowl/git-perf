@@ -23,10 +23,43 @@ ideas of decentralized version control and instead focuses on the collection of
 metrics in a single central location.
 
 ## Migrate measurements
-TODO document this
+There are helper scripts to migrate existing performance notes between formats:
+
+- v1 → v2: `./migration/to_v2.sh <path-to-your-repo>`
+- v2 → v3: `./migration/to_v3.sh <path-to-your-repo>`
+
+Both scripts clone the target repo into a temporary directory, transform the
+notes, commit the change, and push to the appropriate notes ref on `origin`:
+
+- v2 is pushed to `refs/notes/perf-v2`
+- v3 is pushed to `refs/notes/perf-v3`
+
+After migration, make sure your consumers fetch the new notes ref, e.g.:
+
+```bash
+git fetch origin refs/notes/perf-v3:refs/notes/perf-v3
+```
 
 # Setup Different Remote
-TODO document this
+`git-perf push`/`pull` automatically use a special remote called `git-perf-origin`.
+If this remote doesn't exist, git-perf will automatically create it using your
+`origin` remote's URL.
+
+To use a different remote for performance measurements:
+
+```bash
+# Option 1: Set the git-perf-origin remote to a different URL
+git remote set-url git-perf-origin git@github.com:org/repo.git
+
+# Option 2: Add a new remote and set git-perf-origin to use it
+git remote add perf-upstream git@github.com:org/repo.git
+git remote set-url git-perf-origin git@github.com:org/repo.git
+
+# Now git-perf push/pull will use the new remote
+git perf push
+git perf pull
+```
+
 
 # Audit Configuration
 
