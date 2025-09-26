@@ -67,3 +67,4 @@ path = "benches/add.rs"
 skip = ["examples", "benches"]
 timeout = 60
 jobs = 4
+test_tool = "nextest"
