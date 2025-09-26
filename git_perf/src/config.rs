@@ -538,37 +538,53 @@ dispersion_method = "stddev"
     }
 
     #[test]
-    fn test_toml_table_creation_from_empty() {
-        // Test the core logic without git dependencies
-        use toml_edit::{value, Document, Item, Table};
+    fn test_bump_epoch_in_conf_creates_proper_tables() {
+        // We need to test the production bump_epoch_in_conf function, but it calls get_head_revision()
+        // which requires a git repo. Let's temporarily modify the environment to make it work.
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
 
-        // Start with empty config string
-        let conf_str = String::new();
-        let mut conf = conf_str.parse::<Document>().unwrap();
+            // Set up minimal git environment
+            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            env::set_var("GIT_AUTHOR_NAME", "testuser");
+            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+            env::set_var("GIT_COMMITTER_NAME", "testuser");
+            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 
-        let measurement = "mymeasurement";
-        let epoch_value = "12345678";
+            init_git_repo_with_commit(temp_dir);
 
-        // Apply the same logic as bump_epoch_in_conf
-        if !conf.contains_key("measurement") {
-            conf["measurement"] = Item::Table(Table::new());
-        }
-        if !conf["measurement"].as_table().unwrap().contains_key(measurement) {
-            conf["measurement"][measurement] = Item::Table(Table::new());
-        }
+            // Test case 1: Empty config string should create proper table structure
+            let mut empty_config = String::new();
 
-        conf["measurement"][measurement]["epoch"] = value(epoch_value);
-        let result = conf.to_string();
+            // This calls the actual production function!
+            bump_epoch_in_conf("mymeasurement", &mut empty_config).unwrap();
 
-        // Verify that proper table structure is created (not inline tables)
-        assert!(result.contains("[measurement]"));
-        assert!(result.contains("[measurement.mymeasurement]"));
-        assert!(result.contains("epoch = \"12345678\""));
-        // Ensure it's NOT using inline table syntax
-        assert!(!result.contains("measurement = {"));
-        assert!(!result.contains("mymeasurement = {"));
+            // Verify that proper table structure is created (not inline tables)
+            assert!(empty_config.contains("[measurement]"));
+            assert!(empty_config.contains("[measurement.mymeasurement]"));
+            assert!(empty_config.contains("epoch ="));
+            // Ensure it's NOT using inline table syntax
+            assert!(!empty_config.contains("measurement = {"));
+            assert!(!empty_config.contains("mymeasurement = {"));
 
-        println!("Generated config:\n{}", result);
+            // Test case 2: Existing config should preserve structure and add new measurement
+            let mut existing_config = r#"[measurement]
+existing_setting = "value"
+
+[measurement."other"]
+epoch = "oldvalue"
+"#
+            .to_string();
+
+            bump_epoch_in_conf("newmeasurement", &mut existing_config).unwrap();
+
+            // Verify it maintains existing structure and adds new measurement with proper table format
+            assert!(existing_config.contains("[measurement.newmeasurement]"));
+            assert!(existing_config.contains("existing_setting = \"value\""));
+            assert!(existing_config.contains("[measurement.\"other\"]"));
+            assert!(!existing_config.contains("newmeasurement = {"));
+        });
     }
 
     #[test]
