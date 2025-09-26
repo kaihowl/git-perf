@@ -60,15 +60,6 @@ git perf push
 git perf pull
 ```
 
-You can also manually push/pull notes refs to any remote:
-
-```bash
-# Push to a specific remote
-git push perf-upstream refs/notes/perf-v3
-
-# Fetch from a specific remote  
-git fetch perf-upstream refs/notes/perf-v3:refs/notes/perf-v3
-```
 
 # Audit Configuration
 
