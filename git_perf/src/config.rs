@@ -142,7 +142,20 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
         .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
 
     let head_revision = get_head_revision()?;
-    // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
+
+    // Ensure non-inline table formatting by explicitly setting up the structure
+    if !conf.contains_key("measurement") {
+        conf["measurement"] = toml_edit::table();
+    }
+    if !conf["measurement"]
+        .as_table()
+        .unwrap()
+        .contains_key(measurement)
+    {
+        conf["measurement"][measurement] = toml_edit::table();
+    }
+
+    // Set the epoch value
     conf["measurement"][measurement]["epoch"] = value(&head_revision[0..8]);
     *conf_str = conf.to_string();
 

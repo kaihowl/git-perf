@@ -245,6 +245,9 @@ pub enum Commands {
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
+
+    /// Show configuration information including current branch and config file locations
+    Config {},
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String)> {
