@@ -255,7 +255,7 @@ This project uses [nextest](https://nexte.st/) for faster, more reliable test ex
 
 ```bash
 # Development testing (recommended - skips slow tests)
-cargo nextest run --skip slow
+cargo nextest run -- --skip slow
 
 # Full test suite
 cargo nextest run
