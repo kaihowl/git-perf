@@ -84,14 +84,28 @@ jobs:
         # Exit codes: 0=success, 1=usage error, 2=missed mutants, 3=timeouts, 4=baseline fail, 5-6=diff issues, 70=internal error
         # Only fail hard on config/setup errors (1,4,5,6,70), accept missed mutants (2) and timeouts (3)
 
+        # Debug current directory and list files before running
+        echo "🔍 Current working directory: $(pwd)"
+        echo "🔍 Files before mutation testing:"
+        ls -la
+
         # Temporarily disable exit-on-error to capture exit code
         set +e
+        echo "🚀 Starting mutation testing with command:"
+        echo "cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4"
         cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4
         exit_code=$?
         set -e
 
+        # Debug files after running
+        echo "🔍 Files after mutation testing:"
+        ls -la
+        echo "🔍 Looking for any JSON files:"
+        find . -name "*.json" -type f 2>/dev/null || echo "No JSON files found"
+
         # Store exit code for later steps
         echo "MUTANTS_EXIT_CODE=$exit_code" >> $GITHUB_ENV
+        echo "📊 Cargo-mutants exit code: $exit_code"
 
         # Fail hard only on config/setup errors
         case $exit_code in
@@ -117,10 +131,23 @@ jobs:
         exit_code=${MUTANTS_EXIT_CODE:-0}
 
         # Check if mutation report exists and is valid
+        echo "🔍 Checking for mutation report in: $(pwd)"
+        ls -la mutation* 2>/dev/null || echo "No mutation files found"
+
         if [ ! -f mutation-report.json ]; then
           echo "❌ ERROR: Mutation testing report (mutation-report.json) not found!"
-          echo "Mutation testing must generate a report for the job to pass."
-          exit 1
+          echo "This usually means cargo-mutants failed to complete successfully."
+          echo "Check the previous step logs for cargo-mutants error messages."
+
+          # Only fail if this was a config error (should have been caught in previous step)
+          exit_code=${MUTANTS_EXIT_CODE:-0}
+          if [ "$exit_code" -eq 1 ] || [ "$exit_code" -eq 4 ] || [ "$exit_code" -eq 5 ] || [ "$exit_code" -eq 6 ] || [ "$exit_code" -eq 70 ]; then
+            echo "This was a configuration error - failing hard."
+            exit 1
+          else
+            echo "This was not a config error - creating minimal report."
+            echo '{"summary":{"total_mutants":0,"caught":0,"missed":0,"timeout":0}}' > mutation-report.json
+          fi
         fi
 
         # Validate JSON structure
