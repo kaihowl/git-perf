@@ -6,7 +6,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
 };
-use toml_edit::{value, Document};
+use toml_edit::{value, Document, Item, Table};
 
 use crate::git::git_interop::{get_head_revision, get_repository_root};
 
@@ -142,7 +142,19 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
         .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
 
     let head_revision = get_head_revision()?;
-    // TODO(kaihowl) ensure that always non-inline tables are written in an empty config file
+
+    // Ensure that non-inline tables are written in an empty config file
+    if !conf.contains_key("measurement") {
+        conf["measurement"] = Item::Table(Table::new());
+    }
+    if !conf["measurement"]
+        .as_table()
+        .unwrap()
+        .contains_key(measurement)
+    {
+        conf["measurement"][measurement] = Item::Table(Table::new());
+    }
+
     conf["measurement"][measurement]["epoch"] = value(&head_revision[0..8]);
     *conf_str = conf.to_string();
 
@@ -522,6 +534,56 @@ dispersion_method = "stddev"
                 super::audit_dispersion_method("any_measurement"),
                 git_perf_cli_types::DispersionMethod::StandardDeviation
             );
+        });
+    }
+
+    #[test]
+    fn test_bump_epoch_in_conf_creates_proper_tables() {
+        // We need to test the production bump_epoch_in_conf function, but it calls get_head_revision()
+        // which requires a git repo. Let's temporarily modify the environment to make it work.
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+
+            // Set up minimal git environment
+            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
+            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
+            env::set_var("GIT_AUTHOR_NAME", "testuser");
+            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
+            env::set_var("GIT_COMMITTER_NAME", "testuser");
+            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+
+            init_git_repo_with_commit(temp_dir);
+
+            // Test case 1: Empty config string should create proper table structure
+            let mut empty_config = String::new();
+
+            // This calls the actual production function!
+            bump_epoch_in_conf("mymeasurement", &mut empty_config).unwrap();
+
+            // Verify that proper table structure is created (not inline tables)
+            assert!(empty_config.contains("[measurement]"));
+            assert!(empty_config.contains("[measurement.mymeasurement]"));
+            assert!(empty_config.contains("epoch ="));
+            // Ensure it's NOT using inline table syntax
+            assert!(!empty_config.contains("measurement = {"));
+            assert!(!empty_config.contains("mymeasurement = {"));
+
+            // Test case 2: Existing config should preserve structure and add new measurement
+            let mut existing_config = r#"[measurement]
+existing_setting = "value"
+
+[measurement."other"]
+epoch = "oldvalue"
+"#
+            .to_string();
+
+            bump_epoch_in_conf("newmeasurement", &mut existing_config).unwrap();
+
+            // Verify it maintains existing structure and adds new measurement with proper table format
+            assert!(existing_config.contains("[measurement.newmeasurement]"));
+            assert!(existing_config.contains("existing_setting = \"value\""));
+            assert!(existing_config.contains("[measurement.\"other\"]"));
+            assert!(!existing_config.contains("newmeasurement = {"));
         });
     }
 
