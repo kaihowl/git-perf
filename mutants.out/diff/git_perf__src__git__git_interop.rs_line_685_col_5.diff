@@ -1,0 +1,40 @@
+--- git_perf/src/git/git_interop.rs
++++ replace update_read_branch -> Result<TempRef, GitError> with Ok(Default::default())
+@@ -677,36 +677,17 @@
+ impl Drop for TempRef {
+     fn drop(&mut self) {
+         remove_reference(&self.ref_name)
+             .unwrap_or_else(|_| panic!("Failed to remove reference: {}", self.ref_name))
+     }
+ }
+ 
+ fn update_read_branch() -> Result<TempRef, GitError> {
+-    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
+-    // - With the upstream refs/notes/perf-v3
+-    //     - If not merged into refs/notes/perf-v3-read: set refs/notes/perf-v3-read to refs/notes/perf-v3
+-    //     - Protect against concurrent invocations by checking that the refs/notes/perf-v3-read has
+-    //     not changed between invocations!
+-    //
+-    // TODO(kaihowl) add test for bug:
+-    //   read branch might not be up to date with the remote branch after a history cut off.
+-    //   Then the _old_ read branch might have all writes already merged in.
+-    //   But the upstream does not. But we check the pending write branches against the old read
+-    //   branch......
+-    //   Better to just create the read branch fresh from the remote and add in all pending write
+-    //   branches and not optimize. This should be the same as creating the merge branch. Can the
+-    //   code be ..merged..?
+-
+-    let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
+-
+-    let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)?;
+-
+-    Ok(temp_ref)
++    Ok(Default::default()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
+     // update local read branch
+     let temp_ref = update_read_branch()?;
+ 
+     let output = capture_git_output(
+         &[

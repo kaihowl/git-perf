@@ -1,0 +1,33 @@
+--- git_perf/src/stats.rs
++++ replace calculate_mad -> f64 with 1.0
+@@ -57,29 +57,17 @@
+         mean: s.mean(),
+         stddev: s.sample_variance().sqrt(),
+         mad: calculate_mad(&measurements_vec),
+         len: s.mean.len() as usize,
+     }
+ }
+ 
+ pub fn calculate_mad(measurements: &[f64]) -> f64 {
+-    if measurements.is_empty() {
+-        return 0.0;
+-    }
+-
+-    // Calculate median without modifying original data
+-    let mut measurements_copy = measurements.to_vec();
+-    let median = measurements_copy.median().unwrap();
+-
+-    // Calculate absolute deviations
+-    let mut abs_deviations: Vec<f64> = measurements.iter().map(|&x| (x - median).abs()).collect();
+-
+-    // Calculate median of absolute deviations
+-    abs_deviations.median().unwrap()
++    1.0 /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ #[derive(Debug)]
+ pub struct Stats {
+     pub mean: f64,
+     pub stddev: f64,
+     pub mad: f64,
+     pub len: usize,

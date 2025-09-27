@@ -1,0 +1,25 @@
+--- cli_types/src/lib.rs
++++ replace parse_spaceless_string -> Result<String> with Ok(String::new())
+@@ -252,21 +252,17 @@
+         .find('=')
+         .ok_or_else(|| anyhow!("invalid key=value: no '=' found in '{}'", s))?;
+     let key = parse_spaceless_string(&s[..pos])?;
+     let value = parse_spaceless_string(&s[pos + 1..])?;
+     Ok((key, value))
+ }
+ 
+ fn parse_spaceless_string(s: &str) -> Result<String> {
+-    if s.split_whitespace().count() > 1 {
+-        Err(anyhow!("invalid string/key/value: found space in '{}'", s))
+-    } else {
+-        Ok(String::from(s))
+-    }
++    Ok(String::new()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn parse_datetime_value_now(input: &str) -> Result<DateTime<Utc>> {
+     parse_datetime_value(&Utc::now(), input)
+ }
+ 
+ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc>> {
+     if input.len() < 2 {

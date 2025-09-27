@@ -1,0 +1,2491 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 81.279589708,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "raw_push",
+            "return_type": "-> Result<(), GitError>",
+            "span": {
+              "start": {
+                "line": 495,
+                "column": 1
+              },
+              "end": {
+                "line": 542,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 520,
+              "column": 24
+            },
+            "end": {
+              "line": 520,
+              "column": 26
+            }
+          },
+          "replacement": "||",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_520_col_24.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_520_col_24.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602490939,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "Stats::z_score_with_method",
+            "return_type": "-> f64",
+            "span": {
+              "start": {
+                "line": 106,
+                "column": 5
+              },
+              "end": {
+                "line": 117,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 116,
+              "column": 20
+            },
+            "end": {
+              "line": 116,
+              "column": 21
+            }
+          },
+          "replacement": "/",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_116_col_20.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_116_col_20.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602326549,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "parse_git_version",
+            "return_type": "-> Result<(i32, i32, i32)>",
+            "span": {
+              "start": {
+                "line": 169,
+                "column": 1
+              },
+              "end": {
+                "line": 178,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 170,
+              "column": 5
+            },
+            "end": {
+              "line": 177,
+              "column": 6
+            }
+          },
+          "replacement": "Ok((1, 0, 1))",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_170_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_170_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.752651495,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "get_git_version",
+            "return_type": "-> Result<(i32, i32, i32)>",
+            "span": {
+              "start": {
+                "line": 180,
+                "column": 1
+              },
+              "end": {
+                "line": 185,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 181,
+              "column": 5
+            },
+            "end": {
+              "line": 184,
+              "column": 32
+            }
+          },
+          "replacement": "Ok((1, 0, 1))",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_181_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_181_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602418625,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "map_git_error",
+            "return_type": "-> GitError",
+            "span": {
+              "start": {
+                "line": 96,
+                "column": 1
+              },
+              "end": {
+                "line": 114,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 103,
+              "column": 55
+            },
+            "end": {
+              "line": 103,
+              "column": 93
+            }
+          },
+          "replacement": "false",
+          "genre": "MatchArmGuard"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_103_col_55.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_103_col_55.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.552403513,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "feed_git_command",
+            "return_type": "-> Result<GitOutput, GitError>",
+            "span": {
+              "start": {
+                "line": 55,
+                "column": 1
+              },
+              "end": {
+                "line": 94,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 60,
+              "column": 5
+            },
+            "end": {
+              "line": 93,
+              "column": 6
+            }
+          },
+          "replacement": "Ok(Default::default())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_60_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_60_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602493576,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "walk_commits",
+            "return_type": "-> Result<Vec<(String, Vec<String>)>>",
+            "span": {
+              "start": {
+                "line": 707,
+                "column": 1
+              },
+              "end": {
+                "line": 757,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 709,
+              "column": 5
+            },
+            "end": {
+              "line": 756,
+              "column": 16
+            }
+          },
+          "replacement": "Ok(vec![(\"xyzzy\".into(), vec![\"xyzzy\".into()])])",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_709_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_709_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.603235006,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "pull_internal",
+            "return_type": "-> Result<(), GitError>",
+            "span": {
+              "start": {
+                "line": 764,
+                "column": 1
+              },
+              "end": {
+                "line": 775,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 770,
+              "column": 9
+            },
+            "end": {
+              "line": 770,
+              "column": 97
+            }
+          },
+          "replacement": "",
+          "genre": "MatchArm"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_770_col_9.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_770_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602584905,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/reporting.rs",
+          "function": {
+            "function_name": "PlotlyReporter::convert_to_x_y",
+            "return_type": "-> (Vec<usize>, Vec<f64>)",
+            "span": {
+              "start": {
+                "line": 55,
+                "column": 5
+              },
+              "end": {
+                "line": 60,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 56,
+              "column": 9
+            },
+            "end": {
+              "line": 59,
+              "column": 21
+            }
+          },
+          "replacement": "(vec![0], vec![-1.0])",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__reporting.rs_line_56_col_9.log",
+      "diff_path": "diff/git_perf__src__reporting.rs_line_56_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.702742436,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "create_temp_ref",
+            "return_type": "-> Result<String, GitError>",
+            "span": {
+              "start": {
+                "line": 237,
+                "column": 1
+              },
+              "end": {
+                "line": 252,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 239,
+              "column": 21
+            },
+            "end": {
+              "line": 239,
+              "column": 23
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_239_col_21.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_239_col_21.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.702556782,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "<impl VecAggregation for Vec<f64>>::median",
+            "return_type": "-> Option<f64>",
+            "span": {
+              "start": {
+                "line": 121,
+                "column": 5
+              },
+              "end": {
+                "line": 132,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 126,
+              "column": 38
+            },
+            "end": {
+              "line": 126,
+              "column": 39
+            }
+          },
+          "replacement": "%",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_126_col_38.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_126_col_38.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.552334538,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/serialization.rs",
+          "function": {
+            "function_name": "deserialize_single",
+            "return_type": "-> Option<MeasurementData>",
+            "span": {
+              "start": {
+                "line": 41,
+                "column": 1
+              },
+              "end": {
+                "line": 127,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 42,
+              "column": 5
+            },
+            "end": {
+              "line": 126,
+              "column": 7
+            }
+          },
+          "replacement": "Some(Default::default())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "log/git_perf__src__serialization.rs_line_42_col_5.log",
+      "diff_path": "diff/git_perf__src__serialization.rs_line_42_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.502219037,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "<impl VecAggregation for Vec<f64>>::median",
+            "return_type": "-> Option<f64>",
+            "span": {
+              "start": {
+                "line": 121,
+                "column": 5
+              },
+              "end": {
+                "line": 132,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 128,
+              "column": 37
+            },
+            "end": {
+              "line": 128,
+              "column": 38
+            }
+          },
+          "replacement": "*",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_128_col_37.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_128_col_37.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.552350158,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "parse_key_value",
+            "return_type": "-> Result<(String, String)>",
+            "span": {
+              "start": {
+                "line": 250,
+                "column": 1
+              },
+              "end": {
+                "line": 257,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 251,
+              "column": 5
+            },
+            "end": {
+              "line": 256,
+              "column": 21
+            }
+          },
+          "replacement": "Ok((\"xyzzy\".into(), String::new()))",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/cli_types__src__lib.rs_line_251_col_5.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_251_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 6.319001972,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/reporting.rs",
+          "function": {
+            "function_name": "report",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 253,
+                "column": 1
+              },
+              "end": {
+                "line": 363,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 275,
+              "column": 58
+            },
+            "end": {
+              "line": 275,
+              "column": 60
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__reporting.rs_line_275_col_58.log",
+      "diff_path": "diff/git_perf__src__reporting.rs_line_275_col_58.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 1.306216038,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/serialization.rs",
+          "function": {
+            "function_name": "deserialize_single",
+            "return_type": "-> Option<MeasurementData>",
+            "span": {
+              "start": {
+                "line": 41,
+                "column": 1
+              },
+              "end": {
+                "line": 127,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 48,
+              "column": 23
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__serialization.rs_line_48_col_23.log",
+      "diff_path": "diff/git_perf__src__serialization.rs_line_48_col_23.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.654504555,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "get_head_revision",
+            "return_type": "-> Result<String>",
+            "span": {
+              "start": {
+                "line": 141,
+                "column": 1
+              },
+              "end": {
+                "line": 143,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 142,
+              "column": 5
+            },
+            "end": {
+              "line": 142,
+              "column": 38
+            }
+          },
+          "replacement": "Ok(String::new())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_142_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_142_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602556696,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "parse_spaceless_string",
+            "return_type": "-> Result<String>",
+            "span": {
+              "start": {
+                "line": 259,
+                "column": 1
+              },
+              "end": {
+                "line": 265,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 260,
+              "column": 5
+            },
+            "end": {
+              "line": 264,
+              "column": 6
+            }
+          },
+          "replacement": "Ok(String::new())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/cli_types__src__lib.rs_line_260_col_5.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_260_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.251564905,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/audit.rs",
+          "function": {
+            "function_name": "audit",
+            "return_type": "-> Result<AuditResult>",
+            "span": {
+              "start": {
+                "line": 77,
+                "column": 1
+              },
+              "end": {
+                "line": 207,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 156,
+              "column": 50
+            },
+            "end": {
+              "line": 156,
+              "column": 51
+            }
+          },
+          "replacement": ">",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__audit.rs_line_156_col_50.log",
+      "diff_path": "diff/git_perf__src__audit.rs_line_156_col_50.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 1.254258147,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/reporting.rs",
+          "function": {
+            "function_name": "report",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 253,
+                "column": 1
+              },
+              "end": {
+                "line": 363,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 269,
+              "column": 42
+            },
+            "end": {
+              "line": 269,
+              "column": 44
+            }
+          },
+          "replacement": "||",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__reporting.rs_line_269_col_42.log",
+      "diff_path": "diff/git_perf__src__reporting.rs_line_269_col_42.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.702569805,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "parse_datetime_value",
+            "return_type": "-> Result<DateTime<Utc>>",
+            "span": {
+              "start": {
+                "line": 271,
+                "column": 1
+              },
+              "end": {
+                "line": 285,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 272,
+              "column": 5
+            },
+            "end": {
+              "line": 284,
+              "column": 26
+            }
+          },
+          "replacement": "Ok(DateTime::from_iter([Default::default()]))",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "log/cli_types__src__lib.rs_line_272_col_5.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_272_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 1.3545863599999999,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "parse_key_value",
+            "return_type": "-> Result<(String, String)>",
+            "span": {
+              "start": {
+                "line": 250,
+                "column": 1
+              },
+              "end": {
+                "line": 257,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 255,
+              "column": 47
+            },
+            "end": {
+              "line": 255,
+              "column": 48
+            }
+          },
+          "replacement": "-",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/cli_types__src__lib.rs_line_255_col_47.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_255_col_47.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.251786286,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "raw_add_note_line_to_head",
+            "return_type": "-> Result<(), GitError>",
+            "span": {
+              "start": {
+                "line": 91,
+                "column": 1
+              },
+              "end": {
+                "line": 141,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 92,
+              "column": 5
+            },
+            "end": {
+              "line": 140,
+              "column": 11
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_92_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_92_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 1.40417606,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "parse_git_version",
+            "return_type": "-> Result<(i32, i32, i32)>",
+            "span": {
+              "start": {
+                "line": 169,
+                "column": 1
+              },
+              "end": {
+                "line": 178,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 170,
+              "column": 5
+            },
+            "end": {
+              "line": 177,
+              "column": 6
+            }
+          },
+          "replacement": "Ok((0, -1, 0))",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_170_col_5_001.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_170_col_5_001.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.702545967,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "calculate_mad",
+            "return_type": "-> f64",
+            "span": {
+              "start": {
+                "line": 64,
+                "column": 1
+              },
+              "end": {
+                "line": 78,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 65,
+              "column": 5
+            },
+            "end": {
+              "line": 77,
+              "column": 37
+            }
+          },
+          "replacement": "1.0",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_65_col_5.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_65_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.603224784,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/reporting.rs",
+          "function": {
+            "function_name": "report",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 253,
+                "column": 1
+              },
+              "end": {
+                "line": 363,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 261,
+              "column": 5
+            },
+            "end": {
+              "line": 362,
+              "column": 11
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__reporting.rs_line_261_col_5.log",
+      "diff_path": "diff/git_perf__src__reporting.rs_line_261_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652484876,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "push",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 777,
+                "column": 1
+              },
+              "end": {
+                "line": 802,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 778,
+              "column": 5
+            },
+            "end": {
+              "line": 801,
+              "column": 11
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_778_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_778_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.703034077,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "raw_prune",
+            "return_type": "-> Result<(), GitError>",
+            "span": {
+              "start": {
+                "line": 604,
+                "column": 1
+              },
+              "end": {
+                "line": 644,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 605,
+              "column": 5
+            },
+            "end": {
+              "line": 643,
+              "column": 11
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_605_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_605_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602331164,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/reporting.rs",
+          "function": {
+            "function_name": "PlotlyReporter::convert_to_x_y",
+            "return_type": "-> (Vec<usize>, Vec<f64>)",
+            "span": {
+              "start": {
+                "line": 55,
+                "column": 5
+              },
+              "end": {
+                "line": 60,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 58,
+              "column": 38
+            },
+            "end": {
+              "line": 58,
+              "column": 39
+            }
+          },
+          "replacement": "/",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__reporting.rs_line_58_col_38.log",
+      "diff_path": "diff/git_perf__src__reporting.rs_line_58_col_38.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652446872,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "<impl VecAggregation for Vec<f64>>::median",
+            "return_type": "-> Option<f64>",
+            "span": {
+              "start": {
+                "line": 121,
+                "column": 5
+              },
+              "end": {
+                "line": 132,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 128,
+              "column": 28
+            },
+            "end": {
+              "line": 128,
+              "column": 29
+            }
+          },
+          "replacement": "-",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_128_col_28.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_128_col_28.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.552228714,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/serialization.rs",
+          "function": {
+            "function_name": "deserialize_single",
+            "return_type": "-> Option<MeasurementData>",
+            "span": {
+              "start": {
+                "line": 41,
+                "column": 1
+              },
+              "end": {
+                "line": 127,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 91,
+              "column": 36
+            },
+            "end": {
+              "line": 91,
+              "column": 38
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__serialization.rs_line_91_col_36.log",
+      "diff_path": "diff/git_perf__src__serialization.rs_line_91_col_36.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602310946,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "<impl VecAggregation for Vec<f64>>::median",
+            "return_type": "-> Option<f64>",
+            "span": {
+              "start": {
+                "line": 121,
+                "column": 5
+              },
+              "end": {
+                "line": 132,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 122,
+              "column": 9
+            },
+            "end": {
+              "line": 131,
+              "column": 10
+            }
+          },
+          "replacement": "Some(0.0)",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_122_col_9.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_122_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602529077,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/reporting.rs",
+          "function": {
+            "function_name": "<impl Reporter<'a> for PlotlyReporter>::as_bytes",
+            "return_type": "-> Vec<u8>",
+            "span": {
+              "start": {
+                "line": 142,
+                "column": 5
+              },
+              "end": {
+                "line": 144,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 143,
+              "column": 9
+            },
+            "end": {
+              "line": 143,
+              "column": 48
+            }
+          },
+          "replacement": "vec![0]",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__reporting.rs_line_143_col_9.log",
+      "diff_path": "diff/git_perf__src__reporting.rs_line_143_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.552265421,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/config.rs",
+          "function": {
+            "function_name": "determine_epoch_from_config",
+            "return_type": "-> Option<u32>",
+            "span": {
+              "start": {
+                "line": 125,
+                "column": 1
+              },
+              "end": {
+                "line": 137,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 126,
+              "column": 5
+            },
+            "end": {
+              "line": 136,
+              "column": 56
+            }
+          },
+          "replacement": "None",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__config.rs_line_126_col_5.log",
+      "diff_path": "diff/git_perf__src__config.rs_line_126_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652722103,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/serialization.rs",
+          "function": {
+            "function_name": "deserialize_single",
+            "return_type": "-> Option<MeasurementData>",
+            "span": {
+              "start": {
+                "line": 41,
+                "column": 1
+              },
+              "end": {
+                "line": 127,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 48,
+              "column": 23
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          "replacement": "<=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__serialization.rs_line_48_col_23_001.log",
+      "diff_path": "diff/git_perf__src__serialization.rs_line_48_col_23_001.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652612749,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/audit.rs",
+          "function": {
+            "function_name": "audit_multiple",
+            "return_type": "-> Result<()>",
+            "span": {
+              "start": {
+                "line": 41,
+                "column": 1
+              },
+              "end": {
+                "line": 75,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 50,
+              "column": 5
+            },
+            "end": {
+              "line": 74,
+              "column": 11
+            }
+          },
+          "replacement": "Ok(())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__audit.rs_line_50_col_5.log",
+      "diff_path": "diff/git_perf__src__audit.rs_line_50_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652777517,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/audit.rs",
+          "function": {
+            "function_name": "audit",
+            "return_type": "-> Result<AuditResult>",
+            "span": {
+              "start": {
+                "line": 77,
+                "column": 1
+              },
+              "end": {
+                "line": 207,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 150,
+              "column": 41
+            },
+            "end": {
+              "line": 150,
+              "column": 42
+            }
+          },
+          "replacement": "*",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__audit.rs_line_150_col_41.log",
+      "diff_path": "diff/git_perf__src__audit.rs_line_150_col_41.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.603102075,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/config.rs",
+          "function": {
+            "function_name": "read_config_from_file",
+            "return_type": "-> Result<String>",
+            "span": {
+              "start": {
+                "line": 119,
+                "column": 1
+              },
+              "end": {
+                "line": 123,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 120,
+              "column": 5
+            },
+            "end": {
+              "line": 122,
+              "column": 17
+            }
+          },
+          "replacement": "Ok(\"xyzzy\".into())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__config.rs_line_120_col_5.log",
+      "diff_path": "diff/git_perf__src__config.rs_line_120_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652653088,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "<impl FromStr for DispersionMethod>::from_str",
+            "return_type": "-> Result<Self, Self::Err>",
+            "span": {
+              "start": {
+                "line": 28,
+                "column": 5
+              },
+              "end": {
+                "line": 37,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 30,
+              "column": 13
+            },
+            "end": {
+              "line": 30,
+              "column": 65
+            }
+          },
+          "replacement": "",
+          "genre": "MatchArm"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/cli_types__src__lib.rs_line_30_col_13.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_30_col_13.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.351995973,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "<impl FromStr for DispersionMethod>::from_str",
+            "return_type": "-> Result<Self, Self::Err>",
+            "span": {
+              "start": {
+                "line": 28,
+                "column": 5
+              },
+              "end": {
+                "line": 37,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 29,
+              "column": 9
+            },
+            "end": {
+              "line": 36,
+              "column": 10
+            }
+          },
+          "replacement": "Ok(Default::default())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "log/cli_types__src__lib.rs_line_29_col_9.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_29_col_9.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.351822576,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/stats.rs",
+          "function": {
+            "function_name": "<impl VecAggregation for Vec<f64>>::median",
+            "return_type": "-> Option<f64>",
+            "span": {
+              "start": {
+                "line": 121,
+                "column": 5
+              },
+              "end": {
+                "line": 132,
+                "column": 6
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 128,
+              "column": 28
+            },
+            "end": {
+              "line": 128,
+              "column": 29
+            }
+          },
+          "replacement": "*",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__stats.rs_line_128_col_28_001.log",
+      "diff_path": "diff/git_perf__src__stats.rs_line_128_col_28_001.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 1.254150155,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_lowlevel.rs",
+          "function": {
+            "function_name": "parse_git_version",
+            "return_type": "-> Result<(i32, i32, i32)>",
+            "span": {
+              "start": {
+                "line": 169,
+                "column": 1
+              },
+              "end": {
+                "line": 178,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 170,
+              "column": 5
+            },
+            "end": {
+              "line": 177,
+              "column": 6
+            }
+          },
+          "replacement": "Ok((-1, 0, 1))",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__git__git_lowlevel.rs_line_170_col_5_002.log",
+      "diff_path": "diff/git_perf__src__git__git_lowlevel.rs_line_170_col_5_002.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602716168,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/config.rs",
+          "function": {
+            "function_name": "find_config_path",
+            "return_type": "-> Option<PathBuf>",
+            "span": {
+              "start": {
+                "line": 109,
+                "column": 1
+              },
+              "end": {
+                "line": 117,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 111,
+              "column": 5
+            },
+            "end": {
+              "line": 116,
+              "column": 6
+            }
+          },
+          "replacement": "Some(Default::default())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__config.rs_line_111_col_5.log",
+      "diff_path": "diff/git_perf__src__config.rs_line_111_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652677348,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "parse_datetime_value",
+            "return_type": "-> Result<DateTime<Utc>>",
+            "span": {
+              "start": {
+                "line": 271,
+                "column": 1
+              },
+              "end": {
+                "line": 285,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 276,
+              "column": 50
+            },
+            "end": {
+              "line": 276,
+              "column": 51
+            }
+          },
+          "replacement": "/",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/cli_types__src__lib.rs_line_276_col_50.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_276_col_50.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.351726772,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/serialization.rs",
+          "function": {
+            "function_name": "deserialize",
+            "return_type": "-> Vec<MeasurementData>",
+            "span": {
+              "start": {
+                "line": 129,
+                "column": 1
+              },
+              "end": {
+                "line": 135,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 130,
+              "column": 5
+            },
+            "end": {
+              "line": 134,
+              "column": 23
+            }
+          },
+          "replacement": "vec![Default::default()]",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "log/git_perf__src__serialization.rs_line_130_col_5.log",
+      "diff_path": "diff/git_perf__src__serialization.rs_line_130_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 1.204082151,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/git/git_interop.rs",
+          "function": {
+            "function_name": "update_read_branch",
+            "return_type": "-> Result<TempRef, GitError>",
+            "span": {
+              "start": {
+                "line": 684,
+                "column": 1
+              },
+              "end": {
+                "line": 705,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 685,
+              "column": 5
+            },
+            "end": {
+              "line": 704,
+              "column": 17
+            }
+          },
+          "replacement": "Ok(Default::default())",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "log/git_perf__src__git__git_interop.rs_line_685_col_5.log",
+      "diff_path": "diff/git_perf__src__git__git_interop.rs_line_685_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.602504008,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git-perf",
+          "file": "git_perf/src/serialization.rs",
+          "function": {
+            "function_name": "serialize_single",
+            "return_type": "-> String",
+            "span": {
+              "start": {
+                "line": 16,
+                "column": 1
+              },
+              "end": {
+                "line": 32,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 20,
+              "column": 5
+            },
+            "end": {
+              "line": 31,
+              "column": 36
+            }
+          },
+          "replacement": "String::new()",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/git_perf__src__serialization.rs_line_20_col_5.log",
+      "diff_path": "diff/git_perf__src__serialization.rs_line_20_col_5.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.652432109,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git-perf@0.17.2"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "package": "git_perf_cli_types",
+          "file": "cli_types/src/lib.rs",
+          "function": {
+            "function_name": "parse_datetime_value",
+            "return_type": "-> Result<DateTime<Utc>>",
+            "span": {
+              "start": {
+                "line": 271,
+                "column": 1
+              },
+              "end": {
+                "line": 285,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 284,
+              "column": 13
+            },
+            "end": {
+              "line": 284,
+              "column": 14
+            }
+          },
+          "replacement": "+",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "Success",
+      "log_path": "log/cli_types__src__lib.rs_line_284_col_13.log",
+      "diff_path": "diff/cli_types__src__lib.rs_line_284_col_13.diff",
+      "phase_results": [
+        {
+          "phase": "Check",
+          "duration": 0.251595879,
+          "process_status": "Success",
+          "argv": [
+            "/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+            "check",
+            "--tests",
+            "--verbose",
+            "--package=git_perf_cli_types@0.1.1"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 48,
+  "missed": 0,
+  "caught": 0,
+  "timeout": 0,
+  "unviable": 6,
+  "success": 42
+}

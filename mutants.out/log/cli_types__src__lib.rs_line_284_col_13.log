@@ -1,0 +1,56 @@
+
+*** cli_types/src/lib.rs:284:13: replace - with + in parse_datetime_value
+
+*** mutation diff:
+--- cli_types/src/lib.rs
++++ replace - with + in parse_datetime_value
+@@ -276,17 +276,17 @@
+     let (num, unit) = input.split_at(input.len() - 1);
+     let num: i64 = num.parse()?;
+     let subtractor = match unit {
+         "w" => Duration::weeks(num),
+         "d" => Duration::days(num),
+         "h" => Duration::hours(num),
+         _ => bail!("Unsupported datetime format"),
+     };
+-    Ok(*now - subtractor)
++    Ok(*now + /* ~ changed by cargo-mutants ~ */ subtractor)
+ }
+ 
+ #[cfg(test)]
+ mod test {
+     use clap::CommandFactory;
+ 
+     use super::*;
+ 
+
+
+*** /root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo check --tests --verbose --package=git_perf_cli_types@0.1.1
+       Fresh unicode-ident v1.0.12
+       Fresh proc-macro2 v1.0.95
+       Fresh autocfg v1.1.0
+       Fresh utf8parse v0.2.1
+       Fresh anstyle-parse v0.2.3
+       Fresh quote v1.0.40
+       Fresh anstyle v1.0.10
+       Fresh is_terminal_polyfill v1.70.1
+       Fresh anstyle-query v1.0.2
+       Fresh colorchoice v1.0.0
+       Fresh syn v2.0.100
+       Fresh anstream v0.6.18
+       Fresh clap_lex v0.6.0
+       Fresh strsim v0.10.0
+       Fresh heck v0.4.1
+       Fresh clap_derive v4.4.7
+       Fresh clap_builder v4.4.12
+       Fresh num-traits v0.2.17
+       Fresh iana-time-zone v0.1.59
+       Fresh clap v4.4.13
+       Fresh anyhow v1.0.79
+       Fresh chrono v0.4.39
+       Dirty git_perf_cli_types v0.1.1 (/tmp/cargo-mutants-repo-l6y6pT.tmp/cli_types): the file `cli_types/src/lib.rs` has changed (1758958858.844777688s, 2s after last build at 1758958856.121141400s)
+    Checking git_perf_cli_types v0.1.1 (/tmp/cargo-mutants-repo-l6y6pT.tmp/cli_types)
+     Running `/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name git_perf_cli_types --edition=2021 cli_types/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,metadata -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7ae4d00c7adb4409 -C extra-filename=-d56307f0ee33750c --out-dir /tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps -C incremental=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps --extern anyhow=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps/libanyhow-d3df5968a6327529.rmeta --extern chrono=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps/libchrono-0d4edf02d7163120.rmeta --extern clap=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps/libclap-812c94d234c2ea3d.rmeta`
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+
+*** result: Success

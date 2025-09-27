@@ -1,0 +1,21 @@
+--- git_perf/src/git/git_interop.rs
++++ replace != with == in create_temp_ref
+@@ -231,17 +231,17 @@
+         ],
+         &None,
+     )?;
+     Ok(())
+ }
+ 
+ fn create_temp_ref(prefix: &str, current_head: &str) -> Result<String, GitError> {
+     let target = create_temp_ref_name(prefix);
+-    if current_head != EMPTY_OID {
++    if current_head == /* ~ changed by cargo-mutants ~ */ EMPTY_OID {
+         git_update_ref(unindent(
+             format!(
+                 r#"
+             start
+             create {target} {current_head}
+             commit
+             "#
+             )

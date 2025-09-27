@@ -1,0 +1,21 @@
+--- cli_types/src/lib.rs
++++ replace - with / in parse_datetime_value
+@@ -268,17 +268,17 @@
+     parse_datetime_value(&Utc::now(), input)
+ }
+ 
+ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc>> {
+     if input.len() < 2 {
+         bail!("Invalid datetime format");
+     }
+ 
+-    let (num, unit) = input.split_at(input.len() - 1);
++    let (num, unit) = input.split_at(input.len() / /* ~ changed by cargo-mutants ~ */ 1);
+     let num: i64 = num.parse()?;
+     let subtractor = match unit {
+         "w" => Duration::weeks(num),
+         "d" => Duration::days(num),
+         "h" => Duration::hours(num),
+         _ => bail!("Unsupported datetime format"),
+     };
+     Ok(*now - subtractor)

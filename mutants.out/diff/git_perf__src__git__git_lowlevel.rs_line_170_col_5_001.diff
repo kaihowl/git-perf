@@ -1,0 +1,28 @@
+--- git_perf/src/git/git_lowlevel.rs
++++ replace parse_git_version -> Result<(i32, i32, i32)> with Ok((0, -1, 0))
+@@ -162,24 +162,17 @@
+ 
+ pub(super) fn is_shallow_repo() -> Result<bool, GitError> {
+     let output = capture_git_output(&["rev-parse", "--is-shallow-repository"], &None)?;
+ 
+     Ok(output.stdout.starts_with("true"))
+ }
+ 
+ pub(super) fn parse_git_version(version: &str) -> Result<(i32, i32, i32)> {
+-    let version = version
+-        .split_whitespace()
+-        .nth(2)
+-        .ok_or(anyhow!("Could not find git version in string {version}"))?;
+-    match version.split('.').collect_vec()[..] {
+-        [major, minor, patch] => Ok((major.parse()?, minor.parse()?, patch.parse()?)),
+-        _ => Err(anyhow!("Failed determine semantic version from {version}")),
+-    }
++    Ok((0, -1, 0)) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn get_git_version() -> Result<(i32, i32, i32)> {
+     let version = capture_git_output(&["--version"], &None)
+         .context("Determine git version")?
+         .stdout;
+     parse_git_version(&version)
+ }

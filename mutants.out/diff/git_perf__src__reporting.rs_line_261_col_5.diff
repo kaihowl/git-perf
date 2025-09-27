@@ -1,0 +1,115 @@
+--- git_perf/src/reporting.rs
++++ replace report -> Result<()> with Ok(())
+@@ -253,111 +253,10 @@
+ pub fn report(
+     output: PathBuf,
+     separate_by: Option<String>,
+     num_commits: usize,
+     measurement_names: &[String],
+     key_values: &[(String, String)],
+     aggregate_by: Option<ReductionFunc>,
+ ) -> Result<()> {
+-    let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
+-
+-    let mut plot =
+-        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
+-
+-    plot.add_commits(&commits);
+-
+-    let relevant = |m: &MeasurementData| {
+-        if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
+-            return false;
+-        }
+-        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
+-        key_values
+-            .iter()
+-            .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
+-    };
+-
+-    let relevant_measurements = commits
+-        .iter()
+-        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+-
+-    let unique_measurement_names: Vec<_> = relevant_measurements
+-        .clone()
+-        .flat_map(|m| m.map(|m| &m.name))
+-        .unique()
+-        .collect();
+-
+-    if unique_measurement_names.is_empty() {
+-        bail!("No performance measurements found.")
+-    }
+-
+-    for measurement_name in unique_measurement_names {
+-        let filtered_measurements = relevant_measurements
+-            .clone()
+-            .map(|ms| ms.filter(|m| m.name == *measurement_name));
+-
+-        let group_values = if let Some(separate_by) = &separate_by {
+-            filtered_measurements
+-                .clone()
+-                .flat_map(|ms| {
+-                    ms.flat_map(|m| {
+-                        m.key_values
+-                            .iter()
+-                            .filter(|(k, _v)| *k == separate_by)
+-                            .map(|(_k, v)| v)
+-                    })
+-                })
+-                .unique()
+-                .map(|val| (Some(separate_by), Some(val)))
+-                .collect_vec()
+-        } else {
+-            vec![(None, None)]
+-        };
+-
+-        if group_values.is_empty() {
+-            bail!("Invalid separator supplied, no measurements.")
+-        }
+-
+-        for (group_key, group_value) in group_values {
+-            let group_measurements = filtered_measurements.clone().map(|ms| {
+-                ms.filter(|m| {
+-                    group_key
+-                        .map(|gk| m.key_values.get(gk) == group_value)
+-                        .unwrap_or(true)
+-                })
+-            });
+-
+-            if let Some(reduction_func) = aggregate_by {
+-                let trace_measurements = group_measurements
+-                    .clone()
+-                    .enumerate()
+-                    .flat_map(move |(i, ms)| {
+-                        ms.reduce_by(reduction_func)
+-                            .into_iter()
+-                            .map(move |m| (i, m))
+-                    })
+-                    .collect_vec();
+-                plot.add_summarized_trace(trace_measurements, measurement_name, group_value);
+-            } else {
+-                let trace_measurements: Vec<_> = group_measurements
+-                    .clone()
+-                    .enumerate()
+-                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
+-                    .collect();
+-                plot.add_trace(trace_measurements, measurement_name, group_value);
+-            }
+-        }
+-    }
+-
+-    // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
+-    // python)
+-
+-    if output == Path::new("-") {
+-        match io::stdout().write_all(&plot.as_bytes()) {
+-            Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+-            res => res,
+-        }?;
+-    } else {
+-        File::create(&output)?.write_all(&plot.as_bytes())?;
+-    }
+-
+-    Ok(())
++    Ok(()) /* ~ changed by cargo-mutants ~ */
+ }

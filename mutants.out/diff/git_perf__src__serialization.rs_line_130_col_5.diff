@@ -1,0 +1,25 @@
+--- git_perf/src/serialization.rs
++++ replace deserialize -> Vec<MeasurementData> with vec![Default::default()]
+@@ -122,21 +122,17 @@
+         name,
+         timestamp,
+         val,
+         key_values,
+     })
+ }
+ 
+ pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
+-    lines
+-        .lines()
+-        .filter(|l| !l.trim().is_empty())
+-        .filter_map(deserialize_single)
+-        .collect_vec()
++    vec![Default::default()] /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ #[cfg(test)]
+ mod test {
+     use super::*;
+ 
+     #[test]
+     fn key_value_deserialization() {

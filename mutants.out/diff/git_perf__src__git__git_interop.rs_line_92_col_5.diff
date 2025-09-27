@@ -1,0 +1,69 @@
+--- git_perf/src/git/git_interop.rs
++++ replace raw_add_note_line_to_head -> Result<(), GitError> with Ok(())
+@@ -84,65 +84,17 @@
+             anyhow!(err).context("Timed out while adding note line to head")
+         }
+     })?;
+ 
+     Ok(())
+ }
+ 
+ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
+-    ensure_symbolic_write_ref_exists()?;
+-
+-    // `git notes append` is not safe to use concurrently.
+-    // We create a new type of temporary reference: Cannot reuse the normal write references as
+-    // they only get merged upon push. This can take arbitrarily long.
+-    let current_note_head =
+-        git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).unwrap_or(EMPTY_OID.to_string());
+-    let current_symbolic_ref_target = git_rev_parse_symbolic_ref(REFS_NOTES_WRITE_SYMBOLIC_REF)
+-        .expect("Missing symbolic-ref for target");
+-    let temp_target = create_temp_add_head(&current_note_head)?;
+-
+-    defer!(remove_reference(&temp_target)
+-        .expect("Deleting our own temp ref for adding should never fail"));
+-
+-    // Test if the repo has any commit checked out at HEAD
+-    if internal_get_head_revision().is_err() {
+-        return Err(GitError::MissingHead {
+-            reference: "HEAD".to_string(),
+-        });
+-    }
+-
+-    capture_git_output(
+-        &[
+-            "notes",
+-            "--ref",
+-            &temp_target,
+-            "append",
+-            // TODO(kaihowl) disabled until #96 is solved
+-            // "--no-separator",
+-            "-m",
+-            line,
+-        ],
+-        &None,
+-    )?;
+-
+-    // Update current write branch with pending write
+-    git_update_ref(unindent(
+-        format!(
+-            r#"
+-            start
+-            symref-verify {REFS_NOTES_WRITE_SYMBOLIC_REF} {current_symbolic_ref_target}
+-            update {current_symbolic_ref_target} {temp_target} {current_note_head}
+-            commit
+-            "#
+-        )
+-        .as_str(),
+-    ))?;
+-
+-    Ok(())
++    Ok(()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn ensure_remote_exists() -> Result<(), GitError> {
+     if get_git_perf_remote(GIT_PERF_REMOTE).is_some() {
+         return Ok(());
+     }
+ 
+     if let Some(x) = get_git_perf_remote(GIT_ORIGIN) {

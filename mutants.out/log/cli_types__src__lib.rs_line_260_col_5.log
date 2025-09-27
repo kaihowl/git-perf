@@ -1,0 +1,69 @@
+
+*** cli_types/src/lib.rs:260:5: replace parse_spaceless_string -> Result<String> with Ok(String::new())
+
+*** mutation diff:
+--- cli_types/src/lib.rs
++++ replace parse_spaceless_string -> Result<String> with Ok(String::new())
+@@ -252,21 +252,17 @@
+         .find('=')
+         .ok_or_else(|| anyhow!("invalid key=value: no '=' found in '{}'", s))?;
+     let key = parse_spaceless_string(&s[..pos])?;
+     let value = parse_spaceless_string(&s[pos + 1..])?;
+     Ok((key, value))
+ }
+ 
+ fn parse_spaceless_string(s: &str) -> Result<String> {
+-    if s.split_whitespace().count() > 1 {
+-        Err(anyhow!("invalid string/key/value: found space in '{}'", s))
+-    } else {
+-        Ok(String::from(s))
+-    }
++    Ok(String::new()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn parse_datetime_value_now(input: &str) -> Result<DateTime<Utc>> {
+     parse_datetime_value(&Utc::now(), input)
+ }
+ 
+ fn parse_datetime_value(now: &DateTime<Utc>, input: &str) -> Result<DateTime<Utc>> {
+     if input.len() < 2 {
+
+
+*** /root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo check --tests --verbose --package=git_perf_cli_types@0.1.1
+       Fresh unicode-ident v1.0.12
+       Fresh proc-macro2 v1.0.95
+       Fresh utf8parse v0.2.1
+       Fresh autocfg v1.1.0
+       Fresh anstyle-parse v0.2.3
+       Fresh quote v1.0.40
+       Fresh colorchoice v1.0.0
+       Fresh anstyle v1.0.10
+       Fresh is_terminal_polyfill v1.70.1
+       Fresh anstyle-query v1.0.2
+       Fresh syn v2.0.100
+       Fresh anstream v0.6.18
+       Fresh clap_lex v0.6.0
+       Fresh heck v0.4.1
+       Fresh strsim v0.10.0
+       Fresh clap_derive v4.4.7
+       Fresh clap_builder v4.4.12
+       Fresh num-traits v0.2.17
+       Fresh iana-time-zone v0.1.59
+       Fresh clap v4.4.13
+       Fresh anyhow v1.0.79
+       Fresh chrono v0.4.39
+       Dirty git_perf_cli_types v0.1.1 (/tmp/cargo-mutants-repo-l6y6pT.tmp/cli_types): the file `cli_types/src/lib.rs` has changed (1758958838.116743880s, 3s after last build at 1758958835.241537738s)
+    Checking git_perf_cli_types v0.1.1 (/tmp/cargo-mutants-repo-l6y6pT.tmp/cli_types)
+     Running `/root/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name git_perf_cli_types --edition=2021 cli_types/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,metadata -C embed-bitcode=no -C debuginfo=2 --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7ae4d00c7adb4409 -C extra-filename=-d56307f0ee33750c --out-dir /tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps -C incremental=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/incremental -L dependency=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps --extern anyhow=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps/libanyhow-d3df5968a6327529.rmeta --extern chrono=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps/libchrono-0d4edf02d7163120.rmeta --extern clap=/tmp/cargo-mutants-repo-l6y6pT.tmp/target/debug/deps/libclap-812c94d234c2ea3d.rmeta`
+warning: unused variable: `s`
+   --> cli_types/src/lib.rs:259:27
+    |
+259 | fn parse_spaceless_string(s: &str) -> Result<String> {
+    |                           ^ help: if this is intentional, prefix it with an underscore: `_s`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: `git_perf_cli_types` (lib test) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.22s
+
+*** result: Success

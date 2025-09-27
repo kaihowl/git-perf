@@ -1,0 +1,30 @@
+--- git_perf/src/stats.rs
++++ replace <impl VecAggregation for Vec<f64>>::median -> Option<f64> with Some(0.0)
+@@ -114,26 +114,17 @@
+ 
+         // Division by zero is an expected case here: For measurements with no variance
+         (self.mean - other.mean).abs() / dispersion
+     }
+ }
+ 
+ impl VecAggregation for Vec<f64> {
+     fn median(&mut self) -> Option<f64> {
+-        self.sort_by(f64::total_cmp);
+-        match self.len() {
+-            0 => None,
+-            even if even % 2 == 0 => {
+-                let left = self[even / 2 - 1];
+-                let right = self[even / 2];
+-                Some((left + right) / 2.0)
+-            }
+-            odd => Some(self[odd / 2]),
+-        }
++        Some(0.0) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ pub trait NumericReductionFunc: Iterator<Item = f64> {
+     fn aggregate_by(&mut self, fun: ReductionFunc) -> Option<Self::Item> {
+         match fun {
+             ReductionFunc::Min => self.reduce(f64::min),
+             ReductionFunc::Max => self.reduce(f64::max),

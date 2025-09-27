@@ -1,0 +1,24 @@
+--- git_perf/src/reporting.rs
++++ replace PlotlyReporter::convert_to_x_y -> (Vec<usize>, Vec<f64>) with (vec![0], vec![-1.0])
+@@ -48,20 +48,17 @@
+     fn new() -> PlotlyReporter {
+         let config = Configuration::default().responsive(true).fill_frame(true);
+         let mut plot = Plot::new();
+         plot.set_configuration(config);
+         PlotlyReporter { plot, size: 0 }
+     }
+ 
+     fn convert_to_x_y(&self, indexed_measurements: Vec<(usize, f64)>) -> (Vec<usize>, Vec<f64>) {
+-        indexed_measurements
+-            .iter()
+-            .map(|(i, m)| (self.size - i - 1, m))
+-            .unzip()
++        (vec![0], vec![-1.0]) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ impl<'a> Reporter<'a> for PlotlyReporter {
+     fn add_commits(&mut self, commits: &'a [Commit]) {
+         let enumerated_commits = commits.iter().rev().enumerate();
+         self.size = commits.len();
+ 

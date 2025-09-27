@@ -1,0 +1,59 @@
+--- git_perf/src/git/git_interop.rs
++++ replace raw_prune -> Result<(), GitError> with Ok(())
+@@ -597,55 +597,17 @@
+         }
+         ::backoff::Error::Transient { err, .. } => anyhow!(err).context("Timed out pushing refs"),
+     })?;
+ 
+     Ok(())
+ }
+ 
+ fn raw_prune() -> Result<(), GitError> {
+-    if is_shallow_repo()? {
+-        return Err(GitError::ShallowRepository);
+-    }
+-
+-    // TODO(kaihowl) code duplication with remove_measurements_from_commits
+-
+-    // - update local upstream from remote
+-    pull_internal(None)?;
+-
+-    // - create temp branch for pruning and set to current upstream
+-    let current_notes_head = git_rev_parse(REFS_NOTES_BRANCH)?;
+-    let target = create_temp_rewrite_head(&current_notes_head)?;
+-
+-    // - invoke prune
+-    capture_git_output(&["notes", "--ref", &target, "prune"], &None)?;
+-
+-    // - compact the new head
+-    compact_head(&target)?;
+-
+-    // TODO(kaihowl) add additional test coverage checking that the head has been compacted
+-    // / elements are dropped
+-
+-    // - CAS remote upstream
+-    git_push_notes_ref(&current_notes_head, &target, &None)?;
+-    git_update_ref(unindent(
+-        format!(
+-            r#"
+-            start
+-            update {REFS_NOTES_BRANCH} {target}
+-            commit
+-            "#
+-        )
+-        .as_str(),
+-    ))?;
+-
+-    // - clean up temp branch
+-    remove_reference(&target)?;
+-
+-    Ok(())
++    Ok(()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
+     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
+     args.extend(additional_args.iter().map(|s| s.as_str()));
+ 
+     let output = capture_git_output(&args, &None)?;
+     Ok(output

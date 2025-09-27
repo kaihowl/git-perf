@@ -1,0 +1,23 @@
+--- git_perf/src/config.rs
++++ replace read_config_from_file -> Result<String> with Ok("xyzzy".into())
+@@ -112,19 +112,17 @@
+     if path.is_file() {
+         Some(path)
+     } else {
+         None
+     }
+ }
+ 
+ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
+-    let mut conf_str = String::new();
+-    StdFile::open(file)?.read_to_string(&mut conf_str)?;
+-    Ok(conf_str)
++    Ok("xyzzy".into()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
+     let config = read_hierarchical_config()
+         .map_err(|e| {
+             // Log the error but don't fail - this is expected when no config exists
+             log::debug!("Could not read hierarchical config: {}", e);
+         })

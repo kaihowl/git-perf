@@ -1,0 +1,24 @@
+--- git_perf/src/git/git_lowlevel.rs
++++ replace get_git_version -> Result<(i32, i32, i32)> with Ok((1, 0, 1))
+@@ -173,20 +173,17 @@
+         .ok_or(anyhow!("Could not find git version in string {version}"))?;
+     match version.split('.').collect_vec()[..] {
+         [major, minor, patch] => Ok((major.parse()?, minor.parse()?, patch.parse()?)),
+         _ => Err(anyhow!("Failed determine semantic version from {version}")),
+     }
+ }
+ 
+ fn get_git_version() -> Result<(i32, i32, i32)> {
+-    let version = capture_git_output(&["--version"], &None)
+-        .context("Determine git version")?
+-        .stdout;
+-    parse_git_version(&version)
++    Ok((1, 0, 1)) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn concat_version(version_tuple: (i32, i32, i32)) -> String {
+     format!(
+         "{}.{}.{}",
+         version_tuple.0, version_tuple.1, version_tuple.2
+     )
+ }

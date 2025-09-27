@@ -1,0 +1,21 @@
+--- git_perf/src/git/git_interop.rs
++++ replace && with || in raw_push
+@@ -512,17 +512,17 @@
+     //     - Relies on unrelated histories, cat_sort_uniq merge strategy
+     //     - Allows to cut off the history on upstream periodically
+     // NEW
+     // - Note down the current upstream perf ref oid
+     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
+     let refs =
+         consolidate_write_branches_into(&current_upstream_oid, &merge_ref, Some(&new_write_ref))?;
+ 
+-    if refs.is_empty() && current_upstream_oid == EMPTY_OID {
++    if refs.is_empty() || /* ~ changed by cargo-mutants ~ */ current_upstream_oid == EMPTY_OID {
+         return Err(GitError::MissingMeasurements);
+     }
+ 
+     git_push_notes_ref(&current_upstream_oid, &merge_ref, &work_dir)?;
+ 
+     // It is acceptable to fetch here independent of the push. Only one concurrent push will succeed.
+     fetch(None)?;
+ 

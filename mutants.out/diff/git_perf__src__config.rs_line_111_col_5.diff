@@ -1,0 +1,26 @@
+--- git_perf/src/config.rs
++++ replace find_config_path -> Option<PathBuf> with Some(Default::default())
+@@ -103,22 +103,17 @@
+         );
+     }
+ 
+     builder.build()
+ }
+ 
+ fn find_config_path() -> Option<PathBuf> {
+     // Use get_main_config_path but handle errors gracefully
+-    let path = get_main_config_path().ok()?;
+-    if path.is_file() {
+-        Some(path)
+-    } else {
+-        None
+-    }
++    Some(Default::default()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
+     let mut conf_str = String::new();
+     StdFile::open(file)?.read_to_string(&mut conf_str)?;
+     Ok(conf_str)
+ }
+ 

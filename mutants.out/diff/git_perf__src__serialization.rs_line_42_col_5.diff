@@ -1,0 +1,105 @@
+--- git_perf/src/serialization.rs
++++ replace deserialize_single -> Option<MeasurementData> with Some(Default::default())
+@@ -34,101 +34,17 @@
+ pub fn serialize_multiple<M: Borrow<MeasurementData>>(measurement_data: &[M]) -> String {
+     measurement_data
+         .iter()
+         .map(|md| serialize_single(md, DELIMITER))
+         .join("")
+ }
+ 
+ fn deserialize_single(line: &str) -> Option<MeasurementData> {
+-    let components = line
+-        .split(DELIMITER)
+-        .filter(|item| !item.is_empty())
+-        .collect_vec();
+-
+-    let num_components = components.len();
+-    if num_components < 4 {
+-        warn!("Too few items with {num_components}, skipping record");
+-        return None;
+-    }
+-
+-    let epoch = components[0];
+-    let epoch = match epoch.parse::<u32>() {
+-        Ok(e) => e,
+-        Err(err) => {
+-            warn!("Cannot parse epoch '{epoch}': {err}, skipping record");
+-            return None;
+-        }
+-    };
+-
+-    let name = components[1].to_string();
+-
+-    let timestamp = components[2];
+-    let timestamp = match timestamp.parse::<f64>() {
+-        Ok(ts) => ts,
+-        Err(err) => {
+-            warn!("Cannot parse timestamp '{timestamp}': {err}, skipping record");
+-            return None;
+-        }
+-    };
+-
+-    let val = components[3];
+-    let val = match val.parse::<f64>() {
+-        Ok(val) => val,
+-        Err(err) => {
+-            warn!("Cannot parse value '{val}': {err}, skipping record");
+-            return None;
+-        }
+-    };
+-
+-    let mut key_values = HashMap::new();
+-
+-    if components.len() > 4 {
+-        for kv in components.iter().skip(4) {
+-            if let Some((key, value)) = kv.split_once('=') {
+-                let entry = key_values.entry(key.to_string());
+-                let value = value.to_string();
+-                match entry {
+-                    Occupied(mut e) => {
+-                        if e.get() == &value {
+-                            static DUPLICATE_KEY_SAME_VALUE: std::sync::Once =
+-                                std::sync::Once::new();
+-                            DUPLICATE_KEY_SAME_VALUE.call_once(|| {
+-                                warn!("Duplicate entries for key {key} with same value");
+-                            });
+-                        } else {
+-                            static DUPLICATE_KEY_CONFLICT: std::sync::Once = std::sync::Once::new();
+-                            DUPLICATE_KEY_CONFLICT.call_once(|| {
+-                                warn!(
+-                                    "Conflicting values for key {key}: '{}' vs '{}'",
+-                                    e.get(),
+-                                    value
+-                                );
+-                            });
+-                        }
+-                        e.insert(value);
+-                    }
+-                    Vacant(e) => {
+-                        e.insert(value);
+-                    }
+-                }
+-            } else {
+-                warn!("No equals sign in key value pair, skipping record");
+-                return None;
+-            }
+-        }
+-    }
+-
+-    Some(MeasurementData {
+-        epoch,
+-        name,
+-        timestamp,
+-        val,
+-        key_values,
+-    })
++    Some(Default::default()) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ pub fn deserialize(lines: &str) -> Vec<MeasurementData> {
+     lines
+         .lines()
+         .filter(|l| !l.trim().is_empty())
+         .filter_map(deserialize_single)
+         .collect_vec()

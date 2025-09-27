@@ -1,0 +1,21 @@
+--- git_perf/src/audit.rs
++++ replace < with > in audit
+@@ -148,17 +148,17 @@
+ 
+     // Calculate relative deviation of HEAD measurement using tail median
+     let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
+ 
+     // Check if we have a minimum relative deviation threshold configured
+     let min_relative_deviation = config::audit_min_relative_deviation(measurement);
+     let threshold_applied = min_relative_deviation.is_some();
+     let passed_due_to_threshold = min_relative_deviation
+-        .map(|threshold| head_relative_deviation < threshold)
++        .map(|threshold| head_relative_deviation > /* ~ changed by cargo-mutants ~ */ threshold)
+         .unwrap_or(false);
+ 
+     let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
+     let z_score_display = format_z_score_display(z_score);
+ 
+     let method_name = match dispersion_method {
+         DispersionMethod::StandardDeviation => "stddev",
+         DispersionMethod::MedianAbsoluteDeviation => "mad",
