@@ -1,5 +1,5 @@
 test_tool = "nextest"
 exclude_globs = ["examples/**", "benches/**"]
-skip_calls = ["run_slow_bash_tests_with_binary"]
+additional_cargo_test_args = ["--skip", "slow"]
 timeout_multiplier = 2.0
 minimum_test_timeout = 60
