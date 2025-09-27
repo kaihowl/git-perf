@@ -1,4 +1,5 @@
 test_tool = "nextest"
-exclude_globs = ["examples/**", "benches/**", "git_perf/tests/bash_tests.rs"]
+exclude_globs = ["examples/**", "benches/**"]
+skip_calls = ["run_slow_bash_tests_with_binary"]
 timeout_multiplier = 2.0
 minimum_test_timeout = 60
