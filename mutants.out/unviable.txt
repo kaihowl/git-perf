@@ -1,6 +1,0 @@
-git_perf/src/git/git_lowlevel.rs:60:5: replace feed_git_command -> Result<GitOutput, GitError> with Ok(Default::default())
-git_perf/src/serialization.rs:42:5: replace deserialize_single -> Option<MeasurementData> with Some(Default::default())
-cli_types/src/lib.rs:272:5: replace parse_datetime_value -> Result<DateTime<Utc>> with Ok(DateTime::from_iter([Default::default()]))
-cli_types/src/lib.rs:29:9: replace <impl FromStr for DispersionMethod>::from_str -> Result<Self, Self::Err> with Ok(Default::default())
-git_perf/src/serialization.rs:130:5: replace deserialize -> Vec<MeasurementData> with vec![Default::default()]
-git_perf/src/git/git_interop.rs:685:5: replace update_read_branch -> Result<TempRef, GitError> with Ok(Default::default())
