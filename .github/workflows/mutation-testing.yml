@@ -134,8 +134,12 @@ jobs:
         echo "🔍 Checking for mutation report in: $(pwd)"
         ls -la mutation* 2>/dev/null || echo "No mutation files found"
 
-        if [ ! -f mutation-report.json ]; then
-          echo "❌ ERROR: Mutation testing report (mutation-report.json) not found!"
+        # Cargo-mutants creates a directory with --output, not a single file
+        # The actual results are in mutation-report.json/mutants.out/outcomes.json
+        report_file="mutation-report.json/mutants.out/outcomes.json"
+
+        if [ ! -f "$report_file" ]; then
+          echo "❌ ERROR: Mutation testing outcomes file ($report_file) not found!"
           echo "This usually means cargo-mutants failed to complete successfully."
           echo "Check the previous step logs for cargo-mutants error messages."
 
@@ -146,15 +150,19 @@ jobs:
             exit 1
           else
             echo "This was not a config error - creating minimal report."
-            echo '{"summary":{"total_mutants":0,"caught":0,"missed":0,"timeout":0}}' > mutation-report.json
+            mkdir -p mutation-report.json/mutants.out
+            echo '{"summary":{"total_mutants":0,"caught":0,"missed":0,"timeout":0}}' > "$report_file"
           fi
         fi
 
         # Validate JSON structure
-        if ! jq empty mutation-report.json 2>/dev/null; then
+        if ! jq empty "$report_file" 2>/dev/null; then
           echo "❌ ERROR: Mutation testing report is not valid JSON!"
           exit 1
         fi
+
+        # Copy the outcomes file to a flat file for easier processing
+        cp "$report_file" mutation-report-outcomes.json
 
         echo "## Mutation Testing Results" > mutation-summary.md
         echo "" >> mutation-summary.md
@@ -168,10 +176,10 @@ jobs:
         esac
 
         # Extract key metrics from the JSON report
-        total_mutants=$(jq '.summary.total_mutants // 0' mutation-report.json)
-        caught_mutants=$(jq '.summary.caught // 0' mutation-report.json)
-        missed_mutants=$(jq '.summary.missed // 0' mutation-report.json)
-        timeout_mutants=$(jq '.summary.timeout // 0' mutation-report.json)
+        total_mutants=$(jq '.summary.total_mutants // 0' mutation-report-outcomes.json)
+        caught_mutants=$(jq '.summary.caught // 0' mutation-report-outcomes.json)
+        missed_mutants=$(jq '.summary.missed // 0' mutation-report-outcomes.json)
+        timeout_mutants=$(jq '.summary.timeout // 0' mutation-report-outcomes.json)
 
         if [ "$total_mutants" != "null" ] && [ "$total_mutants" -gt 0 ]; then
           score=$(echo "scale=2; $caught_mutants * 100 / $total_mutants" | bc -l)
@@ -198,6 +206,7 @@ jobs:
         name: mutation-testing-report-${{ github.run_number }}
         path: |
           git_perf/mutation-report.json
+          git_perf/mutation-report-outcomes.json
           git_perf/mutation-summary.md
         retention-days: 30
 
