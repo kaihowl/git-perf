@@ -134,12 +134,29 @@ jobs:
         echo "🔍 Checking for mutation report in: $(pwd)"
         ls -la mutation* 2>/dev/null || echo "No mutation files found"
 
-        # Cargo-mutants creates a directory with --output, not a single file
-        # The actual results are in mutation-report.json/mutants.out/outcomes.json
-        report_file="mutation-report.json/mutants.out/outcomes.json"
+        # Cargo-mutants creates output in different locations depending on version
+        # Try multiple possible locations for the outcomes.json file
+        possible_locations=(
+          "mutation-report.json/mutants.out/outcomes.json"
+          "mutants.out/outcomes.json"
+          "mutation-report.json/outcomes.json"
+        )
 
-        if [ ! -f "$report_file" ]; then
-          echo "❌ ERROR: Mutation testing outcomes file ($report_file) not found!"
+        report_file=""
+        for location in "${possible_locations[@]}"; do
+          if [ -f "$location" ]; then
+            report_file="$location"
+            echo "✅ Found mutation report at: $location"
+            break
+          fi
+        done
+
+        if [ -z "$report_file" ]; then
+          echo "❌ ERROR: Mutation testing outcomes file not found in any expected location!"
+          echo "Searched locations:"
+          for location in "${possible_locations[@]}"; do
+            echo "  - $location"
+          done
           echo "This usually means cargo-mutants failed to complete successfully."
           echo "Check the previous step logs for cargo-mutants error messages."
 
@@ -150,7 +167,8 @@ jobs:
             exit 1
           else
             echo "This was not a config error - creating minimal report."
-            mkdir -p mutation-report.json/mutants.out
+            mkdir -p mutants.out
+            report_file="mutants.out/outcomes.json"
             echo '{"summary":{"total_mutants":0,"caught":0,"missed":0,"timeout":0}}' > "$report_file"
           fi
         fi
