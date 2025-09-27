@@ -1,4 +1,4 @@
 test_tool = "nextest"
-skip = ["examples", "benches"]
-timeout = 60
-jobs = 4
+exclude_globs = ["examples/**", "benches/**"]
+timeout_multiplier = 2.0
+minimum_test_timeout = 60
