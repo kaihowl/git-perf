@@ -90,8 +90,8 @@ jobs:
           module_name=$(basename "$file" .rs)
           echo "Testing module: $module_name"
 
-          # Run mutation testing on specific module (nextest configured in Cargo.toml)
-          cargo mutants --file "src/$file" --output "${module_name}-mutation.json" --timeout 30
+          # Run mutation testing on specific module with nextest
+          cargo mutants --test-tool=nextest --file "src/$file" --output "${module_name}-mutation.json" --timeout 30
 
           # Check mutation score against targets
           if [ -f "${module_name}-mutation.json" ]; then

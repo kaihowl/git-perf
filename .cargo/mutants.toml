@@ -1,0 +1,4 @@
+test_tool = "nextest"
+skip = ["examples", "benches"]
+timeout = 60
+jobs = 4

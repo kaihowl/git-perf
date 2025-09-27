@@ -63,8 +63,3 @@ name = "add"
 harness = false
 path = "benches/add.rs"
 
-[package.metadata.mutants]
-skip = ["examples", "benches"]
-timeout = 60
-jobs = 4
-test_tool = "nextest"

@@ -80,8 +80,8 @@ jobs:
       run: |
         set -euo pipefail
         cd git_perf
-        # Run mutation testing (nextest configured in Cargo.toml)
-        cargo mutants --output mutation-report.json --jobs 4 --timeout 60
+        # Run mutation testing with nextest
+        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 4 --timeout 60
       continue-on-error: true
 
     - name: Generate mutation report summary
