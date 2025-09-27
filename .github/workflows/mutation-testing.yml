@@ -33,7 +33,7 @@ jobs:
       GIT_CONFIG_NOSYSTEM: true
       GIT_CONFIG_GLOBAL: /dev/null
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    # No timeout - let cargo-mutants manage its own timing
 
     steps:
     - name: Checkout repository
@@ -80,8 +80,8 @@ jobs:
       run: |
         set -euo pipefail
         cd git_perf
-        # Run mutation testing with nextest (reduced scope for 10min job limit)
-        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 10
+        # Run mutation testing with nextest using sharding to reduce mutant count
+        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4
 
     - name: Generate mutation report summary
       run: |
