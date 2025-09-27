@@ -1,3 +1,7 @@
 # Added by cargo
 
 /target
+
+# Mutation testing artifacts
+/mutants.out
+/mutants.out.old
