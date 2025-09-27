@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.1.1...git_perf_cli_types-v0.2.0) - 2025-09-27
+
+### Added
+
+- [**breaking**] Fix global settings inconsistency ([#292](https://github.com/kaihowl/git-perf/pull/292))
+- MAD dispersion method ([#261](https://github.com/kaihowl/git-perf/pull/261))
+
+### Other
+
+- Simplify manpage versioning ([#291](https://github.com/kaihowl/git-perf/pull/291))
+- Add MAD dispersion method documentation and improve CLI help ([#272](https://github.com/kaihowl/git-perf/pull/272))
+
 ## [0.1.1](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.1.0...git_perf_cli_types-v0.1.1) - 2025-08-23
 
 ### Added

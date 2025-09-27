@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.2...git-perf-v0.18.0) - 2025-09-27
+
+### Added
+
+- [**breaking**] Fix global settings inconsistency ([#292](https://github.com/kaihowl/git-perf/pull/292))
+- implement summarize measurement for csv  ([#276](https://github.com/kaihowl/git-perf/pull/276))
+- MAD dispersion method ([#261](https://github.com/kaihowl/git-perf/pull/261))
+
+### Fixed
+
+- *(config)* ensure non-inline tables are created in empty config files ([#306](https://github.com/kaihowl/git-perf/pull/306))
+- *(audit)* add measurement name header for insufficient data messages and include tests ([#300](https://github.com/kaihowl/git-perf/pull/300))
+- only show finite z-scores ([#259](https://github.com/kaihowl/git-perf/pull/259))
+
+### Other
+
+- *(git_interop)* abstract common git notes operations into execute_notes_operation ([#312](https://github.com/kaihowl/git-perf/pull/312))
+- remove outdated TODO #96 comment about no-separator option ([#308](https://github.com/kaihowl/git-perf/pull/308))
+- *(git)* update minimum git version to 2.46.0 with explanation ([#307](https://github.com/kaihowl/git-perf/pull/307))
+- Remove deprecated TODOs and clean up test scripts ([#295](https://github.com/kaihowl/git-perf/pull/295))
+- *(config)* implement hierarchical configuration system ([#287](https://github.com/kaihowl/git-perf/pull/287))
+- Simplify manpage versioning ([#291](https://github.com/kaihowl/git-perf/pull/291))
+- migrate to nextest ([#280](https://github.com/kaihowl/git-perf/pull/280))
+- proper version check for manpage docs ([#286](https://github.com/kaihowl/git-perf/pull/286))
+- MAD documentation ([#263](https://github.com/kaihowl/git-perf/pull/263))
+- manpage generation with clap_markdown ([#269](https://github.com/kaihowl/git-perf/pull/269))
+- Add MAD dispersion method documentation and improve CLI help ([#272](https://github.com/kaihowl/git-perf/pull/272))
+
 ## [0.17.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.1...git-perf-v0.17.2) - 2025-08-23
 
 ### Added
