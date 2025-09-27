@@ -1,0 +1,269 @@
+name: Mutation Testing
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  # Allow manual triggering
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-testing-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  mutation-testing:
+    name: Mutation Testing
+    env:
+      # Emit backtraces on panics (matching main CI)
+      RUST_BACKTRACE: 1
+      # Git author/committer for hermetic test environment
+      GIT_AUTHOR_NAME: testuser
+      GIT_AUTHOR_EMAIL: testuser@example.com
+      GIT_COMMITTER_NAME: testuser
+      GIT_COMMITTER_EMAIL: testuser@example.com
+      # Hermetic git config
+      GIT_CONFIG_NOSYSTEM: true
+      GIT_CONFIG_GLOBAL: /dev/null
+    runs-on: ubuntu-22.04
+    # No timeout - let cargo-mutants manage its own timing
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 40
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
+    - name: Install libfaketime
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install libfaketime
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-mutation-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-mutation-
+          ${{ runner.os }}-cargo-
+
+    - name: Install nextest
+      run: cargo install cargo-nextest --locked
+
+    - name: Install cargo-mutants
+      run: |
+        set -euo pipefail
+        cargo install cargo-mutants --version 25.3.1 --force
+
+    - name: Run mutation testing
+      run: |
+        set -euo pipefail
+        cd git_perf
+        # Run mutation testing with nextest using sharding to reduce mutant count
+        # Exit codes: 0=success, 1=usage error, 2=missed mutants, 3=timeouts, 4=baseline fail, 5-6=diff issues, 70=internal error
+        # Only fail hard on config/setup errors (1,4,5,6,70), accept missed mutants (2) and timeouts (3)
+
+        # Debug current directory and list files before running
+        echo "🔍 Current working directory: $(pwd)"
+        echo "🔍 Files before mutation testing:"
+        ls -la
+
+        # Temporarily disable exit-on-error to capture exit code
+        set +e
+        echo "🚀 Starting mutation testing with command:"
+        echo "cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4"
+        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4
+        exit_code=$?
+        set -e
+
+        # Debug files after running
+        echo "🔍 Files after mutation testing:"
+        ls -la
+        echo "🔍 Looking for any JSON files:"
+        find . -name "*.json" -type f 2>/dev/null || echo "No JSON files found"
+
+        # Store exit code for later steps
+        echo "MUTANTS_EXIT_CODE=$exit_code" >> $GITHUB_ENV
+        echo "📊 Cargo-mutants exit code: $exit_code"
+
+        # Fail hard only on config/setup errors
+        case $exit_code in
+          0) echo "✅ All mutants caught by tests" ;;
+          2) echo "⚠️  Some mutants not covered by tests (acceptable)" ;;
+          3) echo "⚠️  Some tests timed out (acceptable)" ;;
+          1|4|5|6|70)
+            echo "❌ Configuration or setup error (exit code $exit_code)"
+            exit $exit_code
+            ;;
+          *)
+            echo "❌ Unexpected exit code: $exit_code"
+            exit $exit_code
+            ;;
+        esac
+
+    - name: Generate mutation report summary
+      run: |
+        set -euo pipefail
+        cd git_perf
+
+        # Get the exit code from the previous step
+        exit_code=${MUTANTS_EXIT_CODE:-0}
+
+        # Check if mutation report exists and is valid
+        echo "🔍 Checking for mutation report in: $(pwd)"
+        ls -la mutation* 2>/dev/null || echo "No mutation files found"
+
+        # Cargo-mutants creates output in different locations depending on version
+        # Try multiple possible locations for the outcomes.json file
+        possible_locations=(
+          "mutation-report.json/mutants.out/outcomes.json"
+          "mutants.out/outcomes.json"
+          "mutation-report.json/outcomes.json"
+        )
+
+        report_file=""
+        for location in "${possible_locations[@]}"; do
+          if [ -f "$location" ]; then
+            report_file="$location"
+            echo "✅ Found mutation report at: $location"
+            break
+          fi
+        done
+
+        if [ -z "$report_file" ]; then
+          echo "❌ ERROR: Mutation testing outcomes file not found in any expected location!"
+          echo "Searched locations:"
+          for location in "${possible_locations[@]}"; do
+            echo "  - $location"
+          done
+          echo "This usually means cargo-mutants failed to complete successfully."
+          echo "Check the previous step logs for cargo-mutants error messages."
+
+          # Only fail if this was a config error (should have been caught in previous step)
+          exit_code=${MUTANTS_EXIT_CODE:-0}
+          if [ "$exit_code" -eq 1 ] || [ "$exit_code" -eq 4 ] || [ "$exit_code" -eq 5 ] || [ "$exit_code" -eq 6 ] || [ "$exit_code" -eq 70 ]; then
+            echo "This was a configuration error - failing hard."
+            exit 1
+          else
+            echo "This was not a config error - creating minimal report."
+            mkdir -p mutants.out
+            report_file="mutants.out/outcomes.json"
+            echo '{"summary":{"total_mutants":0,"caught":0,"missed":0,"timeout":0}}' > "$report_file"
+          fi
+        fi
+
+        # Validate JSON structure
+        if ! jq empty "$report_file" 2>/dev/null; then
+          echo "❌ ERROR: Mutation testing report is not valid JSON!"
+          exit 1
+        fi
+
+        # Copy the outcomes file to a flat file for easier processing
+        cp "$report_file" mutation-report-outcomes.json
+
+        echo "## Mutation Testing Results" > mutation-summary.md
+        echo "" >> mutation-summary.md
+
+        # Add exit code context
+        case $exit_code in
+          0) echo "- **Status:** ✅ All mutants caught" >> mutation-summary.md ;;
+          2) echo "- **Status:** ⚠️  Some mutants missed (acceptable)" >> mutation-summary.md ;;
+          3) echo "- **Status:** ⚠️  Some tests timed out (acceptable)" >> mutation-summary.md ;;
+          *) echo "- **Status:** ❌ Error (exit code $exit_code)" >> mutation-summary.md ;;
+        esac
+
+        # Extract key metrics from the JSON report
+        total_mutants=$(jq '.summary.total_mutants // 0' mutation-report-outcomes.json)
+        caught_mutants=$(jq '.summary.caught // 0' mutation-report-outcomes.json)
+        missed_mutants=$(jq '.summary.missed // 0' mutation-report-outcomes.json)
+        timeout_mutants=$(jq '.summary.timeout // 0' mutation-report-outcomes.json)
+
+        if [ "$total_mutants" != "null" ] && [ "$total_mutants" -gt 0 ]; then
+          score=$(echo "scale=2; $caught_mutants * 100 / $total_mutants" | bc -l)
+          echo "- **Total Mutants:** $total_mutants" >> mutation-summary.md
+          echo "- **Caught:** $caught_mutants" >> mutation-summary.md
+          echo "- **Missed:** $missed_mutants" >> mutation-summary.md
+          echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
+          echo "- **Mutation Score:** ${score}%" >> mutation-summary.md
+
+          echo "✅ Mutation testing completed with $total_mutants mutants tested (exit code $exit_code)."
+        else
+          echo "❌ ERROR: No valid mutation results in report!"
+          echo "- **Status:** No mutation results available" >> mutation-summary.md
+          exit 1
+        fi
+
+        echo "" >> mutation-summary.md
+        echo "Full report available in artifacts." >> mutation-summary.md
+
+    - name: Upload mutation testing artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: mutation-testing-report-${{ github.run_number }}
+        path: |
+          git_perf/mutation-report.json
+          git_perf/mutation-report-outcomes.json
+          git_perf/mutation-summary.md
+        retention-days: 30
+
+    - name: Comment mutation results on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = './git_perf/mutation-summary.md';
+
+          if (fs.existsSync(path)) {
+            const summary = fs.readFileSync(path, 'utf8');
+
+            // Find existing mutation testing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes('Mutation Testing Results'));
+
+            const body = `${summary}\n\n<!-- mutation-testing-comment -->`;
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+          }
