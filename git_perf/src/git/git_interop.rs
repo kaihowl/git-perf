@@ -299,18 +299,16 @@ pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()>
     Ok(())
 }
 
-fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(), GitError> {
-    // 1. pull
-    // 2. remove measurements
-    // 3. compact
-    // 4. try to push
-    fetch(None)?;
+fn execute_notes_operation<F>(operation: F) -> Result<(), GitError>
+where
+    F: FnOnce(&str) -> Result<(), GitError>,
+{
+    pull_internal(None)?;
 
     let current_notes_head = git_rev_parse(REFS_NOTES_BRANCH)?;
-
     let target = create_temp_rewrite_head(&current_notes_head)?;
 
-    remove_measurements_from_reference(&target, older_than)?;
+    operation(&target)?;
 
     compact_head(&target)?;
 
@@ -327,10 +325,13 @@ fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(),
         .as_str(),
     ))?;
 
-    // Delete target
     remove_reference(&target)?;
 
     Ok(())
+}
+
+fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(), GitError> {
+    execute_notes_operation(|target| remove_measurements_from_reference(target, older_than))
 }
 
 // Remove notes pertaining to git commits whose commit date is older than specified.
@@ -595,41 +596,9 @@ fn raw_prune() -> Result<(), GitError> {
         return Err(GitError::ShallowRepository);
     }
 
-    // TODO(kaihowl) code duplication with remove_measurements_from_commits
-
-    // - update local upstream from remote
-    pull_internal(None)?;
-
-    // - create temp branch for pruning and set to current upstream
-    let current_notes_head = git_rev_parse(REFS_NOTES_BRANCH)?;
-    let target = create_temp_rewrite_head(&current_notes_head)?;
-
-    // - invoke prune
-    capture_git_output(&["notes", "--ref", &target, "prune"], &None)?;
-
-    // - compact the new head
-    compact_head(&target)?;
-
-    // TODO(kaihowl) add additional test coverage checking that the head has been compacted
-    // / elements are dropped
-
-    // - CAS remote upstream
-    git_push_notes_ref(&current_notes_head, &target, &None)?;
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            update {REFS_NOTES_BRANCH} {target}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
-
-    // - clean up temp branch
-    remove_reference(&target)?;
-
-    Ok(())
+    execute_notes_operation(|target| {
+        capture_git_output(&["notes", "--ref", target, "prune"], &None).map(|_| ())
+    })
 }
 
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
