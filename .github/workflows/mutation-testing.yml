@@ -41,12 +41,6 @@ jobs:
       with:
         fetch-depth: 40
 
-    - name: Set Git user and email
-      run: |
-        set -euo pipefail
-        git config --global user.name "GitHub Actions Bot"
-        git config --global user.email "actions@github.com"
-
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
