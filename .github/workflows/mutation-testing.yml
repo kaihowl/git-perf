@@ -33,7 +33,7 @@ jobs:
       GIT_CONFIG_NOSYSTEM: true
       GIT_CONFIG_GLOBAL: /dev/null
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 10
 
     steps:
     - name: Checkout repository
@@ -80,42 +80,53 @@ jobs:
       run: |
         set -euo pipefail
         cd git_perf
-        # Run mutation testing with nextest
-        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 4 --timeout 60
-      continue-on-error: true
+        # Run mutation testing with nextest (reduced timeout for 10min job limit)
+        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 4 --timeout 15
 
     - name: Generate mutation report summary
       run: |
         set -euo pipefail
         cd git_perf
-        if [ -f mutation-report.json ]; then
-          echo "## Mutation Testing Results" > mutation-summary.md
-          echo "" >> mutation-summary.md
 
-          # Extract key metrics from the JSON report
-          total_mutants=$(jq '.summary.total_mutants // 0' mutation-report.json)
-          caught_mutants=$(jq '.summary.caught // 0' mutation-report.json)
-          missed_mutants=$(jq '.summary.missed // 0' mutation-report.json)
-          timeout_mutants=$(jq '.summary.timeout // 0' mutation-report.json)
-
-          if [ "$total_mutants" != "null" ] && [ "$total_mutants" -gt 0 ]; then
-            score=$(echo "scale=2; $caught_mutants * 100 / $total_mutants" | bc -l)
-            echo "- **Total Mutants:** $total_mutants" >> mutation-summary.md
-            echo "- **Caught:** $caught_mutants" >> mutation-summary.md
-            echo "- **Missed:** $missed_mutants" >> mutation-summary.md
-            echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
-            echo "- **Mutation Score:** ${score}%" >> mutation-summary.md
-          else
-            echo "- **Status:** No mutation results available" >> mutation-summary.md
-          fi
-
-          echo "" >> mutation-summary.md
-          echo "Full report available in artifacts." >> mutation-summary.md
-        else
-          echo "## Mutation Testing Results" > mutation-summary.md
-          echo "" >> mutation-summary.md
-          echo "- **Status:** Mutation testing failed to generate report" >> mutation-summary.md
+        # Check if mutation report exists and is valid
+        if [ ! -f mutation-report.json ]; then
+          echo "❌ ERROR: Mutation testing report (mutation-report.json) not found!"
+          echo "Mutation testing must generate a report for the job to pass."
+          exit 1
         fi
+
+        # Validate JSON structure
+        if ! jq empty mutation-report.json 2>/dev/null; then
+          echo "❌ ERROR: Mutation testing report is not valid JSON!"
+          exit 1
+        fi
+
+        echo "## Mutation Testing Results" > mutation-summary.md
+        echo "" >> mutation-summary.md
+
+        # Extract key metrics from the JSON report
+        total_mutants=$(jq '.summary.total_mutants // 0' mutation-report.json)
+        caught_mutants=$(jq '.summary.caught // 0' mutation-report.json)
+        missed_mutants=$(jq '.summary.missed // 0' mutation-report.json)
+        timeout_mutants=$(jq '.summary.timeout // 0' mutation-report.json)
+
+        if [ "$total_mutants" != "null" ] && [ "$total_mutants" -gt 0 ]; then
+          score=$(echo "scale=2; $caught_mutants * 100 / $total_mutants" | bc -l)
+          echo "- **Total Mutants:** $total_mutants" >> mutation-summary.md
+          echo "- **Caught:** $caught_mutants" >> mutation-summary.md
+          echo "- **Missed:** $missed_mutants" >> mutation-summary.md
+          echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
+          echo "- **Mutation Score:** ${score}%" >> mutation-summary.md
+
+          echo "✅ Mutation testing completed successfully with $total_mutants mutants tested."
+        else
+          echo "❌ ERROR: No valid mutation results in report!"
+          echo "- **Status:** No mutation results available" >> mutation-summary.md
+          exit 1
+        fi
+
+        echo "" >> mutation-summary.md
+        echo "Full report available in artifacts." >> mutation-summary.md
 
     - name: Upload mutation testing artifacts
       uses: actions/upload-artifact@v4
