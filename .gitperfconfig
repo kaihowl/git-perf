@@ -1,1 +1,9 @@
-measurement = { report-size = { epoch = "f3709134" } , report = { epoch = "fe6d0205" } , test-measure2 = { epoch = "b5f56987" } }
+[measurement."report-size"]
+epoch = "f3709134"
+min_relative_deviation = 10.0
+
+[measurement."report"]
+epoch = "fe6d0205"
+
+[measurement."test-measure2"]
+epoch = "b5f56987"
