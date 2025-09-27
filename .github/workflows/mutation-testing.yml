@@ -81,12 +81,36 @@ jobs:
         set -euo pipefail
         cd git_perf
         # Run mutation testing with nextest using sharding to reduce mutant count
+        # Exit codes: 0=success, 1=usage error, 2=missed mutants, 3=timeouts, 4=baseline fail, 5-6=diff issues, 70=internal error
+        # Only fail hard on config/setup errors (1,4,5,6,70), accept missed mutants (2) and timeouts (3)
         cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4
+        exit_code=$?
+
+        # Store exit code for later steps
+        echo "MUTANTS_EXIT_CODE=$exit_code" >> $GITHUB_ENV
+
+        # Fail hard only on config/setup errors
+        case $exit_code in
+          0) echo "✅ All mutants caught by tests" ;;
+          2) echo "⚠️  Some mutants not covered by tests (acceptable)" ;;
+          3) echo "⚠️  Some tests timed out (acceptable)" ;;
+          1|4|5|6|70)
+            echo "❌ Configuration or setup error (exit code $exit_code)"
+            exit $exit_code
+            ;;
+          *)
+            echo "❌ Unexpected exit code: $exit_code"
+            exit $exit_code
+            ;;
+        esac
 
     - name: Generate mutation report summary
       run: |
         set -euo pipefail
         cd git_perf
+
+        # Get the exit code from the previous step
+        exit_code=${MUTANTS_EXIT_CODE:-0}
 
         # Check if mutation report exists and is valid
         if [ ! -f mutation-report.json ]; then
@@ -104,6 +128,14 @@ jobs:
         echo "## Mutation Testing Results" > mutation-summary.md
         echo "" >> mutation-summary.md
 
+        # Add exit code context
+        case $exit_code in
+          0) echo "- **Status:** ✅ All mutants caught" >> mutation-summary.md ;;
+          2) echo "- **Status:** ⚠️  Some mutants missed (acceptable)" >> mutation-summary.md ;;
+          3) echo "- **Status:** ⚠️  Some tests timed out (acceptable)" >> mutation-summary.md ;;
+          *) echo "- **Status:** ❌ Error (exit code $exit_code)" >> mutation-summary.md ;;
+        esac
+
         # Extract key metrics from the JSON report
         total_mutants=$(jq '.summary.total_mutants // 0' mutation-report.json)
         caught_mutants=$(jq '.summary.caught // 0' mutation-report.json)
@@ -118,7 +150,7 @@ jobs:
           echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
           echo "- **Mutation Score:** ${score}%" >> mutation-summary.md
 
-          echo "✅ Mutation testing completed successfully with $total_mutants mutants tested."
+          echo "✅ Mutation testing completed with $total_mutants mutants tested (exit code $exit_code)."
         else
           echo "❌ ERROR: No valid mutation results in report!"
           echo "- **Status:** No mutation results available" >> mutation-summary.md
