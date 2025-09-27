@@ -3,5 +3,5 @@
 /target
 
 # Mutation testing artifacts
-/mutants.out
-/mutants.out.old
+mutants.out/
+mutants.out.old/

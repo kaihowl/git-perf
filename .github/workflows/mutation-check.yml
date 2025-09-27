@@ -91,7 +91,7 @@ jobs:
           echo "Testing module: $module_name"
 
           # Run mutation testing on specific module with nextest
-          cargo mutants --test-tool=nextest --file "src/$file" --output "${module_name}-mutation.json" --timeout 15
+          cargo mutants --test-tool=nextest --file "src/$file" --output "${module_name}-mutation.json" --timeout 10 --jobs 1
 
           # Check mutation score against targets
           if [ -f "${module_name}-mutation.json" ]; then
