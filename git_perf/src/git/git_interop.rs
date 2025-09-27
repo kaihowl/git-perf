@@ -111,16 +111,7 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     }
 
     capture_git_output(
-        &[
-            "notes",
-            "--ref",
-            &temp_target,
-            "append",
-            // TODO #96
-            // "--no-separator",
-            "-m",
-            line,
-        ],
+        &["notes", "--ref", &temp_target, "append", "-m", line],
         &None,
     )?;
 
