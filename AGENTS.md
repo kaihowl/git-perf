@@ -24,12 +24,12 @@ cargo fmt
 cargo clippy
 
 # Run tests (excluding slow ones)
-cargo nextest run --skip slow
+cargo nextest run -- --skip slow
 ```
 
 ## Testing Policy
 
-- **Test command**: `cargo nextest run --skip slow` (excludes slow tests)
+- **Test command**: `cargo nextest run -- --skip slow` (excludes slow tests)
 - Ensure all tests pass before submitting code
 - Use `cargo nextest run` for full test suite when needed
 - This is the standard command for CI and local pre-submit
@@ -155,7 +155,7 @@ Before submitting any code, ensure:
 
 ### Code Quality
 1. ✅ Run `cargo fmt` to format code
-2. ✅ Run `cargo nextest run --skip slow` to verify tests pass
+2. ✅ Run `cargo nextest run -- --skip slow` to verify tests pass
 3. ✅ Run `cargo clippy` for additional code quality checks
 4. ✅ Ensure all changes compile without warnings
 5. ✅ If `cli_types` changed, run `./scripts/generate-manpages.sh` and commit regenerated documentation
@@ -177,7 +177,7 @@ Before submitting any code, ensure:
 ### Final Verification Commands
 ```bash
 # Verify formatting and tests
-cargo fmt --check && cargo nextest run --skip slow && cargo clippy
+cargo fmt --check && cargo nextest run -- --skip slow && cargo clippy
 
 # Check commit message format (should show proper conventional format)
 git log --oneline -1
