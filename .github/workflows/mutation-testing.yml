@@ -83,8 +83,12 @@ jobs:
         # Run mutation testing with nextest using sharding to reduce mutant count
         # Exit codes: 0=success, 1=usage error, 2=missed mutants, 3=timeouts, 4=baseline fail, 5-6=diff issues, 70=internal error
         # Only fail hard on config/setup errors (1,4,5,6,70), accept missed mutants (2) and timeouts (3)
+
+        # Temporarily disable exit-on-error to capture exit code
+        set +e
         cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60 --shard 0/4
         exit_code=$?
+        set -e
 
         # Store exit code for later steps
         echo "MUTANTS_EXIT_CODE=$exit_code" >> $GITHUB_ENV
