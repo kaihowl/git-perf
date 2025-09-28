@@ -247,6 +247,17 @@ brew install libfaketime
 sudo apt-get install libfaketime
 ```
 
+### Development Setup
+
+For contributors, run the setup script to install development tools:
+
+```bash
+# Install cargo-nextest and other development tools
+./scripts/setup-dev-tools.sh
+```
+
+This script will install `cargo-nextest` if not already present, enabling faster test execution in your local development environment.
+
 ### Testing
 
 This project uses [nextest](https://nexte.st/) for faster, more reliable test execution.
