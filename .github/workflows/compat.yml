@@ -96,9 +96,6 @@ jobs:
       - name: Build git-perf
         run: cargo build --verbose ${{ env.TARGET_FLAGS }}
 
-      - name: Install nextest
-        run: cargo install cargo-nextest --locked
-
       - name: Run tests
         run: cargo nextest run --verbose ${{ env.TARGET_FLAGS }}
 
