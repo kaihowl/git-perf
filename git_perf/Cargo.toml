@@ -49,6 +49,7 @@ git_perf_cli_types = { version = "0.1.1", path = "../cli_types" }
 [dev-dependencies]
 tempfile = "3.3.0"
 httptest = "0.15.4"
+cargo-run-bin = "1.7"
 
 [features]
 vendored-openssl = []

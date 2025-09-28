@@ -5,6 +5,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.metadata.bin]
+cargo-nextest = { version = "0.9.104", locked = true }
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
