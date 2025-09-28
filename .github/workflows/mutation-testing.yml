@@ -4,10 +4,6 @@ on:
   # Run weekly on Sundays at 3 AM UTC
   schedule:
     - cron: '0 3 * * 0'
-  # TEMPORARY: Test the workflow on this PR
-  pull_request:
-    branches:
-      - master
   # Allow manual triggering
   workflow_dispatch:
 
