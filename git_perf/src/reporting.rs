@@ -13,10 +13,9 @@ use plotly::{
     Configuration, Layout, Plot,
 };
 
-// TODO(kaihowl) find central place for the data structures
 use crate::{
-    data::{MeasurementData, MeasurementSummary},
-    measurement_retrieval::{self, Commit, MeasurementReducer},
+    data::{Commit, MeasurementData, MeasurementSummary},
+    measurement_retrieval::{self, MeasurementReducer},
     serialization::{serialize_single, DELIMITER},
     stats::ReductionFunc,
 };
