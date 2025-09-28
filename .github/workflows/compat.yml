@@ -96,6 +96,11 @@ jobs:
       - name: Build git-perf
         run: cargo build --verbose ${{ env.TARGET_FLAGS }}
 
+      - name: Install cargo-run-bin and setup nextest
+        run: |
+          cargo install cargo-run-bin
+          cargo bin --sync-aliases
+
       - name: Run tests
         run: cargo nextest run --verbose ${{ env.TARGET_FLAGS }}
 
