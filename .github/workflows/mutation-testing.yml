@@ -202,23 +202,15 @@ jobs:
         echo "JSON keys at root level:"
         jq 'keys' mutation-report-outcomes.json 2>/dev/null || echo "Failed to parse JSON keys"
 
-        # Try to extract key metrics from different possible JSON structures
-        # First try the expected structure with .summary
-        total_mutants=$(jq '.summary.total_mutants // 0' mutation-report-outcomes.json 2>/dev/null)
-        caught_mutants=$(jq '.summary.caught // 0' mutation-report-outcomes.json 2>/dev/null)
-        missed_mutants=$(jq '.summary.missed // 0' mutation-report-outcomes.json 2>/dev/null)
-        timeout_mutants=$(jq '.summary.timeout // 0' mutation-report-outcomes.json 2>/dev/null)
+        # Extract metrics from root level (cargo-mutants actual structure)
+        total_mutants=$(jq '.total_mutants // 0' mutation-report-outcomes.json 2>/dev/null)
+        caught_mutants=$(jq '.caught // 0' mutation-report-outcomes.json 2>/dev/null)
+        missed_mutants=$(jq '.missed // 0' mutation-report-outcomes.json 2>/dev/null)
+        timeout_mutants=$(jq '.timeout // 0' mutation-report-outcomes.json 2>/dev/null)
+        unviable_mutants=$(jq '.unviable // 0' mutation-report-outcomes.json 2>/dev/null)
+        success_mutants=$(jq '.success // 0' mutation-report-outcomes.json 2>/dev/null)
 
-        # If that fails, try counting from the outcomes array
-        if [ "$total_mutants" = "null" ] || [ "$total_mutants" = "0" ]; then
-          echo "🔍 Trying alternative JSON structure..."
-          total_mutants=$(jq 'length' mutation-report-outcomes.json 2>/dev/null || echo "0")
-          caught_mutants=$(jq '[.[] | select(.outcome == "caught" or .outcome == "Caught")] | length' mutation-report-outcomes.json 2>/dev/null || echo "0")
-          missed_mutants=$(jq '[.[] | select(.outcome == "missed" or .outcome == "Missed")] | length' mutation-report-outcomes.json 2>/dev/null || echo "0")
-          timeout_mutants=$(jq '[.[] | select(.outcome == "timeout" or .outcome == "Timeout")] | length' mutation-report-outcomes.json 2>/dev/null || echo "0")
-        fi
-
-        echo "🔍 Extracted values: total=$total_mutants, caught=$caught_mutants, missed=$missed_mutants, timeout=$timeout_mutants"
+        echo "🔍 Extracted values: total=$total_mutants, caught=$caught_mutants, missed=$missed_mutants, timeout=$timeout_mutants, unviable=$unviable_mutants, success=$success_mutants"
 
         # Check if we got valid metrics (handling both numeric and string values)
         if [ "$total_mutants" != "null" ] && [ "$total_mutants" != "0" ] && [ -n "$total_mutants" ] && [ "$total_mutants" -gt 0 ] 2>/dev/null; then
@@ -229,6 +221,7 @@ jobs:
             echo "- **Caught:** $caught_mutants" >> mutation-summary.md
             echo "- **Missed:** $missed_mutants" >> mutation-summary.md
             echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
+            echo "- **Unviable:** $unviable_mutants" >> mutation-summary.md
             echo "- **Mutation Score:** ${score}%" >> mutation-summary.md
             echo "✅ Mutation testing completed with $total_mutants mutants tested (exit code $exit_code)."
           else
