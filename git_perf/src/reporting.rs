@@ -40,6 +40,8 @@ trait Reporter<'a> {
 struct PlotlyReporter {
     plot: Plot,
     // TODO(kaihowl) hack until we can auto_range 'reverse' the axis in plotly directly
+    // Note: plotly-rs 0.8.3 does not support autorange="reversed" - only accepts bool values
+    // This manual reversal calculation is the only viable approach for axis reversal in this version
     size: usize,
 }
 
@@ -54,7 +56,7 @@ impl PlotlyReporter {
     fn convert_to_x_y(&self, indexed_measurements: Vec<(usize, f64)>) -> (Vec<usize>, Vec<f64>) {
         indexed_measurements
             .iter()
-            .map(|(i, m)| (self.size - i - 1, m))
+            .map(|(i, m)| (self.size - i - 1, *m))
             .unzip()
     }
 }
