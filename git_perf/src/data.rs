@@ -20,3 +20,9 @@ pub struct MeasurementData {
     pub val: f64,
     pub key_values: HashMap<String, String>,
 }
+
+#[derive(Debug, PartialEq)]
+pub struct Commit {
+    pub commit: String,
+    pub measurements: Vec<MeasurementData>,
+}

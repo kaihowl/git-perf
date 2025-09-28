@@ -1,6 +1,6 @@
 /// Min supported git version
-/// Must be version 2.45.0 at least to support symref-update commands
-/// TODO(kaihowl) check if we can get by with this version
+/// Must be version 2.46.0 at least to support symref-update commands
+/// This version introduced the symref-update instruction for atomic symref operations
 pub const EXPECTED_VERSION: (i32, i32, i32) = (2, 46, 0);
 
 /// The main branch where performance measurements are stored as git notes

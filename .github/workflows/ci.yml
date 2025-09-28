@@ -1,7 +1,6 @@
 name: ci
 
 # TODO(kaihowl) deeper test with merge-based PR workflow (HEAD == merge commit)
-# TODO(kaihowl) clean up old reports / do we want commit based reports anyway?
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -64,11 +63,11 @@ jobs:
           sudo apt-get install libfaketime
         fi
 
+    - name: Install nextest
+      uses: taiki-e/install-action@nextest
+
     - name: Build git-perf
       run: cargo build --verbose
-
-    - name: Install nextest
-      run: cargo install cargo-nextest --locked
 
     - name: Run tests
       run: cargo nextest run --verbose
