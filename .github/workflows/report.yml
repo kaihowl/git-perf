@@ -83,10 +83,10 @@ jobs:
         if: ${{ inputs.audit-args != '' }}
         run: |
           {
-            echo "AUDIT_OUTPUT<<EOF"
+            echo 'AUDIT_OUTPUT<<EOF'
             git perf audit -n ${{ inputs.depth }} ${{ inputs.audit-args }}
-            echo "EOF"
-          } >> $GITHUB_ENV
+            echo EOF
+          } >> "$GITHUB_ENV"
       - name: Publish new perf reports
         uses: peaceiris/actions-gh-pages@v4
         with:
