@@ -1,2 +1,0 @@
-[alias]
-nextest = ["bin", "cargo-nextest"]
