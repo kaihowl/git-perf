@@ -54,8 +54,10 @@ fi
 
 popd
 
-# TODO(kaihowl) document the constraint of not using a working copy to pull measurements from
-# The original test case failed as we used a different working copy as a remote instead of a bare remote.
+# CONSTRAINT: Must use a bare remote repository, not a working copy
+# When pulling measurements, the remote must be a bare repository. Using a working copy
+# as a remote will cause test failures. The original test case failed because it used
+# a different working copy as a remote instead of a bare remote.
 
 # The shallow warning for a PR-branch with a merge as HEAD should be counting the first parent's history.
 # This is already the default behavior for git-fetch with the depth option.
