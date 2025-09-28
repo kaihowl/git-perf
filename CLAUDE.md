@@ -2,6 +2,14 @@
 
 This document provides clear instructions for AI agents working on this Rust workspace project.
 
+## 🚨 CRITICAL: Pull Request Title Requirements for AI Agents
+
+**MANDATORY**: When creating GitHub pull requests, you MUST:
+1. Always use the `--title` parameter with `gh pr create`
+2. Format the title using Conventional Commits: `type(scope): description`
+3. NEVER rely on GitHub's auto-generated titles
+4. Example: `gh pr create --title "docs(agents): enhance PR title guidelines" --body "..."`
+
 ## Project Overview
 
 This is a Rust workspace with multiple crates (`cli_types`, `git_perf`) that provides performance measurement tools for Git repositories.
@@ -100,9 +108,9 @@ feat: Add new measurement command   # Inconsistent capitalization
 
 ### Creating Pull Requests
 
-**IMPORTANT**: When creating pull requests, you MUST manually ensure the title follows Conventional Commits, regardless of auto-generated titles.
+**CRITICAL FOR AI AGENTS**: When creating pull requests using `gh pr create`, you MUST always use the `--title` parameter with a properly formatted Conventional Commits title. NEVER rely on auto-generated titles from GitHub.
 
-#### Steps for PR Creation
+#### Mandatory PR Creation Process
 
 1. **Create commits with proper format:**
    ```bash
@@ -114,13 +122,24 @@ feat: Add new measurement command   # Inconsistent capitalization
    git push -u origin feature-branch-name
    ```
 
-3. **Create PR with correct title:**
+3. **Create PR with EXPLICIT conventional title:**
    ```bash
-   # GitHub CLI - MANUALLY specify the title
+   # REQUIRED: Always use --title with conventional format
    gh pr create --title "docs(agents): enhance conventional commits guidance" --body "..."
 
-   # OR via GitHub web interface - MANUALLY enter correct title
+   # NEVER use these commands (they generate non-compliant titles):
+   # gh pr create --body "..."  # ❌ Will auto-generate title
+   # gh pr create              # ❌ Will auto-generate title
    ```
+
+#### AI Agent Requirements
+
+**FOR CLAUDE AND OTHER AI AGENTS**:
+- You MUST always construct a conventional commit title for the PR
+- You MUST use the exact format: `type(scope): description`
+- You MUST never create a PR without explicitly specifying the title
+- You MUST ensure the title accurately reflects the primary change in the PR
+- You MUST use the `--title` parameter in all `gh pr create` commands
 
 #### Common PR Creation Pitfalls
 
@@ -168,11 +187,13 @@ Before submitting any code, ensure:
    # Each should start with: feat:, fix:, docs:, etc.
    ```
 
-7. ✅ **Verify PR title follows Conventional Commits format**
+7. ✅ **CRITICAL: Manually craft PR title in Conventional Commits format**
+   - **AI Agents**: You MUST use `--title` parameter with `gh pr create`
    - Must start with valid type prefix (`feat:`, `fix:`, `docs:`, etc.)
    - Use lowercase after the colon
    - Include scope when relevant (e.g., `feat(cli_types):`)
    - Be descriptive but concise
+   - **Never rely on auto-generated GitHub titles**
 
 ### Final Verification Commands
 ```bash
@@ -182,7 +203,8 @@ cargo fmt --check && cargo nextest run -- --skip slow && cargo clippy
 # Check commit message format (should show proper conventional format)
 git log --oneline -1
 
-# When creating PR, manually verify title format before submitting
+# When creating PR, ALWAYS use: gh pr create --title "conventional:format" --body "..."
+# NEVER create PR without explicit --title parameter
 ```
 
 ## Workspace Structure
