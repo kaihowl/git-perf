@@ -1,5 +1,5 @@
 use crate::{
-    data::{CommitSummary, MeasurementData, MeasurementSummary},
+    data::{Commit, CommitSummary, MeasurementData, MeasurementSummary},
     git::git_interop::{self},
     stats::{NumericReductionFunc, ReductionFunc},
 };
@@ -72,12 +72,6 @@ where
             val: aggregate_val?,
         })
     }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Commit {
-    pub commit: String,
-    pub measurements: Vec<MeasurementData>,
 }
 
 // Copying all measurements is currently necessary due to deserialization from git notes.
