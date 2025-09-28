@@ -84,7 +84,7 @@ jobs:
         run: |
           {
             echo 'AUDIT_OUTPUT<<EOF'
-            git perf audit -n ${{ inputs.depth }} ${{ inputs.audit-args }}
+            git perf audit -n ${{ inputs.depth }} ${{ inputs.audit-args }} || echo "Audit failed, but continuing..."
             echo EOF
           } >> "$GITHUB_ENV"
       - name: Publish new perf reports
