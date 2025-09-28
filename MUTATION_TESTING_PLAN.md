@@ -24,14 +24,14 @@ This document provides a concrete, step-by-step implementation plan to improve m
 # Install tool
 cargo install cargo-mutants
 
-# Create configuration
+# Create configuration for comprehensive weekly analysis
 echo '[package.metadata.mutants]
 skip = ["tests", "examples", "benches"]
 timeout = 60
-jobs = 4' >> Cargo.toml
+jobs = 1  # Single-threaded for complete analysis' >> Cargo.toml
 
-# Generate baseline report
-cargo mutants --output baseline-report.json
+# Generate baseline report (full analysis)
+cargo mutants --output baseline-report.json --jobs 1
 ```
 
 **Deliverables:**
@@ -43,19 +43,70 @@ cargo mutants --output baseline-report.json
 **Priority:** High | **Effort:** 4 hours | **Owner:** DevOps/Lead Dev
 
 **Acceptance Criteria:**
-- [ ] GitHub Actions workflow created for mutation testing
-- [ ] Mutation testing report storage configured
-- [ ] PR checks configured for critical modules
+- [ ] GitHub Actions workflow created for weekly mutation testing
+- [ ] Mutation testing report storage configured with historical tracking
+- [ ] Weekly mutation testing report generation automated
 
 **Implementation Steps:**
-1. Create `.github/workflows/mutation-testing.yml`
-2. Configure artifact storage for mutation reports
-3. Set up PR status checks for mutation score regressions
+1. Create `.github/workflows/mutation-testing-weekly.yml` with weekly schedule
+2. Configure comprehensive mutation testing job (no sharding/parallelization)
+3. Set up artifact storage for weekly reports with historical data
+4. Configure automatic report generation and notifications
+
+**Weekly Mutation Testing Configuration:**
+```yaml
+name: Weekly Mutation Testing
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Every Sunday at 2 AM UTC
+  workflow_dispatch:     # Allow manual trigger
+
+jobs:
+  mutation-testing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Allow up to 2 hours for full analysis
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Install cargo-mutants
+      run: cargo install cargo-mutants
+
+    - name: Run Full Mutation Testing
+      run: |
+        cargo mutants --output mutants-report-$(date +%Y-%m-%d).json \
+                     --timeout 60 \
+                     --jobs 1
+
+    - name: Store Mutation Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: mutation-report-${{ github.run_number }}
+        path: mutants-report-*.json
+        retention-days: 90
+
+    - name: Generate Summary
+      run: |
+        echo "## Weekly Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+        echo "Report generated on $(date)" >> $GITHUB_STEP_SUMMARY
+        cargo mutants --output-format=markdown >> $GITHUB_STEP_SUMMARY
+```
+
+**Rationale for Weekly Approach:**
+- **Complete Coverage:** Single weekly job ensures full mutation testing across entire codebase
+- **Comprehensive Analysis:** No sharding allows for complete dependency analysis and accurate scoring
+- **Resource Efficiency:** Avoids CI overhead on every PR while maintaining regular monitoring
+- **Historical Tracking:** Weekly reports provide consistent baseline for improvement tracking
+- **Implementation Focus:** Allows team to focus on code improvements rather than CI optimization
 
 **Deliverables:**
-- CI/CD workflow file
-- Mutation testing job configuration
-- PR protection rules documentation
+- Weekly CI/CD workflow file
+- Comprehensive mutation testing job (single-threaded for complete analysis)
+- Historical report storage and tracking system
 
 ## Phase 2: Critical Module Improvements (Week 2-3)
 
@@ -207,18 +258,19 @@ cargo mutants --output baseline-report.json
 
 ## Phase 4: Integration and Optimization (Week 5)
 
-### Task 4.1: CI/CD Integration Optimization
+### Task 4.1: Weekly Report Analysis and Trending Setup
 **Priority:** Medium | **Effort:** 4 hours | **Owner:** DevOps
 
 **Acceptance Criteria:**
-- [ ] Mutation testing runs efficiently in CI
-- [ ] Reports are generated and stored
-- [ ] Performance optimized for reasonable build times
+- [ ] Weekly mutation testing reports are automatically analyzed
+- [ ] Historical trending dashboard created
+- [ ] Alert system configured for significant score drops
 
 **Implementation Steps:**
-1. Optimize mutation testing job parallelization
-2. Configure selective mutation testing for PRs
-3. Set up mutation score trending
+1. Create mutation score trending analysis scripts
+2. Set up automated weekly report parsing and storage
+3. Configure notifications for mutation score regressions
+4. Create dashboard for tracking progress over time
 
 ### Task 4.2: Documentation and Process Establishment
 **Priority:** Medium | **Effort:** 3 hours | **Owner:** Tech Lead
@@ -236,14 +288,14 @@ cargo mutants --output baseline-report.json
   - `stats.rs`: 90%+
   - `audit.rs`: 85%+
   - `config.rs`: 80%+
-- **PR Mutation Score:** No regressions below module targets
-- **Build Time Impact:** <20% increase in CI time
+- **Weekly Trend:** Consistent improvement or maintenance of scores
+- **Implementation Progress:** Module improvements completed on schedule
 
 ### Monitoring Plan
-- **Weekly:** Review mutation scores for trending
-- **Per PR:** Check for mutation score regressions
-- **Monthly:** Full mutation testing report review
-- **Quarterly:** Review and adjust targets
+- **Weekly:** Automated mutation testing report generation and analysis
+- **Weekly:** Review trending dashboard for score changes
+- **Monthly:** Comprehensive analysis of mutation testing results
+- **Quarterly:** Review and adjust targets based on project evolution
 
 ## Risk Mitigation
 
