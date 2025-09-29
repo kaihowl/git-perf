@@ -42,6 +42,7 @@ struct PlotlyReporter {
     // Manual axis data reversal implementation: plotly-rs does not support autorange="reversed"
     // The autorange parameter only accepts boolean values, requiring manual index reversal
     // to achieve reversed axis display (newest commits on left, oldest on right)
+    // See: https://github.com/kaihowl/git-perf/issues/339
     size: usize,
 }
 
