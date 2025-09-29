@@ -435,14 +435,21 @@ mod test {
         assert!(result.is_ok());
         let audit_result = result.unwrap();
 
-        // With division: 25.0 / 10.0 = 2.5, so relative deviation = (2.5 - 1.0) * 100 = 150%
-        // With modulo: 25.0 % 10.0 = 5.0, so relative deviation = (0.5 - 1.0) * 100 = 50%
-        // The difference should be detectable in the output ranges
+        // With division:
+        // - relative_min = (10.0 / 10.0 - 1.0) * 100 = 0.0%
+        // - relative_max = (25.0 / 10.0 - 1.0) * 100 = 150.0%
+        // With modulo:
+        // - relative_min = (10.0 % 10.0 - 1.0) * 100 = -100.0% (since 10.0 % 10.0 = 0.0)
+        // - relative_max = (25.0 % 10.0 - 1.0) * 100 = -50.0% (since 25.0 % 10.0 = 5.0)
 
-        // Check that the calculation appears reasonable (division, not modulo)
-        // relative_min and relative_max should be around 150% and 50% respectively
-        assert!(audit_result.message.contains("Head:"));
-        assert!(audit_result.message.contains("Tail:"));
+        // Check that the calculation uses division, not modulo
+        // The range should show [+0.0% – +150.0%], not [-100.0% – -50.0%]
+        assert!(audit_result.message.contains("[+0.0% – +150.0%]"));
+
+        // Ensure the modulo results are NOT present
+        assert!(!audit_result.message.contains("[-100.0% – -50.0%]"));
+        assert!(!audit_result.message.contains("-100.0%"));
+        assert!(!audit_result.message.contains("-50.0%"));
     }
 
     #[test]
