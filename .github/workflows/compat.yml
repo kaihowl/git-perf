@@ -7,15 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # TODO(kaihowl) amend
+        # Test against multiple git versions to ensure compatibility
+        # Focus on LTS versions and commonly used releases
         git_version:
-          # - "v2.25.1" # Example: An older, but still relevant version
-          # - "v2.30.0" # Example: A mid-range version
-          # - "v2.34.1" # Ubuntu 22.04 LTS version
-          # - "v2.35.0" # Example: A more recent, stable version
-          # - "v2.40.1" # Example: Another common recent version
-          - "v2.46.0" # Example: A fairly recent version
-          - "v2.50.1" # Example: A very recent version
+          - "v2.34.1" # Ubuntu 22.04 LTS version
+          - "v2.40.1" # Common stable version
+          - "v2.46.0" # Fairly recent version
+          - "v2.50.1" # Very recent version
 
     steps:
       - name: Checkout code
