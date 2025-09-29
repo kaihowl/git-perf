@@ -39,8 +39,8 @@ trait Reporter<'a> {
 
 struct PlotlyReporter {
     plot: Plot,
-    // NOTE: Manual axis reversal required due to plotly-rs limitations
-    // plotly-rs 0.8.3 does not support autorange="reversed" - only accepts bool values
+    // TODO(kaihowl) hack until we can auto_range 'reverse' the axis in plotly directly
+    // Note: plotly-rs 0.8.3 does not support autorange="reversed" - only accepts bool values
     // This manual reversal calculation is the only viable approach for axis reversal in this version
     size: usize,
 }
@@ -250,8 +250,7 @@ impl ReporterFactory {
         res
     }
 }
-// NOTE: End-to-end testing could be more granular for output validation
-// Current tests may not cover all output scenarios comprehensively
+// TODO(kaihowl) needs more fine grained output e2e tests
 pub fn report(
     output: PathBuf,
     separate_by: Option<String>,
@@ -271,6 +270,7 @@ pub fn report(
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
         }
+        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
         m.matches_key_values(key_values)
     };
 
@@ -346,8 +346,8 @@ pub fn report(
         }
     }
 
-    // NOTE: Plot may show fewer measurements than requested by -n parameter
-    // This is a known limitation that existed in the previous Python implementation
+    // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
+    // python)
 
     if output == Path::new("-") {
         match io::stdout().write_all(&plot.as_bytes()) {
