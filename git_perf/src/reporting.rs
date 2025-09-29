@@ -39,9 +39,9 @@ trait Reporter<'a> {
 
 struct PlotlyReporter {
     plot: Plot,
-    // TODO(kaihowl) hack until we can auto_range 'reverse' the axis in plotly directly
-    // Note: plotly-rs 0.8.3 does not support autorange="reversed" - only accepts bool values
-    // This manual reversal calculation is the only viable approach for axis reversal in this version
+    // Manual axis data reversal implementation: plotly-rs does not support autorange="reversed"
+    // The autorange parameter only accepts boolean values, requiring manual index reversal
+    // to achieve reversed axis display (newest commits on left, oldest on right)
     size: usize,
 }
 
