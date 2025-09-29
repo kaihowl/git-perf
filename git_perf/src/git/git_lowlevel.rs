@@ -203,6 +203,13 @@ pub fn check_git_version() -> Result<()> {
     Ok(())
 }
 
+/// Get the repository root directory using git
+pub fn get_repository_root() -> Result<String, String> {
+    let output = capture_git_output(&["rev-parse", "--show-toplevel"], &None)
+        .map_err(|e| format!("Failed to get repository root: {}", e))?;
+    Ok(output.stdout.trim().to_string())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

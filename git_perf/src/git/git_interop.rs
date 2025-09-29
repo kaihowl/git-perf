@@ -36,14 +36,7 @@ pub use super::git_lowlevel::get_head_revision;
 
 pub use super::git_lowlevel::check_git_version;
 
-/// Get the repository root directory using git
-pub fn get_repository_root() -> Result<String, String> {
-    let output = capture_git_output(&["rev-parse", "--show-toplevel"], &None)
-        .map_err(|e| format!("Failed to get repository root: {}", e))?;
-    Ok(output.stdout.trim().to_string())
-}
-
-// TODO(kaihowl) separate into git low and high level logic
+pub use super::git_lowlevel::get_repository_root;
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
