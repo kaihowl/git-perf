@@ -38,8 +38,6 @@ pub use super::git_lowlevel::check_git_version;
 
 pub use super::git_lowlevel::get_repository_root;
 
-// TODO(kaihowl) separate into git low and high level logic
-
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
         GitError::RefFailedToPush { .. }
