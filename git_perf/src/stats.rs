@@ -115,6 +115,11 @@ impl Stats {
         // Division by zero is an expected case here: For measurements with no variance
         (self.mean - other.mean).abs() / dispersion
     }
+
+    pub fn is_significant(&self, other: &Stats, sigma: f64, method: DispersionMethod) -> bool {
+        let z_score = self.z_score_with_method(other, method);
+        z_score > sigma
+    }
 }
 
 impl VecAggregation for Vec<f64> {
@@ -392,5 +397,48 @@ mod test {
         assert!(display.contains("σ: 2"));
         assert!(display.contains("MAD: 1.5"));
         assert!(display.contains("n: 5"));
+    }
+
+    #[test]
+    fn test_is_significant_boundary() {
+        // COVERS MUTATION: z_score > sigma vs >=
+        let tail = Stats {
+            mean: 10.0,
+            stddev: 2.0,
+            mad: 1.5,
+            len: 5,
+        };
+
+        let head = Stats {
+            mean: 12.0, // z_score = (12-10)/2 = 1.0
+            stddev: 0.0,
+            mad: 0.0,
+            len: 1,
+        };
+
+        // Test boundary: z_score = 1.0, sigma = 1.0
+        // Should NOT be significant (z_score is not > sigma)
+        assert!(!head.is_significant(&tail, 1.0, DispersionMethod::StandardDeviation));
+
+        // Test just above boundary: z_score = 1.0, sigma = 0.9
+        // Should be significant (z_score > sigma)
+        assert!(head.is_significant(&tail, 0.9, DispersionMethod::StandardDeviation));
+
+        // Test just below boundary: z_score = 1.0, sigma = 1.1
+        // Should NOT be significant (z_score is not > sigma)
+        assert!(!head.is_significant(&tail, 1.1, DispersionMethod::StandardDeviation));
+
+        // Test with MAD
+        let head_mad = Stats {
+            mean: 11.5, // z_score = (11.5-10)/1.5 = 1.0
+            stddev: 0.0,
+            mad: 0.0,
+            len: 1,
+        };
+
+        // Test boundary with MAD: z_score = 1.0, sigma = 1.0
+        assert!(!head_mad.is_significant(&tail, 1.0, DispersionMethod::MedianAbsoluteDeviation));
+        assert!(head_mad.is_significant(&tail, 0.9, DispersionMethod::MedianAbsoluteDeviation));
+        assert!(!head_mad.is_significant(&tail, 1.1, DispersionMethod::MedianAbsoluteDeviation));
     }
 }
