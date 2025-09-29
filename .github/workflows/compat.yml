@@ -8,12 +8,18 @@ jobs:
     strategy:
       matrix:
         # Test against multiple git versions to ensure compatibility
-        # Focus on LTS versions and commonly used releases
+        # NOTE: All versions must be >= 2.46.0 (see git_definitions.rs:EXPECTED_VERSION)
+        # Required for symref-update commands used in atomic symref operations
+        # Version selection methodology:
+        # - v2.46.0: Minimum supported version (symref-update support introduced)
+        # - v2.47.0: Next stable release after minimum requirement
+        # - v2.48.0: Another stable version for broader coverage
+        # - v2.50.1: Recent version representing current state
         git_version:
-          - "v2.34.1" # Ubuntu 22.04 LTS version
-          - "v2.40.1" # Common stable version
-          - "v2.46.0" # Fairly recent version
-          - "v2.50.1" # Very recent version
+          - "v2.46.0" # Minimum supported version (symref-update support)
+          - "v2.47.0" # Next stable release after minimum
+          - "v2.48.0" # Additional stable version coverage
+          - "v2.50.1" # Recent version
 
     steps:
       - name: Checkout code
