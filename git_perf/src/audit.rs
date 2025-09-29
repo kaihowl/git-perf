@@ -85,12 +85,7 @@ fn audit(
 ) -> Result<AuditResult> {
     let all = measurement_retrieval::walk_commits(max_count)?;
 
-    let filter_by = |m: &MeasurementData| {
-        m.name == measurement
-            && selectors
-                .iter()
-                .all(|s| m.key_values.get(&s.0).map(|v| *v == s.1).unwrap_or(false))
-    };
+    let filter_by = |m: &MeasurementData| m.name == measurement && m.matches_key_values(selectors);
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
         all,

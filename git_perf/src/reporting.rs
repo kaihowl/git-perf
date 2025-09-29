@@ -271,9 +271,7 @@ pub fn report(
             return false;
         }
         // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
-        key_values
-            .iter()
-            .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
+        m.matches_key_values(key_values)
     };
 
     let relevant_measurements = commits
