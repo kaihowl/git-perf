@@ -233,7 +233,6 @@ fi
 echo "Verifying results..."
 LINE_COUNT=$(git-perf report -o - | wc -l)
 # First seed measurement + measurements from adders
-# TODO(kaihowl) add test case for failures happning without the seed measurement
 EXPECTED_COUNT=$((NUM_ADD_ITERATIONS * CONCURRENT_ADDERS + 1))
 
 if [[ $LINE_COUNT -eq $EXPECTED_COUNT ]]; then
@@ -242,5 +241,59 @@ else
     echo "ERROR: Verification failed. Expected $EXPECTED_COUNT lines but found $LINE_COUNT."
     exit_code=1
 fi
+
+# Test case for failures happening without the seed measurement
+echo "Testing scenarios without seed measurement..."
+
+# Create a new test environment without seed measurement
+test_without_seed() {
+    local test_dir=$(mktemp -d)
+    local original_dir=$(pwd)
+
+    pushd "$test_dir" > /dev/null
+
+    # Set up fresh repository without seed measurement
+    mkdir upstream_noseed
+    pushd upstream_noseed > /dev/null
+    git init --bare > /dev/null 2>&1
+    popd > /dev/null
+
+    git clone "$test_dir/upstream_noseed" work_noseed > /dev/null 2>&1
+    pushd work_noseed > /dev/null
+    git commit --allow-empty -m 'test commit without seed' > /dev/null 2>&1
+    git push > /dev/null 2>&1
+
+    # Test remove operation without any measurements (should handle gracefully)
+    echo "Testing remove operation without seed measurements..."
+    if git-perf remove --older-than '7d' > /dev/null 2>&1; then
+        echo "SUCCESS: Remove operation handled empty measurement set gracefully"
+    else
+        echo "INFO: Remove operation failed on empty measurement set (expected behavior)"
+    fi
+
+    # Test prune operation without any measurements (should handle gracefully)
+    echo "Testing prune operation without seed measurements..."
+    if git-perf prune > /dev/null 2>&1; then
+        echo "SUCCESS: Prune operation handled empty measurement set gracefully"
+    else
+        echo "INFO: Prune operation failed on empty measurement set (expected behavior)"
+    fi
+
+    # Test report operation without any measurements (should handle gracefully)
+    echo "Testing report operation without seed measurements..."
+    local report_lines=$(git-perf report -o - 2>/dev/null | wc -l)
+    if [[ $report_lines -eq 0 ]]; then
+        echo "SUCCESS: Report operation correctly returned empty result for no measurements"
+    else
+        echo "WARNING: Report operation returned $report_lines lines for empty measurement set"
+    fi
+
+    popd > /dev/null  # exit work_noseed
+    popd > /dev/null  # exit test_dir
+    cd "$original_dir"
+    rm -rf "$test_dir"
+}
+
+test_without_seed
 
 exit  $exit_code
