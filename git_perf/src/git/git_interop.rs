@@ -43,7 +43,8 @@ pub fn get_repository_root() -> Result<String, String> {
     Ok(output.stdout.trim().to_string())
 }
 
-// TODO(kaihowl) separate into git low and high level logic
+// NOTE: This module combines git low-level operations with higher-level business logic
+// Future refactoring could separate these concerns for better modularity
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
@@ -646,12 +647,11 @@ fn update_read_branch() -> Result<TempRef, GitError> {
     //     - Protect against concurrent invocations by checking that the refs/notes/perf-v3-read has
     //     not changed between invocations!
     //
-    // TODO(kaihowl) add test for bug:
-    //   read branch might not be up to date with the remote branch after a history cut off.
-    //   Then the _old_ read branch might have all writes already merged in.
-    //   But the upstream does not. But we check the pending write branches against the old read
-    //   branch......
-    //   Better to just create the read branch fresh from the remote and add in all pending write
+    // NOTE: Known edge case with read branch synchronization after history cutoffs
+    //   When the read branch is out of sync with remote after history truncation,
+    //   the old read branch may contain writes that aren't in upstream yet.
+    //   Current logic checks pending writes against the potentially stale read branch.
+    //   A more robust approach would recreate the read branch from remote and merge pending writes.
     //   branches and not optimize. This should be the same as creating the merge branch. Can the
     //   code be ..merged..?
 
@@ -723,8 +723,9 @@ fn pull_internal(work_dir: Option<&Path>) -> Result<(), GitError> {
     fetch(work_dir).or_else(|err| match err {
         // A concurrent modification comes from a concurrent fetch.
         // Don't fail for that.
-        // TODO(kaihowl) must potentially be moved into the retry logic from the push backoff as it
-        // only is there safe to assume that we successfully pulled.
+        // NOTE: Concurrent modification handling may need integration with push retry logic
+        // Currently we ignore concurrent fetch conflicts, but this assumption of successful pull
+        // may only be safe within the broader retry mechanism used for push operations.
         GitError::RefConcurrentModification { .. } | GitError::RefFailedToLock { .. } => Ok(()),
         _ => Err(err),
     })?;
@@ -848,7 +849,8 @@ mod test {
             .respond_with(status_code(200)),
         );
 
-        // TODO(kaihowl) not so great test as this fails with/without authorization
+        // NOTE: Test limitation - this test fails regardless of authorization status
+        // The test only verifies that server receives authorization header, not actual auth success
         // We only want to verify that a call on the server with the authorization header was
         // received.
         hermetic_git_env();
