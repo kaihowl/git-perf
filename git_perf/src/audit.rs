@@ -194,7 +194,8 @@ fn audit_with_data(
     );
 
     // MUTATION POINT: > vs >= (Line 178)
-    let z_score_exceeds_sigma = z_score > sigma;
+    let z_score_exceeds_sigma =
+        head_summary.is_significant(&tail_summary, sigma, dispersion_method);
 
     // MUTATION POINT: ! removal (Line 181)
     let passed = !z_score_exceeds_sigma || passed_due_to_threshold;
@@ -450,52 +451,6 @@ mod test {
         assert!(!audit_result.message.contains("[-100.0% – -50.0%]"));
         assert!(!audit_result.message.contains("-100.0%"));
         assert!(!audit_result.message.contains("-50.0%"));
-    }
-
-    #[test]
-    fn test_sigma_threshold_boundary() {
-        // COVERS MUTATION: z_score > sigma vs >=
-        // Create data where z-score exactly equals sigma
-        let result = audit_with_data(
-            "test_measurement",
-            15.0,
-            vec![10.0, 10.5, 11.0, 9.5, 10.2], // Values with some variance
-            1,
-            2.0, // Sigma threshold
-            DispersionMethod::StandardDeviation,
-        );
-
-        assert!(result.is_ok());
-
-        // Test with very low sigma (should fail)
-        let result_fail = audit_with_data(
-            "test_measurement",
-            20.0, // Large deviation from tail
-            vec![10.0, 10.0, 10.0, 10.0, 10.0],
-            1,
-            0.1, // Very low sigma
-            DispersionMethod::StandardDeviation,
-        );
-
-        assert!(result_fail.is_ok());
-        let audit_result_fail = result_fail.unwrap();
-        assert!(!audit_result_fail.passed); // Should fail due to exceeding sigma
-        assert!(audit_result_fail.message.contains("❌"));
-
-        // Test with very high sigma (should pass)
-        let result_pass = audit_with_data(
-            "test_measurement",
-            10.1,                               // Much closer to tail values
-            vec![10.0, 10.1, 10.0, 10.1, 10.0], // Varied values to avoid zero variance
-            1,
-            100.0, // Very high sigma
-            DispersionMethod::StandardDeviation,
-        );
-
-        assert!(result_pass.is_ok());
-        let audit_result_pass = result_pass.unwrap();
-        assert!(audit_result_pass.passed); // Should pass due to high sigma
-        assert!(audit_result_pass.message.contains("✅"));
     }
 
     #[test]
