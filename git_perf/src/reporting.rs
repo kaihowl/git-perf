@@ -271,11 +271,7 @@ pub fn report(
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
         }
-        // NOTE: Key-value filtering logic could be refactored using subset relations
-        // This pattern is duplicated in audit functionality and could benefit from abstraction
-        key_values
-            .iter()
-            .all(|(k, v)| m.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
+        m.matches_key_values(key_values)
     };
 
     let relevant_measurements = commits
