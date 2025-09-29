@@ -916,9 +916,6 @@ mod test {
         let git_dir_url = format!("file://{}", tempdir.path().display());
         run_git_command(&["remote", "add", "origin", &git_dir_url], tempdir.path());
 
-        // TODO(kaihowl) hack to check where the fetch went to
-        std::env::set_var("GIT_TRACE", "true");
-
         // Do not add any notes/measurements or push anything
         let result = super::fetch(Some(tempdir.path()));
         match result {
@@ -945,9 +942,6 @@ mod test {
             &["remote", "add", "origin", "invalid invalid"],
             tempdir.path(),
         );
-
-        // TODO(kaihowl) hack to inspect git commands
-        std::env::set_var("GIT_TRACE", "true");
 
         add_note_line_to_head("test line, invalid measurement, does not matter").unwrap();
 
