@@ -262,6 +262,10 @@ pub fn report(
 ) -> Result<()> {
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
+    if commits.is_empty() {
+        bail!("No commits found in repository. Ensure commits exist and were pushed to the remote if using a shallow clone.");
+    }
+
     let mut plot =
         ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
 
