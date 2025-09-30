@@ -263,7 +263,9 @@ pub fn report(
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
     if commits.is_empty() {
-        bail!("No commits found in repository. Ensure commits exist and were pushed to the remote.");
+        bail!(
+            "No commits found in repository. Ensure commits exist and were pushed to the remote."
+        );
     }
 
     let mut plot =
