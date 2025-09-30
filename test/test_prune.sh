@@ -4,7 +4,6 @@ set -e
 set -x
 
 # TODO(kaihowl) add output expectations for report use cases (based on markdown?)
-# TODO(kaihowl) running without a git repo as current working directory
 # TODO(kaihowl) allow pushing to different remotes
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
