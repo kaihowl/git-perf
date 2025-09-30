@@ -28,7 +28,6 @@ done
 git perf report -n 5
 git perf report -n 20
 
-# TODO(kaihowl) add better log message for the next git perf report a couple lines down if this line is missing AND thus there are no commit to report on
 git push
 git perf push
 
