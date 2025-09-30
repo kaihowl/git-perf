@@ -40,3 +40,27 @@ function cd_temp_repo() {
   create_commit
   create_commit
 }
+
+function assert_output_contains() {
+  local output="$1"
+  local expected="$2"
+  local error_message="${3:-Missing expected string in output}"
+
+  if [[ $output != *"$expected"* ]]; then
+    echo "$error_message:"
+    echo "$output"
+    exit 1
+  fi
+}
+
+function assert_output_not_contains() {
+  local output="$1"
+  local unexpected="$2"
+  local error_message="${3:-Unexpected string found in output}"
+
+  if [[ $output == *"$unexpected"* ]]; then
+    echo "$error_message:"
+    echo "$output"
+    exit 1
+  fi
+}
