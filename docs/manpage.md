@@ -192,7 +192,9 @@ Accept HEAD commit's measurement for audit, even if outside of range. This is al
 
 ## `git-perf remove`
 
-Remove all performance measurements for commits that have been committed before the specified time period
+Remove all performance measurements for commits that have been committed before the specified time period.
+
+Note: Only published measurements (i.e., those that have been pushed to the remote repository) can be removed. Local unpublished measurements are not affected by this operation.
 
 **Usage:** `git-perf remove --older-than <OLDER_THAN>`
 

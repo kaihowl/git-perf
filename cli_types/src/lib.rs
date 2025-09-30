@@ -237,6 +237,10 @@ pub enum Commands {
 
     /// Remove all performance measurements for commits that have been committed
     /// before the specified time period.
+    ///
+    /// Note: Only published measurements (i.e., those that have been pushed to the
+    /// remote repository) can be removed. Local unpublished measurements are not
+    /// affected by this operation.
     Remove {
         #[arg(long = "older-than", value_parser = parse_datetime_value_now)]
         older_than: DateTime<Utc>,

@@ -6,11 +6,13 @@ remove \- Remove all performance measurements for commits that have been committ
 .SH SYNOPSIS
 \fBremove\fR <\fB\-\-older\-than\fR> [\fB\-h\fR|\fB\-\-help\fR] 
 .SH DESCRIPTION
-Remove all performance measurements for commits that have been committed before the specified time period
+Remove all performance measurements for commits that have been committed before the specified time period.
+.PP
+Note: Only published measurements (i.e., those that have been pushed to the remote repository) can be removed. Local unpublished measurements are not affected by this operation.
 .SH OPTIONS
 .TP
 \fB\-\-older\-than\fR \fI<OLDER_THAN>\fR
 
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Print help
+Print help (see a summary with \*(Aq\-h\*(Aq)

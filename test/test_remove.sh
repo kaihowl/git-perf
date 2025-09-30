@@ -70,7 +70,6 @@ num_measurements=$(git perf report -o - | wc -l)
 [[ ${num_measurements} -eq 1 ]] || exit 1
 
 # Only published measurements can be expired
-# TODO(kaihowl) clarify documentation!
 git perf push
 
 # TODO(kaihowl) specify >= or > precisely
