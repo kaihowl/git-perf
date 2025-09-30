@@ -30,32 +30,16 @@ output=$(git perf audit -m test-metric --min-measurements 10 2>&1) || true
 echo "Audit output: $output"
 
 # Verify the output contains the header with measurement name
-if [[ $output == *"⏭️ 'test-metric'"* ]]; then
-    echo "✅ Header with measurement name found"
-else
-    echo "❌ Header with measurement name NOT found"
-    echo "Expected: ⏭️ 'test-metric'"
-    echo "Got: $output"
-    exit 1
-fi
+assert_output_contains "$output" "⏭️ 'test-metric'" "Header with measurement name NOT found"
+echo "✅ Header with measurement name found"
 
 # Verify the output contains the skip message (should be 2 tail measurements + 1 head = 3 total, but only 2 in tail)
-if [[ $output == *"Only 2 measurement"* ]]; then
-    echo "✅ Skip message found"
-else
-    echo "❌ Skip message NOT found"
-    echo "Expected: Only 2 measurement"
-    echo "Got: $output"
-    exit 1
-fi
+assert_output_contains "$output" "Only 2 measurement" "Skip message NOT found"
+echo "✅ Skip message found"
 
 # Verify the output contains the threshold information
-if [[ $output == *"Less than requested min_measurements of 10"* ]]; then
-    echo "✅ Threshold information found"
-else
-    echo "❌ Threshold information NOT found"
-    exit 1
-fi
+assert_output_contains "$output" "Less than requested min_measurements of 10" "Threshold information NOT found"
+echo "✅ Threshold information found"
 
 echo "Test passed: Audit insufficient measurements header format is correct"
 exit 0

@@ -51,11 +51,7 @@ git checkout master
 git perf add -m echo 0.5
 
 output=$(git perf push)
-if [[ ${output} != *'new reference'* ]]; then
-  echo "Missing 'new reference' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "new reference" "Missing 'new reference' in output"
 
 # Second git perf push should be no-op
 git perf push
