@@ -11,11 +11,7 @@ echo Pull in repo without a remote
 cd_empty_repo
 
 output="$(git perf pull 2>&1 1>/dev/null)" && exit 1
-if [[ $output != *"No upstream found"* ]]; then
-  echo "Missing 'No upstream found' from output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "No upstream found" "Missing 'No upstream found' from output"
 
 echo Pull from remote without measurements
 
@@ -39,13 +35,8 @@ git commit -m 'first commit'
 
 git push
 
-# TODO(kaihowl) move functionality for check for output in common function
 output="$(git perf pull 2>&1 1>/dev/null)" && exit 1
-if [[ $output != *'Remote repository is empty or has never been pushed to'* ]]; then
-  echo "Missing 'Remote repository is empty or has never been pushed to' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "Remote repository is empty or has never been pushed to" "Missing 'Remote repository is empty or has never been pushed to' in output"
 
 cd "$root"
 git clone "$orig" repo1
@@ -57,8 +48,4 @@ git perf add -m test-measure 12
 git perf push
 
 output=$(git perf pull 2>/dev/null) || exit 1
-if [[ $output != *'Already up to date'* ]]; then
-  echo "Missing 'Already up to date' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "Already up to date" "Missing 'Already up to date' in output"
