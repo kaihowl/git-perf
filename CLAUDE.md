@@ -37,6 +37,20 @@ cargo nextest run -- --skip slow
 
 ## Testing Policy
 
+### Prerequisites
+
+**REQUIRED**: Install `cargo-nextest` before running tests:
+
+```bash
+# Install cargo-nextest
+cargo install cargo-nextest --locked
+
+# Verify installation
+cargo nextest --version
+```
+
+### Running Tests
+
 - **Test command**: `cargo nextest run -- --skip slow` (excludes slow tests)
 - Ensure all tests pass before submitting code
 - Use `cargo nextest run` for full test suite when needed
@@ -226,6 +240,14 @@ rustc --version
 cargo --version
 cargo fmt --version
 cargo clippy --version
+cargo nextest --version
+```
+
+### Installing Required Tools
+
+```bash
+# Install cargo-nextest (required for testing)
+cargo install cargo-nextest --locked
 ```
 
 ## Why These Rules Matter
