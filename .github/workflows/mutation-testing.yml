@@ -66,7 +66,7 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Install nextest
-      run: cargo install cargo-nextest --locked
+      run: cargo install cargo-nextest --locked --force
 
     - name: Install cargo-mutants
       run: |
