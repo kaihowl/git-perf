@@ -55,7 +55,6 @@ git perf add -m test 5
 # Must push once to create the remote perf branch
 git perf push
 
-# TODO(kaihowl) probably should be deprecated and subsumed into the normal remove operation
 git perf prune
 
 nr_notes=$(git notes --ref=refs/notes/perf-v3 list | wc -l)
