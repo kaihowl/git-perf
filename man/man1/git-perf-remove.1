@@ -2,11 +2,11 @@
 .el .ds Aq '
 .TH remove 1  "remove " 
 .SH NAME
-remove \- Remove all performance measurements for commits that have been committed before the specified time period
+remove \- Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=)
 .SH SYNOPSIS
 \fBremove\fR <\fB\-\-older\-than\fR> [\fB\-h\fR|\fB\-\-help\fR] 
 .SH DESCRIPTION
-Remove all performance measurements for commits that have been committed before the specified time period.
+Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=).
 .PP
 Note: Only published measurements (i.e., those that have been pushed to the remote repository) can be removed. Local unpublished measurements are not affected by this operation.
 .SH OPTIONS

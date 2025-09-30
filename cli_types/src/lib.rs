@@ -236,7 +236,7 @@ pub enum Commands {
     },
 
     /// Remove all performance measurements for commits that have been committed
-    /// before the specified time period.
+    /// at or before the specified time (inclusive boundary, uses <=).
     ///
     /// Note: Only published measurements (i.e., those that have been pushed to the
     /// remote repository) can be removed. Local unpublished measurements are not

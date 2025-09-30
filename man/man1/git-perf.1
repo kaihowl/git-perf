@@ -37,7 +37,7 @@ git\-perf\-bump\-epoch(1)
 Accept HEAD commit\*(Aqs measurement for audit, even if outside of range. This is allows to accept expected performance changes. This is accomplished by starting a new epoch for the given measurement. The epoch is configured in the git perf config file. A change to the epoch therefore has to be committed and will result in a new HEAD for which new measurements have to be taken
 .TP
 git\-perf\-remove(1)
-Remove all performance measurements for commits that have been committed before the specified time period
+Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=)
 .TP
 git\-perf\-prune(1)
 Remove all performance measurements for non\-existent/unreachable objects. Will refuse to work if run on a shallow clone

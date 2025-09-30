@@ -72,9 +72,8 @@ num_measurements=$(git perf report -o - | wc -l)
 # Only published measurements can be expired
 git perf push
 
-# TODO(kaihowl) specify >= or > precisely
-# These tests will become flaky if this is incorrectly set as we remove excactly on 7 day boundaries
-# If the test runs quickly enough, the offset between commits and the invocation of removal will be exactly 7 days
+# Note: --older-than uses <= (inclusive), so measurements at exactly 7 days will be removed
+# These tests will become flaky if run at exactly the 7 day boundary
 echo "Remove measurements on commits older than 7 days"
 git perf remove --older-than 7d || bash -i
 num_measurements=$(git perf report -o - | wc -l)
