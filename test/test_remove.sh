@@ -175,7 +175,6 @@ git perf push
 
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
-# TODO(kaihowl) clean up of write branches needed
 [[ ${num_measurements} -eq 1 ]] || exit 1
 
 popd
