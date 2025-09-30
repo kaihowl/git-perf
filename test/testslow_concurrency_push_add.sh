@@ -233,7 +233,6 @@ fi
 echo "Verifying results..."
 LINE_COUNT=$(git-perf report -o - | wc -l)
 # First seed measurement + measurements from adders
-# TODO(kaihowl) add test case for failures happning without the seed measurement
 EXPECTED_COUNT=$((NUM_ADD_ITERATIONS * CONCURRENT_ADDERS + 1))
 
 if [[ $LINE_COUNT -eq $EXPECTED_COUNT ]]; then
