@@ -137,4 +137,22 @@ jobs:
                 body: commentBody
               })
             }
+      - name: Cleanup reports without measurements
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          # Run cleanup script
+          chmod +x ./scripts/cleanup-reports.sh
+          ./scripts/cleanup-reports.sh
+
+          # Check if there are changes to push
+          git fetch origin gh-pages
+          git checkout gh-pages
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git push origin gh-pages
+            echo "Pushed cleanup changes to gh-pages"
+          else
+            echo "No orphaned reports to clean up"
+          fi
 

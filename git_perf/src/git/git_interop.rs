@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter, Read, Write},
     path::Path,
     process::Stdio,
     thread,
@@ -592,6 +592,33 @@ fn raw_prune() -> Result<(), GitError> {
     execute_notes_operation(|target| {
         capture_git_output(&["notes", "--ref", target, "prune"], &None).map(|_| ())
     })
+}
+
+/// Returns a list of all commit SHA-1 hashes that have performance measurements
+/// in the refs/notes/perf-v3 branch.
+///
+/// Each commit hash is returned as a 40-character hexadecimal string.
+pub fn list_commits_with_measurements() -> Result<Vec<String>> {
+    // Use git notes list to get all annotated commits
+    // Output format: <note_oid> <commit_oid>
+    let mut list_notes =
+        spawn_git_command(&["notes", "--ref", REFS_NOTES_BRANCH, "list"], &None, None)?;
+
+    let mut output = String::new();
+    list_notes
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("Failed to capture stdout from git notes list"))?
+        .read_to_string(&mut output)?;
+
+    // Parse output: each line is "note_sha commit_sha"
+    // We want the commit_sha (second column)
+    let commits: Vec<String> = output
+        .lines()
+        .filter_map(|line| line.split_whitespace().nth(1).map(|s| s.to_string()))
+        .collect();
+
+    Ok(commits)
 }
 
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
