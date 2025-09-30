@@ -32,11 +32,14 @@ echo "Testing remove operation without seed measurements..."
 output=$(git perf remove --older-than '7d' 2>&1 1>/dev/null) && exit_code=0 || exit_code=$?
 if [[ $exit_code -eq 0 ]]; then
     echo "SUCCESS: Remove operation handled empty measurement set gracefully"
-elif [[ ${output} == *'No performance measurements found'* ]] || [[ ${output} == *'This repo does not have any measurements'* ]]; then
-    echo "SUCCESS: Remove operation correctly reported no measurements available"
 else
-    echo "INFO: Remove operation failed on empty measurement set with: $output"
-    # This might be expected behavior - some operations may fail without measurements
+    # Check if output contains expected error messages
+    if [[ ${output} == *'No performance measurements found'* ]] || [[ ${output} == *'This repo does not have any measurements'* ]]; then
+        echo "SUCCESS: Remove operation correctly reported no measurements available"
+    else
+        echo "INFO: Remove operation failed on empty measurement set with: $output"
+        # This might be expected behavior - some operations may fail without measurements
+    fi
 fi
 
 echo "Testing prune operation without seed measurements..."
@@ -44,11 +47,14 @@ echo "Testing prune operation without seed measurements..."
 output=$(git perf prune 2>&1 1>/dev/null) && exit_code=0 || exit_code=$?
 if [[ $exit_code -eq 0 ]]; then
     echo "SUCCESS: Prune operation handled empty measurement set gracefully"
-elif [[ ${output} == *'No performance measurements found'* ]] || [[ ${output} == *'This repo does not have any measurements'* ]]; then
-    echo "SUCCESS: Prune operation correctly reported no measurements available"
 else
-    echo "INFO: Prune operation failed on empty measurement set with: $output"
-    # This might be expected behavior - some operations may fail without measurements
+    # Check if output contains expected error messages
+    if [[ ${output} == *'No performance measurements found'* ]] || [[ ${output} == *'This repo does not have any measurements'* ]]; then
+        echo "SUCCESS: Prune operation correctly reported no measurements available"
+    else
+        echo "INFO: Prune operation failed on empty measurement set with: $output"
+        # This might be expected behavior - some operations may fail without measurements
+    fi
 fi
 
 echo "Testing report operation without seed measurements..."
@@ -61,10 +67,13 @@ if [[ $exit_code -eq 0 ]]; then
     else
         echo "INFO: Report operation returned $report_lines lines for empty measurement set"
     fi
-elif [[ ${output} == *'No performance measurements found'* ]]; then
-    echo "SUCCESS: Report operation correctly reported no measurements available"
 else
-    echo "INFO: Report operation failed on empty measurement set with: $output"
+    # Check if output contains expected error message
+    if [[ ${output} == *'No performance measurements found'* ]]; then
+        echo "SUCCESS: Report operation correctly reported no measurements available"
+    else
+        echo "INFO: Report operation failed on empty measurement set with: $output"
+    fi
 fi
 
 popd > /dev/null  # exit work_noseed

@@ -46,11 +46,7 @@ pushd "$repo2"
 git perf add -m echo 0.5
 
 output=$(git perf push 2>&1 1>/dev/null)
-if [[ $output != *retrying* ]]; then
-  echo "Output is missing 'retrying'. Output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "retrying" "Output is missing 'retrying'"
 
 popd
 

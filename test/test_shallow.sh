@@ -40,17 +40,9 @@ git perf pull
 git perf report -n 2
 git perf audit -n 2 -m test-measure
 output=$(git perf report -n 3 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'shallow clone'* ]]; then
-  echo "Missing warning for 'shallow clone'"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
 output=$(git perf audit -n 3 -m test-measure 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'shallow clone'* ]]; then
-  echo "Missing warning for 'shallow clone'"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
 
 popd
 

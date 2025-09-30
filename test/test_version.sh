@@ -9,11 +9,7 @@ script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 source "$script_dir/common.sh"
 
 output=$(git perf 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'--help'* ]]; then
-  echo "No warning for missing arguments"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "--help" "No warning for missing arguments"
 
 output=$(git perf --version)
 if ! [[ ${output} =~ ^(git-perf )?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
