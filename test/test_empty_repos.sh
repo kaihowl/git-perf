@@ -11,11 +11,7 @@ echo New repo, error out without crash
 cd_empty_repo
 
 output=$(git perf add -m 'test' 23 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'Missing HEAD'* ]]; then
-  echo "Missing 'Missing HEAD' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "Missing HEAD" "Missing 'Missing HEAD' in output"
 
 echo Empty repo with upstream
 cd "$(mktemp -d)"
@@ -33,11 +29,7 @@ git clone "$orig" myworkrepo
 cd myworkrepo
 
 output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'No commit at HEAD'* ]]; then
-  echo "Missing 'No Commit at HEAD' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "No commit at HEAD" "Missing 'No Commit at HEAD' in output"
 
 touch a
 git add a
@@ -46,22 +38,10 @@ git commit -m 'first commit'
 git push
 
 output=$(git perf report 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'No performance measurements found'* ]]; then
-  echo "Missing 'No performance measurements found' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "No performance measurements found" "Missing 'No performance measurements found' in output"
 
 output=$(git perf push 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'This repo does not have any measurements'* ]]; then
-  echo "Missing 'This repo does not have any measurements' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "This repo does not have any measurements" "Missing 'This repo does not have any measurements' in output"
 
 output=$(git perf audit -m non-existent 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'No measurement for HEAD'* ]]; then
-  echo "Missing 'No measurement for HEAD' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "No measurement for HEAD" "Missing 'No measurement for HEAD' in output"

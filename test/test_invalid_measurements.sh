@@ -17,33 +17,21 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "\n"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ ${output} != *'too few items'* ]]; then
-  echo "Missing 'too few items' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "too few items" "Missing 'too few items' in output"
 
 echo Measurement with just date
 cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$(date +%s)"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ ${output} != *'too few items'* ]]; then
-  echo "Missing 'too few items' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "too few items" "Missing 'too few items' in output"
 
 echo Measurement without date
 cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$epochmyothermeasurement$RANDOMkey=value"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ ${output} != *'skipping'* ]]; then
-  echo "Missing 'skipping' in output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "skipping" "Missing 'skipping' in output"
 
 echo Measurement without kvs
 cd_temp_repo
@@ -82,12 +70,7 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=valuekey=valuekey=value"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ ${output} != *'Duplicate entries for key key with same value'* ]]; then
-  echo "Expected warning about 'Duplicate entries for key key with same value' in the output"
-  echo "Output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "Duplicate entries for key key with same value" "Expected warning about 'Duplicate entries for key key with same value' in the output"
 
 # Verify warning is only printed once
 warning_count=$(echo "$output" | grep -c "Duplicate entries for key key with same value")
@@ -103,9 +86,4 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value2"
 output=$(git perf report 2>&1 1>/dev/null)
-if [[ ${output} != *'Conflicting values'* ]]; then
-  echo "Expected warning about 'Conflicting values' in the output"
-  echo "Output:"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "Conflicting values" "Expected warning about 'Conflicting values' in the output"

@@ -36,16 +36,8 @@ git perf report -o single_result.html -m timer
 git perf report -o separated_single_result.html -m timer -s os
 
 output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'no performance measurements'* ]]; then
-  echo "No warning for missing measurements"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "no performance measurements" "No warning for missing measurements"
 
 output=$(git perf report -s does-not-exist 2>&1 1>/dev/null) && exit 1
-if [[ ${output} != *'invalid separator'* ]]; then
-  echo "No warning for invalid separator 'does-not-exist'"
-  echo "$output"
-  exit 1
-fi
+assert_output_contains "$output" "invalid separator" "No warning for invalid separator 'does-not-exist'"
 
