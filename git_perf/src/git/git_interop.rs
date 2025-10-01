@@ -858,7 +858,7 @@ mod test {
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).expect("Failed to change dir");
 
-        let test_server = Server::run();
+        let mut test_server = Server::run();
         add_server_remote(
             test_server.url(""),
             "AUTHORIZATION: sometoken",
@@ -874,11 +874,14 @@ mod test {
             .respond_with(status_code(200)),
         );
 
-        // TODO(kaihowl) not so great test as this fails with/without authorization
-        // We only want to verify that a call on the server with the authorization header was
-        // received.
+        // The pull operation will fail because the mock server doesn't provide a valid git
+        // response, but we verify that the authorization header was sent by checking that
+        // the server's expectations are met (httptest will panic on drop if not).
         hermetic_git_env();
-        pull(None).expect_err("We have no valid git http server setup -> should fail");
+        let _ = pull(None); // Ignore result - we only care that auth header was sent
+
+        // Explicitly verify server expectations were met
+        test_server.verify_and_clear();
     }
 
     #[test]
