@@ -49,11 +49,21 @@ if [ "$line_count" -ne 2 ]; then
 fi
 popd
 
-# Test after removing measurements
-cd_empty_repo
+# Test after removing measurements (requires remote for publish/remove)
+pushd "$(mktemp -d)"
+mkdir bare_repo
+pushd bare_repo
+bare_repo=$(pwd)
+git init --bare
+popd
+
+git clone "$bare_repo" work_repo
+pushd work_repo
+
 create_commit
 current_commit=$(git rev-parse HEAD)
 git perf add -m test 1.0
+git perf push
 
 # Verify measurement was added
 output=$(git perf list-commits)
@@ -72,6 +82,7 @@ if [ -n "$output" ]; then
   echo "Got: $output"
   exit 1
 fi
+popd
 popd
 
 echo "All tests passed!"
