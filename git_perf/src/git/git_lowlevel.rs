@@ -160,6 +160,15 @@ pub(super) fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
         .map(|s| s.stdout.trim().to_owned())
 }
 
+pub(super) fn git_symbolic_ref_create_or_update(
+    reference: &str,
+    target: &str,
+) -> Result<(), GitError> {
+    capture_git_output(&["symbolic-ref", reference, target], &None)
+        .map_err(map_git_error)
+        .map(|_| ())
+}
+
 pub(super) fn is_shallow_repo() -> Result<bool, GitError> {
     let output = capture_git_output(&["rev-parse", "--is-shallow-repository"], &None)?;
 

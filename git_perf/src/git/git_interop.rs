@@ -26,8 +26,8 @@ use super::git_definitions::{
 };
 use super::git_lowlevel::{
     capture_git_output, get_git_perf_remote, git_rev_parse, git_rev_parse_symbolic_ref,
-    git_update_ref, internal_get_head_revision, is_shallow_repo, map_git_error,
-    set_git_perf_remote, spawn_git_command,
+    git_symbolic_ref_create_or_update, git_update_ref, internal_get_head_revision, is_shallow_repo,
+    map_git_error, set_git_perf_remote, spawn_git_command,
 };
 use super::git_types::GitError;
 use super::git_types::Reference;
@@ -109,11 +109,14 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     )?;
 
     // Update current write branch with pending write
+    // We update the target ref directly (no symref-verify needed in git 2.43.0)
+    // The old-oid verification ensures atomicity of the target ref update
+    // If the symref was redirected between reading it and updating, the write goes
+    // to the old target which will still be merged during consolidation
     git_update_ref(unindent(
         format!(
             r#"
             start
-            symref-verify {REFS_NOTES_WRITE_SYMBOLIC_REF} {current_symbolic_ref_target}
             update {current_symbolic_ref_target} {temp_target} {current_note_head}
             commit
             "#
@@ -146,23 +149,19 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
     if git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).is_err() {
         let target = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
 
-        git_update_ref(unindent(
-            format!(
-                r#"
-                start
-                symref-create {REFS_NOTES_WRITE_SYMBOLIC_REF} {target}
-                commit
-                "#
-            )
-            .as_str(),
-        ))
-        .or_else(|err| {
-            if let GitError::RefFailedToLock { .. } = err {
-                Ok(())
-            } else {
-                Err(err)
-            }
-        })?;
+        // Use git symbolic-ref to create the symbolic reference
+        // This is not atomic with other ref operations, but that's acceptable
+        // as this only runs once during initialization
+        git_symbolic_ref_create_or_update(REFS_NOTES_WRITE_SYMBOLIC_REF, &target).or_else(
+            |err| {
+                // If ref already exists (race with another process), that's fine
+                if git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).is_ok() {
+                    Ok(())
+                } else {
+                    Err(err)
+                }
+            },
+        )?;
     }
     Ok(())
 }
@@ -412,16 +411,10 @@ fn remove_measurements_from_reference(
 fn new_symbolic_write_ref() -> Result<String, GitError> {
     let target = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
 
-    git_update_ref(unindent(
-        format!(
-            r#"
-            start
-            symref-update {REFS_NOTES_WRITE_SYMBOLIC_REF} {target}
-            commit
-            "#
-        )
-        .as_str(),
-    ))?;
+    // Use git symbolic-ref to update the symbolic reference target
+    // This is not atomic with other ref operations, but any concurrent writes
+    // that go to the old target will still be merged during consolidation
+    git_symbolic_ref_create_or_update(REFS_NOTES_WRITE_SYMBOLIC_REF, &target)?;
     Ok(target)
 }
 
