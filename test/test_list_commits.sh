@@ -21,7 +21,7 @@ popd
 # Test with single measurement
 cd_empty_repo
 create_commit
-git perf measure -m test -v 1.0
+git perf add -m test 1.0
 git perf publish
 current_commit=$(git rev-parse HEAD)
 output=$(git perf list-commits)
@@ -31,12 +31,12 @@ popd
 # Test with multiple measurements
 cd_empty_repo
 create_commit
-git perf measure -m test -v 1.0
+git perf add -m test 1.0
 git perf publish
 first_commit=$(git rev-parse HEAD)
 
 create_commit
-git perf measure -m test -v 2.0
+git perf add -m test 2.0
 git perf publish
 second_commit=$(git rev-parse HEAD)
 
@@ -55,7 +55,7 @@ popd
 # Test that unpublished measurements are not listed
 cd_empty_repo
 create_commit
-git perf measure -m test -v 1.0
+git perf add -m test 1.0
 # Don't publish
 current_commit=$(git rev-parse HEAD)
 output=$(git perf list-commits)
@@ -68,7 +68,7 @@ popd
 # Test after removing measurements
 cd_empty_repo
 create_commit
-git perf measure -m test -v 1.0
+git perf add -m test 1.0
 git perf publish
 current_commit=$(git rev-parse HEAD)
 
