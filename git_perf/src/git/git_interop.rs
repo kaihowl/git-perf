@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, BufReader, BufWriter, Read, Write},
+    io::{BufRead, BufReader, BufWriter, Write},
     path::Path,
     process::Stdio,
     thread,
@@ -599,23 +599,29 @@ fn raw_prune() -> Result<(), GitError> {
 ///
 /// Each commit hash is returned as a 40-character hexadecimal string.
 pub fn list_commits_with_measurements() -> Result<Vec<String>> {
+    // Update local read branch to include pending writes (like walk_commits does)
+    let temp_ref = update_read_branch()?;
+
     // Use git notes list to get all annotated commits
     // Output format: <note_oid> <commit_oid>
     let mut list_notes =
-        spawn_git_command(&["notes", "--ref", REFS_NOTES_BRANCH, "list"], &None, None)?;
+        spawn_git_command(&["notes", "--ref", &temp_ref.ref_name, "list"], &None, None)?;
 
-    let mut output = String::new();
-    list_notes
+    let stdout = list_notes
         .stdout
         .take()
-        .ok_or_else(|| anyhow!("Failed to capture stdout from git notes list"))?
-        .read_to_string(&mut output)?;
+        .ok_or_else(|| anyhow!("Failed to capture stdout from git notes list"))?;
 
-    // Parse output: each line is "note_sha commit_sha"
+    // Parse output line by line: each line is "note_sha commit_sha"
     // We want the commit_sha (second column)
-    let commits: Vec<String> = output
+    // Process directly from BufReader for efficiency
+    let commits: Vec<String> = BufReader::new(stdout)
         .lines()
-        .filter_map(|line| line.split_whitespace().nth(1).map(|s| s.to_string()))
+        .filter_map(|line_result| {
+            line_result
+                .ok()
+                .and_then(|line| line.split_whitespace().nth(1).map(|s| s.to_string()))
+        })
         .collect();
 
     Ok(commits)
