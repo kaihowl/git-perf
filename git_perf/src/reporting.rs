@@ -351,7 +351,9 @@ mod tests {
     }
 }
 
-// TODO(kaihowl) needs more fine grained output e2e tests
+// Fine-grained output e2e tests added in test_report_output_validation.sh
+// Tests verify: CSV data accuracy, aggregation correctness, key-value filtering,
+// HTML content validation, separation/grouping, and multiple measurement types
 pub fn report(
     output: PathBuf,
     separate_by: Option<String>,
