@@ -62,8 +62,8 @@ assert_output_contains "$output" "$current_commit" "Expected commit to have meas
 # Wait a moment to ensure timestamp difference
 sleep 2
 
-# Remove measurements older than now
-git perf remove --older-than now
+# Remove measurements older than 0 days (removes all measurements)
+git perf remove --older-than 0d
 
 # Verify measurement was removed
 output=$(git perf list-commits)
