@@ -212,4 +212,132 @@ mod test {
         let result = deserialize_single(out_of_range_line);
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_serialize_multiple_empty() {
+        let measurements: Vec<MeasurementData> = vec![];
+        let serialized = serialize_multiple(&measurements);
+        assert_eq!(serialized, "");
+    }
+
+    #[test]
+    fn test_serialize_multiple_single() {
+        let md = MeasurementData {
+            epoch: 1,
+            name: "test".into(),
+            timestamp: 1000.0,
+            val: 5.0,
+            key_values: HashMap::new(),
+        };
+        let serialized = serialize_multiple(&[md]);
+        let expected = format!("1{}test{}1000.0{}5.0\n", DELIMITER, DELIMITER, DELIMITER);
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn test_serialize_multiple_multiple() {
+        let md1 = MeasurementData {
+            epoch: 1,
+            name: "test1".into(),
+            timestamp: 1000.0,
+            val: 5.0,
+            key_values: HashMap::new(),
+        };
+        let md2 = MeasurementData {
+            epoch: 2,
+            name: "test2".into(),
+            timestamp: 2000.0,
+            val: 10.0,
+            key_values: HashMap::new(),
+        };
+        let serialized = serialize_multiple(&[md1, md2]);
+        let expected = format!(
+            "1{}test1{}1000.0{}5.0\n2{}test2{}2000.0{}10.0\n",
+            DELIMITER, DELIMITER, DELIMITER, DELIMITER, DELIMITER, DELIMITER
+        );
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn test_deserialize_single_exactly_four_components() {
+        // Test boundary case: exactly 4 components (no key-value pairs)
+        let line = format!(
+            "5{}measurement{}1234.5{}67.8",
+            DELIMITER, DELIMITER, DELIMITER
+        );
+        let result = deserialize_single(&line);
+        assert!(result.is_some());
+        let md = result.unwrap();
+        assert_eq!(md.epoch, 5);
+        assert_eq!(md.name, "measurement");
+        assert_eq!(md.timestamp, 1234.5);
+        assert_eq!(md.val, 67.8);
+        assert!(md.key_values.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_single_more_than_four_components() {
+        // Test with more than 4 components (includes key-value pairs)
+        let line = format!(
+            "0{}test{}1234{}123{}foo=bar",
+            DELIMITER, DELIMITER, DELIMITER, DELIMITER
+        );
+        let result = deserialize_single(&line);
+        assert!(result.is_some());
+        let md = result.unwrap();
+        assert_eq!(md.key_values.len(), 1);
+        assert_eq!(md.key_values.get("foo"), Some(&"bar".to_string()));
+    }
+
+    #[test]
+    fn test_deserialize_serialize_roundtrip() {
+        let original = MeasurementData {
+            epoch: 10,
+            name: "roundtrip_test".into(),
+            timestamp: 9999.5,
+            val: 42.42,
+            key_values: [
+                ("key1".to_string(), "value1".to_string()),
+                ("key2".to_string(), "value2".to_string()),
+            ]
+            .into(),
+        };
+
+        let serialized = serialize_single(&original, DELIMITER);
+        let deserialized_vec = deserialize(&serialized);
+
+        assert_eq!(deserialized_vec.len(), 1);
+        let deserialized = &deserialized_vec[0];
+
+        assert_eq!(deserialized.epoch, original.epoch);
+        assert_eq!(deserialized.name, original.name);
+        assert_eq!(deserialized.timestamp, original.timestamp);
+        assert_eq!(deserialized.val, original.val);
+        assert_eq!(deserialized.key_values, original.key_values);
+    }
+
+    #[test]
+    fn test_deserialize_multiple_lines() {
+        let lines = format!(
+            "1{}test1{}1000.0{}5.0{}key1=val1\n2{}test2{}2000.0{}10.0{}key2=val2\n",
+            DELIMITER, DELIMITER, DELIMITER, DELIMITER, DELIMITER, DELIMITER, DELIMITER, DELIMITER
+        );
+        let results = deserialize(&lines);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].name, "test1");
+        assert_eq!(results[1].name, "test2");
+    }
+
+    #[test]
+    fn test_serialize_single_with_custom_delimiter() {
+        let md = MeasurementData {
+            epoch: 0,
+            name: "test".into(),
+            timestamp: 100.0,
+            val: 50.0,
+            key_values: [("k".to_string(), "v".to_string())].into(),
+        };
+        let serialized = serialize_single(&md, ",");
+        assert_eq!(serialized, "0,test,100.0,50.0,k=v\n");
+    }
 }
