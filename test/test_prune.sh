@@ -3,7 +3,6 @@
 set -e
 set -x
 
-# TODO(kaihowl) add output expectations for report use cases (based on markdown?)
 # TODO(kaihowl) allow pushing to different remotes
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
