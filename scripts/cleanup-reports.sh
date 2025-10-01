@@ -1,13 +1,29 @@
 #!/bin/bash
 # Removes HTML reports for commits without performance measurements
-# Usage: cleanup-reports.sh [--dry-run]
+# Usage: cleanup-reports.sh [--dry-run] [-y|--yes]
 
 set -euo pipefail
 
 DRY_RUN=false
-if [[ "${1:-}" == "--dry-run" ]]; then
-    DRY_RUN=true
-fi
+AUTO_YES=false
+
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        --dry-run)
+            DRY_RUN=true
+            ;;
+        -y|--yes)
+            AUTO_YES=true
+            ;;
+        *)
+            echo "Usage: $0 [--dry-run] [-y|--yes]"
+            echo "  --dry-run  Show what would be deleted without making changes"
+            echo "  -y, --yes  Skip confirmation prompts (required for non-interactive use)"
+            exit 1
+            ;;
+    esac
+done
 
 # Check if git-perf is available
 if ! command -v git-perf &> /dev/null; then
@@ -59,9 +75,37 @@ if [ "$DRY_RUN" = true ]; then
     exit 0
 fi
 
+# Show what will be deleted and ask for confirmation
+echo ""
+echo "The following reports will be deleted:"
+echo "$ORPHANED_REPORTS" | head -20
+if [ "$ORPHAN_COUNT" -gt 20 ]; then
+    echo "... and $((ORPHAN_COUNT - 20)) more"
+fi
+echo ""
+
+if [ "$AUTO_YES" = false ]; then
+    read -p "⚠️  Delete $ORPHAN_COUNT orphaned reports? (yes/no): " -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        echo "Aborted. No changes made."
+        exit 0
+    fi
+fi
+
 # Checkout gh-pages and delete orphaned reports
 echo "Checking out gh-pages branch..."
 CURRENT_BRANCH=$(git branch --show-current)
+
+if [ "$AUTO_YES" = false ]; then
+    read -p "Continue with checkout to gh-pages? (yes/no): " -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        echo "Aborted. No changes made."
+        exit 0
+    fi
+fi
+
 git checkout gh-pages
 
 echo "Deleting orphaned reports..."
@@ -75,12 +119,23 @@ for commit in $ORPHANED_REPORTS; do
 done
 
 if [ -n "$(git status --porcelain)" ]; then
+    echo "✓ Deleted $DELETED_COUNT orphaned reports"
+
+    if [ "$AUTO_YES" = false ]; then
+        read -p "Commit changes to gh-pages? (yes/no): " -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+            echo "Aborted. Changes not committed."
+            echo "Run 'git checkout $CURRENT_BRANCH' to return to your original branch."
+            exit 1
+        fi
+    fi
+
     git commit -m "chore: remove $DELETED_COUNT reports without measurements
 
 Removed reports for commits that no longer have performance
 measurements as reported by 'git perf list-commits'."
 
-    echo "✓ Deleted $DELETED_COUNT orphaned reports"
     echo "✓ Changes committed to gh-pages"
     echo ""
     echo "To push: git push origin gh-pages"

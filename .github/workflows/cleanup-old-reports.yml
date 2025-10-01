@@ -51,8 +51,9 @@ jobs:
       - name: Cleanup orphaned reports
         run: |
           # Run cleanup script to remove reports without measurements
+          # Use -y flag for non-interactive execution in CI
           chmod +x ./scripts/cleanup-reports.sh
-          ./scripts/cleanup-reports.sh || echo "Cleanup script failed but continuing"
+          ./scripts/cleanup-reports.sh -y || echo "Cleanup script failed but continuing"
 
       - name: Push gh-pages changes
         run: |
