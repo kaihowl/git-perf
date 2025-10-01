@@ -8,16 +8,18 @@ jobs:
     strategy:
       matrix:
         # Test against multiple git versions to ensure compatibility
-        # NOTE: All versions must be >= 2.46.0 (see git_definitions.rs:EXPECTED_VERSION)
-        # Required for symref-update commands used in atomic symref operations
+        # NOTE: All versions must be >= 2.43.0 (see git_definitions.rs:EXPECTED_VERSION)
+        # Required for symbolic reference support via git symbolic-ref
         # Version selection methodology:
-        # - v2.46.0: Minimum supported version (symref-update support introduced)
-        # - v2.47.0: Next stable release after minimum requirement
+        # - v2.43.0: Minimum supported version (symbolic-ref + update-ref dereferencing)
+        # - v2.46.0: Version that introduced symref-update (no longer required)
+        # - v2.47.0: Next stable release for broader coverage
         # - v2.48.0: Another stable version for broader coverage
         # - v2.50.1: Recent version representing current state
         git_version:
-          - "v2.46.0" # Minimum supported version (symref-update support)
-          - "v2.47.0" # Next stable release after minimum
+          - "v2.43.0" # Minimum supported version
+          - "v2.46.0" # Previously minimum version
+          - "v2.47.0" # Stable release
           - "v2.48.0" # Additional stable version coverage
           - "v2.50.1" # Recent version
 

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [[ " $@ " =~ [[:space:]]--version[[:space:]] ]]; then
+  echo git version 2.43.0
+fi

@@ -23,7 +23,7 @@ export PATH=${script_dir}/fake_git_2.40.0:$PATH
 git-perf add -m test 12 && exit 1
 
 # Git version just right
-export PATH=${script_dir}/fake_git_2.46.0:$PATH
+export PATH=${script_dir}/fake_git_2.43.0:$PATH
 git-perf add -m test 12
 
 exit 0

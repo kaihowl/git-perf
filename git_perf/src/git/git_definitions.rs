@@ -1,7 +1,7 @@
 /// Min supported git version
-/// Must be version 2.46.0 at least to support symref-update commands
-/// This version introduced the symref-update instruction for atomic symref operations
-pub const EXPECTED_VERSION: (i32, i32, i32) = (2, 46, 0);
+/// Git 2.43.0 supports symbolic references via git symbolic-ref command
+/// and automatic dereferencing in update-ref transactions
+pub const EXPECTED_VERSION: (i32, i32, i32) = (2, 43, 0);
 
 /// The main branch where performance measurements are stored as git notes
 pub const REFS_NOTES_BRANCH: &str = "refs/notes/perf-v3";
