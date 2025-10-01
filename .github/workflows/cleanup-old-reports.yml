@@ -5,6 +5,8 @@ on:
     # Run every Sunday at 02:00 UTC
     - cron: '0 2 * * 0'
   workflow_dispatch: # Allow manual triggering
+  pull_request:
+    branches: [ master ]
 
 permissions:
   contents: write
@@ -14,6 +16,16 @@ jobs:
   cleanup:
     runs-on: ubuntu-22.04
     steps:
+      - name: Check if dry-run mode
+        id: check-mode
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "dry_run=true" >> $GITHUB_OUTPUT
+            echo "Running in dry-run mode for PR"
+          else
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+            echo "Running in regular mode"
+          fi
       - uses: actions/checkout@v5
         with:
           fetch-depth: 1
@@ -37,12 +49,21 @@ jobs:
         run: |
           # Remove measurements older than 90 days
           # This will update the notes ref locally
-          git perf remove --older-than 90d || echo "No measurements to remove or not applicable"
+          if [ "${{ steps.check-mode.outputs.dry_run }}" == "true" ]; then
+            echo "DRY RUN: Would remove measurements older than 90 days"
+            git perf remove --older-than 90d --dry-run || echo "No measurements to remove or not applicable"
+          else
+            git perf remove --older-than 90d || echo "No measurements to remove or not applicable"
+          fi
 
       - name: Push updated notes
         run: |
           # Push the updated notes ref back to origin
-          git perf push || echo "No changes to push"
+          if [ "${{ steps.check-mode.outputs.dry_run }}" == "true" ]; then
+            echo "DRY RUN: Would push updated notes"
+          else
+            git perf push || echo "No changes to push"
+          fi
 
       - name: Fetch gh-pages branch
         run: |
@@ -52,14 +73,24 @@ jobs:
         run: |
           # Run cleanup script to remove reports without measurements
           chmod +x ./scripts/cleanup-reports.sh
-          ./scripts/cleanup-reports.sh || echo "Cleanup script failed but continuing"
+          if [ "${{ steps.check-mode.outputs.dry_run }}" == "true" ]; then
+            echo "DRY RUN: Would run cleanup-reports.sh"
+            DRY_RUN=true ./scripts/cleanup-reports.sh || echo "Cleanup script failed but continuing"
+          else
+            ./scripts/cleanup-reports.sh || echo "Cleanup script failed but continuing"
+          fi
 
       - name: Push gh-pages changes
         run: |
           git checkout gh-pages
           if [ -n "$(git status --porcelain)" ]; then
-            git push origin gh-pages
-            echo "Pushed cleanup changes to gh-pages"
+            if [ "${{ steps.check-mode.outputs.dry_run }}" == "true" ]; then
+              echo "DRY RUN: Would push cleanup changes to gh-pages"
+              git status --porcelain
+            else
+              git push origin gh-pages
+              echo "Pushed cleanup changes to gh-pages"
+            fi
           else
             echo "No orphaned reports to clean up"
           fi
