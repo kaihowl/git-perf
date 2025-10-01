@@ -1,0 +1,65 @@
+name: 'Cleanup Old Reports'
+
+on:
+  schedule:
+    # Run every Sunday at 02:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Set Git user and email
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+      - name: Install git-perf
+        uses: kaihowl/git-perf/.github/actions/install@master
+        with:
+          release: latest
+
+      - name: Fetch performance notes
+        run: |
+          # Fetch the notes ref to access measurements
+          git fetch origin refs/notes/perf-v3:refs/notes/perf-v3 || echo "No notes ref found"
+
+      - name: Remove old measurements (>90 days)
+        run: |
+          # Remove measurements older than 90 days
+          # This will update the notes ref locally
+          git perf remove --older-than 90d || echo "No measurements to remove or not applicable"
+
+      - name: Push updated notes
+        run: |
+          # Push the updated notes ref back to origin
+          git perf push || echo "No changes to push"
+
+      - name: Fetch gh-pages branch
+        run: |
+          git fetch origin gh-pages:gh-pages
+
+      - name: Cleanup orphaned reports
+        run: |
+          # Run cleanup script to remove reports without measurements
+          chmod +x ./scripts/cleanup-reports.sh
+          ./scripts/cleanup-reports.sh || echo "Cleanup script failed but continuing"
+
+      - name: Push gh-pages changes
+        run: |
+          git checkout gh-pages
+          if [ -n "$(git status --porcelain)" ]; then
+            git push origin gh-pages
+            echo "Pushed cleanup changes to gh-pages"
+          else
+            echo "No orphaned reports to clean up"
+          fi
