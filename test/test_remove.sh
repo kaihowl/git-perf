@@ -175,8 +175,16 @@ git perf push
 
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should be there
-# TODO(kaihowl) clean up of write branches needed
 [[ ${num_measurements} -eq 1 ]] || exit 1
+
+# Verify that temporary write branches are cleaned up after push
+ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
+if [[ 1 -ne $ref_count ]]; then
+  echo "Expected only the permanent git perf ref after push, but found ${ref_count} refs"
+  echo "Current refs:"
+  git for-each-ref '**/notes/perf-*'
+  exit 1
+fi
 
 popd
 
