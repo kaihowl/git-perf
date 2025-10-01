@@ -21,9 +21,8 @@ popd
 # Test with single measurement
 cd_empty_repo
 create_commit
-git perf add -m test 1.0
-git perf publish
 current_commit=$(git rev-parse HEAD)
+git perf add -m test 1.0
 output=$(git perf list-commits)
 assert_output_contains "$output" "$current_commit" "Expected current commit in list-commits output"
 popd
@@ -31,14 +30,12 @@ popd
 # Test with multiple measurements
 cd_empty_repo
 create_commit
-git perf add -m test 1.0
-git perf publish
 first_commit=$(git rev-parse HEAD)
+git perf add -m test 1.0
 
 create_commit
-git perf add -m test 2.0
-git perf publish
 second_commit=$(git rev-parse HEAD)
+git perf add -m test 2.0
 
 output=$(git perf list-commits)
 assert_output_contains "$output" "$first_commit" "Expected first commit in list-commits output"
@@ -52,36 +49,27 @@ if [ "$line_count" -ne 2 ]; then
 fi
 popd
 
-# Test that unpublished measurements are not listed
-cd_empty_repo
-create_commit
-git perf add -m test 1.0
-# Don't publish
-current_commit=$(git rev-parse HEAD)
-output=$(git perf list-commits)
-if [ -n "$output" ]; then
-  echo "Expected empty output for unpublished measurements"
-  exit 1
-fi
-popd
-
 # Test after removing measurements
 cd_empty_repo
 create_commit
-git perf add -m test 1.0
-git perf publish
 current_commit=$(git rev-parse HEAD)
+git perf add -m test 1.0
+
+# Verify measurement was added
+output=$(git perf list-commits)
+assert_output_contains "$output" "$current_commit" "Expected commit to have measurement before removal"
 
 # Wait a moment to ensure timestamp difference
 sleep 2
 
 # Remove measurements older than now
 git perf remove --older-than now
-git perf publish
 
+# Verify measurement was removed
 output=$(git perf list-commits)
 if [ -n "$output" ]; then
   echo "Expected empty output after removing all measurements"
+  echo "Got: $output"
   exit 1
 fi
 popd
