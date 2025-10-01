@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # Full checkout required for git perf remove/prune operations
 
       - name: Set Git user and email
         run: |
