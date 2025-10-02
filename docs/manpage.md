@@ -80,7 +80,11 @@ Add single measurement
 
 Publish performance results to remote
 
-**Usage:** `git-perf push`
+**Usage:** `git-perf push [OPTIONS]`
+
+###### **Options:**
+
+* `-r`, `--remote <REMOTE>` — Remote to push to (defaults to git-perf-origin)
 
 
 

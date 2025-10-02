@@ -103,7 +103,11 @@ pub enum Commands {
     },
 
     /// Publish performance results to remote
-    Push {},
+    Push {
+        /// Remote to push to (defaults to git-perf-origin)
+        #[arg(short, long)]
+        remote: Option<String>,
+    },
 
     /// Pull performance results from remote
     Pull {},
