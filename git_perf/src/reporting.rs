@@ -376,7 +376,8 @@ pub fn report(
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
         }
-        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
+        // Filter measurements where key_values is a subset of the measurement's key_values.
+        // This is equivalent to the subset relation check in the audit function.
         m.matches_key_values(key_values)
     };
 

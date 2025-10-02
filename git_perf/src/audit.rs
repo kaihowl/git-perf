@@ -85,6 +85,8 @@ fn audit(
 ) -> Result<AuditResult> {
     let all = measurement_retrieval::walk_commits(max_count)?;
 
+    // Filter measurements where selectors is a subset of the measurement's key_values.
+    // This is equivalent to the subset relation check in the reporting function.
     let filter_by = |m: &MeasurementData| m.name == measurement && m.matches_key_values(selectors);
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
