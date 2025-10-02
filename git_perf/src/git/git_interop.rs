@@ -748,15 +748,7 @@ pub fn pull(work_dir: Option<&Path>) -> Result<()> {
 }
 
 fn pull_internal(work_dir: Option<&Path>) -> Result<(), GitError> {
-    fetch(work_dir).or_else(|err| match err {
-        // A concurrent modification comes from a concurrent fetch.
-        // Don't fail for that.
-        // TODO(kaihowl) must potentially be moved into the retry logic from the push backoff as it
-        // only is there safe to assume that we successfully pulled.
-        GitError::RefConcurrentModification { .. } | GitError::RefFailedToLock { .. } => Ok(()),
-        _ => Err(err),
-    })?;
-
+    fetch(work_dir)?;
     Ok(())
 }
 
@@ -766,9 +758,28 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
             .map_err(map_git_error_for_backoff)
             .map_err(|e: ::backoff::Error<GitError>| match e {
                 ::backoff::Error::Transient { .. } => {
-                    match pull_internal(work_dir).map_err(map_git_error_for_backoff) {
-                        Ok(_) => e,
-                        Err(e) => e,
+                    // Attempt to pull to resolve conflicts
+                    let pull_result = pull_internal(work_dir).map_err(map_git_error_for_backoff);
+
+                    // A concurrent modification comes from a concurrent fetch.
+                    // Don't fail for that - it's safe to assume we successfully pulled
+                    // in the context of the retry logic.
+                    let pull_succeeded = pull_result.is_ok()
+                        || matches!(
+                            pull_result,
+                            Err(::backoff::Error::Permanent(
+                                GitError::RefConcurrentModification { .. }
+                                    | GitError::RefFailedToLock { .. }
+                            ))
+                        );
+
+                    if pull_succeeded {
+                        // Pull succeeded or failed with expected concurrent errors,
+                        // return the original push error to retry
+                        e
+                    } else {
+                        // Pull failed with unexpected error, propagate it
+                        pull_result.unwrap_err()
                     }
                 }
                 ::backoff::Error::Permanent { .. } => e,
