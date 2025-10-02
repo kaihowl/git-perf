@@ -39,13 +39,13 @@ if [[ "$line_count" -ne 6 ]]; then
   exit 1
 fi
 
-# Verify specific values appear in output
-assert_output_contains "$csv_output" "1.5" "Missing measurement value 1.5"
-assert_output_contains "$csv_output" "2.5" "Missing measurement value 2.5"
-assert_output_contains "$csv_output" "3.0" "Missing measurement value 3.0"
-assert_output_contains "$csv_output" "4.0" "Missing measurement value 4.0"
-assert_output_contains "$csv_output" "5.0" "Missing measurement value 5.0"
-assert_output_contains "$csv_output" "6.0" "Missing measurement value 6.0"
+# Verify specific values appear in output (check with tab delimiter to avoid matching timestamps)
+assert_output_contains "$csv_output" "	1.5	" "Missing measurement value 1.5"
+assert_output_contains "$csv_output" "	2.5	" "Missing measurement value 2.5"
+assert_output_contains "$csv_output" "	3.0	" "Missing measurement value 3.0"
+assert_output_contains "$csv_output" "	4.0	" "Missing measurement value 4.0"
+assert_output_contains "$csv_output" "	5.0	" "Missing measurement value 5.0"
+assert_output_contains "$csv_output" "	6.0	" "Missing measurement value 6.0"
 
 # Verify measurement name appears in all lines
 timer_count=$(echo "$csv_output" | grep -c "timer")
@@ -69,10 +69,10 @@ if [[ "$line_count" -ne 3 ]]; then
   exit 1
 fi
 
-# Check for the mean values (allowing for floating point representation)
-assert_output_contains "$agg_output" "2" "Missing aggregated value ~2.0 (mean of 1.5, 2.5)"
-assert_output_contains "$agg_output" "3.5" "Missing aggregated value 3.5 (mean of 3.0, 4.0)"
-assert_output_contains "$agg_output" "5.5" "Missing aggregated value 5.5 (mean of 5.0, 6.0)"
+# Check for the mean values (with tab delimiter to avoid matching timestamps)
+assert_output_contains "$agg_output" "	2	" "Missing aggregated value ~2.0 (mean of 1.5, 2.5)"
+assert_output_contains "$agg_output" "	3.5	" "Missing aggregated value 3.5 (mean of 3.0, 4.0)"
+assert_output_contains "$agg_output" "	5.5	" "Missing aggregated value 5.5 (mean of 5.0, 6.0)"
 
 echo "✓ CSV aggregation produces correct mean values"
 
@@ -88,15 +88,15 @@ if [[ "$line_count" -ne 4 ]]; then
   exit 1
 fi
 
-# Verify ubuntu values are present
-assert_output_contains "$ubuntu_output" "1.5" "Missing ubuntu measurement 1.5"
-assert_output_contains "$ubuntu_output" "2.5" "Missing ubuntu measurement 2.5"
-assert_output_contains "$ubuntu_output" "3.0" "Missing ubuntu measurement 3.0"
-assert_output_contains "$ubuntu_output" "4.0" "Missing ubuntu measurement 4.0"
+# Verify ubuntu values are present (check with tab delimiter to avoid matching timestamps)
+assert_output_contains "$ubuntu_output" "	1.5	" "Missing ubuntu measurement 1.5"
+assert_output_contains "$ubuntu_output" "	2.5	" "Missing ubuntu measurement 2.5"
+assert_output_contains "$ubuntu_output" "	3.0	" "Missing ubuntu measurement 3.0"
+assert_output_contains "$ubuntu_output" "	4.0	" "Missing ubuntu measurement 4.0"
 
-# Verify mac values are NOT present
-assert_output_not_contains "$ubuntu_output" "5.0" "Mac measurement 5.0 should not appear in ubuntu filter"
-assert_output_not_contains "$ubuntu_output" "6.0" "Mac measurement 6.0 should not appear in ubuntu filter"
+# Verify mac values are NOT present (check with tab delimiter to avoid matching timestamps)
+assert_output_not_contains "$ubuntu_output" "	5.0	" "Mac measurement 5.0 should not appear in ubuntu filter"
+assert_output_not_contains "$ubuntu_output" "	6.0	" "Mac measurement 6.0 should not appear in ubuntu filter"
 
 echo "✓ Key-value filtering correctly filters measurements"
 
@@ -149,10 +149,10 @@ multi_output=$(git perf report -o -)
 assert_output_contains "$multi_output" "timer" "Multi-measurement CSV missing 'timer'"
 assert_output_contains "$multi_output" "memory" "Multi-measurement CSV missing 'memory'"
 
-# Should contain values from both measurement types
-assert_output_contains "$multi_output" "1.5" "Multi-measurement CSV missing timer value"
-assert_output_contains "$multi_output" "100" "Multi-measurement CSV missing memory value"
-assert_output_contains "$multi_output" "200" "Multi-measurement CSV missing memory value"
+# Should contain values from both measurement types (with tab delimiters)
+assert_output_contains "$multi_output" "	1.5	" "Multi-measurement CSV missing timer value"
+assert_output_contains "$multi_output" "	100	" "Multi-measurement CSV missing memory value"
+assert_output_contains "$multi_output" "	200	" "Multi-measurement CSV missing memory value"
 
 echo "✓ Multiple measurement types appear in same report"
 
