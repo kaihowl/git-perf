@@ -680,20 +680,9 @@ impl Drop for TempRef {
 
 fn update_read_branch() -> Result<TempRef, GitError> {
     let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
-    // - With the upstream refs/notes/perf-v3
-    //     - If not merged into refs/notes/perf-v3-read: set refs/notes/perf-v3-read to refs/notes/perf-v3
-    //     - Protect against concurrent invocations by checking that the refs/notes/perf-v3-read has
-    //     not changed between invocations!
-    //
-    // TODO(kaihowl) add test for bug:
-    //   read branch might not be up to date with the remote branch after a history cut off.
-    //   Then the _old_ read branch might have all writes already merged in.
-    //   But the upstream does not. But we check the pending write branches against the old read
-    //   branch......
-    //   Better to just create the read branch fresh from the remote and add in all pending write
-    //   branches and not optimize. This should be the same as creating the merge branch. Can the
-    //   code be ..merged..?
-
+    // Create a fresh read branch from the remote and consolidate all pending write branches.
+    // This ensures the read branch is always up to date with the remote branch, even after
+    // a history cutoff, by checking against the current upstream state.
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
 
     let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)?;
