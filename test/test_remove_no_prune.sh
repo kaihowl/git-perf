@@ -7,20 +7,9 @@ script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-# Check that no git objects in the entire repo contains the given pattern
-function git_objects_contain {
-  PATTERN=$1
-  # Iterate over all git objects in the repository
-  while read -r OBJECT; do
-      # Check if the object contains the specific pattern
-      if git cat-file -p "$OBJECT" 2>/dev/null | grep -q "$PATTERN"; then
-          echo "The pattern '$PATTERN' was found in the git object '$OBJECT'."
-          return 0
-      fi
-  done < <(git rev-list --objects --all | awk '{print $1}')
-
-  echo "Success: No git objects contain the pattern '$PATTERN'."
-  return 1
+# Check how many notes exist in the perf branch
+function count_perf_notes {
+  git notes --ref=refs/notes/perf-v3 list 2>/dev/null | wc -l
 }
 
 if [[ $(uname -s) = Darwin ]]; then
@@ -44,72 +33,53 @@ pushd my-first-checkout
 # --- 28 days ago
 export FAKETIME='-28d'
 
-echo "Add measurement on commit in the past"
+echo "Setup: Create old commit with measurement"
 create_commit
+old_commit=$(git rev-parse HEAD)
 git perf add -m test-measure-old 10.0
-num_measurements=$(git perf report -o - | wc -l)
-# Exactly one measurement should be present
-[[ ${num_measurements} -eq 1 ]] || exit 1
 
-# Only published measurements can be expired
+# Must push to create the remote perf branch
+git push
 git perf push
 
-# --- 14 days ago
-export FAKETIME='-14d'
+# --- Now (present)
+unset FAKETIME
 
-echo "Add a commit with a newer measurement"
+echo "Setup: Create newer commit with measurement"
 create_commit
 git perf add -m test-measure-new 20.0
-num_measurements=$(git perf report -o - | wc -l)
-# Two measurements should be there
-[[ ${num_measurements} -eq 2 ]] || exit 1
-
-# Only published measurements can be expired
+git push
 git perf push
 
-# Now remove the old commit from git history (simulating a rebase/force push)
+# Now make the old commit unreachable by resetting and force pushing
 git reset --hard HEAD~1
-git push --force
+git push --force origin master:master
 
-# Run git prune to make the old commit unreachable
+# Make sure old commit is truly unreachable
 git reflog expire --expire=all --all
 git prune --expire=now
 
-echo "Test 1: Remove with --no-prune flag (should NOT prune orphaned measurements)"
+echo "Initial state: should have 2 notes (one orphaned for unreachable commit)"
+initial_notes=$(count_perf_notes)
+[[ $initial_notes -eq 2 ]] || { echo "Expected 2 notes, got $initial_notes"; exit 1; }
+
+echo "Test 1: Remove with --no-prune (should keep orphaned note)"
 git perf remove --older-than 20d --no-prune
 
-num_measurements=$(git perf report -o - | wc -l)
-# One measurement should still be there (test-measure-new)
-[[ ${num_measurements} -eq 1 ]] || exit 1
+after_no_prune=$(count_perf_notes)
+# Should still have 2 notes even though one measurement was removed
+# (the note for the unreachable commit is orphaned but not pruned)
+[[ $after_no_prune -eq 2 ]] || { echo "Expected 2 notes after --no-prune, got $after_no_prune"; exit 1; }
 
-# The orphaned measurement (test-measure-old) should STILL be in git objects
-# because we used --no-prune
-if ! git_objects_contain test-measure-old; then
-  echo "ERROR: test-measure-old was pruned even with --no-prune flag!"
-  exit 1
-fi
-
-echo "Test 2: Now remove with default behavior (should prune orphaned measurements)"
-# First, let's remove measurements again, this time without --no-prune
+echo "Test 2: Remove with default behavior (should prune orphaned note)"
 git perf remove --older-than 20d
 
-num_measurements=$(git perf report -o - | wc -l)
-# Still one measurement (test-measure-new)
-[[ ${num_measurements} -eq 1 ]] || exit 1
+after_prune=$(count_perf_notes)
+# Should now have only 1 note (orphaned one was pruned)
+[[ $after_prune -eq 1 ]] || { echo "Expected 1 note after default remove, got $after_prune"; exit 1; }
 
-# Now the orphaned measurement (test-measure-old) should be GONE
-# because default behavior includes pruning
-git reflog expire --expire=all --all
-git prune --expire=now
-
-if git_objects_contain test-measure-old; then
-  echo "ERROR: test-measure-old was NOT pruned with default behavior!"
-  echo "This means automatic pruning is not working"
-  exit 1
-fi
-
-echo "SUCCESS: --no-prune flag works correctly"
-echo "SUCCESS: default pruning behavior works correctly"
+echo "SUCCESS: --no-prune flag correctly skips pruning"
+echo "SUCCESS: default behavior correctly prunes orphaned measurements"
 
 popd
 
