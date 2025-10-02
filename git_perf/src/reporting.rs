@@ -452,9 +452,6 @@ pub fn report(
         }
     }
 
-    // TODO(kaihowl) fewer than the -n specified measurements appear in plot (old problem, even in
-    // python)
-
     if output == Path::new("-") {
         match io::stdout().write_all(&plot.as_bytes()) {
             Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
