@@ -32,6 +32,14 @@ impl MeasurementData {
     /// Returns true if all key-value pairs in `criteria` exist in this measurement
     /// with matching values.
     pub fn matches_key_values(&self, criteria: &[(String, String)]) -> bool {
+        self.key_values_is_superset_of(criteria)
+    }
+
+    /// Checks if this measurement's key-values form a superset of the given criteria.
+    /// In other words, verifies that criteria ⊆ measurement.key_values.
+    /// Returns true if all key-value pairs in `criteria` exist in this measurement's
+    /// key_values with matching values.
+    pub fn key_values_is_superset_of(&self, criteria: &[(String, String)]) -> bool {
         criteria
             .iter()
             .all(|(k, v)| self.key_values.get(k).map(|mv| v == mv).unwrap_or(false))
