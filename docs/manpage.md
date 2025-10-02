@@ -196,13 +196,18 @@ Accept HEAD commit's measurement for audit, even if outside of range. This is al
 
 Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=).
 
+By default, this command automatically prunes orphaned measurements after removal (measurements for commits that no longer exist or are unreachable). Use --no-prune to skip this automatic cleanup.
+
 Note: Only published measurements (i.e., those that have been pushed to the remote repository) can be removed. Local unpublished measurements are not affected by this operation.
 
-**Usage:** `git-perf remove --older-than <OLDER_THAN>`
+**Usage:** `git-perf remove [OPTIONS] --older-than <OLDER_THAN>`
 
 ###### **Options:**
 
 * `--older-than <OLDER_THAN>`
+* `--no-prune` — Skip automatic pruning of orphaned measurements after removal
+
+  Default value: `false`
 
 
 

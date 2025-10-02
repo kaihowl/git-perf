@@ -238,12 +238,20 @@ pub enum Commands {
     /// Remove all performance measurements for commits that have been committed
     /// at or before the specified time (inclusive boundary, uses <=).
     ///
+    /// By default, this command automatically prunes orphaned measurements after
+    /// removal (measurements for commits that no longer exist or are unreachable).
+    /// Use --no-prune to skip this automatic cleanup.
+    ///
     /// Note: Only published measurements (i.e., those that have been pushed to the
     /// remote repository) can be removed. Local unpublished measurements are not
     /// affected by this operation.
     Remove {
         #[arg(long = "older-than", value_parser = parse_datetime_value_now)]
         older_than: DateTime<Utc>,
+
+        /// Skip automatic pruning of orphaned measurements after removal
+        #[arg(long = "no-prune", default_value = "false")]
+        no_prune: bool,
     },
 
     /// Remove all performance measurements for non-existent/unreachable objects.
