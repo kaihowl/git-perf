@@ -156,8 +156,8 @@ assert_output_contains "$multi_output" "memory" "Multi-measurement CSV missing '
 # Should contain values from both measurement types with whitespace normalization
 multi_normalized=$(echo "$multi_output" | tr -s '[:space:]' ' ')
 assert_output_contains "$multi_normalized" " 1.5 " "Multi-measurement CSV missing timer value"
-assert_output_contains "$multi_normalized" " 100 " "Multi-measurement CSV missing memory value"
-assert_output_contains "$multi_normalized" " 200 " "Multi-measurement CSV missing memory value"
+assert_output_contains "$multi_normalized" " 100.0 " "Multi-measurement CSV missing memory value"
+assert_output_contains "$multi_normalized" " 200.0 " "Multi-measurement CSV missing memory value"
 
 echo "✓ Multiple measurement types appear in same report"
 
