@@ -376,8 +376,8 @@ pub fn report(
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
         }
-        // TODO(kaihowl) express this and the audit-fn equivalent as subset relations
-        m.matches_key_values(key_values)
+        // Filter using subset relation: key_values ⊆ measurement.key_values
+        m.key_values_is_superset_of(key_values)
     };
 
     let relevant_measurements = commits
