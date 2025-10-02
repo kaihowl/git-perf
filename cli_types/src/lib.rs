@@ -249,6 +249,16 @@ pub enum Commands {
     /// Remove all performance measurements for non-existent/unreachable objects.
     /// Will refuse to work if run on a shallow clone.
     Prune {},
+
+    /// List all commits that have performance measurements.
+    ///
+    /// Outputs one commit SHA-1 hash per line. This can be used to identify
+    /// which commits have measurements stored in the performance notes branch.
+    ///
+    /// Example:
+    ///   git perf list-commits | wc -l  # Count commits with measurements
+    ///   git perf list-commits | head   # Show first few commits
+    ListCommits {},
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String)> {

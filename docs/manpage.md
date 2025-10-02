@@ -14,6 +14,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf bump-epoch`↴](#git-perf-bump-epoch)
 * [`git-perf remove`↴](#git-perf-remove)
 * [`git-perf prune`↴](#git-perf-prune)
+* [`git-perf list-commits`↴](#git-perf-list-commits)
 
 ## `git-perf`
 
@@ -30,6 +31,7 @@ This document contains the help content for the `git-perf` command-line program.
 * `bump-epoch` — Accept HEAD commit's measurement for audit, even if outside of range. This is allows to accept expected performance changes. This is accomplished by starting a new epoch for the given measurement. The epoch is configured in the git perf config file. A change to the epoch therefore has to be committed and will result in a new HEAD for which new measurements have to be taken
 * `remove` — Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=)
 * `prune` — Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
+* `list-commits` — List all commits that have performance measurements
 
 ###### **Options:**
 
@@ -209,6 +211,18 @@ Note: Only published measurements (i.e., those that have been pushed to the remo
 Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
 
 **Usage:** `git-perf prune`
+
+
+
+## `git-perf list-commits`
+
+List all commits that have performance measurements.
+
+Outputs one commit SHA-1 hash per line. This can be used to identify which commits have measurements stored in the performance notes branch.
+
+Example: git perf list-commits | wc -l  # Count commits with measurements git perf list-commits | head   # Show first few commits
+
+**Usage:** `git-perf list-commits`
 
 
 

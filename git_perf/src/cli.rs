@@ -8,7 +8,7 @@ use crate::audit;
 use crate::basic_measure::measure;
 use crate::config::bump_epoch;
 use crate::git::git_interop::check_git_version;
-use crate::git::git_interop::{prune, pull, push};
+use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push};
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
 use crate::stats::ReductionFunc;
@@ -86,6 +86,13 @@ pub fn handle_calls() -> Result<()> {
         Commands::BumpEpoch { measurement } => bump_epoch(&measurement),
         Commands::Prune {} => prune(),
         Commands::Remove { older_than } => remove_measurements_from_commits(older_than),
+        Commands::ListCommits {} => {
+            let commits = list_commits_with_measurements()?;
+            for commit in commits {
+                println!("{}", commit);
+            }
+            Ok(())
+        }
     }
 }
 

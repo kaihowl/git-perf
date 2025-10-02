@@ -1,0 +1,17 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH list-commits 1  "list-commits " 
+.SH NAME
+list\-commits \- List all commits that have performance measurements
+.SH SYNOPSIS
+\fBlist\-commits\fR [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+List all commits that have performance measurements.
+.PP
+Outputs one commit SHA\-1 hash per line. This can be used to identify which commits have measurements stored in the performance notes branch.
+.PP
+Example: git perf list\-commits | wc \-l  # Count commits with measurements git perf list\-commits | head   # Show first few commits
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
