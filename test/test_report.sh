@@ -55,6 +55,18 @@ assert_output_contains "$separated_content" "mac" "Separated HTML missing 'mac' 
 all_content=$(cat all_result.html)
 assert_output_contains "$all_content" "timer2" "All results HTML missing 'timer2' measurement"
 
+# Verify timer2 is absent from filtered reports
+single_content=$(cat single_result.html)
+separated_single_content=$(cat separated_single_result.html)
+if grep -q "timer2" <<< "$single_content"; then
+  echo "Single measurement HTML should not contain 'timer2'"
+  exit 1
+fi
+if grep -q "timer2" <<< "$separated_single_content"; then
+  echo "Separated single measurement HTML should not contain 'timer2'"
+  exit 1
+fi
+
 output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
 assert_output_contains "$output" "no performance measurements" "No warning for missing measurements"
 

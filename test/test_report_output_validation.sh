@@ -7,9 +7,6 @@ script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-# Test fine-grained report output validation
-# This addresses the TODO at reporting.rs:354 about needing more detailed e2e output tests
-
 cd_empty_repo
 
 # Create test data with known values
@@ -171,16 +168,5 @@ full_output=$(git perf report -m timer -o -)
 assert_output_contains "$full_output" "$short_commit" "CSV missing commit hash"
 
 echo "✓ CSV output includes commit information"
-
-echo ""
-echo "All report output validation tests passed!"
-echo "These tests verify:"
-echo "  - CSV contains correct measurement values"
-echo "  - Aggregation calculates correct mean values"
-echo "  - Key-value filtering works correctly"
-echo "  - HTML output contains measurement data"
-echo "  - Separation by key works in HTML output"
-echo "  - Multiple measurement types in same report"
-echo "  - CSV includes commit information"
 
 popd
