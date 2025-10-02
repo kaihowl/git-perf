@@ -41,8 +41,10 @@ fi
 # Verify the aggregated values are correct
 # Commit 1: mean of [1.0, 2.0] = 1.5
 # Commit 2: mean of [3.0, 4.0] = 3.5
-assert_output_contains "$agg_output" "	1.5" "CSV missing aggregated mean value 1.5 (mean of 1.0, 2.0)"
-assert_output_contains "$agg_output" "	3.5" "CSV missing aggregated mean value 3.5 (mean of 3.0, 4.0)"
+# Normalize whitespace for reliable matching
+agg_normalized=$(echo "$agg_output" | tr -s '[:space:]' ' ')
+assert_output_contains "$agg_normalized" " 1.5" "CSV missing aggregated mean value 1.5 (mean of 1.0, 2.0)"
+assert_output_contains "$agg_normalized" " 3.5" "CSV missing aggregated mean value 3.5 (mean of 3.0, 4.0)"
 
 echo "CSV aggregated report produced correct number of summarized lines and correct mean values."
 
