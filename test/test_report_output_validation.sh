@@ -70,7 +70,7 @@ if [[ "$line_count" -ne 3 ]]; then
 fi
 
 # Check for the mean values (with tab delimiter to avoid matching timestamps)
-assert_output_contains "$agg_output" "	2	" "Missing aggregated value ~2.0 (mean of 1.5, 2.5)"
+assert_output_contains "$agg_output" "	2.0	" "Missing aggregated value 2.0 (mean of 1.5, 2.5)"
 assert_output_contains "$agg_output" "	3.5	" "Missing aggregated value 3.5 (mean of 3.0, 4.0)"
 assert_output_contains "$agg_output" "	5.5	" "Missing aggregated value 5.5 (mean of 5.0, 6.0)"
 
