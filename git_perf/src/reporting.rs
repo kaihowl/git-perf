@@ -351,7 +351,6 @@ mod tests {
     }
 }
 
-// TODO(kaihowl) needs more fine grained output e2e tests
 pub fn report(
     output: PathBuf,
     separate_by: Option<String>,

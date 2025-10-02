@@ -22,19 +22,29 @@ git perf add -m timer 3.0
 git perf add -m timer 4.0
 
 # Aggregate by mean and write to stdout (CSV/TSV)
-num_lines=$(git perf report -m timer -a mean -o - | wc -l)
+agg_output=$(git perf report -m timer -a mean -o - | grep -v '^[[:space:]]*$')
+num_lines=$(echo "$agg_output" | grep -v '^[[:space:]]*$' | wc -l)
 
 if [[ "$num_lines" -ne 2 ]]; then
   echo "Expected 2 summarized lines (one per commit), got: $num_lines"
+  echo "Output: $agg_output"
   exit 1
 fi
 
 # Basic sanity: ensure measurement name appears on each line
-name_count=$(git perf report -m timer -a mean -o - | grep -c "timer")
+name_count=$(echo "$agg_output" | grep -c "timer")
 if [[ "$name_count" -ne 2 ]]; then
   echo "Expected measurement name 'timer' to appear on 2 lines, got: $name_count"
   exit 1
 fi
 
-echo "CSV aggregated report produced correct number of summarized lines."
+# Verify the aggregated values are correct
+# Commit 1: mean of [1.0, 2.0] = 1.5
+# Commit 2: mean of [3.0, 4.0] = 3.5
+# Normalize whitespace for reliable matching
+agg_normalized=$(echo "$agg_output" | tr -s '[:space:]' ' ')
+assert_output_contains "$agg_normalized" " 1.5" "CSV missing aggregated mean value 1.5 (mean of 1.0, 2.0)"
+assert_output_contains "$agg_normalized" " 3.5" "CSV missing aggregated mean value 3.5 (mean of 3.0, 4.0)"
+
+echo "CSV aggregated report produced correct number of summarized lines and correct mean values."
 

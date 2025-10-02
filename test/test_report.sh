@@ -35,6 +35,38 @@ git perf report -o separated_result.html -s os
 git perf report -o single_result.html -m timer
 git perf report -o separated_single_result.html -m timer -s os
 
+# Verify HTML files were created and contain measurement data
+for html_file in all_result.html separated_result.html single_result.html separated_single_result.html; do
+  if [[ ! -f "$html_file" ]]; then
+    echo "Expected HTML file '$html_file' was not created"
+    exit 1
+  fi
+
+  html_content=$(cat "$html_file")
+  assert_output_contains "$html_content" "timer" "HTML file '$html_file' missing measurement name 'timer'"
+done
+
+# Verify separated output contains OS labels
+separated_content=$(cat separated_result.html)
+assert_output_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
+assert_output_contains "$separated_content" "mac" "Separated HTML missing 'mac' group label"
+
+# Verify timer2 only appears in all_result (not filtered out)
+all_content=$(cat all_result.html)
+assert_output_contains "$all_content" "timer2" "All results HTML missing 'timer2' measurement"
+
+# Verify timer2 is absent from filtered reports
+single_content=$(cat single_result.html)
+separated_single_content=$(cat separated_single_result.html)
+if grep -q "timer2" <<< "$single_content"; then
+  echo "Single measurement HTML should not contain 'timer2'"
+  exit 1
+fi
+if grep -q "timer2" <<< "$separated_single_content"; then
+  echo "Separated single measurement HTML should not contain 'timer2'"
+  exit 1
+fi
+
 output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
 assert_output_contains "$output" "no performance measurements" "No warning for missing measurements"
 
