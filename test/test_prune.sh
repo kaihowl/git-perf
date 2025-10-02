@@ -3,8 +3,6 @@
 set -e
 set -x
 
-# TODO(kaihowl) allow pushing to different remotes
-
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"

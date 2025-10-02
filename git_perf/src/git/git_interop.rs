@@ -304,7 +304,7 @@ where
 
     compact_head(&target)?;
 
-    git_push_notes_ref(&current_notes_head, &target, &None)?;
+    git_push_notes_ref(&current_notes_head, &target, &None, None)?;
 
     git_update_ref(unindent(
         format!(
@@ -469,7 +469,7 @@ fn remove_reference(ref_name: &str) -> Result<(), GitError> {
     ))
 }
 
-fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
+fn raw_push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<(), GitError> {
     ensure_remote_exists()?;
     // This might merge concurrently created write branches. There is no protection against that.
     // This wants to achieve an at-least-once semantic. The exactly-once semantic is ensured by the
@@ -498,7 +498,7 @@ fn raw_push(work_dir: Option<&Path>) -> Result<(), GitError> {
         return Err(GitError::MissingMeasurements);
     }
 
-    git_push_notes_ref(&current_upstream_oid, &merge_ref, &work_dir)?;
+    git_push_notes_ref(&current_upstream_oid, &merge_ref, &work_dir, remote)?;
 
     // It is acceptable to fetch here independent of the push. Only one concurrent push will succeed.
     fetch(None)?;
@@ -522,15 +522,17 @@ fn git_push_notes_ref(
     expected_upstream: &str,
     push_ref: &str,
     working_dir: &Option<&Path>,
+    remote: Option<&str>,
 ) -> Result<(), GitError> {
     // - CAS push the temporary merge ref to upstream using the noted down upstream ref
     //     - In case of concurrent pushes, back off and restart fresh from previous step.
+    let remote_name = remote.unwrap_or(GIT_PERF_REMOTE);
     let output = capture_git_output(
         &[
             "push",
             "--porcelain",
             format!("--force-with-lease={REFS_NOTES_BRANCH}:{expected_upstream}").as_str(),
-            GIT_PERF_REMOTE,
+            remote_name,
             format!("{push_ref}:{REFS_NOTES_BRANCH}").as_str(),
         ],
         working_dir,
@@ -751,9 +753,9 @@ fn pull_internal(work_dir: Option<&Path>) -> Result<(), GitError> {
     Ok(())
 }
 
-pub fn push(work_dir: Option<&Path>) -> Result<()> {
+pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
     let op = || {
-        raw_push(work_dir)
+        raw_push(work_dir, remote)
             .map_err(map_git_error_for_backoff)
             .map_err(|e: ::backoff::Error<GitError>| match e {
                 ::backoff::Error::Transient { .. } => {
@@ -904,7 +906,7 @@ mod test {
         ensure_symbolic_write_ref_exists().expect("Failed to ensure symbolic write ref exists");
         add_note_line_to_head("test note line").expect("Failed to add note line");
 
-        let error = push(None);
+        let error = push(None, None);
         error
             .as_ref()
             .expect_err("We have no valid git http server setup -> should fail");
@@ -973,7 +975,7 @@ mod test {
 
         add_note_line_to_head("test line, invalid measurement, does not matter").unwrap();
 
-        let result = super::raw_push(Some(tempdir.path()));
+        let result = super::raw_push(Some(tempdir.path()), None);
         match result {
             Err(GitError::RefFailedToPush { output }) => {
                 assert!(

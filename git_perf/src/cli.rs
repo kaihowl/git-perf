@@ -40,7 +40,7 @@ pub fn handle_calls() -> Result<()> {
         Commands::Add { value, measurement } => {
             add(&measurement.name, value, &measurement.key_value)
         }
-        Commands::Push {} => push(None),
+        Commands::Push { remote } => push(None, remote.as_deref()),
         Commands::Pull {} => pull(None),
         Commands::Report {
             output,
