@@ -1,2 +1,3 @@
 Cargo.lock linguist-generated=true
 docs/manpage.md linguist-generated=true
+man/** linguist-generated=true
