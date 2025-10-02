@@ -272,19 +272,19 @@ fn retry_notify(err: GitError, dur: Duration) {
     warn!("Retrying...");
 }
 
-pub fn remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<()> {
+pub fn remove_measurements_from_commits(older_than: DateTime<Utc>, prune: bool) -> Result<()> {
     let op = || -> Result<(), ::backoff::Error<GitError>> {
-        raw_remove_measurements_from_commits(older_than).map_err(map_git_error_for_backoff)
+        raw_remove_measurements_from_commits(older_than, prune).map_err(map_git_error_for_backoff)
     };
 
     let backoff = default_backoff();
 
     ::backoff::retry_notify(backoff, op, retry_notify).map_err(|e| match e {
         ::backoff::Error::Permanent(err) => {
-            anyhow!(err).context("Permanent failure while adding note line to head")
+            anyhow!(err).context("Permanent failure while removing measurements")
         }
         ::backoff::Error::Transient { err, .. } => {
-            anyhow!(err).context("Timed out while adding note line to head")
+            anyhow!(err).context("Timed out while removing measurements")
         }
     })?;
 
@@ -322,8 +322,26 @@ where
     Ok(())
 }
 
-fn raw_remove_measurements_from_commits(older_than: DateTime<Utc>) -> Result<(), GitError> {
-    execute_notes_operation(|target| remove_measurements_from_reference(target, older_than))
+fn raw_remove_measurements_from_commits(
+    older_than: DateTime<Utc>,
+    prune: bool,
+) -> Result<(), GitError> {
+    // Check for shallow repo once at the beginning (needed for prune)
+    if prune && is_shallow_repo()? {
+        return Err(GitError::ShallowRepository);
+    }
+
+    execute_notes_operation(|target| {
+        // Remove measurements older than the specified date
+        remove_measurements_from_reference(target, older_than)?;
+
+        // Prune orphaned measurements if requested
+        if prune {
+            capture_git_output(&["notes", "--ref", target, "prune"], &None).map(|_| ())?;
+        }
+
+        Ok(())
+    })
 }
 
 // Remove notes pertaining to git commits whose commit date is older than specified.

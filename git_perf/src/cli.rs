@@ -85,7 +85,10 @@ pub fn handle_calls() -> Result<()> {
         }
         Commands::BumpEpoch { measurement } => bump_epoch(&measurement),
         Commands::Prune {} => prune(),
-        Commands::Remove { older_than } => remove_measurements_from_commits(older_than),
+        Commands::Remove {
+            older_than,
+            no_prune,
+        } => remove_measurements_from_commits(older_than, !no_prune),
         Commands::ListCommits {} => {
             let commits = list_commits_with_measurements()?;
             for commit in commits {
