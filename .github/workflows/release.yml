@@ -285,11 +285,6 @@ jobs:
           # List what's left for debugging
           echo "Artifacts after cleanup:"
           ls -la artifacts/
-      # TODO(kaihowl) known race condition:
-      # The release will be created after the tag is created.
-      # release-plz only offers DRAFT but not PRERELEASES.
-      # We cannot upload artifacts to drafts.
-      # Ideally, https://github.com/MarcoIeni/release-plz/issues/1219 is resolved.
       - name: Upload release artifacts
         run: |
           # Find all files in artifacts directory (excluding manifests)
