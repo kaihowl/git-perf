@@ -1,7 +1,5 @@
 name: ci
 
-# TODO(kaihowl) deeper test with merge-based PR workflow (HEAD == merge commit)
-
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
