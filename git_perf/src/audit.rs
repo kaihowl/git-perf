@@ -273,7 +273,7 @@ mod test {
 
         // Create mock data that would produce different z-scores with stddev vs MAD
         let head_value = 35.0;
-        let tail_values = vec![30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 100.0];
+        let tail_values = [30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 100.0];
 
         let head_summary = stats::aggregate_measurements(std::iter::once(&head_value));
         let tail_summary = stats::aggregate_measurements(tail_values.iter());

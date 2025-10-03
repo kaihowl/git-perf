@@ -52,12 +52,10 @@ fn find_man_dir() -> PathBuf {
             // Check if it contains at least one manpage
             if let Ok(entries) = std::fs::read_dir(path) {
                 let mut has_manpages = false;
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        if entry.path().extension().map_or(false, |ext| ext == "1") {
-                            has_manpages = true;
-                            break;
-                        }
+                for entry in entries.flatten() {
+                    if entry.path().extension().is_some_and(|ext| ext == "1") {
+                        has_manpages = true;
+                        break;
                     }
                 }
                 if has_manpages {
@@ -122,7 +120,7 @@ fn test_manpage_generation() {
         );
 
         // Basic content validation - check that the file is not empty
-        let content = std::fs::read_to_string(&page_path)
+        let content = std::fs::read_to_string(page_path)
             .unwrap_or_else(|_| panic!("Failed to read manpage: {}", page_path.display()));
 
         assert!(
