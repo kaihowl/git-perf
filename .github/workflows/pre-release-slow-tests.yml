@@ -1,0 +1,104 @@
+name: Pre-Release Slow Tests
+
+# This workflow runs the slow bash tests with a higher number of iterations
+# to catch intermittent issues before releases. It's more thorough than the
+# weekly slow test loop and is designed to be run manually before releases.
+
+concurrency:
+  group: pre-release-slow-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:  # Manual trigger for pre-release validation
+    inputs:
+      iterations:
+        description: 'Number of test iterations to run'
+        required: false
+        default: '500'
+        type: string
+
+jobs:
+  pre-release-slow-tests:
+    name: Pre-Release Slow Tests (High Iteration Count)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 720  # 12 hours maximum runtime
+
+    env:
+      # Emit backtraces on panics
+      RUST_BACKTRACE: 1
+      # Set a reasonable timeout for individual test runs
+      CARGO_TEST_TIMEOUT: 300
+      GH_TOKEN: ${{ github.token }}
+      # Use the input or default to 500 iterations
+      MAX_ITERATIONS: ${{ inputs.iterations || '500' }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set Git user and email
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Install libfaketime
+      run: sudo apt-get install libfaketime
+
+    - name: Install nextest
+      uses: taiki-e/install-action@nextest
+
+    - name: Build git-perf
+      run: cargo build --verbose
+
+    - name: Run slow tests with high iteration count
+      run: |
+        echo "Starting pre-release slow test validation"
+        echo "Running up to $MAX_ITERATIONS iterations..."
+        echo "================================================"
+
+        iteration=1
+
+        while [ $iteration -le $MAX_ITERATIONS ]; do
+            echo ""
+            echo "=== Iteration $iteration of $MAX_ITERATIONS ==="
+            echo "Running slow bash tests..."
+            echo "=============================="
+
+            # Run the slow bash test using cargo nextest
+            if cargo nextest run run_slow_bash_tests_with_binary --lib --test bash_tests; then
+                echo "✅ Test passed on iteration $iteration"
+                echo "Continuing to next iteration..."
+                ((iteration++))
+            else
+                echo ""
+                echo "❌ Test FAILED on iteration $iteration"
+                echo "========================================="
+                echo "The test failed after $iteration iterations."
+                echo "This indicates an intermittent issue that must be fixed before release."
+                exit 1
+            fi
+        done
+
+        echo ""
+        echo "================================================"
+        echo "🎉 SUCCESS: All $MAX_ITERATIONS iterations passed!"
+        echo "================================================"
+        echo "The slow tests are stable and ready for release."
+
+    - name: Report success
+      if: success()
+      run: |
+        echo "::notice::All $MAX_ITERATIONS iterations of slow tests completed successfully. Ready for release!"
+
+    - name: Report failure
+      if: failure()
+      run: |
+        echo "::error::Slow tests failed during pre-release validation. Do not proceed with release until this is fixed."
