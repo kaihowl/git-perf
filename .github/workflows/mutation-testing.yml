@@ -244,6 +244,12 @@ jobs:
         echo "" >> mutation-summary.md
         echo "Full report available in artifacts." >> mutation-summary.md
 
+    - name: Add summary to GitHub Actions
+      run: |
+        set -euo pipefail
+        cd git_perf
+        cat mutation-summary.md >> $GITHUB_STEP_SUMMARY
+
     - name: Upload mutation testing artifacts
       uses: actions/upload-artifact@v4
       if: always()
