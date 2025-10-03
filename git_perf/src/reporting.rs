@@ -251,105 +251,6 @@ impl ReporterFactory {
         res
     }
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_convert_to_x_y_empty() {
-        let reporter = PlotlyReporter::new();
-        let (x, y) = reporter.convert_to_x_y(vec![]);
-        assert!(x.is_empty());
-        assert!(y.is_empty());
-    }
-
-    #[test]
-    fn test_convert_to_x_y_single_value() {
-        let mut reporter = PlotlyReporter::new();
-        reporter.size = 3;
-        let (x, y) = reporter.convert_to_x_y(vec![(0, 1.5)]);
-        assert_eq!(x, vec![2]);
-        assert_eq!(y, vec![1.5]);
-    }
-
-    #[test]
-    fn test_convert_to_x_y_multiple_values() {
-        let mut reporter = PlotlyReporter::new();
-        reporter.size = 5;
-        let (x, y) = reporter.convert_to_x_y(vec![(0, 10.0), (2, 20.0), (4, 30.0)]);
-        assert_eq!(x, vec![4, 2, 0]);
-        assert_eq!(y, vec![10.0, 20.0, 30.0]);
-    }
-
-    #[test]
-    fn test_convert_to_x_y_negative_values() {
-        let mut reporter = PlotlyReporter::new();
-        reporter.size = 2;
-        let (x, y) = reporter.convert_to_x_y(vec![(0, -5.5), (1, -10.2)]);
-        assert_eq!(x, vec![1, 0]);
-        assert_eq!(y, vec![-5.5, -10.2]);
-    }
-
-    #[test]
-    fn test_plotly_reporter_as_bytes_not_empty() {
-        let reporter = PlotlyReporter::new();
-        let bytes = reporter.as_bytes();
-        assert!(!bytes.is_empty());
-        // HTML output should contain plotly-related content
-        let html = String::from_utf8_lossy(&bytes);
-        assert!(html.contains("plotly") || html.contains("Plotly"));
-    }
-
-    #[test]
-    fn test_reporter_factory_html_extension() {
-        let path = Path::new("output.html");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_reporter_factory_csv_extension() {
-        let path = Path::new("output.csv");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_reporter_factory_stdout() {
-        let path = Path::new("-");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_reporter_factory_unsupported_extension() {
-        let path = Path::new("output.txt");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_none());
-    }
-
-    #[test]
-    fn test_reporter_factory_no_extension() {
-        let path = Path::new("output");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_none());
-    }
-
-    #[test]
-    fn test_reporter_factory_uppercase_extension() {
-        let path = Path::new("output.HTML");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_csv_reporter_as_bytes_empty_on_init() {
-        let reporter = CsvReporter::new();
-        let bytes = reporter.as_bytes();
-        // Empty reporter should produce empty bytes
-        assert!(bytes.is_empty() || String::from_utf8_lossy(&bytes).trim().is_empty());
-    }
-}
 
 pub fn report(
     output: PathBuf,
@@ -462,4 +363,104 @@ pub fn report(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_convert_to_x_y_empty() {
+        let reporter = PlotlyReporter::new();
+        let (x, y) = reporter.convert_to_x_y(vec![]);
+        assert!(x.is_empty());
+        assert!(y.is_empty());
+    }
+
+    #[test]
+    fn test_convert_to_x_y_single_value() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 3;
+        let (x, y) = reporter.convert_to_x_y(vec![(0, 1.5)]);
+        assert_eq!(x, vec![2]);
+        assert_eq!(y, vec![1.5]);
+    }
+
+    #[test]
+    fn test_convert_to_x_y_multiple_values() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 5;
+        let (x, y) = reporter.convert_to_x_y(vec![(0, 10.0), (2, 20.0), (4, 30.0)]);
+        assert_eq!(x, vec![4, 2, 0]);
+        assert_eq!(y, vec![10.0, 20.0, 30.0]);
+    }
+
+    #[test]
+    fn test_convert_to_x_y_negative_values() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 2;
+        let (x, y) = reporter.convert_to_x_y(vec![(0, -5.5), (1, -10.2)]);
+        assert_eq!(x, vec![1, 0]);
+        assert_eq!(y, vec![-5.5, -10.2]);
+    }
+
+    #[test]
+    fn test_plotly_reporter_as_bytes_not_empty() {
+        let reporter = PlotlyReporter::new();
+        let bytes = reporter.as_bytes();
+        assert!(!bytes.is_empty());
+        // HTML output should contain plotly-related content
+        let html = String::from_utf8_lossy(&bytes);
+        assert!(html.contains("plotly") || html.contains("Plotly"));
+    }
+
+    #[test]
+    fn test_reporter_factory_html_extension() {
+        let path = Path::new("output.html");
+        let reporter = ReporterFactory::from_file_name(path);
+        assert!(reporter.is_some());
+    }
+
+    #[test]
+    fn test_reporter_factory_csv_extension() {
+        let path = Path::new("output.csv");
+        let reporter = ReporterFactory::from_file_name(path);
+        assert!(reporter.is_some());
+    }
+
+    #[test]
+    fn test_reporter_factory_stdout() {
+        let path = Path::new("-");
+        let reporter = ReporterFactory::from_file_name(path);
+        assert!(reporter.is_some());
+    }
+
+    #[test]
+    fn test_reporter_factory_unsupported_extension() {
+        let path = Path::new("output.txt");
+        let reporter = ReporterFactory::from_file_name(path);
+        assert!(reporter.is_none());
+    }
+
+    #[test]
+    fn test_reporter_factory_no_extension() {
+        let path = Path::new("output");
+        let reporter = ReporterFactory::from_file_name(path);
+        assert!(reporter.is_none());
+    }
+
+    #[test]
+    fn test_reporter_factory_uppercase_extension() {
+        let path = Path::new("output.HTML");
+        let reporter = ReporterFactory::from_file_name(path);
+        assert!(reporter.is_some());
+    }
+
+    #[test]
+    fn test_csv_reporter_as_bytes_empty_on_init() {
+        let reporter = CsvReporter::new();
+        let bytes = reporter.as_bytes();
+        // Empty reporter should produce empty bytes
+        assert!(bytes.is_empty() || String::from_utf8_lossy(&bytes).trim().is_empty());
+    }
 }

@@ -243,7 +243,7 @@ mod test {
     /// Initialize a git repository in the given directory
     fn init_git_repo(dir: &Path) {
         std::process::Command::new("git")
-            .args(&["init", "--initial-branch=master"])
+            .args(["init", "--initial-branch=master"])
             .current_dir(dir)
             .output()
             .expect("Failed to initialize git repository");
@@ -256,12 +256,12 @@ mod test {
         // Create a test file and commit it
         fs::write(dir.join("test.txt"), "test content").unwrap();
         std::process::Command::new("git")
-            .args(&["add", "test.txt"])
+            .args(["add", "test.txt"])
             .current_dir(dir)
             .output()
             .expect("Failed to add file");
         std::process::Command::new("git")
-            .args(&["commit", "-m", "test commit"])
+            .args(["commit", "-m", "test commit"])
             .current_dir(dir)
             .output()
             .expect("Failed to commit");

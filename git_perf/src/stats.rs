@@ -175,7 +175,7 @@ mod test {
 
     #[test]
     fn single_measurement() {
-        let measurements = vec![1.0];
+        let measurements = [1.0];
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 1);
         assert_eq!(stats.mean, 1.0);
@@ -184,7 +184,7 @@ mod test {
 
     #[test]
     fn no_measurement() {
-        let measurements = vec![];
+        let measurements = [];
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 0);
         assert_eq!(stats.mean, 0.0);
@@ -321,7 +321,7 @@ mod test {
 
     #[test]
     fn test_mad_in_aggregate_measurements() {
-        let measurements = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let measurements = [1.0, 2.0, 3.0, 4.0, 5.0];
         let stats = aggregate_measurements(measurements.iter());
 
         assert_eq!(stats.len, 5);
