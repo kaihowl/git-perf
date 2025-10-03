@@ -54,8 +54,7 @@ jobs:
       - id: install-action-from-release
         if: ${{ inputs.release != 'branch' }}
         name: install git-perf
-        # TODO(kaihowl) move to `latest` once actions are published
-        uses: kaihowl/git-perf/.github/actions/install@master
+        uses: kaihowl/git-perf/.github/actions/install@latest
         with:
           release: latest
       - name: Inject slug/short variables
