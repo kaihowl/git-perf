@@ -147,17 +147,20 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: stable
-    - name: Check documentation is up to date
+    - name: Generate documentation
       run: |
         ./scripts/generate-manpages.sh
-
-    - name: Upload documentation patch artifacts
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: documentation-patches
-        path: /tmp/*.diff
-        if-no-files-found: error
+    - name: Check for uncommitted changes
+      run: |
+        if ! git diff --exit-code man/ docs/; then
+          echo "Error: Documentation is out of date!"
+          echo "Please run './scripts/generate-manpages.sh' and commit the changes."
+          echo ""
+          echo "Diff:"
+          git diff man/ docs/
+          exit 1
+        fi
+        echo "Documentation is up to date ✓"
 
   report:
     name: git-perf
