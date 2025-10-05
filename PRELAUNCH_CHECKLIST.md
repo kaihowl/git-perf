@@ -29,6 +29,7 @@ This checklist covers items to review and complete before publicly announcing th
 - [x] Versioning system
 - [x] Changelog automation
 - [x] Latest release published (v0.17.2)
+- [x] Published to crates.io (via release-plz)
 
 ### Documentation
 - [x] README with quick start
@@ -111,18 +112,17 @@ This checklist covers items to review and complete before publicly announcing th
 
 ### Documentation Enhancements
 - [ ] Add installation instructions beyond quick start:
-  - Installation from crates.io (if published)
-  - Building from source
-  - Platform-specific notes
+  - [x] Installation from crates.io (already published)
+  - [ ] Add `cargo install git-perf` to README
+  - [ ] Building from source
+  - [ ] Platform-specific notes
 - [ ] Add FAQ section to README
 - [ ] Create evaluation README in `evaluation/` directory (referenced in INDEX.md but missing)
 - [ ] Add security policy (SECURITY.md) for vulnerability reporting
 - [ ] Add examples directory with real-world use cases
 
 ### Publishing & Distribution
-- [ ] Publish to crates.io (Rust package registry)
-  - Update README with `cargo install git-perf` instructions
-  - Ensure package metadata is complete
+- [x] Published to crates.io (via release-plz automation)
 - [ ] Create announcement blog post or documentation
 - [ ] Prepare social media announcement content
 
@@ -163,7 +163,7 @@ To announce the project publicly, at minimum complete:
    - [ ] FAQ section
 
 3. **📌 NICE TO HAVE** (Can be added post-launch):
-   - [ ] crates.io publishing
+   - [x] crates.io publishing
    - [ ] CODE_OF_CONDUCT.md
    - [ ] Issue/PR templates
    - [ ] GitHub Actions Marketplace listing
@@ -181,4 +181,4 @@ To announce the project publicly, at minimum complete:
 2. Package and publish the cleanup action for reuse
 3. Add repository metadata (description, topics)
 4. Add CONTRIBUTING.md based on existing CLAUDE.md guidelines
-5. Consider publishing to crates.io for wider Rust ecosystem adoption
+5. Add `cargo install git-perf` installation instructions to README
