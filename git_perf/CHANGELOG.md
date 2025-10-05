@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.2...git-perf-v0.18.0) - 2025-10-05
+
+### Added
+
+- *(cli)* add optional remote parameter to push command ([#375](https://github.com/kaihowl/git-perf/pull/375))
+- merge prune functionality into remove command ([#370](https://github.com/kaihowl/git-perf/pull/370))
+- *(cli)* add list-commits command, cleanup orphaned gh-pages reports with safety confirmations, scheduled cleanup workflow, and comprehensive testing & documentation ([#353](https://github.com/kaihowl/git-perf/pull/353))
+- add support for git 2.43.0 by using git symbolic-ref ([#355](https://github.com/kaihowl/git-perf/pull/355))
+- [**breaking**] Fix global settings inconsistency ([#292](https://github.com/kaihowl/git-perf/pull/292))
+- implement summarize measurement for csv  ([#276](https://github.com/kaihowl/git-perf/pull/276))
+- MAD dispersion method ([#261](https://github.com/kaihowl/git-perf/pull/261))
+
+### Fixed
+
+- *(reporting)* improve error message when no commits are found and add test for empty repository ([#348](https://github.com/kaihowl/git-perf/pull/348))
+- *(config)* ensure non-inline tables are created in empty config files ([#306](https://github.com/kaihowl/git-perf/pull/306))
+- *(audit)* add measurement name header for insufficient data messages and include tests ([#300](https://github.com/kaihowl/git-perf/pull/300))
+- only show finite z-scores ([#259](https://github.com/kaihowl/git-perf/pull/259))
+
+### Other
+
+- *(mutation)* add tests for critical missed mutants ([#392](https://github.com/kaihowl/git-perf/pull/392))
+- resolve clippy warnings for code quality improvements ([#383](https://github.com/kaihowl/git-perf/pull/383))
+- *(git)* move concurrent modification error handling to push retry logic ([#377](https://github.com/kaihowl/git-perf/pull/377))
+- remove outdated TODO comment in update_read_branch function ([#376](https://github.com/kaihowl/git-perf/pull/376))
+- remove outdated TODO comment in reporting module ([#374](https://github.com/kaihowl/git-perf/pull/374))
+- *(filter)* express measurement filters using subset relation semantics ([#372](https://github.com/kaihowl/git-perf/pull/372))
+- *(report)* add comprehensive output validation and improved existing tests ([#368](https://github.com/kaihowl/git-perf/pull/368))
+- *(git_interop)* improve authorization header verification in test_customheader_pull ([#365](https://github.com/kaihowl/git-perf/pull/365))
+- *(reporting,serialization)* add comprehensive unit tests for coverage improvement ([#354](https://github.com/kaihowl/git-perf/pull/354))
+- *(git)* move get_repository_root from high-level to low-level module ([#340](https://github.com/kaihowl/git-perf/pull/340))
+- *(reporting)* replace TODO with explanatory comment for axis reversal ([#338](https://github.com/kaihowl/git-perf/pull/338))
+- *(data)* extract key-value filtering logic into reusable utility method ([#337](https://github.com/kaihowl/git-perf/pull/337))
+- replace TODO comments with explanatory NOTE comments ([#336](https://github.com/kaihowl/git-perf/pull/336))
+- *(stats)* move sigma threshold check to is_significant method and add boundary tests ([#335](https://github.com/kaihowl/git-perf/pull/335))
+- *(audit)* improve test clarity for relative deviation calculation  ([#334](https://github.com/kaihowl/git-perf/pull/334))
+- *(audit)* improve test coverage and add core audit logic tests ([#316](https://github.com/kaihowl/git-perf/pull/316))
+- *(reporting)* clarify axis reversal limitation in plotly-rs 0.8.3 ([#317](https://github.com/kaihowl/git-perf/pull/317))
+- add weekly mutation testing with comprehensive coverage ([#299](https://github.com/kaihowl/git-perf/pull/299))
+- *(data)* centralize data structures by moving Commit to data.rs ([#313](https://github.com/kaihowl/git-perf/pull/313))
+- *(git_interop)* abstract common git notes operations into execute_notes_operation ([#312](https://github.com/kaihowl/git-perf/pull/312))
+- remove outdated TODO #96 comment about no-separator option ([#308](https://github.com/kaihowl/git-perf/pull/308))
+- *(git)* update minimum git version to 2.46.0 with explanation ([#307](https://github.com/kaihowl/git-perf/pull/307))
+- Remove deprecated TODOs and clean up test scripts ([#295](https://github.com/kaihowl/git-perf/pull/295))
+- *(config)* implement hierarchical configuration system ([#287](https://github.com/kaihowl/git-perf/pull/287))
+- Simplify manpage versioning ([#291](https://github.com/kaihowl/git-perf/pull/291))
+- migrate to nextest ([#280](https://github.com/kaihowl/git-perf/pull/280))
+- proper version check for manpage docs ([#286](https://github.com/kaihowl/git-perf/pull/286))
+- MAD documentation ([#263](https://github.com/kaihowl/git-perf/pull/263))
+- manpage generation with clap_markdown ([#269](https://github.com/kaihowl/git-perf/pull/269))
+- *(cli)* clarify that remove only affects published measurements ([#344](https://github.com/kaihowl/git-perf/pull/344))
+- *(cli)* clarify that remove only affects published measurements ([#343](https://github.com/kaihowl/git-perf/pull/343))
+- Add MAD dispersion method documentation and improve CLI help ([#272](https://github.com/kaihowl/git-perf/pull/272))
+
 ## [0.17.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.1...git-perf-v0.17.2) - 2025-08-23
 
 ### Added
