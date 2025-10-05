@@ -819,4 +819,31 @@ dispersion_method = "stddev"
             assert_eq!(backoff_max_elapsed_seconds(), 120);
         });
     }
+
+    #[test]
+    fn test_read_config_from_file_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let nonexistent_file = temp_dir.path().join("does_not_exist.toml");
+
+        // Should return error, not Ok(String::new())
+        let result = read_config_from_file(&nonexistent_file);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_config_from_file_valid_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_file = temp_dir.path().join("test_config.toml");
+        let expected_content = "[measurement]\nepoch = \"12345678\"\n";
+
+        fs::write(&config_file, expected_content).unwrap();
+
+        let result = read_config_from_file(&config_file);
+        assert!(result.is_ok());
+        let content = result.unwrap();
+        assert_eq!(content, expected_content);
+
+        // This would catch the mutant that returns Ok(String::new())
+        assert!(!content.is_empty());
+    }
 }
