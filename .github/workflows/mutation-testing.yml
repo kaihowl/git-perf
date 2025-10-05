@@ -213,8 +213,15 @@ jobs:
         if [ "$total_mutants" != "null" ] && [ "$total_mutants" != "0" ] && [ -n "$total_mutants" ] && [ "$total_mutants" -gt 0 ] 2>/dev/null; then
           # Calculate mutation score if we have valid numbers
           if [ "$caught_mutants" != "null" ] && [ -n "$caught_mutants" ]; then
-            score=$(echo "scale=2; $caught_mutants * 100 / $total_mutants" | bc -l 2>/dev/null || echo "N/A")
+            # Exclude unviable mutations from scoring (unviable mutations don't compile/can't be tested)
+            viable_mutants=$(echo "$total_mutants - $unviable_mutants" | bc -l 2>/dev/null || echo "$total_mutants")
+            if [ "$viable_mutants" -gt 0 ] 2>/dev/null; then
+              score=$(echo "scale=2; $caught_mutants * 100 / $viable_mutants" | bc -l 2>/dev/null || echo "N/A")
+            else
+              score="N/A"
+            fi
             echo "- **Total Mutants:** $total_mutants" >> mutation-summary.md
+            echo "- **Viable Mutants:** $viable_mutants" >> mutation-summary.md
             echo "- **Caught:** $caught_mutants" >> mutation-summary.md
             echo "- **Missed:** $missed_mutants" >> mutation-summary.md
             echo "- **Timeout:** $timeout_mutants" >> mutation-summary.md
