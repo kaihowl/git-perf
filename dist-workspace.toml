@@ -21,3 +21,8 @@ install-path = "CARGO_HOME"
 install-updater = false
 # Where to host releases
 hosting = "github"
+# Extra artifacts to include in release archives
+extra-artifacts = [
+  "man/man1/*.1",
+  "docs/manpage.md"
+]
