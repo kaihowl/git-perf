@@ -276,4 +276,171 @@ mod test {
         let version = parse_git_version("git version 2.52.0\n");
         assert_eq!(version.unwrap(), (2, 52, 0));
     }
+
+    #[test]
+    fn test_map_git_error_ref_failed_to_lock() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: cannot lock ref 'refs/heads/main': Unable to create lock".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_ref_concurrent_modification() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: ref updates forbidden, but expected commit abc123".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefConcurrentModification { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_no_remote_measurements() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: couldn't find remote ref refs/notes/measurements".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "fetch".to_string(),
+            output,
+        };
+
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::NoRemoteMeasurements { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_bad_object() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "error: bad object abc123def456".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "cat-file".to_string(),
+            output,
+        };
+
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::BadObject { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_unmapped() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: some other error".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "status".to_string(),
+            output,
+        };
+
+        let mapped = map_git_error(error);
+        // Should remain as ExecError for unrecognized patterns
+        assert!(matches!(mapped, GitError::ExecError { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_false_positive_avoidance() {
+        // Test that partial matches don't trigger false positives
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "this message mentions 'lock' without the full pattern".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "test".to_string(),
+            output,
+        };
+
+        let mapped = map_git_error(error);
+        // Should NOT be mapped to RefFailedToLock
+        assert!(matches!(mapped, GitError::ExecError { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_cannot_lock_ref_pattern_must_match() {
+        // Test that "cannot lock ref" must be present (not just "lock")
+        let test_cases = vec![
+            ("fatal: cannot lock ref 'refs/heads/main'", true),
+            ("error: cannot lock ref update", true),
+            ("fatal: failed to lock something", false),
+            ("error: lock failed", false),
+        ];
+
+        for (stderr_msg, should_map) in test_cases {
+            let output = GitOutput {
+                stdout: String::new(),
+                stderr: stderr_msg.to_string(),
+            };
+            let error = GitError::ExecError {
+                command: "test".to_string(),
+                output,
+            };
+
+            let mapped = map_git_error(error);
+            if should_map {
+                assert!(
+                    matches!(mapped, GitError::RefFailedToLock { .. }),
+                    "Expected RefFailedToLock for: {}",
+                    stderr_msg
+                );
+            } else {
+                assert!(
+                    matches!(mapped, GitError::ExecError { .. }),
+                    "Expected ExecError for: {}",
+                    stderr_msg
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_map_git_error_but_expected_pattern_must_match() {
+        // Test that "but expected" must be present
+        let test_cases = vec![
+            ("fatal: but expected commit abc123", true),
+            ("error: ref update failed but expected something", true),
+            ("fatal: expected something", false),
+            ("error: only mentioned the word but", false),
+        ];
+
+        for (stderr_msg, should_map) in test_cases {
+            let output = GitOutput {
+                stdout: String::new(),
+                stderr: stderr_msg.to_string(),
+            };
+            let error = GitError::ExecError {
+                command: "test".to_string(),
+                output,
+            };
+
+            let mapped = map_git_error(error);
+            if should_map {
+                assert!(
+                    matches!(mapped, GitError::RefConcurrentModification { .. }),
+                    "Expected RefConcurrentModification for: {}",
+                    stderr_msg
+                );
+            } else {
+                assert!(
+                    matches!(mapped, GitError::ExecError { .. }),
+                    "Expected ExecError for: {}",
+                    stderr_msg
+                );
+            }
+        }
+    }
 }

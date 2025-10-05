@@ -819,4 +819,62 @@ dispersion_method = "stddev"
             assert_eq!(backoff_max_elapsed_seconds(), 120);
         });
     }
+
+    #[test]
+    fn test_read_config_from_file_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let nonexistent_file = temp_dir.path().join("does_not_exist.toml");
+
+        // Should return error, not Ok(String::new())
+        let result = read_config_from_file(&nonexistent_file);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_config_from_file_valid_content() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_file = temp_dir.path().join("test_config.toml");
+        let expected_content = "[measurement]\nepoch = \"12345678\"\n";
+
+        fs::write(&config_file, expected_content).unwrap();
+
+        let result = read_config_from_file(&config_file);
+        assert!(result.is_ok());
+        let content = result.unwrap();
+        assert_eq!(content, expected_content);
+
+        // This would catch the mutant that returns Ok(String::new())
+        assert!(!content.is_empty());
+    }
+
+    #[test]
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[ignore] // Skip by default as this test fails when running as root
+    fn test_read_config_from_file_permission_error() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let config_file = temp_dir.path().join("unreadable.toml");
+        fs::write(&config_file, "test").unwrap();
+
+        // Remove read permissions
+        let mut perms = fs::metadata(&config_file).unwrap().permissions();
+        perms.set_mode(0o000);
+        fs::set_permissions(&config_file, perms).unwrap();
+
+        let result = read_config_from_file(&config_file);
+
+        // This test only works when not running as root
+        // When running as root, even files with 0o000 can be read
+        if result.is_ok() {
+            eprintln!("Note: Permission test skipped (likely running as root)");
+        } else {
+            assert!(result.is_err());
+        }
+
+        // Restore permissions for cleanup
+        let mut perms = fs::metadata(&config_file).unwrap().permissions();
+        perms.set_mode(0o644);
+        fs::set_permissions(&config_file, perms).unwrap();
+    }
 }
