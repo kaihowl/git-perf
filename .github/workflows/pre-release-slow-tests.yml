@@ -1,0 +1,98 @@
+name: Pre-Release Slow Tests
+
+# This workflow runs the slow bash tests with a higher iteration scale factor
+# to catch intermittent issues before releases. It's more thorough than the
+# weekly slow test loop and is designed to be run manually before releases.
+#
+# The scale factor multiplies the base iteration counts in the test scripts:
+# - Scale factor 1 (default): Normal iteration counts
+# - Scale factor 4 (pre-release): 4x iterations for thorough validation
+
+concurrency:
+  group: pre-release-slow-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:  # Manual trigger for pre-release validation
+    inputs:
+      scale_factor:
+        description: 'Iteration scale factor (multiplies base iteration counts)'
+        required: false
+        default: '4'
+        type: string
+
+jobs:
+  pre-release-slow-tests:
+    name: Pre-Release Slow Tests (Scale Factor ${{ inputs.scale_factor || '4' }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 720  # 12 hours maximum runtime
+
+    env:
+      # Emit backtraces on panics
+      RUST_BACKTRACE: 1
+      # Set a reasonable timeout for individual test runs
+      CARGO_TEST_TIMEOUT: 300
+      GH_TOKEN: ${{ github.token }}
+      # Scale factor for test iterations (multiplies base iteration counts)
+      ITERATION_SCALE_FACTOR: ${{ inputs.scale_factor || '4' }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set Git user and email
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Install libfaketime
+      run: sudo apt-get install libfaketime
+
+    - name: Install nextest
+      uses: taiki-e/install-action@nextest
+
+    - name: Build git-perf
+      run: cargo build --verbose
+
+    - name: Run slow tests with iteration scale factor
+      run: |
+        echo "Starting pre-release slow test validation"
+        echo "Iteration scale factor: $ITERATION_SCALE_FACTOR"
+        echo "================================================"
+        echo ""
+        echo "This will run the slow bash tests with iteration counts"
+        echo "multiplied by the scale factor (e.g., scale 4 = 4x iterations)."
+        echo ""
+
+        # Run the slow bash test using cargo nextest with the scale factor
+        if cargo nextest run run_slow_bash_tests_with_binary --lib --test bash_tests; then
+            echo ""
+            echo "================================================"
+            echo "🎉 SUCCESS: Slow tests passed with scale factor $ITERATION_SCALE_FACTOR!"
+            echo "================================================"
+            echo "The slow tests are stable and ready for release."
+        else
+            echo ""
+            echo "❌ Test FAILED with scale factor $ITERATION_SCALE_FACTOR"
+            echo "========================================================"
+            echo "This indicates an intermittent issue that must be fixed before release."
+            exit 1
+        fi
+
+    - name: Report success
+      if: success()
+      run: |
+        echo "::notice::Slow tests with scale factor $ITERATION_SCALE_FACTOR completed successfully. Ready for release!"
+
+    - name: Report failure
+      if: failure()
+      run: |
+        echo "::error::Slow tests failed during pre-release validation. Do not proceed with release until this is fixed."
