@@ -6,4 +6,5 @@ min_relative_deviation = 10.0
 epoch = "fe6d0205"
 
 [measurement."test-measure2"]
-epoch = "b5f56987"
+epoch = "bd5554eb"
+min_relative_deviation = 10.0

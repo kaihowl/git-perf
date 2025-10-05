@@ -75,7 +75,7 @@ jobs:
           set -x
           cargo install --path git_perf
           # Run report on repo with known (n=10) number of measurements
-          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 0.01
+          git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 1
           git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
           git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
           git perf push
