@@ -10,6 +10,7 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 
 ## Table of Contents
 
+- [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
 - [Audit System](#audit-system)
@@ -18,6 +19,26 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 - [Remote Setup](#remote-setup)
 - [Development](#development)
 - [Documentation](#documentation)
+
+## Installation
+
+### From crates.io (Recommended)
+
+```bash
+cargo install git-perf
+```
+
+### From Source
+
+```bash
+git clone https://github.com/kaihowl/git-perf.git
+cd git-perf
+cargo install --path .
+```
+
+### Pre-built Binaries
+
+Download pre-built binaries for Linux and macOS (x86_64/ARM64) from the [latest release](https://github.com/kaihowl/git-perf/releases/latest).
 
 ## Quick Start
 

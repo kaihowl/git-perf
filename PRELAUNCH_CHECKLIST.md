@@ -111,11 +111,11 @@ This checklist covers items to review and complete before publicly announcing th
 - [ ] Add PR template
 
 ### Documentation Enhancements
-- [ ] Add installation instructions beyond quick start:
+- [x] Add installation instructions beyond quick start:
   - [x] Installation from crates.io (already published)
-  - [ ] Add `cargo install git-perf` to README
-  - [ ] Building from source
-  - [ ] Platform-specific notes
+  - [x] Add `cargo install git-perf` to README
+  - [x] Building from source
+  - [x] Pre-built binaries from releases
 - [ ] Add FAQ section to README
 - [ ] Create evaluation README in `evaluation/` directory (referenced in INDEX.md but missing)
 - [ ] Add security policy (SECURITY.md) for vulnerability reporting
