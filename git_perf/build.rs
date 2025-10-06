@@ -5,12 +5,9 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
 
-    // Version normalization is no longer needed since manpages exclude version entirely
-
-    // Path calculation to the workspace root
-    let workspace_root = out_dir.join("../../../../../");
-    let man_dir = workspace_root.join("man").join("man1");
-    let docs_dir = workspace_root.join("docs");
+    // Generate manpages and docs in OUT_DIR to comply with cargo publish rules
+    let man_dir = out_dir.join("man").join("man1");
+    let docs_dir = out_dir.join("docs");
 
     fs::create_dir_all(&man_dir).unwrap();
     fs::create_dir_all(&docs_dir).unwrap();

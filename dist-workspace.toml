@@ -21,3 +21,21 @@ install-path = "CARGO_HOME"
 install-updater = false
 # Where to host releases
 hosting = "github"
+
+# Extra artifacts to include in release archives
+[[dist.extra-artifacts]]
+artifacts = [
+  "man/man1/git-perf.1",
+  "man/man1/git-perf-add.1",
+  "man/man1/git-perf-audit.1",
+  "man/man1/git-perf-bump-epoch.1",
+  "man/man1/git-perf-list-commits.1",
+  "man/man1/git-perf-measure.1",
+  "man/man1/git-perf-prune.1",
+  "man/man1/git-perf-pull.1",
+  "man/man1/git-perf-push.1",
+  "man/man1/git-perf-remove.1",
+  "man/man1/git-perf-report.1",
+  "docs/manpage.md"
+]
+build = ["./scripts/generate-manpages.sh"]
