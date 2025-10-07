@@ -1,0 +1,84 @@
+name: Test Installer Script
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  test-bash-installer:
+    name: Test bash installer on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install git-perf using bash installer
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh | sh
+
+      - name: Add git-perf to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Verify git-perf is installed
+        run: |
+          echo "Checking if git-perf is in PATH..."
+          which git-perf
+          echo "Git-perf version:"
+          git-perf --version
+
+      - name: Show help output
+        run: |
+          echo "=== Git-perf help output ==="
+          git-perf --help
+          echo ""
+          echo "=== Git-perf add subcommand help ==="
+          git-perf add --help
+          echo ""
+          echo "=== Git-perf audit subcommand help ==="
+          git-perf audit --help
+
+      - name: Check if manpages are installed
+        run: |
+          echo "=== Checking for manpages installation ==="
+          if man -w git-perf 2>/dev/null; then
+            echo "✅ Manpage found at: $(man -w git-perf)"
+            echo ""
+            echo "=== Manpage content preview ==="
+            man git-perf | head -n 50
+          else
+            echo "❌ Manpage NOT found in man path"
+            echo "Man search paths:"
+            manpath || echo "manpath command not available"
+            echo ""
+            echo "Searching for git-perf manpage files manually..."
+            find $HOME/.cargo -name "*git-perf*" -type f 2>/dev/null || echo "No git-perf files found in ~/.cargo"
+            find /usr/local/share/man -name "*git-perf*" -type f 2>/dev/null || echo "No git-perf files found in /usr/local/share/man"
+            find /usr/share/man -name "*git-perf*" -type f 2>/dev/null || echo "No git-perf files found in /usr/share/man"
+          fi
+
+      - name: Test basic functionality
+        run: |
+          echo "=== Testing basic git-perf functionality ==="
+          # Initialize a git repo
+          git config --global user.email "test@example.com"
+          git config --global user.name "Test User"
+          mkdir test-repo
+          cd test-repo
+          git init
+          echo "test" > test.txt
+          git add test.txt
+          git commit -m "Initial commit"
+
+          # Test adding a measurement
+          git perf add build_time 42.5
+          echo "✅ Successfully added a measurement"
+
+          # Test listing measurements
+          git perf list || echo "List command test"
