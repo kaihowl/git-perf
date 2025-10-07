@@ -10,6 +10,7 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 
 ## Table of Contents
 
+- [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
 - [Audit System](#audit-system)
@@ -18,6 +19,41 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 - [Remote Setup](#remote-setup)
 - [Development](#development)
 - [Documentation](#documentation)
+
+## Installation
+
+### Shell Installer (Recommended)
+
+For Linux and macOS:
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh | sh
+```
+
+### From crates.io
+
+```bash
+cargo install git-perf
+```
+
+### Pre-built Binaries
+
+Download pre-built tarballs for your platform from the [latest release](https://github.com/kaihowl/git-perf/releases/latest):
+
+- **Linux x86_64**: `git-perf-x86_64-unknown-linux-gnu.tar.xz`
+- **Linux x86_64 (musl)**: `git-perf-x86_64-unknown-linux-musl.tar.xz`
+- **Linux ARM64**: `git-perf-aarch64-unknown-linux-gnu.tar.xz`
+- **macOS ARM64 (Apple Silicon)**: `git-perf-aarch64-apple-darwin.tar.xz`
+
+All tarballs include SHA256 checksums for verification.
+
+### From Source
+
+```bash
+git clone https://github.com/kaihowl/git-perf.git
+cd git-perf
+cargo install --path .
+```
 
 ## Quick Start
 
