@@ -40,8 +40,8 @@ trait Reporter<'a> {
 struct PlotlyReporter {
     plot: Plot,
     // Manual axis data reversal implementation: plotly-rs does not support autorange="reversed"
-    // The autorange parameter only accepts boolean values, requiring manual index reversal
-    // to achieve reversed axis display (newest commits on right, oldest on left)
+    // The autorange parameter only accepts boolean values (as of v0.13.5), requiring manual
+    // index reversal to achieve reversed axis display (newest commits on right, oldest on left)
     // See: https://github.com/kaihowl/git-perf/issues/339
     size: usize,
 }
@@ -76,7 +76,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             .tick_angle(45.0)
             .tick_font(Font::new().family("monospace"));
         let layout = Layout::new()
-            .title(Title::new("Performance Measurements"))
+            .title(Title::from("Performance Measurements"))
             .x_axis(x_axis)
             .legend(
                 Legend::new()
@@ -106,7 +106,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             trace
                 .name(group_value)
                 .legend_group(measurement_name)
-                .legend_group_title(LegendGroupTitle::new(measurement_name))
+                .legend_group_title(LegendGroupTitle::from(measurement_name))
         } else {
             trace.name(measurement_name)
         };
@@ -133,7 +133,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             trace
                 .name(group_value)
                 .legend_group(measurement_name)
-                .legend_group_title(LegendGroupTitle::new(measurement_name))
+                .legend_group_title(LegendGroupTitle::from(measurement_name))
         } else {
             trace.name(measurement_name)
         };

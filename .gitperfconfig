@@ -1,10 +1,10 @@
 [measurement."report-size"]
-epoch = "f3709134"
+epoch = "439374ca"
 min_relative_deviation = 10.0
 
 [measurement."report"]
-epoch = "fe6d0205"
+epoch = "439374ca"
 
 [measurement."test-measure2"]
-epoch = "bd5554eb"
+epoch = "439374ca"
 min_relative_deviation = 10.0
