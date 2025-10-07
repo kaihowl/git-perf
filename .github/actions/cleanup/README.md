@@ -5,10 +5,10 @@ A GitHub Action to automatically remove old measurements and orphaned reports fr
 ## Overview
 
 This action helps maintain your git-perf measurement history by:
-- Removing measurements older than a specified retention period
+- Removing measurements older than a specified retention period (automatically pushes updates)
 - Creating backups before deletion (optional)
 - Cleaning up orphaned reports on gh-pages (optional)
-- Pushing updated notes and reports back to the repository
+- Pushing updated reports back to the repository
 
 ## Usage
 
@@ -98,10 +98,9 @@ permissions:
 
 1. **Fetch Notes**: Downloads the git-perf notes ref (`refs/notes/perf-v3`)
 2. **Backup** (optional): Creates a backup at `refs/notes/perf-v3-backup`
-3. **Remove Old Measurements**: Runs `git perf remove --older-than <days>d`
-4. **Push Notes**: Pushes updated notes back to origin
-5. **Cleanup Reports** (optional): Removes orphaned reports from gh-pages
-6. **Push Reports** (optional): Pushes cleaned gh-pages branch
+3. **Remove Old Measurements**: Runs `git perf remove --older-than <days>d` (automatically pushes updated notes)
+4. **Cleanup Reports** (optional): Removes orphaned reports from gh-pages
+5. **Push Reports** (optional): Pushes cleaned gh-pages branch
 
 ## Recovery from Backup
 
@@ -173,9 +172,9 @@ Consider running cleanup on a schedule that balances storage concerns with histo
 ### No measurements removed
 
 If the action runs but doesn't remove measurements:
-- Verify measurements exist with `git perf list`
 - Check that measurements are actually older than the retention period
 - Ensure the notes ref is properly fetched
+- Verify that the `refs/notes/perf-v3` ref exists in your repository
 
 ### Backup creation fails
 

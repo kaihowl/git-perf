@@ -1,6 +1,6 @@
 name: 'Cleanup git-perf Measurements and Reports'
 description: 'Remove old measurements and orphaned reports from git-perf tracking'
-author: 'Terragon Labs'
+author: 'Kai Höwelmeyer'
 
 branding:
   icon: 'trash-2'
@@ -61,14 +61,8 @@ runs:
       shell: bash
       run: |
         # Remove measurements older than specified retention period
-        # This will update the notes ref locally
+        # git perf remove automatically pushes updated measurements
         git perf remove --older-than ${{ inputs.retention-days }}d || echo "No measurements to remove or not applicable"
-
-    - name: Push updated notes
-      shell: bash
-      run: |
-        # Push the updated notes ref back to origin
-        git perf push || echo "No changes to push"
 
     - name: Fetch gh-pages branch
       if: inputs.cleanup-reports == 'true'
