@@ -48,16 +48,18 @@ This checklist covers items to review and complete before publicly announcing th
 
 ## ⚠️ Known Gaps - High Priority
 
-### 1. Missing GitHub Action Publishing
+### 1. ~~Missing GitHub Action Publishing~~ ✅ COMPLETED
 **Issue**: The cleanup action is not published as a reusable GitHub Action
 - Current state: Cleanup workflow exists at `.github/workflows/cleanup-measurements-and-reports.yml`
 - Gap: Not available for other repositories to use directly
 - Impact: Users cannot easily integrate cleanup into their own workflows
 
 **Action Required**:
-- [ ] Publish cleanup action as a composite action or workflow template
+- [x] Publish cleanup action as a composite action or workflow template
 - [ ] Add to GitHub Actions Marketplace (optional but recommended)
-- [ ] Document how to use the cleanup action in other repositories
+- [x] Document how to use the cleanup action in other repositories
+
+**Completed**: Created `.github/actions/cleanup/action.yml` as a reusable composite action with full documentation in `.github/actions/cleanup/README.md`. The existing workflow now uses this action.
 
 ### 2. Missing Integration Tutorial
 **Issue**: No end-to-end tutorial for integrating git-perf into a new GitHub project
