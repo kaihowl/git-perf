@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0  # Full checkout required for git perf remove/prune operations
 
       - name: Cleanup old measurements and reports
-        uses: kaihowl/git-perf/.github/actions/cleanup@master
+        uses: ./.github/actions/cleanup
         with:
           retention-days: 90
           backup: true
