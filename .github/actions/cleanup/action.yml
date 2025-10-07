@@ -1,0 +1,106 @@
+name: 'Cleanup git-perf Measurements and Reports'
+description: 'Remove old measurements and orphaned reports from git-perf tracking'
+author: 'Terragon Labs'
+
+branding:
+  icon: 'trash-2'
+  color: 'orange'
+
+inputs:
+  retention-days:
+    description: 'Number of days to retain measurements (e.g., 90)'
+    required: false
+    default: '90'
+  backup:
+    description: 'Create backup of measurements before removal'
+    required: false
+    default: 'true'
+  cleanup-reports:
+    description: 'Also cleanup orphaned reports on gh-pages branch'
+    required: false
+    default: 'true'
+  git-perf-version:
+    description: 'Version of git-perf to use (latest, or specific version)'
+    required: false
+    default: 'latest'
+
+runs:
+  using: composite
+  steps:
+    - name: Set Git user and email
+      shell: bash
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+
+    - name: Install git-perf
+      uses: kaihowl/git-perf/.github/actions/install@master
+      with:
+        release: ${{ inputs.git-perf-version }}
+
+    - name: Fetch performance notes
+      shell: bash
+      run: |
+        # Fetch the notes ref to access measurements
+        git fetch origin refs/notes/perf-v3:refs/notes/perf-v3 || echo "No notes ref found"
+
+    - name: Create backup of measurements
+      if: inputs.backup == 'true'
+      shell: bash
+      run: |
+        # Create a backup of measurements before removal
+        # This allows recovery if needed
+        if git rev-parse --verify refs/notes/perf-v3 >/dev/null 2>&1; then
+          git push origin refs/notes/perf-v3:refs/notes/perf-v3-backup --force
+          echo "Backup created at refs/notes/perf-v3-backup"
+        else
+          echo "No measurements to backup"
+        fi
+
+    - name: Remove old measurements
+      shell: bash
+      run: |
+        # Remove measurements older than specified retention period
+        # This will update the notes ref locally
+        git perf remove --older-than ${{ inputs.retention-days }}d || echo "No measurements to remove or not applicable"
+
+    - name: Push updated notes
+      shell: bash
+      run: |
+        # Push the updated notes ref back to origin
+        git perf push || echo "No changes to push"
+
+    - name: Fetch gh-pages branch
+      if: inputs.cleanup-reports == 'true'
+      shell: bash
+      run: |
+        git fetch origin gh-pages:gh-pages || echo "No gh-pages branch found"
+
+    - name: Cleanup orphaned reports
+      if: inputs.cleanup-reports == 'true'
+      shell: bash
+      run: |
+        # Run cleanup script to remove reports without measurements
+        # Use -y flag for non-interactive execution in CI
+        if [ -f ./scripts/cleanup-reports.sh ]; then
+          chmod +x ./scripts/cleanup-reports.sh
+          ./scripts/cleanup-reports.sh -y || echo "Cleanup script failed but continuing"
+        else
+          echo "Cleanup script not found, skipping report cleanup"
+        fi
+
+    - name: Push gh-pages changes
+      if: inputs.cleanup-reports == 'true'
+      shell: bash
+      run: |
+        if git rev-parse --verify gh-pages >/dev/null 2>&1; then
+          git checkout gh-pages
+          if [ -n "$(git status --porcelain)" ]; then
+            git push origin gh-pages
+            echo "Pushed cleanup changes to gh-pages"
+          else
+            echo "No orphaned reports to clean up"
+          fi
+        else
+          echo "No gh-pages branch, skipping report cleanup push"
+        fi

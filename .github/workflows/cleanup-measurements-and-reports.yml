@@ -18,60 +18,10 @@ jobs:
         with:
           fetch-depth: 0  # Full checkout required for git perf remove/prune operations
 
-      - name: Set Git user and email
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
-
-      - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@master
+      - name: Cleanup old measurements and reports
+        uses: kaihowl/git-perf/.github/actions/cleanup@master
         with:
-          release: latest
-
-      - name: Fetch performance notes
-        run: |
-          # Fetch the notes ref to access measurements
-          git fetch origin refs/notes/perf-v3:refs/notes/perf-v3 || echo "No notes ref found"
-
-      - name: Create backup of measurements
-        run: |
-          # Create a backup of measurements before removal
-          # This allows recovery if needed
-          if git rev-parse --verify refs/notes/perf-v3 >/dev/null 2>&1; then
-            git push origin refs/notes/perf-v3:refs/notes/perf-v3-backup --force
-            echo "Backup created at refs/notes/perf-v3-backup"
-          else
-            echo "No measurements to backup"
-          fi
-
-      - name: Remove old measurements (>90 days)
-        run: |
-          # Remove measurements older than 90 days
-          # This will update the notes ref locally
-          git perf remove --older-than 90d || echo "No measurements to remove or not applicable"
-
-      - name: Push updated notes
-        run: |
-          # Push the updated notes ref back to origin
-          git perf push || echo "No changes to push"
-
-      - name: Fetch gh-pages branch
-        run: |
-          git fetch origin gh-pages:gh-pages
-
-      - name: Cleanup orphaned reports
-        run: |
-          # Run cleanup script to remove reports without measurements
-          # Use -y flag for non-interactive execution in CI
-          chmod +x ./scripts/cleanup-reports.sh
-          ./scripts/cleanup-reports.sh -y || echo "Cleanup script failed but continuing"
-
-      - name: Push gh-pages changes
-        run: |
-          git checkout gh-pages
-          if [ -n "$(git status --porcelain)" ]; then
-            git push origin gh-pages
-            echo "Pushed cleanup changes to gh-pages"
-          else
-            echo "No orphaned reports to clean up"
-          fi
+          retention-days: 90
+          backup: true
+          cleanup-reports: true
+          git-perf-version: latest
