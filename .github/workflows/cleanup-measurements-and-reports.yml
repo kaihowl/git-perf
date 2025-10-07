@@ -5,6 +5,10 @@ on:
     # Run every Sunday at 02:00 UTC
     - cron: '0 2 * * 0'
   workflow_dispatch: # Allow manual triggering
+  pull_request:
+    paths:
+      - '.github/actions/cleanup/**'
+      - '.github/workflows/cleanup-measurements-and-reports.yml'
 
 permissions:
   contents: write
@@ -25,3 +29,4 @@ jobs:
           backup: true
           cleanup-reports: true
           git-perf-version: latest
+          dry-run: ${{ github.event_name == 'pull_request' }}

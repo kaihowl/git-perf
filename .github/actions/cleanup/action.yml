@@ -23,6 +23,10 @@ inputs:
     description: 'Version of git-perf to use (latest, or specific version)'
     required: false
     default: 'latest'
+  dry-run:
+    description: 'Perform dry-run without making actual changes'
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -45,7 +49,7 @@ runs:
         git fetch origin refs/notes/perf-v3:refs/notes/perf-v3 || echo "No notes ref found"
 
     - name: Create backup of measurements
-      if: inputs.backup == 'true'
+      if: inputs.backup == 'true' && inputs.dry-run == 'false'
       shell: bash
       run: |
         # Create a backup of measurements before removal
@@ -62,7 +66,12 @@ runs:
       run: |
         # Remove measurements older than specified retention period
         # git perf remove automatically pushes updated measurements
-        git perf remove --older-than ${{ inputs.retention-days }}d || echo "No measurements to remove or not applicable"
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          echo "[DRY-RUN] Would remove measurements older than ${{ inputs.retention-days }} days"
+          git perf remove --older-than ${{ inputs.retention-days }}d --dry-run || echo "No measurements to remove or not applicable"
+        else
+          git perf remove --older-than ${{ inputs.retention-days }}d || echo "No measurements to remove or not applicable"
+        fi
 
     - name: Fetch gh-pages branch
       if: inputs.cleanup-reports == 'true'
@@ -78,13 +87,18 @@ runs:
         # Use -y flag for non-interactive execution in CI
         if [ -f ./scripts/cleanup-reports.sh ]; then
           chmod +x ./scripts/cleanup-reports.sh
-          ./scripts/cleanup-reports.sh -y || echo "Cleanup script failed but continuing"
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            echo "[DRY-RUN] Would cleanup orphaned reports"
+            ./scripts/cleanup-reports.sh --dry-run || echo "Cleanup script failed but continuing"
+          else
+            ./scripts/cleanup-reports.sh -y || echo "Cleanup script failed but continuing"
+          fi
         else
           echo "Cleanup script not found, skipping report cleanup"
         fi
 
     - name: Push gh-pages changes
-      if: inputs.cleanup-reports == 'true'
+      if: inputs.cleanup-reports == 'true' && inputs.dry-run == 'false'
       shell: bash
       run: |
         if git rev-parse --verify gh-pages >/dev/null 2>&1; then
