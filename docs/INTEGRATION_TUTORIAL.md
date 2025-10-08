@@ -56,7 +56,6 @@ dispersion_method = "mad"
 [measurement."build_time"]
 min_relative_deviation = 10.0
 dispersion_method = "mad"
-epoch = "00000000"
 
 [measurement."binary_size"]
 min_relative_deviation = 2.0
