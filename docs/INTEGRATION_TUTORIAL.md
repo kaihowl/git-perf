@@ -5,39 +5,19 @@ This tutorial walks you through integrating git-perf into your GitHub project fo
 ## Prerequisites
 
 - A Git repository (local or on GitHub)
-- Git version 2.0 or higher
+- Git version 2.43.0 or higher
 - For GitHub Actions integration: A GitHub repository with Actions enabled
 - Basic familiarity with Git and YAML (for GitHub Actions setup)
 
 ## Step 1: Install git-perf Locally
 
-Choose one of the following installation methods:
+See the [Installation section in the README](../README.md#installation) for complete installation instructions, including:
+- Shell installer (recommended)
+- Installing from crates.io
+- Pre-built binaries
+- Building from source
 
-### Option A: Install from crates.io (Recommended)
-
-```bash
-cargo install git-perf
-```
-
-### Option B: Install from Pre-built Binaries
-
-Download the latest release for your platform from the [Releases page](https://github.com/terragonlabs/git-perf/releases):
-
-```bash
-# Example for Linux
-curl -L https://github.com/terragonlabs/git-perf/releases/latest/download/git-perf-x86_64-unknown-linux-gnu.tar.gz | tar xz
-sudo mv git-perf /usr/local/bin/
-```
-
-### Option C: Build from Source
-
-```bash
-git clone https://github.com/terragonlabs/git-perf.git
-cd git-perf
-cargo install --path .
-```
-
-### Verify Installation
+Verify installation:
 
 ```bash
 git-perf --version
@@ -52,37 +32,35 @@ Navigate to your project repository and add a measurement:
 ```bash
 cd /path/to/your/project
 
-# Measure a specific metric (e.g., build time)
+# Add a measurement (e.g., build time in seconds)
 # You'll typically get this value from your build or test process
-git-perf measure build_time 42.5 --unit seconds
+git perf add -m build_time 42.5
 
-# Verify the measurement was recorded
-git-perf list
+# View measurements in a report
+git perf report
 ```
 
-### Configure Measurement Metadata
+### Configure Measurement Settings
 
-Create a `.gitperfconfig` file in your repository root to customize how measurements are displayed:
+Create a `.gitperfconfig` file in your repository root. See the [Configuration section in the README](../README.md#configuration) for all available options.
+
+Example configuration:
 
 ```toml
-# .gitperfconfig
-[measurements.build_time]
-name = "Build Time"
-unit = "seconds"
-description = "Time to compile the entire project"
-lower_is_better = true
+# Default settings for all measurements
+[measurement]
+min_relative_deviation = 5.0
+dispersion_method = "mad"
 
-[measurements.test_duration]
-name = "Test Suite Duration"
-unit = "seconds"
-description = "Time to run all tests"
-lower_is_better = true
+# Measurement-specific settings
+[measurement."build_time"]
+min_relative_deviation = 10.0
+dispersion_method = "mad"
+epoch = "00000000"
 
-[measurements.binary_size]
-name = "Binary Size"
-unit = "bytes"
-description = "Size of release binary"
-lower_is_better = true
+[measurement."binary_size"]
+min_relative_deviation = 2.0
+dispersion_method = "stddev"
 ```
 
 ### Commit the Configuration
@@ -140,19 +118,19 @@ jobs:
           duration=$(echo "$end_time - $start_time" | bc)
 
           # Record measurement
-          git-perf measure build_time "$duration" --unit seconds
+          git perf add -m build_time "$duration"
 
       # Example: Measure binary size
       - name: Measure binary size
         run: |
           binary_size=$(stat -c%s target/release/your-binary)
-          git-perf measure binary_size "$binary_size" --unit bytes
+          git perf add -m binary_size "$binary_size"
 
       # Push measurements back to the repository
       - name: Push measurements
         if: github.event_name == 'push'
         run: |
-          git-perf push
+          git perf push
 ```
 
 **Important Notes:**
@@ -188,12 +166,12 @@ Add a job to generate visual reports of your performance data:
           version: latest
 
       - name: Pull latest measurements
-        run: git-perf pull
+        run: git perf pull
 
       - name: Generate report
         run: |
           mkdir -p reports
-          git-perf report --output reports/index.html --format html
+          git perf report --output reports/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
@@ -255,26 +233,22 @@ jobs:
 
 ### Configure Audit Thresholds
 
-Add audit configuration to your `.gitperfconfig`:
+Configure audit settings in your `.gitperfconfig`. See the [Audit System section in the README](../README.md#audit-system) for complete details.
 
 ```toml
-[audit]
-enabled = true
-stddev_threshold = 2.0  # Alert if metric deviates by 2 standard deviations
-mad_threshold = 3.0     # Alert if metric deviates by 3 MAD (more robust)
-min_samples = 5         # Need at least 5 samples before auditing
+# Default settings
+[measurement]
+min_relative_deviation = 5.0
+dispersion_method = "mad"
 
-[measurements.build_time]
-name = "Build Time"
-unit = "seconds"
-lower_is_better = true
-audit = true  # Enable auditing for this measurement
+# Measurement-specific settings
+[measurement."build_time"]
+min_relative_deviation = 10.0
+dispersion_method = "mad"
 
-[measurements.binary_size]
-name = "Binary Size"
-unit = "bytes"
-lower_is_better = true
-audit = true
+[measurement."binary_size"]
+min_relative_deviation = 2.0
+dispersion_method = "stddev"
 ```
 
 ### Add Audit Step to CI
@@ -286,95 +260,74 @@ Update your workflow to run audits and fail on regressions:
 - name: Run audit for regressions
   run: |
     # Pull latest measurements to ensure we have historical data
-    git-perf pull || true
+    git perf pull || true
 
-    # Run audit
-    if ! git-perf audit --format github; then
-      echo "⚠️ Performance regression detected!"
-      exit 1
-    fi
+    # Run audit for specific measurements
+    git perf audit -m build_time
+    git perf audit -m binary_size
 ```
-
-The `--format github` option outputs results in a format that GitHub Actions will display nicely in the workflow logs.
 
 ## Step 7: Advanced Configuration
 
 ### Custom Statistical Methods
 
-git-perf supports multiple dispersion methods for regression detection:
+git-perf supports multiple dispersion methods for regression detection. See the [Audit System section in the README](../README.md#audit-system) for details on choosing between `stddev` and `mad`.
+
+Configure per measurement:
 
 ```toml
-[audit]
-enabled = true
-dispersion_method = "mad"  # Options: "stddev", "mad", "both"
+[measurement."build_time"]
+dispersion_method = "mad"  # Robust to outliers
+
+[measurement."memory_usage"]
+dispersion_method = "stddev"  # More sensitive
 ```
 
-- **stddev**: Standard deviation (sensitive to outliers)
-- **mad**: Median Absolute Deviation (robust to outliers)
-- **both**: Use both methods (more conservative)
+Or override via CLI:
 
-### Measurement Categories
-
-Organize measurements into categories:
-
-```toml
-[measurements.cpu_benchmark]
-name = "CPU Benchmark"
-unit = "ops/sec"
-category = "performance"
-lower_is_better = false
-
-[measurements.memory_usage]
-name = "Memory Usage"
-unit = "MB"
-category = "resources"
-lower_is_better = true
+```bash
+git perf audit -m build_time --dispersion-method mad
+git perf audit -m build_time -D stddev  # Short form
 ```
 
 ### Multi-Environment Tracking
 
-Track measurements across different environments:
+Track measurements across different environments using key-value pairs:
 
 ```yaml
 # In your workflow
 - name: Measure performance (development)
   run: |
-    git-perf measure build_time_dev "$duration" --unit seconds
+    git perf add -m build_time "$duration" -k env=dev
 
 - name: Measure performance (production)
   run: |
-    git-perf measure build_time_prod "$duration" --unit seconds
+    git perf add -m build_time "$duration" -k env=prod
 ```
 
-Configure separately in `.gitperfconfig`:
+Filter in reports:
 
-```toml
-[measurements.build_time_dev]
-name = "Build Time (Dev)"
-unit = "seconds"
-environment = "development"
-
-[measurements.build_time_prod]
-name = "Build Time (Prod)"
-unit = "seconds"
-environment = "production"
+```bash
+git perf report -m build_time -k env=dev
+git perf report -m build_time -k env=prod
 ```
 
 ## Troubleshooting
 
 ### Issue: Measurements Not Appearing
 
-**Symptom**: `git-perf list` shows no measurements
+**Symptom**: Reports show no measurements
 
 **Solutions**:
 1. Verify git-perf is installed: `git-perf --version`
 2. Check you're in a git repository: `git status`
-3. Ensure measurements were committed: `git log --notes=perf/v3`
-4. Try pulling measurements: `git-perf pull`
+3. Ensure measurements were committed: `git log --notes=perf-v3`
+4. Try pulling measurements: `git perf pull`
+5. Check if measurements exist: `git perf list-commits`
 
 ### Issue: Push Fails in GitHub Actions
 
-**Symptom**: `git-perf push` fails with authentication errors
+**Symptom**: `git perf push` fails with authentication errors
 
 **Solutions**:
 1. Ensure `contents: write` permission is set in the workflow
@@ -388,30 +341,27 @@ environment = "production"
 **Solutions**:
 1. Increase thresholds in `.gitperfconfig`:
    ```toml
-   [audit]
-   stddev_threshold = 3.0  # More lenient
-   mad_threshold = 4.0
+   [measurement."build_time"]
+   min_relative_deviation = 10.0  # More lenient (default is 5.0)
    ```
 2. Use MAD instead of stddev for more robust detection:
    ```toml
-   [audit]
+   [measurement."build_time"]
    dispersion_method = "mad"
    ```
-3. Increase minimum samples:
-   ```toml
-   [audit]
-   min_samples = 10
+3. Increase sigma threshold via CLI:
+   ```bash
+   git perf audit -m build_time -d 6.0  # Default is 4.0
    ```
 
 ### Issue: Reports Not Generating
 
-**Symptom**: `git-perf report` produces empty or incomplete reports
+**Symptom**: `git perf report` produces empty or incomplete reports
 
 **Solutions**:
-1. Pull measurements first: `git-perf pull`
-2. Verify measurements exist: `git-perf list`
-3. Check `.gitperfconfig` format: `git-perf config --validate`
-4. Generate with verbose output: `git-perf report -v`
+1. Pull measurements first: `git perf pull`
+2. Verify measurements exist: `git perf list-commits`
+3. Generate with verbose output: `git perf report -v`
 
 ### Issue: Cleanup Deleting Too Much Data
 
@@ -513,24 +463,27 @@ jobs:
           start=$(date +%s.%N)
           cargo build --release
           duration=$(echo "$(date +%s.%N) - $start" | bc)
-          git-perf measure build_time "$duration" --unit seconds
+          git perf add -m build_time "$duration"
 
           size=$(stat -c%s target/release/my-app)
-          git-perf measure binary_size "$size" --unit bytes
+          git perf add -m binary_size "$size"
 
       - name: Test and measure
         run: |
           start=$(date +%s.%N)
           cargo test --release
           duration=$(echo "$(date +%s.%N) - $start" | bc)
-          git-perf measure test_duration "$duration" --unit seconds
+          git perf add -m test_duration "$duration"
 
       - name: Audit
-        run: git-perf audit --format github
+        run: |
+          git perf audit -m build_time
+          git perf audit -m binary_size
+          git perf audit -m test_duration
 
       - name: Push measurements
         if: github.event_name == 'push'
-        run: git-perf push
+        run: git perf push
 
   report:
     needs: measure
@@ -546,11 +499,11 @@ jobs:
 
       - uses: terragonlabs/git-perf/.github/actions/install@master
 
-      - run: git-perf pull
+      - run: git perf pull
 
       - run: |
           mkdir -p reports
-          git-perf report --output reports/index.html --format html
+          git perf report --output reports/index.html
 
       - uses: peaceiris/actions-gh-pages@v3
         with:
@@ -569,10 +522,11 @@ jobs:
 ## Additional Resources
 
 - [git-perf README](../README.md) - Full feature documentation
+- [Command Reference](./manpage.md) - Complete CLI documentation
 - [Configuration Guide](../README.md#configuration) - Detailed `.gitperfconfig` options
+- [Audit System](../README.md#audit-system) - Statistical methods and regression detection
 - [GitHub Actions](../.github/actions/) - Reusable actions reference
-- [Example Report](https://terragonlabs.github.io/git-perf/) - Live performance dashboard
-- [Statistical Methods](../docs/statistical-comparison.md) - Understanding stddev vs MAD
+- [Example Report](https://kaihowl.github.io/git-perf/master.html) - Live performance dashboard
 
 ## Getting Help
 
