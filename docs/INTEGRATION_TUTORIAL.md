@@ -20,7 +20,7 @@ See the [Installation section in the README](../README.md#installation) for comp
 Verify installation:
 
 ```bash
-git-perf --version
+git perf --version
 ```
 
 ## Step 2: Add Initial Measurements
@@ -100,25 +100,14 @@ jobs:
 
       # Install git-perf
       - name: Install git-perf
-        uses: terragonlabs/git-perf/.github/actions/install@master
+        uses: kaihowl/git-perf/.github/actions/install@master
         with:
           version: latest
 
-      # Example: Measure build time
+      # Example: Measure build time using the measure command
       - name: Build project and measure
         run: |
-          # Start timing
-          start_time=$(date +%s.%N)
-
-          # Your build command
-          cargo build --release
-
-          # Calculate duration
-          end_time=$(date +%s.%N)
-          duration=$(echo "$end_time - $start_time" | bc)
-
-          # Record measurement
-          git perf add -m build_time "$duration"
+          git perf measure -m build_time -- cargo build --release
 
       # Example: Measure binary size
       - name: Measure binary size
@@ -128,24 +117,49 @@ jobs:
 
       # Push measurements back to the repository
       - name: Push measurements
-        if: github.event_name == 'push'
-        run: |
-          git perf push
+        run: git perf push
 ```
 
 **Important Notes:**
 - The `fetch-depth: 0` is required so git-perf has access to the full git history
 - The `contents: write` permission is needed to push measurement data
-- Only push measurements from the main branch (not from PRs) to avoid conflicts
+- The `git perf measure` command automatically times the execution of the supplied command
+- Push is unconditional to ensure measurements are always saved
 
 ## Step 4: Set Up Automatic Reporting
 
 ### Generate HTML Reports
 
-Add a job to generate visual reports of your performance data:
+The report generation must happen in the same workflow and be chained with the measurement job. Update your workflow to include report generation:
 
 ```yaml
-# Add this job to your .github/workflows/performance-tracking.yml
+# Update your .github/workflows/performance-tracking.yml
+
+jobs:
+  measure-performance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-perf
+        uses: kaihowl/git-perf/.github/actions/install@master
+        with:
+          version: latest
+
+      - name: Build project and measure
+        run: git perf measure -m build_time -- cargo build --release
+
+      - name: Measure binary size
+        run: |
+          binary_size=$(stat -c%s target/release/your-binary)
+          git perf add -m binary_size "$binary_size"
+
+      - name: Push measurements
+        run: git perf push
 
   generate-report:
     runs-on: ubuntu-latest
@@ -154,14 +168,13 @@ Add a job to generate visual reports of your performance data:
     permissions:
       contents: write
       pages: write
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install git-perf
-        uses: terragonlabs/git-perf/.github/actions/install@master
+        uses: kaihowl/git-perf/.github/actions/install@master
         with:
           version: latest
 
@@ -216,7 +229,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cleanup measurements and reports
-        uses: terragonlabs/git-perf/.github/actions/cleanup@master
+        uses: kaihowl/git-perf/.github/actions/cleanup@master
         with:
           retention-days: 90
           cleanup-reports: true
@@ -298,11 +311,11 @@ Track measurements across different environments using key-value pairs:
 # In your workflow
 - name: Measure performance (development)
   run: |
-    git perf add -m build_time "$duration" -k env=dev
+    git perf measure -m build_time -k env=dev -- cargo build
 
 - name: Measure performance (production)
   run: |
-    git perf add -m build_time "$duration" -k env=prod
+    git perf measure -m build_time -k env=prod -- cargo build --release
 ```
 
 Filter in reports:
@@ -312,6 +325,16 @@ git perf report -m build_time -k env=dev
 git perf report -m build_time -k env=prod
 ```
 
+Audit specific environments:
+
+```bash
+# Audit development environment only
+git perf audit -m build_time -s env=dev
+
+# Audit production environment only
+git perf audit -m build_time -s env=prod
+```
+
 ## Troubleshooting
 
 ### Issue: Measurements Not Appearing
@@ -319,7 +342,7 @@ git perf report -m build_time -k env=prod
 **Symptom**: Reports show no measurements
 
 **Solutions**:
-1. Verify git-perf is installed: `git-perf --version`
+1. Verify git-perf is installed: `git perf --version`
 2. Check you're in a git repository: `git status`
 3. Ensure measurements were committed: `git log --notes=perf-v3`
 4. Try pulling measurements: `git perf pull`
@@ -422,13 +445,13 @@ git perf report -m build_time -k env=prod
 ### 4. Workflow Organization
 
 **Do:**
-- Separate measurement collection from reporting
-- Only push from protected branches
+- Separate measurement collection from reporting (use chained jobs)
 - Use workflow dispatch for manual triggers
+- Generate reports after measurements are pushed
 
 **Don't:**
-- Push measurements from PR builds (creates conflicts)
-- Generate reports on every commit (once per merge is enough)
+- Skip the push step (measurements won't be saved)
+- Generate reports in a separate workflow (must be chained)
 - Skip permissions declarations
 
 ## Example Real-World Workflow
@@ -456,24 +479,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: terragonlabs/git-perf/.github/actions/install@master
+      - uses: kaihowl/git-perf/.github/actions/install@master
 
       - name: Build and measure
         run: |
-          start=$(date +%s.%N)
-          cargo build --release
-          duration=$(echo "$(date +%s.%N) - $start" | bc)
-          git perf add -m build_time "$duration"
+          git perf measure -m build_time -- cargo build --release
 
           size=$(stat -c%s target/release/my-app)
           git perf add -m binary_size "$size"
 
       - name: Test and measure
-        run: |
-          start=$(date +%s.%N)
-          cargo test --release
-          duration=$(echo "$(date +%s.%N) - $start" | bc)
-          git perf add -m test_duration "$duration"
+        run: git perf measure -m test_duration -- cargo test --release
 
       - name: Audit
         run: |
@@ -482,7 +498,6 @@ jobs:
           git perf audit -m test_duration
 
       - name: Push measurements
-        if: github.event_name == 'push'
         run: git perf push
 
   report:
@@ -497,7 +512,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: terragonlabs/git-perf/.github/actions/install@master
+      - uses: kaihowl/git-perf/.github/actions/install@master
 
       - run: git perf pull
 
