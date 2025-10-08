@@ -210,6 +210,10 @@ jobs:
         ./target/release/git-perf add -m release-binary-size -k os=ubuntu-22.04 -k rust=stable "$BYTES"
         ./target/release/git-perf push
 
+    - name: Audit release binary size
+      run: |
+        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable --min-measurements 10
+
     - name: Upload size artifact
       uses: actions/upload-artifact@v4
       with:

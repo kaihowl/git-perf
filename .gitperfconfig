@@ -8,3 +8,6 @@ epoch = "439374ca"
 [measurement."test-measure2"]
 epoch = "439374ca"
 min_relative_deviation = 10.0
+
+[measurement."release-binary-size"]
+epoch = "861493e"
