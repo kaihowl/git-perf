@@ -120,7 +120,7 @@ jobs:
 ```
 
 **Important Notes:**
-- The `fetch-depth: 0` is required so git-perf has access to the full git history
+- The `fetch-depth: 0` fetches full history; you can use a specific depth (e.g., `fetch-depth: 50`) matching the `-n` flag used in `report` or `audit` commands
 - The `contents: write` permission is needed to push measurement data
 - The `git perf measure` command automatically times the execution of the supplied command
 - Push is unconditional to ensure measurements are always saved
