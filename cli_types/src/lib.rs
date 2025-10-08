@@ -14,6 +14,23 @@ pub enum ReductionFunc {
     Mean,
 }
 
+impl FromStr for ReductionFunc {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "min" => Ok(ReductionFunc::Min),
+            "max" => Ok(ReductionFunc::Max),
+            "median" => Ok(ReductionFunc::Median),
+            "mean" => Ok(ReductionFunc::Mean),
+            _ => Err(anyhow!(
+                "Invalid reduction function: {}. Valid values are 'min', 'max', 'median', or 'mean'",
+                s
+            )),
+        }
+    }
+}
+
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DispersionMethod {
     #[value(name = "stddev")]
@@ -166,18 +183,30 @@ pub enum Commands {
     /// **Default settings:**
     /// - `[measurement].min_relative_deviation = 5.0`
     /// - `[measurement].dispersion_method = "mad"`
+    /// - `[measurement].min_measurements = 3`
+    /// - `[measurement].aggregate_by = "median"`
+    /// - `[measurement].sigma = 3.5`
     ///
     /// **Measurement-specific settings (override defaults):**
     /// - `[measurement."name"].min_relative_deviation = 10.0`
     /// - `[measurement."name"].dispersion_method = "stddev"`
+    /// - `[measurement."name"].min_measurements = 5`
+    /// - `[measurement."name"].aggregate_by = "mean"`
+    /// - `[measurement."name"].sigma = 4.5`
     ///
     /// ## Precedence
     ///
-    /// The dispersion method is determined in this order:
-    /// 1. CLI option (`--dispersion-method` or `-D`) - highest priority
+    /// All audit options follow the same precedence order:
+    /// 1. CLI option (if specified) - highest priority
     /// 2. Measurement-specific config - overrides default
     /// 3. Default config - overrides built-in default
-    /// 4. Built-in default (stddev) - lowest priority
+    /// 4. Built-in default - lowest priority
+    ///
+    /// Built-in defaults:
+    /// - `min_measurements`: 2
+    /// - `aggregate_by`: min
+    /// - `sigma`: 4.0
+    /// - `dispersion_method`: stddev
     ///
     /// When the relative deviation is below the threshold, the audit passes even
     /// if the z-score exceeds the sigma threshold. The relative deviation is
@@ -201,18 +230,21 @@ pub enum Commands {
         /// more measurements are needed.
         /// A minimum of two historic measurements are needed for proper evaluation of standard
         /// deviation.
-        #[arg(long, value_parser=clap::value_parser!(u16).range(2..), default_value="2")]
-        min_measurements: u16,
+        /// If not specified, uses the value from .gitperfconfig file, or defaults to 2.
+        #[arg(long, value_parser=clap::value_parser!(u16).range(2..))]
+        min_measurements: Option<u16>,
 
-        /// What to aggregate the measurements in each group with
-        #[arg(short, long, default_value = "min")]
-        aggregate_by: ReductionFunc,
+        /// What to aggregate the measurements in each group with.
+        /// If not specified, uses the value from .gitperfconfig file, or defaults to min.
+        #[arg(short, long)]
+        aggregate_by: Option<ReductionFunc>,
 
-        /// Multiple of the stddev after which a outlier is detected.
-        /// If the HEAD measurement is within `[mean-<d>*sigma; mean+<d>*sigma]`,
+        /// Multiple of the dispersion after which an outlier is detected.
+        /// If the HEAD measurement is within the acceptable range based on this threshold,
         /// it is considered acceptable.
-        #[arg(short = 'd', long, default_value = "4.0")]
-        sigma: f64,
+        /// If not specified, uses the value from .gitperfconfig file, or defaults to 4.0.
+        #[arg(short = 'd', long)]
+        sigma: Option<f64>,
 
         /// Method for calculating statistical dispersion. Choose between:
         ///

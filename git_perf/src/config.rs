@@ -218,6 +218,40 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
     DispersionMethod::StandardDeviation
 }
 
+/// Returns the minimum measurements from config, or None if not set.
+pub fn audit_min_measurements(measurement: &str) -> Option<u16> {
+    let config = read_hierarchical_config().ok()?;
+
+    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "min_measurements")
+    {
+        if let Ok(v) = s.parse::<u16>() {
+            return Some(v);
+        }
+    }
+
+    None
+}
+
+/// Returns the aggregate-by reduction function from config, or None if not set.
+pub fn audit_aggregate_by(measurement: &str) -> Option<String> {
+    let config = read_hierarchical_config().ok()?;
+
+    config.get_with_parent_fallback("measurement", measurement, "aggregate_by")
+}
+
+/// Returns the sigma value from config, or None if not set.
+pub fn audit_sigma(measurement: &str) -> Option<f64> {
+    let config = read_hierarchical_config().ok()?;
+
+    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "sigma") {
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -845,5 +879,110 @@ dispersion_method = "stddev"
 
         // This would catch the mutant that returns Ok(String::new())
         assert!(!content.is_empty());
+    }
+
+    #[test]
+    fn test_audit_min_measurements() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+min_measurements = 5
+
+[measurement."build_time"]
+min_measurements = 10
+
+[measurement."memory_usage"]
+min_measurements = 3
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(super::audit_min_measurements("build_time"), Some(10));
+            assert_eq!(super::audit_min_measurements("memory_usage"), Some(3));
+            assert_eq!(super::audit_min_measurements("other_measurement"), Some(5));
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_min_measurements("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_audit_aggregate_by() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+aggregate_by = "median"
+
+[measurement."build_time"]
+aggregate_by = "max"
+
+[measurement."memory_usage"]
+aggregate_by = "mean"
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(
+                super::audit_aggregate_by("build_time"),
+                Some("max".to_string())
+            );
+            assert_eq!(
+                super::audit_aggregate_by("memory_usage"),
+                Some("mean".to_string())
+            );
+            assert_eq!(
+                super::audit_aggregate_by("other_measurement"),
+                Some("median".to_string())
+            );
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_aggregate_by("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_audit_sigma() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+sigma = 3.0
+
+[measurement."build_time"]
+sigma = 5.5
+
+[measurement."memory_usage"]
+sigma = 2.0
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(super::audit_sigma("build_time"), Some(5.5));
+            assert_eq!(super::audit_sigma("memory_usage"), Some(2.0));
+            assert_eq!(super::audit_sigma("other_measurement"), Some(3.0));
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_sigma("any_measurement"), None);
+        });
     }
 }
