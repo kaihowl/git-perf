@@ -41,23 +41,53 @@ struct AuditResult {
 pub fn audit_multiple(
     measurements: &[String],
     max_count: usize,
-    min_count: u16,
+    min_count: Option<u16>,
     selectors: &[(String, String)],
-    summarize_by: ReductionFunc,
-    sigma: f64,
-    dispersion_method: DispersionMethod,
+    summarize_by: Option<ReductionFunc>,
+    sigma: Option<f64>,
+    dispersion_method: Option<DispersionMethod>,
 ) -> Result<()> {
     let mut failed = false;
 
     for measurement in measurements {
+        // Determine final values with proper precedence for this specific measurement:
+        // 1. CLI option (if specified)
+        // 2. Measurement-specific config
+        // 3. Default config
+        // 4. Built-in default
+
+        let final_min_count = min_count
+            .or_else(|| config::audit_min_measurements(measurement))
+            .unwrap_or(2);
+
+        let final_summarize_by = summarize_by
+            .or_else(|| {
+                config::audit_aggregate_by(measurement)
+                    .and_then(|s| s.parse::<git_perf_cli_types::ReductionFunc>().ok())
+                    .map(ReductionFunc::from)
+            })
+            .unwrap_or(ReductionFunc::Min);
+
+        let final_sigma = sigma
+            .or_else(|| config::audit_sigma(measurement))
+            .unwrap_or(4.0);
+
+        let final_dispersion_method = dispersion_method
+            .or_else(|| {
+                Some(DispersionMethod::from(config::audit_dispersion_method(
+                    measurement,
+                )))
+            })
+            .unwrap_or(DispersionMethod::StandardDeviation);
+
         let result = audit(
             measurement,
             max_count,
-            min_count,
+            final_min_count,
             selectors,
-            summarize_by,
-            sigma,
-            dispersion_method,
+            final_summarize_by,
+            final_sigma,
+            final_dispersion_method,
         )?;
 
         println!("{}", result.message);
@@ -320,11 +350,11 @@ mod test {
         let result = audit_multiple(
             &[], // Empty measurements list
             100,
-            1,
+            Some(1),
             &[],
-            ReductionFunc::Mean,
-            2.0,
-            DispersionMethod::StandardDeviation,
+            Some(ReductionFunc::Mean),
+            Some(2.0),
+            Some(DispersionMethod::StandardDeviation),
         );
 
         // Should succeed when no measurements need to be audited
