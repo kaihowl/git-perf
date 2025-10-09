@@ -33,5 +33,17 @@ jobs:
 
       - name: Check cargo publish (dry-run)
         run: |
-          cargo publish --dry-run --package git-perf --allow-dirty
+          # Verify both packages can be packaged and published
+          # Order matters: cli_types has no workspace deps, git-perf depends on cli_types
+
+          # First, package both to verify they can be bundled correctly
+          cargo package --package git_perf_cli_types --allow-dirty
+          cargo package --package git-perf --allow-dirty
+
+          # Verify cli_types can be published (no workspace dependencies)
           cargo publish --dry-run --package git_perf_cli_types --allow-dirty
+
+          # For git-perf: use --no-verify to skip the build check that would fail
+          # when cli_types has unpublished changes. The cargo package above already
+          # verified the package builds correctly with path dependencies.
+          cargo publish --dry-run --package git-perf --allow-dirty --no-verify
