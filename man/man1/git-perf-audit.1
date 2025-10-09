@@ -22,13 +22,15 @@ The audit supports two methods for calculating statistical dispersion:
 .PP
 Configuration is done via the `.gitperfconfig` file:
 .PP
-**Default settings:** \- `[measurement].min_relative_deviation = 5.0` \- `[measurement].dispersion_method = "mad"`
+**Default settings:** \- `[measurement].min_relative_deviation = 5.0` \- `[measurement].dispersion_method = "mad"` \- `[measurement].min_measurements = 3` \- `[measurement].aggregate_by = "median"` \- `[measurement].sigma = 3.5`
 .PP
-**Measurement\-specific settings (override defaults):** \- `[measurement."name"].min_relative_deviation = 10.0` \- `[measurement."name"].dispersion_method = "stddev"`
+**Measurement\-specific settings (override defaults):** \- `[measurement."name"].min_relative_deviation = 10.0` \- `[measurement."name"].dispersion_method = "stddev"` \- `[measurement."name"].min_measurements = 5` \- `[measurement."name"].aggregate_by = "mean"` \- `[measurement."name"].sigma = 4.5`
 .PP
 ## Precedence
 .PP
-The dispersion method is determined in this order: 1. CLI option (`\-\-dispersion\-method` or `\-D`) \- highest priority 2. Measurement\-specific config \- overrides default 3. Default config \- overrides built\-in default 4. Built\-in default (stddev) \- lowest priority
+All audit options follow the same precedence order: 1. CLI option (if specified) \- highest priority 2. Measurement\-specific config \- overrides default 3. Default config \- overrides built\-in default 4. Built\-in default \- lowest priority
+.PP
+Built\-in defaults: \- `min_measurements`: 2 \- `aggregate_by`: min \- `sigma`: 4.0 \- `dispersion_method`: stddev
 .PP
 When the relative deviation is below the threshold, the audit passes even if the z\-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median \- 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
 .PP
@@ -44,18 +46,18 @@ Limit the number of previous commits considered. HEAD is included in this count
 \fB\-s\fR, \fB\-\-selectors\fR \fI<SELECTORS>\fR
 Key\-value pair separated by "=" with no whitespaces to subselect measurements
 .TP
-\fB\-\-min\-measurements\fR \fI<MIN_MEASUREMENTS>\fR [default: 2]
-Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation
+\fB\-\-min\-measurements\fR \fI<MIN_MEASUREMENTS>\fR
+Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If not specified, uses the value from .gitperfconfig file, or defaults to 2
 .TP
-\fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR [default: min]
-What to aggregate the measurements in each group with
+\fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR
+What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min
 .br
 
 .br
 [\fIpossible values: \fRmin, max, median, mean]
 .TP
-\fB\-d\fR, \fB\-\-sigma\fR \fI<SIGMA>\fR [default: 4.0]
-Multiple of the stddev after which a outlier is detected. If the HEAD measurement is within `[mean\-<d>*sigma; mean+<d>*sigma]`, it is considered acceptable
+\fB\-d\fR, \fB\-\-sigma\fR \fI<SIGMA>\fR
+Multiple of the dispersion after which an outlier is detected. If the HEAD measurement is within the acceptable range based on this threshold, it is considered acceptable. If not specified, uses the value from .gitperfconfig file, or defaults to 4.0
 .TP
 \fB\-D\fR, \fB\-\-dispersion\-method\fR \fI<DISPERSION_METHOD>\fR
 Method for calculating statistical dispersion. Choose between:

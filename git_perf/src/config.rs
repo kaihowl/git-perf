@@ -233,10 +233,19 @@ pub fn audit_min_measurements(measurement: &str) -> Option<u16> {
 }
 
 /// Returns the aggregate-by reduction function from config, or None if not set.
-pub fn audit_aggregate_by(measurement: &str) -> Option<String> {
+pub fn audit_aggregate_by(measurement: &str) -> Option<git_perf_cli_types::ReductionFunc> {
     let config = read_hierarchical_config().ok()?;
 
-    config.get_with_parent_fallback("measurement", measurement, "aggregate_by")
+    let s = config.get_with_parent_fallback("measurement", measurement, "aggregate_by")?;
+
+    // Parse the string to ReductionFunc
+    match s.to_lowercase().as_str() {
+        "min" => Some(git_perf_cli_types::ReductionFunc::Min),
+        "max" => Some(git_perf_cli_types::ReductionFunc::Max),
+        "median" => Some(git_perf_cli_types::ReductionFunc::Median),
+        "mean" => Some(git_perf_cli_types::ReductionFunc::Mean),
+        _ => None,
+    }
 }
 
 /// Returns the sigma value from config, or None if not set.
@@ -937,15 +946,15 @@ aggregate_by = "mean"
             // Test measurement-specific settings
             assert_eq!(
                 super::audit_aggregate_by("build_time"),
-                Some("max".to_string())
+                Some(git_perf_cli_types::ReductionFunc::Max)
             );
             assert_eq!(
                 super::audit_aggregate_by("memory_usage"),
-                Some("mean".to_string())
+                Some(git_perf_cli_types::ReductionFunc::Mean)
             );
             assert_eq!(
                 super::audit_aggregate_by("other_measurement"),
-                Some("median".to_string())
+                Some(git_perf_cli_types::ReductionFunc::Median)
             );
 
             // Test no config

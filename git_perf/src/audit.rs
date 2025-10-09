@@ -61,11 +61,7 @@ pub fn audit_multiple(
             .unwrap_or(2);
 
         let final_summarize_by = summarize_by
-            .or_else(|| {
-                config::audit_aggregate_by(measurement)
-                    .and_then(|s| s.parse::<git_perf_cli_types::ReductionFunc>().ok())
-                    .map(ReductionFunc::from)
-            })
+            .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
             .unwrap_or(ReductionFunc::Min);
 
         let final_sigma = sigma
