@@ -1,6 +1,6 @@
 [package]
 name = "git_perf_cli_types"
-version = "0.3.0"
+version = "0.2.0"
 edition = "2021"
 description = "Shared CLI types for git-perf"
 repository = "https://github.com/kaihowl/git-perf"
