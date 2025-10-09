@@ -7,7 +7,7 @@ use chrono::prelude::*;
 use chrono::Duration;
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReductionFunc {
+pub enum AggregationFunc {
     Min,
     Max,
     Median,
@@ -135,7 +135,7 @@ pub enum Commands {
 
         /// What to aggregate the measurements in each group with
         #[arg(short, long)]
-        aggregate_by: Option<ReductionFunc>,
+        aggregate_by: Option<AggregationFunc>,
     },
 
     /// For given measurements, check perfomance deviations of the HEAD commit
@@ -206,7 +206,7 @@ pub enum Commands {
 
         /// What to aggregate the measurements in each group with
         #[arg(short, long, default_value = "min")]
-        aggregate_by: ReductionFunc,
+        aggregate_by: AggregationFunc,
 
         /// Multiple of the stddev after which a outlier is detected.
         /// If the HEAD measurement is within `[mean-<d>*sigma; mean+<d>*sigma]`,
