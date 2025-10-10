@@ -34,18 +34,35 @@ jobs:
       - name: Check cargo publish (dry-run)
         run: |
           # Verify both packages can be packaged and published
-          # Order matters: cli_types has no workspace deps, git-perf depends on cli_types
+          # When packages have interdependent unpublished changes, we need a multi-phase approach
 
-          # First, package cli_types (no workspace dependencies, can verify fully)
+          # Phase 1: Verify build.rs doesn't modify source tree
+          # Capture git status before build
+          git status --porcelain > /tmp/git_status_before.txt
+
+          # Build workspace to trigger all build scripts
+          cargo build --workspace --all-targets
+
+          # Check if any source files were modified or created
+          git status --porcelain > /tmp/git_status_after.txt
+          if ! diff /tmp/git_status_before.txt /tmp/git_status_after.txt > /dev/null; then
+            echo "Error: Build script modified or created files in source tree!"
+            echo "Changes detected:"
+            diff /tmp/git_status_before.txt /tmp/git_status_after.txt || true
+            git status
+            exit 1
+          fi
+          echo "✓ Build scripts did not modify source tree"
+
+          # Phase 2: Package verification
+          # Package cli_types with full verification (no workspace dependencies)
           cargo package --package git_perf_cli_types --allow-dirty
 
           # Package git-perf with --no-verify since it depends on unpublished cli_types changes
           # The verification would fail trying to build against the published cli_types version
+          # We've already verified the build works and doesn't modify sources in Phase 1
           cargo package --package git-perf --allow-dirty --no-verify
 
-          # Verify cli_types can be published (no workspace dependencies)
+          # Phase 3: Dry-run publish to verify crates.io metadata
           cargo publish --dry-run --package git_perf_cli_types --allow-dirty
-
-          # For git-perf: use --no-verify to skip the build check that would fail
-          # when cli_types has unpublished changes.
           cargo publish --dry-run --package git-perf --allow-dirty --no-verify
