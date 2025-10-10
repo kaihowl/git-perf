@@ -49,16 +49,16 @@ pub fn audit_multiple(
 ) -> Result<()> {
     let mut failed = false;
 
+    // Determine min_count once globally - it applies to ALL measurements
+    // CLI option overrides config and default
+    let final_min_count = min_count.unwrap_or(2);
+
     for measurement in measurements {
         // Determine final values with proper precedence for this specific measurement:
         // 1. CLI option (if specified)
         // 2. Measurement-specific config
         // 3. Default config
         // 4. Built-in default
-
-        let final_min_count = min_count
-            .or_else(|| config::audit_min_measurements(measurement))
-            .unwrap_or(2);
 
         let final_summarize_by = summarize_by
             .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
@@ -589,9 +589,7 @@ mod test {
     #[cfg(test)]
     mod integration {
         use super::*;
-        use crate::config::{
-            audit_aggregate_by, audit_dispersion_method, audit_min_measurements, audit_sigma,
-        };
+        use crate::config::{audit_aggregate_by, audit_dispersion_method, audit_sigma};
         use std::env;
         use std::fs;
         use tempfile::TempDir;
@@ -655,38 +653,6 @@ dispersion_method = "stddev"
                 DispersionMethod::from(other_method),
                 DispersionMethod::StandardDeviation,
                 "other_metric should use default stddev"
-            );
-        }
-
-        #[test]
-        fn test_different_min_measurements_per_measurement() {
-            let _temp_dir = setup_test_env_with_config(
-                r#"
-[measurement]
-min_measurements = 5
-
-[measurement."build_time"]
-min_measurements = 10
-
-[measurement."memory_usage"]
-min_measurements = 3
-"#,
-            );
-
-            assert_eq!(
-                audit_min_measurements("build_time"),
-                Some(10),
-                "build_time should require 10 measurements"
-            );
-            assert_eq!(
-                audit_min_measurements("memory_usage"),
-                Some(3),
-                "memory_usage should require 3 measurements"
-            );
-            assert_eq!(
-                audit_min_measurements("other_metric"),
-                Some(5),
-                "other_metric should use default 5 measurements"
             );
         }
 
@@ -759,7 +725,6 @@ sigma = 2.0
             let _temp_dir = setup_test_env_with_config(
                 r#"
 [measurement."build_time"]
-min_measurements = 10
 aggregate_by = "max"
 sigma = 5.5
 dispersion_method = "mad"
@@ -775,9 +740,8 @@ dispersion_method = "mad"
             // Test the precedence logic from audit_multiple
             let measurement = "build_time";
 
-            let final_min = cli_min_measurements
-                .or_else(|| audit_min_measurements(measurement))
-                .unwrap_or(2);
+            // min_measurements is global - CLI or default only (no config support)
+            let final_min = cli_min_measurements.unwrap_or(2);
             let final_agg = cli_aggregate_by
                 .or_else(|| audit_aggregate_by(measurement).map(ReductionFunc::from))
                 .unwrap_or(ReductionFunc::Min);
@@ -789,7 +753,7 @@ dispersion_method = "mad"
                 .unwrap_or(DispersionMethod::StandardDeviation);
 
             // CLI values should win
-            assert_eq!(final_min, 2, "CLI min_measurements should override config");
+            assert_eq!(final_min, 2, "CLI min_measurements should be used");
             assert_eq!(
                 final_agg,
                 ReductionFunc::Min,
@@ -808,7 +772,6 @@ dispersion_method = "mad"
             let _temp_dir = setup_test_env_with_config(
                 r#"
 [measurement."build_time"]
-min_measurements = 10
 aggregate_by = "max"
 sigma = 5.5
 dispersion_method = "mad"
@@ -823,9 +786,8 @@ dispersion_method = "mad"
 
             let measurement = "build_time";
 
-            let final_min = cli_min_measurements
-                .or_else(|| audit_min_measurements(measurement))
-                .unwrap_or(2);
+            // min_measurements is global - CLI or default only (no config support)
+            let final_min = cli_min_measurements.unwrap_or(2);
             let final_agg = cli_aggregate_by
                 .or_else(|| audit_aggregate_by(measurement).map(ReductionFunc::from))
                 .unwrap_or(ReductionFunc::Min);
@@ -836,10 +798,10 @@ dispersion_method = "mad"
                 .or_else(|| Some(DispersionMethod::from(audit_dispersion_method(measurement))))
                 .unwrap_or(DispersionMethod::StandardDeviation);
 
-            // Config values should win over defaults
+            // Config values should win over defaults (except min_measurements which isn't configurable)
             assert_eq!(
-                final_min, 10,
-                "Config min_measurements should override default"
+                final_min, 2,
+                "min_measurements should use default (not configurable)"
             );
             assert_eq!(
                 final_agg,
@@ -866,9 +828,8 @@ dispersion_method = "mad"
 
             let measurement = "non_existent_measurement";
 
-            let final_min = cli_min_measurements
-                .or_else(|| audit_min_measurements(measurement))
-                .unwrap_or(2);
+            // min_measurements is global - CLI or default only (no config support)
+            let final_min = cli_min_measurements.unwrap_or(2);
             let final_agg = cli_aggregate_by
                 .or_else(|| audit_aggregate_by(measurement).map(ReductionFunc::from))
                 .unwrap_or(ReductionFunc::Min);
