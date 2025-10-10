@@ -36,14 +36,16 @@ jobs:
           # Verify both packages can be packaged and published
           # Order matters: cli_types has no workspace deps, git-perf depends on cli_types
 
-          # First, package both to verify they can be bundled correctly
+          # First, package cli_types (no workspace dependencies, can verify fully)
           cargo package --package git_perf_cli_types --allow-dirty
-          cargo package --package git-perf --allow-dirty
+
+          # Package git-perf with --no-verify since it depends on unpublished cli_types changes
+          # The verification would fail trying to build against the published cli_types version
+          cargo package --package git-perf --allow-dirty --no-verify
 
           # Verify cli_types can be published (no workspace dependencies)
           cargo publish --dry-run --package git_perf_cli_types --allow-dirty
 
           # For git-perf: use --no-verify to skip the build check that would fail
-          # when cli_types has unpublished changes. The cargo package above already
-          # verified the package builds correctly with path dependencies.
+          # when cli_types has unpublished changes.
           cargo publish --dry-run --package git-perf --allow-dirty --no-verify
