@@ -39,10 +39,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Tell cargo to re-run this if the CLI definition changes
     println!("cargo:rerun-if-changed=../git_perf_cli_types/src/lib.rs");
 
-    // TESTING: Write to source tree during build to trigger dirty check failure
-    let src_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let test_file = src_dir.join("build_artifact.txt");
-    fs::write(&test_file, "This file was generated during build")?;
-
     Ok(())
 }

@@ -20,13 +20,13 @@ pub enum DispersionMethod {
 }
 
 // Conversion from CLI types to stats types
-impl From<git_perf_cli_types::AggregationFunc> for ReductionFunc {
-    fn from(func: git_perf_cli_types::AggregationFunc) -> Self {
+impl From<git_perf_cli_types::ReductionFunc> for ReductionFunc {
+    fn from(func: git_perf_cli_types::ReductionFunc) -> Self {
         match func {
-            git_perf_cli_types::AggregationFunc::Min => ReductionFunc::Min,
-            git_perf_cli_types::AggregationFunc::Max => ReductionFunc::Max,
-            git_perf_cli_types::AggregationFunc::Median => ReductionFunc::Median,
-            git_perf_cli_types::AggregationFunc::Mean => ReductionFunc::Mean,
+            git_perf_cli_types::ReductionFunc::Min => ReductionFunc::Min,
+            git_perf_cli_types::ReductionFunc::Max => ReductionFunc::Max,
+            git_perf_cli_types::ReductionFunc::Median => ReductionFunc::Median,
+            git_perf_cli_types::ReductionFunc::Mean => ReductionFunc::Mean,
         }
     }
 }
