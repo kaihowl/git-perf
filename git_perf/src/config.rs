@@ -218,6 +218,20 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
     DispersionMethod::StandardDeviation
 }
 
+/// Returns the minimum measurements from config, or None if not set.
+pub fn audit_min_measurements(measurement: &str) -> Option<u16> {
+    let config = read_hierarchical_config().ok()?;
+
+    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "min_measurements")
+    {
+        if let Ok(v) = s.parse::<u16>() {
+            return Some(v);
+        }
+    }
+
+    None
+}
+
 /// Returns the aggregate-by reduction function from config, or None if not set.
 pub fn audit_aggregate_by(measurement: &str) -> Option<git_perf_cli_types::ReductionFunc> {
     let config = read_hierarchical_config().ok()?;
@@ -874,6 +888,38 @@ dispersion_method = "stddev"
 
         // This would catch the mutant that returns Ok(String::new())
         assert!(!content.is_empty());
+    }
+
+    #[test]
+    fn test_audit_min_measurements() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+min_measurements = 5
+
+[measurement."build_time"]
+min_measurements = 10
+
+[measurement."memory_usage"]
+min_measurements = 3
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(super::audit_min_measurements("build_time"), Some(10));
+            assert_eq!(super::audit_min_measurements("memory_usage"), Some(3));
+            assert_eq!(super::audit_min_measurements("other_measurement"), Some(5));
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_min_measurements("any_measurement"), None);
+        });
     }
 
     #[test]

@@ -43,8 +43,34 @@ git checkout master
 
 echo "Added measurements for build_time and memory_usage across 6 commits"
 
-# Test 1: Different aggregate_by per measurement
-echo "Test 1: Different aggregate_by per measurement"
+# Test 1: Different min_measurements per measurement
+echo "Test 1: Different min_measurements per measurement"
+cat > .gitperfconfig << 'EOF'
+[measurement]
+min_measurements = 3
+
+[measurement."build_time"]
+min_measurements = 5
+
+[measurement."memory_usage"]
+min_measurements = 2
+EOF
+
+# build_time should require 5 measurements
+AUDIT_BUILD=$(git perf audit -m build_time -n 10 2>&1 || true)
+echo "Build time audit output: $AUDIT_BUILD"
+
+# memory_usage should require 2 measurements
+AUDIT_MEMORY=$(git perf audit -m memory_usage -n 10 2>&1 || true)
+echo "Memory usage audit output: $AUDIT_MEMORY"
+
+# Both should have run (we have enough measurements)
+echo "$AUDIT_BUILD" | grep -q "z-score" || exit 1
+echo "$AUDIT_MEMORY" | grep -q "z-score" || exit 1
+echo "✅ Different min_measurements per measurement works"
+
+# Test 2: Different aggregate_by per measurement
+echo "Test 2: Different aggregate_by per measurement"
 cat > .gitperfconfig << 'EOF'
 [measurement]
 aggregate_by = "median"
@@ -65,8 +91,8 @@ echo "$AUDIT_BUILD_AGG" | grep -q "z-score" || exit 1
 echo "$AUDIT_MEMORY_AGG" | grep -q "z-score" || exit 1
 echo "✅ Different aggregate_by per measurement works"
 
-# Test 2: Different sigma per measurement
-echo "Test 2: Different sigma per measurement"
+# Test 3: Different sigma per measurement
+echo "Test 3: Different sigma per measurement"
 cat > .gitperfconfig << 'EOF'
 [measurement]
 sigma = 4.0
@@ -86,8 +112,8 @@ echo "$AUDIT_BUILD_SIGMA" | grep -q "z-score" || exit 1
 echo "$AUDIT_MEMORY_SIGMA" | grep -q "z-score" || exit 1
 echo "✅ Different sigma per measurement works"
 
-# Test 3: Multiple measurements with different dispersion methods in ONE audit call
-echo "Test 3: Multiple measurements with different dispersion methods in single audit"
+# Test 4: Multiple measurements with different dispersion methods in ONE audit call
+echo "Test 4: Multiple measurements with different dispersion methods in single audit"
 cat > .gitperfconfig << 'EOF'
 [measurement]
 dispersion_method = "stddev"
@@ -119,8 +145,8 @@ echo "$AUDIT_MULTI" | grep -A 5 "build_time" | grep -q "z-score (mad):" || exit 
 echo "$AUDIT_MULTI" | grep -A 5 "memory_usage" | grep -q "z-score (stddev):" || exit 1
 echo "✅ Multiple measurements use different dispersion methods in single audit"
 
-# Test 4: CLI option overrides config for specific measurement
-echo "Test 4: CLI option overrides per-measurement config"
+# Test 5: CLI option overrides config for specific measurement
+echo "Test 5: CLI option overrides per-measurement config"
 cat > .gitperfconfig << 'EOF'
 [measurement."build_time"]
 aggregate_by = "max"
@@ -133,8 +159,8 @@ AUDIT_CLI_OVERRIDE=$(git perf audit -m build_time -n 10 --min-measurements 2 -a 
 echo "$AUDIT_CLI_OVERRIDE" | grep -q "z-score (stddev):" || exit 1
 echo "✅ CLI options override per-measurement config"
 
-# Test 5: Three parameters different for three measurements
-echo "Test 5: Three measurements with different configs for aggregate_by, sigma, and dispersion_method"
+# Test 6: All four parameters different for three measurements
+echo "Test 6: Three measurements with different configs for all parameters"
 
 # Add a third measurement
 for i in {5..0}; do
@@ -149,21 +175,25 @@ git checkout master
 
 cat > .gitperfconfig << 'EOF'
 [measurement]
+min_measurements = 3
 aggregate_by = "median"
 sigma = 4.0
 dispersion_method = "stddev"
 
 [measurement."build_time"]
+min_measurements = 5
 aggregate_by = "max"
 sigma = 6.0
 dispersion_method = "mad"
 
 [measurement."memory_usage"]
+min_measurements = 2
 aggregate_by = "min"
 sigma = 2.0
 dispersion_method = "stddev"
 
 [measurement."test_metric"]
+min_measurements = 4
 aggregate_by = "mean"
 sigma = 5.0
 dispersion_method = "mad"
@@ -182,12 +212,13 @@ echo "$AUDIT_THREE" | grep "test_metric" || exit 1
 echo "$AUDIT_THREE" | grep -A 5 "build_time" | grep -q "z-score (mad):" || exit 1
 echo "$AUDIT_THREE" | grep -A 5 "memory_usage" | grep -q "z-score (stddev):" || exit 1
 echo "$AUDIT_THREE" | grep -A 5 "test_metric" | grep -q "z-score (mad):" || exit 1
-echo "✅ Three measurements with different configs for aggregate_by, sigma, and dispersion_method"
+echo "✅ Three measurements with different configs for all parameters"
 
-# Test 6: Config falls back to defaults when measurement-specific not defined
-echo "Test 6: Falls back to global config when measurement-specific not defined"
+# Test 7: Config falls back to defaults when measurement-specific not defined
+echo "Test 7: Falls back to global config when measurement-specific not defined"
 cat > .gitperfconfig << 'EOF'
 [measurement]
+min_measurements = 4
 aggregate_by = "mean"
 sigma = 3.5
 dispersion_method = "mad"

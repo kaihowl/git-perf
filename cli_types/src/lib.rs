@@ -183,28 +183,30 @@ pub enum Commands {
     /// **Default settings:**
     /// - `[measurement].min_relative_deviation = 5.0`
     /// - `[measurement].dispersion_method = "mad"`
+    /// - `[measurement].min_measurements = 3`
     /// - `[measurement].aggregate_by = "median"`
     /// - `[measurement].sigma = 3.5`
     ///
     /// **Measurement-specific settings (override defaults):**
     /// - `[measurement."name"].min_relative_deviation = 10.0`
     /// - `[measurement."name"].dispersion_method = "stddev"`
+    /// - `[measurement."name"].min_measurements = 5`
     /// - `[measurement."name"].aggregate_by = "mean"`
     /// - `[measurement."name"].sigma = 4.5`
     ///
-    /// **Note:** `min_measurements` is NOT configurable via .gitperfconfig and must be
-    /// specified via CLI (--min-measurements) or defaults to 2.
-    ///
     /// ## Precedence
     ///
-    /// For configurable options (aggregate_by, sigma, dispersion_method), the precedence is:
+    /// All audit options follow the same precedence order:
     /// 1. CLI option (if specified) - highest priority
     /// 2. Measurement-specific config - overrides default
     /// 3. Default config - overrides built-in default
     /// 4. Built-in default - lowest priority
     ///
+    /// **Note:** When `--min-measurements` is specified on CLI, it applies to ALL
+    /// measurements in the audit, overriding any per-measurement config values.
+    ///
     /// Built-in defaults:
-    /// - `min_measurements`: 2 (CLI-only, applies to all measurements in audit)
+    /// - `min_measurements`: 2
     /// - `aggregate_by`: min
     /// - `sigma`: 4.0
     /// - `dispersion_method`: stddev
@@ -228,10 +230,11 @@ pub enum Commands {
         selectors: Vec<(String, String)>,
 
         /// Minimum number of measurements needed. If less, pass test and assume
-        /// more measurements are needed. This applies to ALL measurements in the audit.
+        /// more measurements are needed.
         /// A minimum of two historic measurements are needed for proper evaluation of standard
         /// deviation.
-        /// If not specified, defaults to 2. NOT configurable via .gitperfconfig.
+        /// If specified on CLI, applies to ALL measurements (overrides config).
+        /// If not specified, uses per-measurement config or defaults to 2.
         #[arg(long, value_parser=clap::value_parser!(u16).range(2..))]
         min_measurements: Option<u16>,
 

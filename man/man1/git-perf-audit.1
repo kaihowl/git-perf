@@ -30,6 +30,8 @@ Configuration is done via the `.gitperfconfig` file:
 .PP
 All audit options follow the same precedence order: 1. CLI option (if specified) \- highest priority 2. Measurement\-specific config \- overrides default 3. Default config \- overrides built\-in default 4. Built\-in default \- lowest priority
 .PP
+**Note:** When `\-\-min\-measurements` is specified on CLI, it applies to ALL measurements in the audit, overriding any per\-measurement config values.
+.PP
 Built\-in defaults: \- `min_measurements`: 2 \- `aggregate_by`: min \- `sigma`: 4.0 \- `dispersion_method`: stddev
 .PP
 When the relative deviation is below the threshold, the audit passes even if the z\-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median \- 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
@@ -47,7 +49,7 @@ Limit the number of previous commits considered. HEAD is included in this count
 Key\-value pair separated by "=" with no whitespaces to subselect measurements
 .TP
 \fB\-\-min\-measurements\fR \fI<MIN_MEASUREMENTS>\fR
-Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If not specified, uses the value from .gitperfconfig file, or defaults to 2
+Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per\-measurement config or defaults to 2
 .TP
 \fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR
 What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min

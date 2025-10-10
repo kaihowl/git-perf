@@ -146,6 +146,8 @@ Configuration is done via the `.gitperfconfig` file:
 
 All audit options follow the same precedence order: 1. CLI option (if specified) - highest priority 2. Measurement-specific config - overrides default 3. Default config - overrides built-in default 4. Built-in default - lowest priority
 
+**Note:** When `--min-measurements` is specified on CLI, it applies to ALL measurements in the audit, overriding any per-measurement config values.
+
 Built-in defaults: - `min_measurements`: 2 - `aggregate_by`: min - `sigma`: 4.0 - `dispersion_method`: stddev
 
 When the relative deviation is below the threshold, the audit passes even if the z-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median - 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
@@ -161,7 +163,7 @@ The sparkline visualization shows the range of measurements relative to the tail
 
   Default value: `40`
 * `-s`, `--selectors <SELECTORS>` — Key-value pair separated by "=" with no whitespaces to subselect measurements
-* `--min-measurements <MIN_MEASUREMENTS>` — Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If not specified, uses the value from .gitperfconfig file, or defaults to 2
+* `--min-measurements <MIN_MEASUREMENTS>` — Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per-measurement config or defaults to 2
 * `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min
 
   Possible values: `min`, `max`, `median`, `mean`
