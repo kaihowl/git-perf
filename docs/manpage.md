@@ -138,13 +138,17 @@ The audit supports two methods for calculating statistical dispersion:
 
 Configuration is done via the `.gitperfconfig` file:
 
-**Default settings:** - `[measurement].min_relative_deviation = 5.0` - `[measurement].dispersion_method = "mad"`
+**Default settings:** - `[measurement].min_relative_deviation = 5.0` - `[measurement].dispersion_method = "mad"` - `[measurement].min_measurements = 3` - `[measurement].aggregate_by = "median"` - `[measurement].sigma = 3.5`
 
-**Measurement-specific settings (override defaults):** - `[measurement."name"].min_relative_deviation = 10.0` - `[measurement."name"].dispersion_method = "stddev"`
+**Measurement-specific settings (override defaults):** - `[measurement."name"].min_relative_deviation = 10.0` - `[measurement."name"].dispersion_method = "stddev"` - `[measurement."name"].min_measurements = 5` - `[measurement."name"].aggregate_by = "mean"` - `[measurement."name"].sigma = 4.5`
 
 ## Precedence
 
-The dispersion method is determined in this order: 1. CLI option (`--dispersion-method` or `-D`) - highest priority 2. Measurement-specific config - overrides default 3. Default config - overrides built-in default 4. Built-in default (stddev) - lowest priority
+All audit options follow the same precedence order: 1. CLI option (if specified) - highest priority 2. Measurement-specific config - overrides default 3. Default config - overrides built-in default 4. Built-in default - lowest priority
+
+**Note:** When `--min-measurements` is specified on CLI, it applies to ALL measurements in the audit, overriding any per-measurement config values.
+
+Built-in defaults: - `min_measurements`: 2 - `aggregate_by`: min - `sigma`: 4.0 - `dispersion_method`: stddev
 
 When the relative deviation is below the threshold, the audit passes even if the z-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median - 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
 
@@ -159,18 +163,12 @@ The sparkline visualization shows the range of measurements relative to the tail
 
   Default value: `40`
 * `-s`, `--selectors <SELECTORS>` — Key-value pair separated by "=" with no whitespaces to subselect measurements
-* `--min-measurements <MIN_MEASUREMENTS>` — Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation
-
-  Default value: `2`
-* `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with
-
-  Default value: `min`
+* `--min-measurements <MIN_MEASUREMENTS>` — Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per-measurement config or defaults to 2
+* `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min
 
   Possible values: `min`, `max`, `median`, `mean`
 
-* `-d`, `--sigma <SIGMA>` — Multiple of the stddev after which a outlier is detected. If the HEAD measurement is within `[mean-<d>*sigma; mean+<d>*sigma]`, it is considered acceptable
-
-  Default value: `4.0`
+* `-d`, `--sigma <SIGMA>` — Multiple of the dispersion after which an outlier is detected. If the HEAD measurement is within the acceptable range based on this threshold, it is considered acceptable. If not specified, uses the value from .gitperfconfig file, or defaults to 4.0
 * `-D`, `--dispersion-method <DISPERSION_METHOD>` — Method for calculating statistical dispersion. Choose between:
 
    **stddev**: Standard deviation - sensitive to outliers, use for normally distributed data where you want to detect all changes.
