@@ -163,6 +163,8 @@ jobs:
   generate-report:
     runs-on: ubuntu-latest
     needs: measure-performance
+    # Only generate reports for pushes to main branch (not PRs or other branches)
+    # This avoids generating reports for every commit and keeps GitHub Pages focused on the main branch
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
