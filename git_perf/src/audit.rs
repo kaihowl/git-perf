@@ -127,24 +127,12 @@ fn audit_with_data(
     let head_summary = stats::aggregate_measurements(iter::once(&head));
     let tail_summary = stats::aggregate_measurements(tail.iter());
 
-    // MUTATION POINT: < vs == (Line 120)
-    if tail_summary.len < min_count.into() {
-        let number_measurements = tail_summary.len;
-        // MUTATION POINT: > vs < (Line 122)
-        let plural_s = if number_measurements > 1 { "s" } else { "" };
-        error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
-        return Ok(AuditResult {
-            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."),
-            passed: true,
-        });
-    }
-
-    let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
-
-    let mut tail_measurements = tail.clone();
-    let tail_median = tail_measurements.median().unwrap_or(0.0);
-
+    // Generate sparkline and calculate range for all measurements - used in both skip and normal paths
     let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
+
+    let mut tail_measurements = all_measurements.clone();
+    tail_measurements.pop(); // Remove head to get just tail for median calculation
+    let tail_median = tail_measurements.median().unwrap_or(0.0);
 
     // MUTATION POINT: / vs % (Line 140)
     let relative_min = all_measurements
@@ -159,6 +147,28 @@ fn audit_with_data(
         .unwrap()
         / tail_median
         - 1.0;
+
+    let sparkline = format!(
+        " [{:+.2}% – {:+.2}%] {}",
+        (relative_min * 100.0),
+        (relative_max * 100.0),
+        spark(all_measurements.as_slice())
+    );
+
+    // MUTATION POINT: < vs == (Line 120)
+    if tail_summary.len < min_count.into() {
+        let number_measurements = tail_summary.len;
+        // MUTATION POINT: > vs < (Line 122)
+        let plural_s = if number_measurements > 1 { "s" } else { "" };
+        error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
+
+        return Ok(AuditResult {
+            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"),
+            passed: true,
+        });
+    }
+
+    let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
 
     // MUTATION POINT: / vs % (Line 150)
     let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
@@ -181,13 +191,8 @@ fn audit_with_data(
     };
 
     let text_summary = format!(
-        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n [{:+.1}% – {:+.1}%] {}",
-        z_score_display,
-        &head_summary,
-        &tail_summary,
-        (relative_min * 100.0),
-        (relative_max * 100.0),
-        spark(all_measurements.as_slice()),
+        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n{}",
+        z_score_display, &head_summary, &tail_summary, sparkline,
     );
 
     // MUTATION POINT: > vs >= (Line 178)
@@ -441,13 +446,13 @@ mod test {
         // - relative_max = (25.0 % 10.0 - 1.0) * 100 = -50.0% (since 25.0 % 10.0 = 5.0)
 
         // Check that the calculation uses division, not modulo
-        // The range should show [+0.0% – +150.0%], not [-100.0% – -50.0%]
-        assert!(audit_result.message.contains("[+0.0% – +150.0%]"));
+        // The range should show [+0.00% – +150.00%], not [-100.00% – -50.00%]
+        assert!(audit_result.message.contains("[+0.00% – +150.00%]"));
 
         // Ensure the modulo results are NOT present
-        assert!(!audit_result.message.contains("[-100.0% – -50.0%]"));
-        assert!(!audit_result.message.contains("-100.0%"));
-        assert!(!audit_result.message.contains("-50.0%"));
+        assert!(!audit_result.message.contains("[-100.00% – -50.00%]"));
+        assert!(!audit_result.message.contains("-100.00%"));
+        assert!(!audit_result.message.contains("-50.00%"));
     }
 
     #[test]
