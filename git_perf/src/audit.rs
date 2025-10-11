@@ -127,16 +127,16 @@ fn audit_with_data(
     let head_summary = stats::aggregate_measurements(iter::once(&head));
     let tail_summary = stats::aggregate_measurements(tail.iter());
 
+    // Generate sparkline for all measurements (tail + head) - used in both skip and normal paths
+    let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
+    let sparkline = spark(all_measurements.as_slice());
+
     // MUTATION POINT: < vs == (Line 120)
     if tail_summary.len < min_count.into() {
         let number_measurements = tail_summary.len;
         // MUTATION POINT: > vs < (Line 122)
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
-
-        // Generate sparkline for the available measurements
-        let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
-        let sparkline = spark(all_measurements.as_slice());
 
         return Ok(AuditResult {
             message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"),
@@ -146,10 +146,9 @@ fn audit_with_data(
 
     let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
 
-    let mut tail_measurements = tail.clone();
+    let mut tail_measurements = all_measurements.clone();
+    tail_measurements.pop(); // Remove head to get just tail for median calculation
     let tail_median = tail_measurements.median().unwrap_or(0.0);
-
-    let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
 
     // MUTATION POINT: / vs % (Line 140)
     let relative_min = all_measurements
@@ -192,7 +191,7 @@ fn audit_with_data(
         &tail_summary,
         (relative_min * 100.0),
         (relative_max * 100.0),
-        spark(all_measurements.as_slice()),
+        sparkline,
     );
 
     // MUTATION POINT: > vs >= (Line 178)
