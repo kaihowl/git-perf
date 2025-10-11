@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -31,7 +31,30 @@ jobs:
           path: target
           key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Set non-existent versions for workspace packages
+        run: |
+          # Generate a unique version based on timestamp to ensure it doesn't exist on crates.io
+          TEMP_VERSION="999.999.$(date +%s)"
+          echo "Using temporary version: $TEMP_VERSION"
+
+          # Update all workspace package versions
+          for manifest in cli_types/Cargo.toml git_perf/Cargo.toml; do
+            if [ -f "$manifest" ]; then
+              sed -i "s/^version = \".*\"/version = \"$TEMP_VERSION\"/" "$manifest"
+            fi
+          done
+
+          # Update all workspace dependencies to use the new version
+          for manifest in cli_types/Cargo.toml git_perf/Cargo.toml; do
+            if [ -f "$manifest" ]; then
+              sed -i "s/git_perf_cli_types = { version = \"[^\"]*\"/git_perf_cli_types = { version = \"$TEMP_VERSION\"/" "$manifest"
+            fi
+          done
+
+          echo "Updated package versions:"
+          grep -H '^version = ' cli_types/Cargo.toml git_perf/Cargo.toml || true
+          grep -H 'git_perf_cli_types = { version' git_perf/Cargo.toml || true
+
       - name: Check cargo publish (dry-run)
         run: |
-          cargo publish --dry-run --package git-perf --allow-dirty
-          cargo publish --dry-run --package git_perf_cli_types --allow-dirty
+          cargo publish --workspace --dry-run --allow-dirty
