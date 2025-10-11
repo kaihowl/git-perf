@@ -59,19 +59,18 @@ EOF
 # We have 6 measurements total
 # build_time requires 5, memory_usage requires 2 (both should have enough)
 AUDIT_BUILD=$(git perf audit -m build_time -n 10 2>&1 || true)
-echo "$AUDIT_BUILD" | grep -q "z-score" || exit 1
-echo "$AUDIT_BUILD" | grep -q "Tail:" || exit 1  # Should show tail measurements
+assert_output_contains "$AUDIT_BUILD" "z-score"
+assert_output_contains "$AUDIT_BUILD" "Tail:"
 
 AUDIT_MEMORY=$(git perf audit -m memory_usage -n 10 2>&1 || true)
-echo "$AUDIT_MEMORY" | grep -q "z-score" || exit 1
-echo "$AUDIT_MEMORY" | grep -q "Tail:" || exit 1  # Should show tail measurements
+assert_output_contains "$AUDIT_MEMORY" "z-score"
+assert_output_contains "$AUDIT_MEMORY" "Tail:"
 
 # Test with insufficient measurements: build_time needs 5 but only get 2 (HEAD + 1 tail with n=1)
 # This should skip the test
 AUDIT_BUILD_INSUFFICIENT=$(git perf audit -m build_time -n 1 2>&1)
-# With insufficient measurements, audit skips and shows error message
-echo "$AUDIT_BUILD_INSUFFICIENT" | grep -q "min_measurements of 5" || exit 1
-echo "$AUDIT_BUILD_INSUFFICIENT" | grep -q "⏭️" || exit 1  # Skip symbol
+assert_output_contains "$AUDIT_BUILD_INSUFFICIENT" "min_measurements of 5"
+assert_output_contains "$AUDIT_BUILD_INSUFFICIENT" "⏭️"
 echo "✅ Different min_measurements per measurement works"
 
 # Test 2: Different aggregate_by per measurement
@@ -92,8 +91,8 @@ EOF
 AUDIT_BUILD_AGG=$(git perf audit -m build_time -n 10 2>&1 || true)
 AUDIT_MEMORY_AGG=$(git perf audit -m memory_usage -n 10 2>&1 || true)
 
-echo "$AUDIT_BUILD_AGG" | grep -q "z-score" || exit 1
-echo "$AUDIT_MEMORY_AGG" | grep -q "z-score" || exit 1
+assert_output_contains "$AUDIT_BUILD_AGG" "z-score"
+assert_output_contains "$AUDIT_MEMORY_AGG" "z-score"
 echo "✅ Different aggregate_by per measurement works"
 
 # Test 3: Different sigma per measurement
@@ -113,8 +112,8 @@ EOF
 AUDIT_BUILD_SIGMA=$(git perf audit -m build_time -n 10 2>&1 || true)
 AUDIT_MEMORY_SIGMA=$(git perf audit -m memory_usage -n 10 2>&1 || true)
 
-echo "$AUDIT_BUILD_SIGMA" | grep -q "z-score" || exit 1
-echo "$AUDIT_MEMORY_SIGMA" | grep -q "z-score" || exit 1
+assert_output_contains "$AUDIT_BUILD_SIGMA" "z-score"
+assert_output_contains "$AUDIT_MEMORY_SIGMA" "z-score"
 echo "✅ Different sigma per measurement works"
 
 # Test 4: Multiple measurements with different dispersion methods in ONE audit call
@@ -132,22 +131,14 @@ EOF
 
 # Run audit with BOTH measurements at once
 AUDIT_MULTI=$(git perf audit -m build_time -m memory_usage -n 10 2>&1 || true)
-echo "Multi-measurement audit output: $AUDIT_MULTI"
 
 # Verify both measurements were audited with their respective methods
-echo "$AUDIT_MULTI" | grep "build_time" || exit 1
-echo "$AUDIT_MULTI" | grep "memory_usage" || exit 1
-
-# Extract the lines for each measurement and verify dispersion methods
-BUILD_LINE=$(echo "$AUDIT_MULTI" | grep "build_time" || echo "")
-MEMORY_LINE=$(echo "$AUDIT_MULTI" | grep "memory_usage" || echo "")
-
-echo "Build time line: $BUILD_LINE"
-echo "Memory usage line: $MEMORY_LINE"
+assert_output_contains "$AUDIT_MULTI" "build_time"
+assert_output_contains "$AUDIT_MULTI" "memory_usage"
 
 # build_time should use MAD, memory_usage should use stddev
-echo "$AUDIT_MULTI" | grep -A 5 "build_time" | grep -q "z-score (mad):" || exit 1
-echo "$AUDIT_MULTI" | grep -A 5 "memory_usage" | grep -q "z-score (stddev):" || exit 1
+assert_output_contains "$AUDIT_MULTI" "z-score (mad):"
+assert_output_contains "$AUDIT_MULTI" "z-score (stddev):"
 echo "✅ Multiple measurements use different dispersion methods in single audit"
 
 # Test 5: CLI option overrides config for specific measurement
@@ -166,17 +157,15 @@ EOF
 
 # CLI should override all config values
 AUDIT_CLI_OVERRIDE=$(git perf audit -m build_time -n 10 --min-measurements 2 -a min -d 3.0 --dispersion-method stddev 2>&1 || true)
-echo "$AUDIT_CLI_OVERRIDE" | grep -q "z-score (stddev):" || exit 1
+assert_output_contains "$AUDIT_CLI_OVERRIDE" "z-score (stddev):"
 
 # CRITICAL: CLI --min-measurements should apply to ALL measurements
 # Config says build_time needs 10 and memory_usage needs 8, but CLI says 2 for all
 AUDIT_CLI_MIN_ALL=$(git perf audit -m build_time -m memory_usage -n 3 --min-measurements 2 2>&1 || true)
-echo "Audit with CLI min override: $AUDIT_CLI_MIN_ALL"
 # Both should succeed with only 3 measurements because CLI overrides config for ALL
-echo "$AUDIT_CLI_MIN_ALL" | grep -q "build_time" || exit 1
-echo "$AUDIT_CLI_MIN_ALL" | grep -A 2 "build_time" | grep -q "z-score" || exit 1
-echo "$AUDIT_CLI_MIN_ALL" | grep -q "memory_usage" || exit 1
-echo "$AUDIT_CLI_MIN_ALL" | grep -A 2 "memory_usage" | grep -q "z-score" || exit 1
+assert_output_contains "$AUDIT_CLI_MIN_ALL" "build_time"
+assert_output_contains "$AUDIT_CLI_MIN_ALL" "memory_usage"
+assert_output_contains "$AUDIT_CLI_MIN_ALL" "z-score"
 echo "✅ CLI options override per-measurement config"
 
 # Test 6: All four parameters different for three measurements
@@ -221,17 +210,15 @@ EOF
 
 # Run audit with all three measurements
 AUDIT_THREE=$(git perf audit -m build_time -m memory_usage -m test_metric -n 10 2>&1 || true)
-echo "Three measurement audit output: $AUDIT_THREE"
 
 # Verify all three were audited
-echo "$AUDIT_THREE" | grep "build_time" || exit 1
-echo "$AUDIT_THREE" | grep "memory_usage" || exit 1
-echo "$AUDIT_THREE" | grep "test_metric" || exit 1
+assert_output_contains "$AUDIT_THREE" "build_time"
+assert_output_contains "$AUDIT_THREE" "memory_usage"
+assert_output_contains "$AUDIT_THREE" "test_metric"
 
 # Verify dispersion methods are correct
-echo "$AUDIT_THREE" | grep -A 5 "build_time" | grep -q "z-score (mad):" || exit 1
-echo "$AUDIT_THREE" | grep -A 5 "memory_usage" | grep -q "z-score (stddev):" || exit 1
-echo "$AUDIT_THREE" | grep -A 5 "test_metric" | grep -q "z-score (mad):" || exit 1
+assert_output_contains "$AUDIT_THREE" "z-score (mad):"
+assert_output_contains "$AUDIT_THREE" "z-score (stddev):"
 echo "✅ Three measurements with different configs for all parameters"
 
 # Test 7: Config falls back to defaults when measurement-specific not defined
@@ -251,8 +238,8 @@ EOF
 # memory_usage should use all global settings
 AUDIT_FALLBACK=$(git perf audit -m build_time -m memory_usage -n 10 2>&1 || true)
 
-echo "$AUDIT_FALLBACK" | grep -A 5 "build_time" | grep -q "z-score (stddev):" || exit 1
-echo "$AUDIT_FALLBACK" | grep -A 5 "memory_usage" | grep -q "z-score (mad):" || exit 1
+assert_output_contains "$AUDIT_FALLBACK" "z-score (stddev):"
+assert_output_contains "$AUDIT_FALLBACK" "z-score (mad):"
 echo "✅ Correctly falls back to global config"
 
 echo "All per-measurement configuration tests passed!"

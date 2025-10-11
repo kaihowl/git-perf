@@ -50,8 +50,8 @@ pub(crate) struct ResolvedAuditParams {
 /// Resolves audit parameters for a specific measurement with proper precedence:
 /// CLI option -> measurement-specific config -> global config -> built-in default
 ///
-/// Special behavior for min_count: When CLI provides a value, it applies to ALL
-/// measurements (overrides config). When CLI is None, use per-measurement config.
+/// Note: When CLI provides min_count, the caller (audit_multiple) uses the same
+/// value for all measurements. When CLI is None, this function reads per-measurement config.
 pub(crate) fn resolve_audit_params(
     measurement: &str,
     cli_min_count: Option<u16>,
