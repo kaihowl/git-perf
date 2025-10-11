@@ -242,4 +242,64 @@ assert_output_contains "$AUDIT_FALLBACK" "z-score (stddev):"
 assert_output_contains "$AUDIT_FALLBACK" "z-score (mad):"
 echo "✅ Correctly falls back to global config"
 
+# Test 8: Warning when max_count < min_measurements (config)
+echo "Test 8: Warning when max_count < min_measurements from config"
+cat > .gitperfconfig << 'EOF'
+[measurement."build_time"]
+min_measurements = 10
+
+[measurement."memory_usage"]
+min_measurements = 15
+EOF
+
+# Test with max_count=3, which is less than both config values
+# This should produce warnings for both measurements
+AUDIT_WARNING=$(git perf audit -m build_time -m memory_usage -n 3 2>&1 || true)
+
+# Verify warnings appear for both measurements
+assert_output_contains "$AUDIT_WARNING" "Warning: --max_count (3) is less than min_measurements (10)"
+assert_output_contains "$AUDIT_WARNING" "measurement 'build_time'"
+assert_output_contains "$AUDIT_WARNING" "Warning: --max_count (3) is less than min_measurements (15)"
+assert_output_contains "$AUDIT_WARNING" "measurement 'memory_usage'"
+assert_output_contains "$AUDIT_WARNING" "limits available historical data"
+echo "✅ Warning displayed when max_count < config min_measurements"
+
+# Test 9: No warning when max_count >= min_measurements
+echo "Test 9: No warning when max_count >= min_measurements"
+cat > .gitperfconfig << 'EOF'
+[measurement."build_time"]
+min_measurements = 3
+EOF
+
+# Test with max_count=5, which is >= config min_measurements (3)
+# This should NOT produce a warning
+AUDIT_NO_WARNING=$(git perf audit -m build_time -n 5 2>&1 || true)
+
+# Verify no warning appears
+if echo "$AUDIT_NO_WARNING" | grep -q "Warning.*max_count"; then
+    echo "❌ Unexpected warning when max_count >= min_measurements"
+    echo "Output was: $AUDIT_NO_WARNING"
+    exit 1
+fi
+echo "✅ No warning when max_count >= min_measurements"
+
+# Test 10: No warning when CLI provides both max_count and min_measurements
+# (CLI validation should prevent invalid combinations)
+echo "Test 10: CLI validation prevents invalid max_count/min_measurements combination"
+
+# This should fail with CLI validation error, not reach our warning
+AUDIT_CLI_INVALID=$(git perf audit -m build_time -n 3 --min-measurements 5 2>&1 || true)
+
+# Should have CLI validation error, not our runtime warning
+assert_output_contains "$AUDIT_CLI_INVALID" "minimal number of measurements"
+assert_output_contains "$AUDIT_CLI_INVALID" "cannot be more than"
+
+# Should NOT have our runtime warning (because CLI validation prevented execution)
+if echo "$AUDIT_CLI_INVALID" | grep -q "limits available historical data"; then
+    echo "❌ Runtime warning appeared when CLI should have prevented execution"
+    echo "Output was: $AUDIT_CLI_INVALID"
+    exit 1
+fi
+echo "✅ CLI validation prevents invalid combinations before runtime"
+
 echo "All per-measurement configuration tests passed!"
