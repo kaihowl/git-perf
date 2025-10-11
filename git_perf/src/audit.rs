@@ -107,6 +107,17 @@ pub fn audit_multiple(
             dispersion_method,
         );
 
+        // Warn if max_count limits historical data below min_measurements requirement
+        if (max_count as u16) < params.min_count {
+            eprintln!(
+                "⚠️  Warning: --max_count ({}) is less than min_measurements ({}) for measurement '{}'.",
+                max_count, params.min_count, measurement
+            );
+            eprintln!(
+                "   This limits available historical data and may prevent achieving statistical significance."
+            );
+        }
+
         let result = audit(
             measurement,
             max_count,
