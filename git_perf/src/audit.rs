@@ -133,8 +133,13 @@ fn audit_with_data(
         // MUTATION POINT: > vs < (Line 122)
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
+
+        // Generate sparkline for the available measurements
+        let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
+        let sparkline = spark(all_measurements.as_slice());
+
         return Ok(AuditResult {
-            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."),
+            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"),
             passed: true,
         });
     }
