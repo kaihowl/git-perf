@@ -149,7 +149,7 @@ fn audit_with_data(
         - 1.0;
 
     let sparkline = format!(
-        " [{:+.1}% – {:+.1}%] {}",
+        " [{:+.2}% – {:+.2}%] {}",
         (relative_min * 100.0),
         (relative_max * 100.0),
         spark(all_measurements.as_slice())
@@ -446,13 +446,13 @@ mod test {
         // - relative_max = (25.0 % 10.0 - 1.0) * 100 = -50.0% (since 25.0 % 10.0 = 5.0)
 
         // Check that the calculation uses division, not modulo
-        // The range should show [+0.0% – +150.0%], not [-100.0% – -50.0%]
-        assert!(audit_result.message.contains("[+0.0% – +150.0%]"));
+        // The range should show [+0.00% – +150.00%], not [-100.00% – -50.00%]
+        assert!(audit_result.message.contains("[+0.00% – +150.00%]"));
 
         // Ensure the modulo results are NOT present
-        assert!(!audit_result.message.contains("[-100.0% – -50.0%]"));
-        assert!(!audit_result.message.contains("-100.0%"));
-        assert!(!audit_result.message.contains("-50.0%"));
+        assert!(!audit_result.message.contains("[-100.00% – -50.00%]"));
+        assert!(!audit_result.message.contains("-100.00%"));
+        assert!(!audit_result.message.contains("-50.00%"));
     }
 
     #[test]
