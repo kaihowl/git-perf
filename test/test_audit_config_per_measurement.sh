@@ -56,17 +56,22 @@ min_measurements = 5
 min_measurements = 2
 EOF
 
-# build_time should require 5 measurements
+# We have 6 measurements total
+# build_time requires 5, memory_usage requires 2 (both should have enough)
 AUDIT_BUILD=$(git perf audit -m build_time -n 10 2>&1 || true)
-echo "Build time audit output: $AUDIT_BUILD"
-
-# memory_usage should require 2 measurements
-AUDIT_MEMORY=$(git perf audit -m memory_usage -n 10 2>&1 || true)
-echo "Memory usage audit output: $AUDIT_MEMORY"
-
-# Both should have run (we have enough measurements)
 echo "$AUDIT_BUILD" | grep -q "z-score" || exit 1
+echo "$AUDIT_BUILD" | grep -q "Tail:" || exit 1  # Should show tail measurements
+
+AUDIT_MEMORY=$(git perf audit -m memory_usage -n 10 2>&1 || true)
 echo "$AUDIT_MEMORY" | grep -q "z-score" || exit 1
+echo "$AUDIT_MEMORY" | grep -q "Tail:" || exit 1  # Should show tail measurements
+
+# Test with insufficient measurements: build_time needs 5 but only get 2 (HEAD + 1 tail with n=1)
+# This should skip the test
+AUDIT_BUILD_INSUFFICIENT=$(git perf audit -m build_time -n 1 2>&1)
+# With insufficient measurements, audit skips and shows error message
+echo "$AUDIT_BUILD_INSUFFICIENT" | grep -q "min_measurements of 5" || exit 1
+echo "$AUDIT_BUILD_INSUFFICIENT" | grep -q "⏭️" || exit 1  # Skip symbol
 echo "✅ Different min_measurements per measurement works"
 
 # Test 2: Different aggregate_by per measurement
@@ -149,14 +154,29 @@ echo "✅ Multiple measurements use different dispersion methods in single audit
 echo "Test 5: CLI option overrides per-measurement config"
 cat > .gitperfconfig << 'EOF'
 [measurement."build_time"]
+min_measurements = 10
 aggregate_by = "max"
 sigma = 6.0
+dispersion_method = "mad"
+
+[measurement."memory_usage"]
+min_measurements = 8
 dispersion_method = "mad"
 EOF
 
 # CLI should override all config values
 AUDIT_CLI_OVERRIDE=$(git perf audit -m build_time -n 10 --min-measurements 2 -a min -d 3.0 --dispersion-method stddev 2>&1 || true)
 echo "$AUDIT_CLI_OVERRIDE" | grep -q "z-score (stddev):" || exit 1
+
+# CRITICAL: CLI --min-measurements should apply to ALL measurements
+# Config says build_time needs 10 and memory_usage needs 8, but CLI says 2 for all
+AUDIT_CLI_MIN_ALL=$(git perf audit -m build_time -m memory_usage -n 3 --min-measurements 2 2>&1 || true)
+echo "Audit with CLI min override: $AUDIT_CLI_MIN_ALL"
+# Both should succeed with only 3 measurements because CLI overrides config for ALL
+echo "$AUDIT_CLI_MIN_ALL" | grep -q "build_time" || exit 1
+echo "$AUDIT_CLI_MIN_ALL" | grep -A 2 "build_time" | grep -q "z-score" || exit 1
+echo "$AUDIT_CLI_MIN_ALL" | grep -q "memory_usage" || exit 1
+echo "$AUDIT_CLI_MIN_ALL" | grep -A 2 "memory_usage" | grep -q "z-score" || exit 1
 echo "✅ CLI options override per-measurement config"
 
 # Test 6: All four parameters different for three measurements

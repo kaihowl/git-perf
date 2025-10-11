@@ -38,6 +38,55 @@ struct AuditResult {
     passed: bool,
 }
 
+/// Resolved audit parameters for a specific measurement.
+#[derive(Debug, PartialEq)]
+pub(crate) struct ResolvedAuditParams {
+    pub min_count: u16,
+    pub summarize_by: ReductionFunc,
+    pub sigma: f64,
+    pub dispersion_method: DispersionMethod,
+}
+
+/// Resolves audit parameters for a specific measurement with proper precedence:
+/// CLI option -> measurement-specific config -> global config -> built-in default
+///
+/// Special behavior for min_count: When CLI provides a value, it applies to ALL
+/// measurements (overrides config). When CLI is None, use per-measurement config.
+pub(crate) fn resolve_audit_params(
+    measurement: &str,
+    cli_min_count: Option<u16>,
+    cli_summarize_by: Option<ReductionFunc>,
+    cli_sigma: Option<f64>,
+    cli_dispersion_method: Option<DispersionMethod>,
+) -> ResolvedAuditParams {
+    let min_count = cli_min_count
+        .or_else(|| config::audit_min_measurements(measurement))
+        .unwrap_or(2);
+
+    let summarize_by = cli_summarize_by
+        .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
+        .unwrap_or(ReductionFunc::Min);
+
+    let sigma = cli_sigma
+        .or_else(|| config::audit_sigma(measurement))
+        .unwrap_or(4.0);
+
+    let dispersion_method = cli_dispersion_method
+        .or_else(|| {
+            Some(DispersionMethod::from(config::audit_dispersion_method(
+                measurement,
+            )))
+        })
+        .unwrap_or(DispersionMethod::StandardDeviation);
+
+    ResolvedAuditParams {
+        min_count,
+        summarize_by,
+        sigma,
+        dispersion_method,
+    }
+}
+
 pub fn audit_multiple(
     measurements: &[String],
     max_count: usize,
@@ -50,39 +99,22 @@ pub fn audit_multiple(
     let mut failed = false;
 
     for measurement in measurements {
-        // Determine final values with proper precedence for this specific measurement:
-        // For min_count: CLI option (if specified) overrides EVERYTHING (config and default)
-        //                If CLI not specified, use per-measurement config or default
-        // For others: CLI option -> measurement-specific config -> global config -> default
-
-        let final_min_count = min_count
-            .or_else(|| config::audit_min_measurements(measurement))
-            .unwrap_or(2);
-
-        let final_summarize_by = summarize_by
-            .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
-            .unwrap_or(ReductionFunc::Min);
-
-        let final_sigma = sigma
-            .or_else(|| config::audit_sigma(measurement))
-            .unwrap_or(4.0);
-
-        let final_dispersion_method = dispersion_method
-            .or_else(|| {
-                Some(DispersionMethod::from(config::audit_dispersion_method(
-                    measurement,
-                )))
-            })
-            .unwrap_or(DispersionMethod::StandardDeviation);
+        let params = resolve_audit_params(
+            measurement,
+            min_count,
+            summarize_by,
+            sigma,
+            dispersion_method,
+        );
 
         let result = audit(
             measurement,
             max_count,
-            final_min_count,
+            params.min_count,
             selectors,
-            final_summarize_by,
-            final_sigma,
-            final_dispersion_method,
+            params.summarize_by,
+            params.sigma,
+            params.dispersion_method,
         )?;
 
         println!("{}", result.message);
@@ -765,39 +797,27 @@ dispersion_method = "mad"
 "#,
             );
 
-            // Simulate CLI providing values - these should override config
-            let cli_min_measurements = Some(2);
-            let cli_aggregate_by = Some(ReductionFunc::Min);
-            let cli_sigma = Some(3.0);
-            let cli_dispersion = Some(DispersionMethod::StandardDeviation);
+            // Test that CLI values override config
+            let params = super::resolve_audit_params(
+                "build_time",
+                Some(2),                                   // CLI min
+                Some(ReductionFunc::Min),                  // CLI aggregate
+                Some(3.0),                                 // CLI sigma
+                Some(DispersionMethod::StandardDeviation), // CLI dispersion
+            );
 
-            // Test the precedence logic from audit_multiple
-            let measurement = "build_time";
-
-            // When CLI provides min_measurements, it overrides everything (config and default)
-            let final_min = cli_min_measurements
-                .or_else(|| audit_min_measurements(measurement))
-                .unwrap_or(2);
-            let final_agg = cli_aggregate_by
-                .or_else(|| audit_aggregate_by(measurement).map(ReductionFunc::from))
-                .unwrap_or(ReductionFunc::Min);
-            let final_sigma = cli_sigma
-                .or_else(|| audit_sigma(measurement))
-                .unwrap_or(4.0);
-            let final_disp = cli_dispersion
-                .or_else(|| Some(DispersionMethod::from(audit_dispersion_method(measurement))))
-                .unwrap_or(DispersionMethod::StandardDeviation);
-
-            // CLI values should win
-            assert_eq!(final_min, 2, "CLI min_measurements should override config");
             assert_eq!(
-                final_agg,
+                params.min_count, 2,
+                "CLI min_measurements should override config"
+            );
+            assert_eq!(
+                params.summarize_by,
                 ReductionFunc::Min,
                 "CLI aggregate_by should override config"
             );
-            assert_eq!(final_sigma, 3.0, "CLI sigma should override config");
+            assert_eq!(params.sigma, 3.0, "CLI sigma should override config");
             assert_eq!(
-                final_disp,
+                params.dispersion_method,
                 DispersionMethod::StandardDeviation,
                 "CLI dispersion should override config"
             );
@@ -815,41 +835,27 @@ dispersion_method = "mad"
 "#,
             );
 
-            // No CLI values provided
-            let cli_min_measurements: Option<u16> = None;
-            let cli_aggregate_by: Option<ReductionFunc> = None;
-            let cli_sigma: Option<f64> = None;
-            let cli_dispersion: Option<DispersionMethod> = None;
+            // Test that config values are used when no CLI values provided
+            let params = super::resolve_audit_params(
+                "build_time",
+                None, // No CLI values
+                None,
+                None,
+                None,
+            );
 
-            let measurement = "build_time";
-
-            // When no CLI value, config is used for all parameters
-            let final_min = cli_min_measurements
-                .or_else(|| audit_min_measurements(measurement))
-                .unwrap_or(2);
-            let final_agg = cli_aggregate_by
-                .or_else(|| audit_aggregate_by(measurement).map(ReductionFunc::from))
-                .unwrap_or(ReductionFunc::Min);
-            let final_sigma = cli_sigma
-                .or_else(|| audit_sigma(measurement))
-                .unwrap_or(4.0);
-            let final_disp = cli_dispersion
-                .or_else(|| Some(DispersionMethod::from(audit_dispersion_method(measurement))))
-                .unwrap_or(DispersionMethod::StandardDeviation);
-
-            // Config values should win over defaults
             assert_eq!(
-                final_min, 10,
+                params.min_count, 10,
                 "Config min_measurements should override default"
             );
             assert_eq!(
-                final_agg,
+                params.summarize_by,
                 ReductionFunc::Max,
                 "Config aggregate_by should override default"
             );
-            assert_eq!(final_sigma, 5.5, "Config sigma should override default");
+            assert_eq!(params.sigma, 5.5, "Config sigma should override default");
             assert_eq!(
-                final_disp,
+                params.dispersion_method,
                 DispersionMethod::MedianAbsoluteDeviation,
                 "Config dispersion should override default"
             );
@@ -859,38 +865,27 @@ dispersion_method = "mad"
         fn test_uses_defaults_when_no_config_or_cli() {
             let _temp_dir = setup_test_env_with_config("");
 
-            // No CLI values provided
-            let cli_min_measurements: Option<u16> = None;
-            let cli_aggregate_by: Option<ReductionFunc> = None;
-            let cli_sigma: Option<f64> = None;
-            let cli_dispersion: Option<DispersionMethod> = None;
+            // Test that defaults are used when no CLI or config
+            let params = super::resolve_audit_params(
+                "non_existent_measurement",
+                None, // No CLI values
+                None,
+                None,
+                None,
+            );
 
-            let measurement = "non_existent_measurement";
-
-            // When no CLI and no config, use defaults for all parameters
-            let final_min = cli_min_measurements
-                .or_else(|| audit_min_measurements(measurement))
-                .unwrap_or(2);
-            let final_agg = cli_aggregate_by
-                .or_else(|| audit_aggregate_by(measurement).map(ReductionFunc::from))
-                .unwrap_or(ReductionFunc::Min);
-            let final_sigma = cli_sigma
-                .or_else(|| audit_sigma(measurement))
-                .unwrap_or(4.0);
-            let final_disp = cli_dispersion
-                .or_else(|| Some(DispersionMethod::from(audit_dispersion_method(measurement))))
-                .unwrap_or(DispersionMethod::StandardDeviation);
-
-            // Should use built-in defaults
-            assert_eq!(final_min, 2, "Should use default min_measurements of 2");
             assert_eq!(
-                final_agg,
+                params.min_count, 2,
+                "Should use default min_measurements of 2"
+            );
+            assert_eq!(
+                params.summarize_by,
                 ReductionFunc::Min,
                 "Should use default aggregate_by of Min"
             );
-            assert_eq!(final_sigma, 4.0, "Should use default sigma of 4.0");
+            assert_eq!(params.sigma, 4.0, "Should use default sigma of 4.0");
             assert_eq!(
-                final_disp,
+                params.dispersion_method,
                 DispersionMethod::StandardDeviation,
                 "Should use default dispersion of stddev"
             );
