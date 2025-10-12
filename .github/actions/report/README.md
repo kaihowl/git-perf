@@ -103,6 +103,13 @@ The action automatically comments on PRs by default. To disable automatic commen
   permissions:
     pages: write
     contents: write
+    pull-requests: write  # If using comment-on-pr
+  ```
+- **Important**: To prevent concurrent pushes to gh-pages branch, add concurrency control to your workflow:
+  ```yaml
+  concurrency:
+    group: gh-pages-${{ github.ref }}
+    cancel-in-progress: false  # Don't cancel, let them queue
   ```
 
 ## Report Naming
@@ -129,6 +136,9 @@ permissions:
 jobs:
   report:
     runs-on: ubuntu-22.04
+    concurrency:
+      group: gh-pages-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
         with:
@@ -169,6 +179,7 @@ jobs:
 
 ## Notes
 
+- **Concurrency Control**: The action does NOT enforce concurrency control internally. You MUST add concurrency control at the job/workflow level to prevent concurrent pushes to the gh-pages branch, which could cause conflicts.
 - **Automatic PR Comments**: By default, the action automatically comments on pull requests with the report URL and audit results. Set `comment-on-pr: 'false'` to disable.
 - **PR Comment Updates**: If a performance comment already exists, the action updates it instead of creating a new one.
 - **GitHub Pages**: The action uses `peaceiris/actions-gh-pages@v4` to publish to GitHub Pages with `keep_files: true`, preserving previous reports.

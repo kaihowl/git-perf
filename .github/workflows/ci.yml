@@ -169,6 +169,7 @@ jobs:
     needs: [test, rustfmt, clippy, rustdoc, documentation-check, release-binary-size]
     concurrency:
       group: gh-pages-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
         with:
