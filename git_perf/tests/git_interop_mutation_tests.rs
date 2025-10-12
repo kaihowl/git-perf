@@ -44,21 +44,25 @@ fn hermetic_git_env() {
     env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 }
 
-/// Test that ensure_symbolic_write_ref_exists creates a valid, non-empty reference
+/// Test that symbolic write ref is created properly via add_note_line_to_head
 /// Indirectly tests new_symbolic_write_ref() which had missed mutants:
 /// - Could return Ok(String::new()) - empty string
 /// - Could return Ok("xyzzy".into()) - arbitrary invalid string
+///
+/// The function new_symbolic_write_ref() is private but called by ensure_symbolic_write_ref_exists(),
+/// which is called by add_note_line_to_head(). This test verifies the symbolic ref created
+/// is valid and properly formatted.
 #[test]
 fn test_symbolic_write_ref_creates_valid_reference() {
     let tempdir = dir_with_repo();
     set_current_dir(tempdir.path()).expect("Failed to change dir");
     hermetic_git_env();
 
-    // This calls new_symbolic_write_ref internally
-    let result = git_perf::git::git_interop::ensure_symbolic_write_ref_exists();
+    // This indirectly calls ensure_symbolic_write_ref_exists -> new_symbolic_write_ref
+    let result = git_perf::git::git_interop::add_note_line_to_head("test: 100");
     assert!(
         result.is_ok(),
-        "Should create symbolic write ref: {:?}",
+        "Should add note (which creates symbolic write ref): {:?}",
         result
     );
 
