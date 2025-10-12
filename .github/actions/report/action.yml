@@ -30,6 +30,10 @@ inputs:
   github-token:
     description: 'GitHub token for publishing to gh-pages'
     required: true
+  comment-on-pr:
+    description: 'Whether to comment on the PR with the report URL (only applies to pull_request events)'
+    required: false
+    default: 'true'
 
 outputs:
   report-url:
@@ -102,3 +106,47 @@ runs:
         pages_url=$(gh api repos/${{ github.repository }}/pages --jq '.html_url')
         echo "pages-url=$pages_url" >> $GITHUB_OUTPUT
         echo "Pages URL: $pages_url"
+
+    - name: Comment on PR
+      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
+      uses: actions/github-script@v8
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const reportName = '${{ steps.set-report-name.outputs.report-name }}'
+          const pagesUrl = '${{ steps.get-pages-url.outputs.pages-url }}'
+          const reportUrl = `${pagesUrl}/${reportName}.html`
+
+          const auditOutput = `${{ steps.audit.outputs.audit-output }}`.trim()
+          const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
+          const commentBody = `⏱  [Performance Results](${reportUrl})${auditSection}`
+
+          // Find existing performance comment
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          })
+
+          const existingComment = comments.data.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('⏱  [Performance Results]')
+          )
+
+          if (existingComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existingComment.id,
+              body: commentBody
+            })
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            })
+          }
