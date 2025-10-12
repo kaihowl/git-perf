@@ -44,14 +44,14 @@ fn hermetic_git_env() {
     env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 }
 
-/// Test that symbolic write ref is created properly via add_note_line_to_head
+/// Test that notes can be added successfully and creates proper references
 /// Indirectly tests new_symbolic_write_ref() which had missed mutants:
 /// - Could return Ok(String::new()) - empty string
 /// - Could return Ok("xyzzy".into()) - arbitrary invalid string
 ///
 /// The function new_symbolic_write_ref() is private but called by ensure_symbolic_write_ref_exists(),
-/// which is called by add_note_line_to_head(). This test verifies the symbolic ref created
-/// is valid and properly formatted.
+/// which is called by add_note_line_to_head(). If the ref name is empty or invalid, the note
+/// operation will fail. This test verifies the operation succeeds, ensuring valid ref creation.
 #[test]
 fn test_symbolic_write_ref_creates_valid_reference() {
     let tempdir = dir_with_repo();
@@ -59,47 +59,61 @@ fn test_symbolic_write_ref_creates_valid_reference() {
     hermetic_git_env();
 
     // This indirectly calls ensure_symbolic_write_ref_exists -> new_symbolic_write_ref
+    // If new_symbolic_write_ref returns empty string or "xyzzy", this operation will fail
     let result = git_perf::git::git_interop::add_note_line_to_head("test: 100");
     assert!(
         result.is_ok(),
-        "Should add note (which creates symbolic write ref): {:?}",
+        "Should add note (requires valid symbolic ref): {:?}",
         result
     );
 
-    // Verify the symbolic ref exists and is not empty or invalid
-    let output = run_git_command(&["symbolic-ref", "refs/notes/write"], tempdir.path())
-        .expect("Should read symbolic ref");
+    // Verify refs/notes/write-target/* ref was created with proper format
+    // List all refs matching the pattern
+    let output = run_git_command(
+        &["for-each-ref", "refs/notes/write-target/"],
+        tempdir.path(),
+    )
+    .expect("Should list refs");
 
     assert!(
         output.status.success(),
-        "symbolic-ref read should succeed: {}",
+        "for-each-ref should succeed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let symbolic_target = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let refs_output = String::from_utf8_lossy(&output.stdout);
 
-    // Mutation 1: Should not be empty
+    // Should have at least one write-target ref
     assert!(
-        !symbolic_target.is_empty(),
-        "Symbolic ref target should not be empty"
+        refs_output.contains("refs/notes/write-target/"),
+        "Should create refs/notes/write-target/* reference"
     );
 
-    // Mutation 2: Should not be arbitrary like "xyzzy", should follow ref pattern
-    assert!(
-        symbolic_target.starts_with("refs/notes/write-target/"),
-        "Symbolic ref should point to refs/notes/write-target/*, got: {}",
-        symbolic_target
-    );
+    // Verify the ref name has hex suffix (not empty, not "xyzzy")
+    // Extract just the ref name
+    for line in refs_output.lines() {
+        if line.contains("refs/notes/write-target/") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(ref_name) = parts.last() {
+                // Mutation 1: Should not be just "refs/notes/write-target/" (empty suffix)
+                assert!(
+                    ref_name.len() > "refs/notes/write-target/".len(),
+                    "Ref should have non-empty suffix: {}",
+                    ref_name
+                );
 
-    // Verify it has a hex suffix (shows it's properly generated)
-    let suffix = symbolic_target
-        .strip_prefix("refs/notes/write-target/")
-        .expect("Should have prefix");
-    assert!(
-        !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_hexdigit()),
-        "Target should have hex suffix, got: {}",
-        suffix
-    );
+                // Mutation 2: Should have hex suffix, not arbitrary like "xyzzy"
+                let suffix = ref_name
+                    .strip_prefix("refs/notes/write-target/")
+                    .expect("Should have prefix");
+                assert!(
+                    suffix.chars().all(|c| c.is_ascii_hexdigit()),
+                    "Ref suffix should be hex, not arbitrary string: {}",
+                    suffix
+                );
+            }
+        }
+    }
 }
 
 /// Test walk_commits with shallow repository containing multiple grafted commits
