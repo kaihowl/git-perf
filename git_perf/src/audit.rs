@@ -39,26 +39,94 @@ struct AuditResult {
     passed: bool,
 }
 
+/// Resolved audit parameters for a specific measurement.
+#[derive(Debug, PartialEq)]
+pub(crate) struct ResolvedAuditParams {
+    pub min_count: u16,
+    pub summarize_by: ReductionFunc,
+    pub sigma: f64,
+    pub dispersion_method: DispersionMethod,
+}
+
+/// Resolves audit parameters for a specific measurement with proper precedence:
+/// CLI option -> measurement-specific config -> global config -> built-in default
+///
+/// Note: When CLI provides min_count, the caller (audit_multiple) uses the same
+/// value for all measurements. When CLI is None, this function reads per-measurement config.
+pub(crate) fn resolve_audit_params(
+    measurement: &str,
+    cli_min_count: Option<u16>,
+    cli_summarize_by: Option<ReductionFunc>,
+    cli_sigma: Option<f64>,
+    cli_dispersion_method: Option<DispersionMethod>,
+) -> ResolvedAuditParams {
+    let min_count = cli_min_count
+        .or_else(|| config::audit_min_measurements(measurement))
+        .unwrap_or(2);
+
+    let summarize_by = cli_summarize_by
+        .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
+        .unwrap_or(ReductionFunc::Min);
+
+    let sigma = cli_sigma
+        .or_else(|| config::audit_sigma(measurement))
+        .unwrap_or(4.0);
+
+    let dispersion_method = cli_dispersion_method
+        .or_else(|| {
+            Some(DispersionMethod::from(config::audit_dispersion_method(
+                measurement,
+            )))
+        })
+        .unwrap_or(DispersionMethod::StandardDeviation);
+
+    ResolvedAuditParams {
+        min_count,
+        summarize_by,
+        sigma,
+        dispersion_method,
+    }
+}
+
 pub fn audit_multiple(
     measurements: &[String],
     max_count: usize,
-    min_count: u16,
+    min_count: Option<u16>,
     selectors: &[(String, String)],
-    summarize_by: ReductionFunc,
-    sigma: f64,
-    dispersion_method: DispersionMethod,
+    summarize_by: Option<ReductionFunc>,
+    sigma: Option<f64>,
+    dispersion_method: Option<DispersionMethod>,
 ) -> Result<()> {
     let mut failed = false;
 
     for measurement in measurements {
-        let result = audit(
+        let params = resolve_audit_params(
             measurement,
-            max_count,
             min_count,
-            selectors,
             summarize_by,
             sigma,
             dispersion_method,
+        );
+
+        // Warn if max_count limits historical data below min_measurements requirement
+        if (max_count as u16) < params.min_count {
+            eprintln!(
+                "⚠️  Warning: --max_count ({}) is less than min_measurements ({}) for measurement '{}'.",
+                max_count, params.min_count, measurement
+            );
+            eprintln!(
+                "   This limits available historical data and may prevent achieving statistical significance."
+            );
+        }
+
+        let result = audit(
+            measurement,
+            max_count,
+            params.min_count,
+            selectors,
+            params.summarize_by,
+            params.sigma,
+            params.dispersion_method,
         )?;
 
         println!("{}", result.message);
@@ -326,11 +394,11 @@ mod test {
         let result = audit_multiple(
             &[], // Empty measurements list
             100,
-            1,
+            Some(1),
             &[],
-            ReductionFunc::Mean,
-            2.0,
-            DispersionMethod::StandardDeviation,
+            Some(ReductionFunc::Mean),
+            Some(2.0),
+            Some(DispersionMethod::StandardDeviation),
         );
 
         // Should succeed when no measurements need to be audited
@@ -563,5 +631,281 @@ mod test {
         // Both should contain method indicators
         assert!(stddev_result.message.contains("stddev"));
         assert!(mad_result.message.contains("mad"));
+    }
+
+    // Integration tests that verify per-measurement config determination
+    #[cfg(test)]
+    mod integration {
+        use super::*;
+        use crate::config::{
+            audit_aggregate_by, audit_dispersion_method, audit_min_measurements, audit_sigma,
+        };
+        use std::env;
+        use std::fs;
+        use tempfile::TempDir;
+
+        fn setup_test_env_with_config(config_content: &str) -> TempDir {
+            let temp_dir = TempDir::new().unwrap();
+
+            // Initialize git repo
+            env::set_current_dir(&temp_dir).unwrap();
+            std::process::Command::new("git")
+                .args(["init"])
+                .output()
+                .unwrap();
+            std::process::Command::new("git")
+                .args(["config", "user.email", "test@example.com"])
+                .output()
+                .unwrap();
+            std::process::Command::new("git")
+                .args(["config", "user.name", "Test User"])
+                .output()
+                .unwrap();
+
+            // Create .gitperfconfig
+            let config_path = temp_dir.path().join(".gitperfconfig");
+            fs::write(&config_path, config_content).unwrap();
+
+            temp_dir
+        }
+
+        #[test]
+        fn test_different_dispersion_methods_per_measurement() {
+            let _temp_dir = setup_test_env_with_config(
+                r#"
+[measurement]
+dispersion_method = "stddev"
+
+[measurement."build_time"]
+dispersion_method = "mad"
+
+[measurement."memory_usage"]
+dispersion_method = "stddev"
+"#,
+            );
+
+            // Verify each measurement gets its own config
+            let build_time_method = audit_dispersion_method("build_time");
+            let memory_usage_method = audit_dispersion_method("memory_usage");
+            let other_method = audit_dispersion_method("other_metric");
+
+            assert_eq!(
+                DispersionMethod::from(build_time_method),
+                DispersionMethod::MedianAbsoluteDeviation,
+                "build_time should use MAD"
+            );
+            assert_eq!(
+                DispersionMethod::from(memory_usage_method),
+                DispersionMethod::StandardDeviation,
+                "memory_usage should use stddev"
+            );
+            assert_eq!(
+                DispersionMethod::from(other_method),
+                DispersionMethod::StandardDeviation,
+                "other_metric should use default stddev"
+            );
+        }
+
+        #[test]
+        fn test_different_min_measurements_per_measurement() {
+            let _temp_dir = setup_test_env_with_config(
+                r#"
+[measurement]
+min_measurements = 5
+
+[measurement."build_time"]
+min_measurements = 10
+
+[measurement."memory_usage"]
+min_measurements = 3
+"#,
+            );
+
+            assert_eq!(
+                audit_min_measurements("build_time"),
+                Some(10),
+                "build_time should require 10 measurements"
+            );
+            assert_eq!(
+                audit_min_measurements("memory_usage"),
+                Some(3),
+                "memory_usage should require 3 measurements"
+            );
+            assert_eq!(
+                audit_min_measurements("other_metric"),
+                Some(5),
+                "other_metric should use default 5 measurements"
+            );
+        }
+
+        #[test]
+        fn test_different_aggregate_by_per_measurement() {
+            let _temp_dir = setup_test_env_with_config(
+                r#"
+[measurement]
+aggregate_by = "median"
+
+[measurement."build_time"]
+aggregate_by = "max"
+
+[measurement."memory_usage"]
+aggregate_by = "mean"
+"#,
+            );
+
+            assert_eq!(
+                audit_aggregate_by("build_time"),
+                Some(git_perf_cli_types::ReductionFunc::Max),
+                "build_time should use max"
+            );
+            assert_eq!(
+                audit_aggregate_by("memory_usage"),
+                Some(git_perf_cli_types::ReductionFunc::Mean),
+                "memory_usage should use mean"
+            );
+            assert_eq!(
+                audit_aggregate_by("other_metric"),
+                Some(git_perf_cli_types::ReductionFunc::Median),
+                "other_metric should use default median"
+            );
+        }
+
+        #[test]
+        fn test_different_sigma_per_measurement() {
+            let _temp_dir = setup_test_env_with_config(
+                r#"
+[measurement]
+sigma = 3.0
+
+[measurement."build_time"]
+sigma = 5.5
+
+[measurement."memory_usage"]
+sigma = 2.0
+"#,
+            );
+
+            assert_eq!(
+                audit_sigma("build_time"),
+                Some(5.5),
+                "build_time should use sigma 5.5"
+            );
+            assert_eq!(
+                audit_sigma("memory_usage"),
+                Some(2.0),
+                "memory_usage should use sigma 2.0"
+            );
+            assert_eq!(
+                audit_sigma("other_metric"),
+                Some(3.0),
+                "other_metric should use default sigma 3.0"
+            );
+        }
+
+        #[test]
+        fn test_cli_overrides_config() {
+            let _temp_dir = setup_test_env_with_config(
+                r#"
+[measurement."build_time"]
+min_measurements = 10
+aggregate_by = "max"
+sigma = 5.5
+dispersion_method = "mad"
+"#,
+            );
+
+            // Test that CLI values override config
+            let params = super::resolve_audit_params(
+                "build_time",
+                Some(2),                                   // CLI min
+                Some(ReductionFunc::Min),                  // CLI aggregate
+                Some(3.0),                                 // CLI sigma
+                Some(DispersionMethod::StandardDeviation), // CLI dispersion
+            );
+
+            assert_eq!(
+                params.min_count, 2,
+                "CLI min_measurements should override config"
+            );
+            assert_eq!(
+                params.summarize_by,
+                ReductionFunc::Min,
+                "CLI aggregate_by should override config"
+            );
+            assert_eq!(params.sigma, 3.0, "CLI sigma should override config");
+            assert_eq!(
+                params.dispersion_method,
+                DispersionMethod::StandardDeviation,
+                "CLI dispersion should override config"
+            );
+        }
+
+        #[test]
+        fn test_config_overrides_defaults() {
+            let _temp_dir = setup_test_env_with_config(
+                r#"
+[measurement."build_time"]
+min_measurements = 10
+aggregate_by = "max"
+sigma = 5.5
+dispersion_method = "mad"
+"#,
+            );
+
+            // Test that config values are used when no CLI values provided
+            let params = super::resolve_audit_params(
+                "build_time",
+                None, // No CLI values
+                None,
+                None,
+                None,
+            );
+
+            assert_eq!(
+                params.min_count, 10,
+                "Config min_measurements should override default"
+            );
+            assert_eq!(
+                params.summarize_by,
+                ReductionFunc::Max,
+                "Config aggregate_by should override default"
+            );
+            assert_eq!(params.sigma, 5.5, "Config sigma should override default");
+            assert_eq!(
+                params.dispersion_method,
+                DispersionMethod::MedianAbsoluteDeviation,
+                "Config dispersion should override default"
+            );
+        }
+
+        #[test]
+        fn test_uses_defaults_when_no_config_or_cli() {
+            let _temp_dir = setup_test_env_with_config("");
+
+            // Test that defaults are used when no CLI or config
+            let params = super::resolve_audit_params(
+                "non_existent_measurement",
+                None, // No CLI values
+                None,
+                None,
+                None,
+            );
+
+            assert_eq!(
+                params.min_count, 2,
+                "Should use default min_measurements of 2"
+            );
+            assert_eq!(
+                params.summarize_by,
+                ReductionFunc::Min,
+                "Should use default aggregate_by of Min"
+            );
+            assert_eq!(params.sigma, 4.0, "Should use default sigma of 4.0");
+            assert_eq!(
+                params.dispersion_method,
+                DispersionMethod::StandardDeviation,
+                "Should use default dispersion of stddev"
+            );
+        }
     }
 }

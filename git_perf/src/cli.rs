@@ -66,21 +66,21 @@ pub fn handle_calls() -> Result<()> {
             sigma,
             dispersion_method,
         } => {
-            if report_history.max_count < min_measurements.into() {
-                Cli::command().error(ArgumentConflict, format!("The minimal number of measurements ({}) cannot be more than the maximum number of measurements ({})", min_measurements, report_history.max_count)).exit()
+            // Validate max_count vs min_measurements if min_measurements is specified via CLI
+            if let Some(min_count) = min_measurements {
+                if report_history.max_count < min_count.into() {
+                    Cli::command().error(ArgumentConflict, format!("The minimal number of measurements ({}) cannot be more than the maximum number of measurements ({})", min_count, report_history.max_count)).exit()
+                }
             }
-
-            let final_dispersion_method =
-                determine_dispersion_method(dispersion_method, &measurement);
 
             audit::audit_multiple(
                 &measurement,
                 report_history.max_count,
                 min_measurements,
                 &selectors,
-                ReductionFunc::from(aggregate_by),
+                aggregate_by.map(ReductionFunc::from),
                 sigma,
-                final_dispersion_method,
+                dispersion_method.map(crate::stats::DispersionMethod::from),
             )
         }
         Commands::BumpEpoch { measurement } => bump_epoch(&measurement),
@@ -95,29 +95,6 @@ pub fn handle_calls() -> Result<()> {
                 println!("{}", commit);
             }
             Ok(())
-        }
-    }
-}
-
-/// Determine the final dispersion method with proper precedence:
-/// 1. CLI option (if specified)
-/// 2. Configuration file (measurement-specific or global)
-/// 3. Default (stddev)
-fn determine_dispersion_method(
-    cli_method: Option<git_perf_cli_types::DispersionMethod>,
-    measurement: &[String],
-) -> crate::stats::DispersionMethod {
-    if let Some(cli_method) = cli_method {
-        // User explicitly specified a dispersion method via CLI
-        crate::stats::DispersionMethod::from(cli_method)
-    } else {
-        // User didn't specify --dispersion-method, try to get from configuration
-        if measurement.is_empty() {
-            crate::stats::DispersionMethod::StandardDeviation
-        } else {
-            // Use configuration for the first measurement, or fall back to StandardDeviation
-            let config_method = crate::config::audit_dispersion_method(&measurement[0]);
-            crate::stats::DispersionMethod::from(config_method)
         }
     }
 }
