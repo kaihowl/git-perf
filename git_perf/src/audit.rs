@@ -24,11 +24,12 @@ fn format_z_score_display(z_score: f64) -> String {
 
 /// Determines the direction arrow based on comparison of head and tail means.
 /// Returns ↑ for greater, ↓ for less, → for equal.
+/// Returns → for NaN values to avoid panicking.
 fn get_direction_arrow(head_mean: f64, tail_mean: f64) -> &'static str {
-    match head_mean.partial_cmp(&tail_mean).unwrap() {
-        Ordering::Greater => "↑",
-        Ordering::Less => "↓",
-        Ordering::Equal => "→",
+    match head_mean.partial_cmp(&tail_mean) {
+        Some(Ordering::Greater) => "↑",
+        Some(Ordering::Less) => "↓",
+        Some(Ordering::Equal) | None => "→",
     }
 }
 
