@@ -1,0 +1,104 @@
+name: 'Publish git-perf Report'
+description: 'Generate and publish git-perf performance reports to GitHub Pages'
+author: 'Kai Höwelmeyer'
+
+branding:
+  icon: 'bar-chart-2'
+  color: 'blue'
+
+inputs:
+  depth:
+    description: 'Depth of the report in number of commits'
+    required: false
+    default: '40'
+  report-name:
+    description: 'Name of the report file (without .html extension). If empty, uses branch name or commit SHA'
+    required: false
+    default: ''
+  additional-args:
+    description: 'Additional arguments to git-perf report invocation'
+    required: false
+    default: ''
+  audit-args:
+    description: 'Additional arguments to git-perf audit invocation'
+    required: false
+    default: ''
+  git-perf-version:
+    description: 'Version of git-perf to use (latest, or specific version)'
+    required: false
+    default: 'latest'
+  github-token:
+    description: 'GitHub token for publishing to gh-pages'
+    required: true
+
+outputs:
+  report-url:
+    description: 'URL of the published report'
+    value: ${{ steps.get-pages-url.outputs.pages-url }}/${{ steps.set-report-name.outputs.report-name }}.html
+  audit-output:
+    description: 'Output from git-perf audit command'
+    value: ${{ steps.audit.outputs.audit-output }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install git-perf
+      uses: kaihowl/git-perf/.github/actions/install@master
+      with:
+        release: ${{ inputs.git-perf-version }}
+
+    - name: Inject slug/short variables
+      uses: rlespinasse/github-slug-action@v5
+
+    - name: Set report name
+      id: set-report-name
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.report-name }}" ]; then
+          REPORT_NAME="${{ inputs.report-name }}"
+        elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          REPORT_NAME="$(git rev-parse HEAD)"
+        else
+          REPORT_NAME="${GITHUB_REF_SLUG}"
+        fi
+        echo "report-name=$REPORT_NAME" >> $GITHUB_OUTPUT
+        echo "Using report name: $REPORT_NAME"
+
+    - name: Generate report
+      shell: bash
+      run: |
+        # Add error handling for git perf pull
+        if ! git perf pull; then
+          echo "Warning: git perf pull failed, but continuing with report generation"
+          echo "This may be due to missing git objects in the repository"
+        fi
+        mkdir -p reports/
+        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html ${{ inputs.additional-args }}
+
+    - name: Run audit
+      id: audit
+      shell: bash
+      if: ${{ inputs.audit-args != '' }}
+      run: |
+        {
+          echo 'audit-output<<EOF'
+          git perf audit -n ${{ inputs.depth }} ${{ inputs.audit-args }} 2>&1 || echo "Audit failed, but continuing..."
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Publish to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ inputs.github-token }}
+        publish_dir: ./reports
+        keep_files: true
+
+    - name: Get Pages URL
+      id: get-pages-url
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        pages_url=$(gh api repos/${{ github.repository }}/pages --jq '.html_url')
+        echo "pages-url=$pages_url" >> $GITHUB_OUTPUT
+        echo "Pages URL: $pages_url"
