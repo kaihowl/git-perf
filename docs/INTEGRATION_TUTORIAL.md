@@ -161,38 +161,15 @@ jobs:
         run: git perf push
 
   generate-report:
-    runs-on: ubuntu-latest
     needs: measure-performance
+    uses: kaihowl/git-perf/.github/workflows/report.yml@master
     permissions:
       contents: write
       pages: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@master
-        with:
-          version: latest
-
-      - name: Pull latest measurements
-        run: git perf pull
-
-      - name: Generate report
-        run: |
-          mkdir -p reports
-          git perf report --output reports/index.html
-
-      # Only deploy to GitHub Pages for main branch
-      # Reports are generated and stored for all branches/commits via git notes
-      - name: Deploy to GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports
-          publish_branch: gh-pages
+      pull-requests: write
+    with:
+      release: latest
+      depth: 40
 ```
 
 ### Enable GitHub Pages
@@ -503,28 +480,14 @@ jobs:
 
   report:
     needs: measure
-    if: github.event_name == 'push' || github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    uses: kaihowl/git-perf/.github/workflows/report.yml@master
     permissions:
       contents: write
       pages: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: kaihowl/git-perf/.github/actions/install@master
-
-      - run: git perf pull
-
-      - run: |
-          mkdir -p reports
-          git perf report --output reports/index.html
-
-      - uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports
+      pull-requests: write
+    with:
+      release: latest
+      depth: 40
 ```
 
 ## Next Steps
@@ -541,11 +504,11 @@ jobs:
 - [Command Reference](./manpage.md) - Complete CLI documentation
 - [Configuration Guide](../README.md#configuration) - Detailed `.gitperfconfig` options
 - [Audit System](../README.md#audit-system) - Statistical methods and regression detection
-- [GitHub Actions](../.github/actions/) - Reusable actions reference
+- [GitHub Actions](../.github/actions/) - Reusable actions (install, cleanup) and [workflows](../.github/workflows/report.yml) (report)
 - [Example Report](https://kaihowl.github.io/git-perf/master.html) - Live performance dashboard
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/terragonlabs/git-perf/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/terragonlabs/git-perf/discussions)
+- **Issues**: [GitHub Issues](https://github.com/kaihowl/git-perf/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kaihowl/git-perf/discussions)
 - **Documentation**: Check the `docs/` directory for detailed guides
