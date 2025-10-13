@@ -325,17 +325,6 @@ git perf audit -m build_time -s env=prod
 
 ## Troubleshooting
 
-### Issue: Measurements Not Appearing
-
-**Symptom**: Reports show no measurements
-
-**Solutions**:
-1. Verify git-perf is installed: `git perf --version`
-2. Check you're in a git repository: `git status`
-3. Ensure measurements were committed: `git log --notes=perf-v3`
-4. Try pulling measurements: `git perf pull`
-5. Check if measurements exist: `git perf list-commits`
-
 ### Issue: Push Fails in GitHub Actions
 
 **Symptom**: `git perf push` fails with authentication errors
@@ -364,15 +353,6 @@ git perf audit -m build_time -s env=prod
    ```bash
    git perf audit -m build_time -d 6.0  # Default is 4.0
    ```
-
-### Issue: Reports Not Generating
-
-**Symptom**: `git perf report` produces empty or incomplete reports
-
-**Solutions**:
-1. Pull measurements first: `git perf pull`
-2. Verify measurements exist: `git perf list-commits`
-3. Generate with verbose output: `git perf report -v`
 
 ### Issue: Cleanup Deleting Too Much Data
 
