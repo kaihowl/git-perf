@@ -41,5 +41,13 @@ echo "✅ Skip message found"
 assert_output_contains "$output" "Less than requested min_measurements of 10" "Threshold information NOT found"
 echo "✅ Threshold information found"
 
+# Verify the output contains a sparkline with range (check for range format and sparkline characters)
+if echo "$output" | grep -q "\[.*%.*–.*%\].*[▁▂▃▄▅▆▇█]"; then
+    echo "✅ Sparkline with range found in skip message"
+else
+    echo "❌ ERROR: Sparkline with range NOT found in skip message"
+    exit 1
+fi
+
 echo "Test passed: Audit insufficient measurements header format is correct"
 exit 0

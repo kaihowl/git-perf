@@ -164,14 +164,24 @@ jobs:
 
   report:
     name: git-perf
+    runs-on: ubuntu-22.04
     if: always()
     needs: [test, rustfmt, clippy, rustdoc, documentation-check, release-binary-size]
-    uses: ./.github/workflows/report.yml
-    with:
-      additional-args: '-s rust'
-      concurrency-token: gh-pages-${{ github.ref }}
-      release: 'branch'
-      audit-args: '-m report -m report-size -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+    concurrency:
+      group: gh-pages-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 40
+
+      - uses: ./.github/actions/report
+        with:
+          depth: 40
+          additional-args: '-s rust'
+          audit-args: '-m report -m report-size -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+          git-perf-version: 'branch'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   release-binary-size:
     name: release-binary-size
