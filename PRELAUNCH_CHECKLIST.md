@@ -86,7 +86,7 @@ This checklist covers items to review and complete before publicly announcing th
 - [ ] Set homepage URL (could point to example report or docs)
 
 ### Community & Contribution
-- [ ] Add `CONTRIBUTING.md` with:
+- [x] Add `CONTRIBUTING.md` with:
   - Development setup instructions
   - Code style guidelines
   - PR submission process
@@ -147,7 +147,7 @@ To announce the project publicly, at minimum complete:
 
 2. **⚠️ HIGH PRIORITY** (Should have for good first impression):
    - [x] Published cleanup GitHub Action
-   - [ ] CONTRIBUTING.md
+   - [x] CONTRIBUTING.md
    - [ ] Repository topics/tags
    - [ ] FAQ section
 
@@ -168,5 +168,5 @@ To announce the project publicly, at minimum complete:
 
 1. ~~Create the integration tutorial as the highest priority item~~ ✅ COMPLETED
 2. ~~Package and publish the cleanup action for reuse~~ ✅ COMPLETED
-3. Add repository metadata (description, topics)
-4. Add CONTRIBUTING.md based on existing CLAUDE.md guidelines
+3. ~~Add CONTRIBUTING.md based on existing CLAUDE.md guidelines~~ ✅ COMPLETED
+4. Add repository metadata (description, topics)
