@@ -129,16 +129,21 @@ jobs:
 
 ### Generate HTML Reports
 
-The report generation must happen in the same workflow and be chained with the measurement job. Update your workflow to include report generation:
+The report generation happens as a step in your workflow using the report action. Update your workflow to include report generation:
 
 ```yaml
 # Update your .github/workflows/performance-tracking.yml
 
 jobs:
-  measure-performance:
+  measure-and-report:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      pull-requests: write  # Required for PR comments
+    concurrency:
+      group: gh-pages-${{ github.ref }}
+      cancel-in-progress: false  # Let jobs queue to prevent conflicts
     steps:
       - uses: actions/checkout@v4
         with:
@@ -160,16 +165,11 @@ jobs:
       - name: Push measurements
         run: git perf push
 
-  generate-report:
-    needs: measure-performance
-    uses: kaihowl/git-perf/.github/workflows/report.yml@master
-    permissions:
-      contents: write
-      pages: write
-      pull-requests: write
-    with:
-      release: latest
-      depth: 40
+      - name: Generate performance report
+        uses: kaihowl/git-perf/.github/actions/report@master
+        with:
+          depth: 40
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### Enable GitHub Pages
@@ -244,10 +244,10 @@ dispersion_method = "stddev"
 
 ### Add Audit Step to CI
 
-Update your workflow to run audits and fail on regressions:
+Update your workflow to run audits and fail on regressions. You can also integrate audit into the report action:
 
 ```yaml
-# Add this step after measuring performance
+# Option 1: Add audit as a separate step
 - name: Run audit for regressions
   run: |
     # Pull latest measurements to ensure we have historical data
@@ -256,7 +256,17 @@ Update your workflow to run audits and fail on regressions:
     # Run audit for specific measurements
     git perf audit -m build_time
     git perf audit -m binary_size
+
+# Option 2: Integrate audit with report generation
+- name: Generate report with audit
+  uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    depth: 40
+    audit-args: '-m build_time -m binary_size -d 4.0 --min-measurements 5'
+    github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+The report action will automatically comment on pull requests with both the report URL and audit results.
 
 ## Step 7: Advanced Configuration
 
@@ -423,14 +433,15 @@ git perf audit -m build_time -s env=prod
 ### 4. Workflow Organization
 
 **Do:**
-- Separate measurement collection from reporting (use chained jobs)
+- Push measurements before generating reports
+- Use the report action for automated reporting and PR comments
+- Include concurrency control to prevent gh-pages conflicts
 - Use workflow dispatch for manual triggers
-- Generate reports after measurements are pushed
 
 **Don't:**
 - Skip the push step (measurements won't be saved)
-- Generate reports in a separate workflow (must be chained)
 - Skip permissions declarations
+- Forget concurrency control when publishing to gh-pages
 
 ## Example Real-World Workflow
 
@@ -448,10 +459,15 @@ on:
     - cron: '0 0 * * 0'  # Weekly reports
 
 jobs:
-  measure:
+  measure-and-report:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      pull-requests: write
+    concurrency:
+      group: gh-pages-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -469,25 +485,15 @@ jobs:
       - name: Test and measure
         run: git perf measure -m test_duration -- cargo test --release
 
-      - name: Audit
-        run: |
-          git perf audit -m build_time
-          git perf audit -m binary_size
-          git perf audit -m test_duration
-
       - name: Push measurements
         run: git perf push
 
-  report:
-    needs: measure
-    uses: kaihowl/git-perf/.github/workflows/report.yml@master
-    permissions:
-      contents: write
-      pages: write
-      pull-requests: write
-    with:
-      release: latest
-      depth: 40
+      - name: Generate report with audit
+        uses: kaihowl/git-perf/.github/actions/report@master
+        with:
+          depth: 40
+          audit-args: '-m build_time -m binary_size -m test_duration -d 4.0 --min-measurements 5'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Next Steps
@@ -504,7 +510,7 @@ jobs:
 - [Command Reference](./manpage.md) - Complete CLI documentation
 - [Configuration Guide](../README.md#configuration) - Detailed `.gitperfconfig` options
 - [Audit System](../README.md#audit-system) - Statistical methods and regression detection
-- [GitHub Actions](../.github/actions/) - Reusable actions (install, cleanup) and [workflows](../.github/workflows/report.yml) (report)
+- [GitHub Actions](../.github/actions/) - Reusable actions: [install](../.github/actions/install/), [report](../.github/actions/report/), [cleanup](../.github/actions/cleanup/)
 - [Example Report](https://kaihowl.github.io/git-perf/master.html) - Live performance dashboard
 
 ## Getting Help
