@@ -1,23 +1,62 @@
 # Contributing to git-perf
 
-Thank you for considering contributing to git-perf! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to git-perf! We welcome contributions from everyone. Whether it's a bug report, new feature, documentation improvement, or a simple typo fix - all contributions are valued and appreciated.
 
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
+- [Ways to Contribute](#ways-to-contribute)
 - [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
+- [Development Workflow](#development-workflow)
 - [Code Quality Standards](#code-quality-standards)
 - [Testing Requirements](#testing-requirements)
-- [Pull Request Process](#pull-request-process)
+- [Submitting Changes](#submitting-changes)
 - [Commit Message Guidelines](#commit-message-guidelines)
 - [Documentation](#documentation)
+- [Project Goals](#project-goals)
+- [Getting Help](#getting-help)
 
 ## Code of Conduct
 
-We expect all contributors to be respectful and professional. Please maintain a welcoming and inclusive environment for everyone.
+We are committed to providing a welcoming and inclusive environment for everyone. We expect all contributors to:
+- Be respectful and professional in all interactions
+- Provide constructive feedback
+- Focus on what is best for the community
+- Show empathy towards other community members
+
+> **Note**: The first impression you give to a new contributor never fades. Let's make every interaction positive and encouraging.
+
+## Ways to Contribute
+
+No contribution is too small! Here are ways you can help:
+
+### Non-Code Contributions
+- **Report bugs**: Found an issue? Let us know!
+- **Suggest features**: Have an idea? Share it with us
+- **Improve documentation**: Fix typos, clarify instructions, add examples
+- **Answer questions**: Help others in issues and discussions
+- **Triage issues**: Help categorize and reproduce reported issues
+
+### Code Contributions
+- **Fix bugs**: Pick an issue and submit a fix
+- **Add features**: Implement new functionality
+- **Improve performance**: Optimize existing code
+- **Write tests**: Increase test coverage
+- **Refactor code**: Improve code quality and maintainability
 
 ## Getting Started
+
+### Best Way to Start
+
+The best way to get started is by asking for help! We're here to support you.
+
+1. **Browse existing issues** to find something interesting
+2. **Check the documentation**:
+   - [README](README.md) - Project overview and quick start
+   - [Integration Tutorial](docs/INTEGRATION_TUTORIAL.md) - End-to-end setup guide
+   - [CLAUDE.md](CLAUDE.md) - Detailed development guidelines
+3. **Join the conversation** by commenting on issues
+4. **Start small** - even fixing a typo is a great first contribution
 
 ### Prerequisites
 
@@ -35,68 +74,114 @@ cargo install cargo-nextest --locked
 cargo nextest --version
 ```
 
-## Development Setup
+## Development Workflow
 
-1. **Fork and clone the repository**:
-   ```bash
-   git clone https://github.com/your-username/git-perf.git
-   cd git-perf
-   ```
+### 1. Fork and Clone
 
-2. **Verify your environment**:
-   ```bash
-   # Ensure Rust toolchain is available
-   rustc --version
-   cargo --version
+```bash
+# Fork the repository on GitHub, then:
+git clone https://github.com/your-username/git-perf.git
+cd git-perf
+```
 
-   # Verify formatting tools
-   cargo fmt --version
-   cargo clippy --version
-   ```
+### 2. Create a Branch
 
-3. **Build the project**:
-   ```bash
-   cargo build
-   ```
+Use descriptive branch names that reflect your changes:
 
-4. **Run tests**:
-   ```bash
-   cargo nextest run -- --skip slow
-   ```
+```bash
+# For new features
+git checkout -b feat/your-feature-name
+
+# For bug fixes
+git checkout -b fix/issue-description
+
+# For documentation
+git checkout -b docs/what-youre-documenting
+```
+
+### 3. Set Up Your Environment
+
+```bash
+# Ensure Rust toolchain is available
+rustc --version
+cargo --version
+
+# Verify formatting tools
+cargo fmt --version
+cargo clippy --version
+
+# Build the project
+cargo build
+
+# Run tests
+cargo nextest run -- --skip slow
+```
+
+### 4. Make Your Changes
+
+- Keep changes focused and atomic (one logical change per commit)
+- Write clear, descriptive commit messages (see [Commit Guidelines](#commit-message-guidelines))
+- Add tests for new functionality
+- Update documentation as needed
+
+### 5. Before Submitting
+
+Run the complete pre-submission checklist:
+
+```bash
+# Format code (REQUIRED)
+cargo fmt
+
+# Run linting (REQUIRED)
+cargo clippy
+
+# Run tests (REQUIRED)
+cargo nextest run -- --skip slow
+
+# Ensure no warnings
+cargo build --workspace
+
+# If you modified CLI, regenerate documentation
+./scripts/generate-manpages.sh
+```
 
 ## Code Quality Standards
 
-All code contributions must meet the following standards:
+All code contributions must meet these standards:
 
-### Required Checks Before Submission
+### Required Checks
 
-1. **Format your code** (MANDATORY):
-   ```bash
-   cargo fmt
-   ```
+✅ **Format your code**:
+```bash
+cargo fmt
+```
 
-2. **Run linting** (MANDATORY):
-   ```bash
-   cargo clippy
-   ```
+✅ **Run linting**:
+```bash
+cargo clippy
+```
 
-3. **Run tests** (MANDATORY):
-   ```bash
-   cargo nextest run -- --skip slow
-   ```
+✅ **Run tests**:
+```bash
+cargo nextest run -- --skip slow
+```
 
-4. **Ensure no warnings**:
-   ```bash
-   cargo build --workspace
-   ```
+✅ **Ensure no warnings**:
+```bash
+cargo build --workspace
+```
 
 ### Rust Best Practices
 
 - Follow idiomatic Rust code patterns
 - Use proper error handling with `Result` and `Option` types
 - Use meaningful variable and function names
-- Add documentation comments for public APIs
-- Avoid unsafe code unless absolutely necessary and well-justified
+- Add documentation comments (`///`) for public APIs
+- Avoid `unsafe` code unless absolutely necessary and well-justified
+- Write code that is:
+  - **Memory-conscious**: Avoid unnecessary allocations
+  - **Fast**: Performance matters for a measurement tool
+  - **Correct**: Handle errors gracefully, validate inputs
 
 ## Testing Requirements
 
@@ -105,7 +190,7 @@ All code contributions must meet the following standards:
 The project uses `cargo-nextest` for testing:
 
 ```bash
-# Run standard tests (excludes slow tests)
+# Run standard tests (excludes slow tests) - recommended for pre-submission
 cargo nextest run -- --skip slow
 
 # Run full test suite including slow tests
@@ -113,72 +198,119 @@ cargo nextest run
 
 # Run tests for a specific package
 cargo nextest run -p git_perf
+cargo nextest run -p cli_types
 ```
 
 ### Writing Tests
 
-- Add tests for all new functionality
-- Ensure edge cases are covered
-- Use descriptive test names that explain what is being tested
-- Keep tests focused and isolated
+When adding new functionality:
+- ✅ Add tests before implementing the feature (TDD approach)
+- ✅ Test edge cases and error conditions
+- ✅ Use descriptive test names that explain what is being tested
+- ✅ Keep tests focused and isolated
+- ✅ Add integration tests for end-to-end workflows
 
-## Pull Request Process
+Example test structure:
+```rust
+#[test]
+fn test_measurement_parsing_handles_empty_input() {
+    // Arrange
+    let input = "";
 
-### Before Creating a Pull Request
+    // Act
+    let result = parse_measurement(input);
 
-Run the complete pre-submission checklist:
-
-```bash
-# Format code
-cargo fmt
-
-# Run tests
-cargo nextest run -- --skip slow
-
-# Run linting
-cargo clippy
-
-# If you modified CLI types, regenerate documentation
-./scripts/generate-manpages.sh
+    // Assert
+    assert!(result.is_err());
+}
 ```
 
-### Creating a Pull Request
+## Submitting Changes
 
-**CRITICAL**: Both commit messages AND pull request titles MUST follow [Conventional Commits](https://www.conventionalcommits.org/).
+### Opening Issues
 
-1. **Create a feature branch**:
-   ```bash
-   git checkout -b feat/your-feature-name
-   ```
+**Before opening an issue**, please:
+- Search existing issues to avoid duplicates
+- Check if your issue is already fixed in the latest version
 
-2. **Make your changes and commit** (see commit guidelines below)
+**When reporting bugs**, include:
+- git-perf version: `git perf --version`
+- Operating system and version
+- Rust version: `rustc --version`
+- Minimal, Complete, and Verifiable example to reproduce
+- Expected vs actual behavior
+- Relevant error messages or logs
 
-3. **Push your branch**:
-   ```bash
-   git push -u origin feat/your-feature-name
-   ```
+**When requesting features**, describe:
+- The problem you're trying to solve
+- Why existing features don't address it
+- Your proposed solution (if any)
+- Alternative approaches you've considered
+- Potential drawbacks or trade-offs
 
-4. **Create the pull request with a proper title**:
-   ```bash
-   gh pr create --title "feat(scope): description of change" --body "Detailed description..."
-   ```
+### Creating Pull Requests
+
+**Recommended workflow**:
+1. **For significant changes**: Open an issue first to discuss the approach
+2. **For small changes**: Feel free to submit a PR directly
+
+**Pull Request Guidelines**:
+
+1. **Create focused, atomic PRs**: Each PR should have a single, clear purpose
+2. **Write clear descriptions**: Explain what changes you made and why
+3. **Follow conventional commits**: Both commit messages AND PR titles (see below)
+4. **Link related issues**: Use "Fixes #123" or "Closes #456" in PR description
+5. **Be responsive**: Address review feedback promptly
+
+**Creating the PR**:
+
+```bash
+# Push your branch
+git push -u origin your-branch-name
+
+# Create PR with proper conventional commits title
+gh pr create --title "feat(scope): description of change" --body "
+## Summary
+Brief description of changes
+
+## Changes Made
+- Change 1
+- Change 2
+
+## Testing
+How to test these changes
+
+Fixes #123
+"
+```
 
 ### Pull Request Checklist
 
+Before requesting review, ensure:
+
 - [ ] Code is formatted with `cargo fmt`
-- [ ] All tests pass with `cargo nextest run -- --skip slow`
-- [ ] Code passes `cargo clippy` without warnings
+- [ ] All tests pass: `cargo nextest run -- --skip slow`
+- [ ] Linting passes: `cargo clippy` (no warnings)
 - [ ] Commit messages follow Conventional Commits format
 - [ ] PR title follows Conventional Commits format
-- [ ] Documentation is updated if needed
-- [ ] Manpages regenerated if CLI was modified
+- [ ] Documentation is updated (if needed)
+- [ ] Manpages regenerated (if CLI was modified): `./scripts/generate-manpages.sh`
+- [ ] Tests are added for new functionality
+- [ ] Breaking changes are clearly documented
 
 ## Commit Message Guidelines
 
 ### Conventional Commits Format
 
-All commit messages MUST follow the [Conventional Commits specification](https://www.conventionalcommits.org/):
+**CRITICAL**: All commit messages AND pull request titles MUST follow [Conventional Commits](https://www.conventionalcommits.org/).
 
+This is enforced by CI and enables:
+- Automated changelog generation
+- Semantic versioning
+- Clear project history
+- Better collaboration
+
+**Format**:
 ```
 <type>(<scope>): <description>
 
@@ -189,18 +321,18 @@ All commit messages MUST follow the [Conventional Commits specification](https:/
 
 ### Commit Types
 
-| Type | Description | Examples |
+| Type | Description | Use When |
 |------|-------------|----------|
-| `feat` | New features | `feat(cli): add audit command` |
-| `fix` | Bug fixes | `fix(config): handle missing file gracefully` |
-| `docs` | Documentation only | `docs: update README installation steps` |
-| `refactor` | Code refactoring | `refactor(parser): simplify error handling` |
-| `test` | Adding or updating tests | `test: add integration tests for audit` |
-| `chore` | Maintenance tasks | `chore(deps): update clap to 4.5.0` |
-| `perf` | Performance improvements | `perf: optimize measurement parsing` |
-| `build` | Build system changes | `build: update cargo config` |
-| `ci` | CI/CD changes | `ci: add release workflow` |
-| `revert` | Reverts previous commits | `revert: undo performance optimization` |
+| `feat` | New features | Adding new functionality |
+| `fix` | Bug fixes | Fixing incorrect behavior |
+| `docs` | Documentation only | README, comments, guides |
+| `refactor` | Code refactoring | Restructuring without behavior change |
+| `test` | Adding or updating tests | Test additions/modifications |
+| `chore` | Maintenance tasks | Dependencies, tooling, cleanup |
+| `perf` | Performance improvements | Optimizations |
+| `build` | Build system changes | Cargo.toml, build scripts |
+| `ci` | CI/CD changes | GitHub Actions, workflows |
+| `revert` | Reverts previous commits | Undoing previous changes |
 
 ### Scopes (Optional but Recommended)
 
@@ -211,24 +343,42 @@ Common scopes in this project:
 - `audit` - Audit functionality
 - `docs` - Documentation
 - `test` - Tests
+- `ci` - Continuous integration
 
-### Good Commit Message Examples
+### Examples
 
-✅ **Good**:
+✅ **Good Commit Messages**:
 ```
 feat(cli_types): add new measurement command
-fix(audit): handle empty measurement data
-docs: improve installation instructions
-test(integration): add git interop tests
+fix(audit): handle empty measurement data correctly
+docs: improve installation instructions in README
+test(integration): add git interop edge case tests
 chore(deps): update clap to 4.5.0
+perf(parser): optimize measurement parsing by 30%
 ```
 
-❌ **Bad**:
+❌ **Bad Commit Messages**:
 ```
-Add new feature                    # Missing type prefix
-Update README                      # Missing type prefix
-fix stuff                         # Too vague
-feat: Add new measurement command  # Inconsistent capitalization
+Add new feature                     # Missing type prefix
+Update README                       # Missing type prefix
+fix stuff                          # Too vague, no description
+feat: Add new measurement command   # Inconsistent capitalization
+WIP                                 # Not descriptive
+```
+
+### Atomic Commits
+
+We ask that commits are **atomic**, meaning they:
+- Are complete and functional
+- Have a single, clear responsibility
+- Can be understood in isolation
+- Make it easy to review and revert if needed
+
+**Example of good atomic commits**:
+```bash
+git commit -m "feat(audit): add baseline threshold configuration"
+git commit -m "test(audit): add tests for threshold edge cases"
+git commit -m "docs(audit): document threshold configuration"
 ```
 
 ## Documentation
@@ -240,13 +390,28 @@ Update documentation when:
 - Changing existing functionality
 - Modifying configuration options
 - Adding new examples or use cases
+- Fixing bugs that were caused by unclear docs
 
 ### Documentation Types
 
-1. **Code Comments**: Document complex logic and public APIs
-2. **README**: Keep user-facing documentation current
-3. **Manpages**: Automatically regenerated from CLI definitions
-4. **Integration Guides**: Update if setup process changes
+1. **Code Comments**:
+   - Use `///` for public APIs
+   - Explain *why*, not just *what*
+   - Include examples for complex functions
+
+2. **README**:
+   - Keep user-facing documentation current
+   - Add new features to the feature list
+   - Update examples if behavior changes
+
+3. **Manpages**:
+   - Automatically regenerated from CLI definitions
+   - Run `./scripts/generate-manpages.sh` after CLI changes
+   - Commit generated docs with code changes
+
+4. **Integration Guides**:
+   - Update if setup process changes
+   - Add troubleshooting for common issues
 
 ### Regenerating Manpages
 
@@ -256,10 +421,33 @@ If you modify the CLI (commands, arguments, descriptions):
 # Regenerate manpages and markdown documentation
 ./scripts/generate-manpages.sh
 
+# Verify the changes
+git diff docs/
+
 # Commit the regenerated documentation
 git add docs/manpages/ docs/cli/
 git commit -m "docs: regenerate manpages for CLI changes"
 ```
+
+## Project Goals
+
+Understanding the project goals helps you make contributions that align with the project's direction:
+
+### Core Principles
+
+1. **Performance First**: git-perf is a performance measurement tool - it must be fast
+2. **Correctness**: Accurate measurements and reliable regression detection
+3. **Git Integration**: Seamless integration with Git workflows and git-notes
+4. **Developer Experience**: Easy to set up, use, and integrate
+5. **Backwards Compatibility**: Avoid breaking changes when possible
+
+### What We Value
+
+- **Simple, focused changes** over large, complex refactors
+- **Well-tested code** over "it works on my machine"
+- **Clear documentation** over clever code
+- **Incremental improvements** over perfect solutions
+- **Community feedback** over individual preferences
 
 ## Project Structure
 
@@ -268,34 +456,68 @@ This is a Rust workspace with multiple crates:
 ```
 git-perf/
 ├── cli_types/          # CLI type definitions and argument parsing
+│   ├── src/
+│   └── Cargo.toml
 ├── git_perf/           # Core functionality and main binary
+│   ├── src/
+│   └── Cargo.toml
 ├── docs/               # Documentation
+│   ├── INTEGRATION_TUTORIAL.md
+│   ├── cli/
+│   └── manpages/
 ├── scripts/            # Build and maintenance scripts
-└── .github/            # GitHub Actions workflows and actions
+│   └── generate-manpages.sh
+├── .github/            # GitHub Actions workflows and actions
+│   ├── workflows/
+│   └── actions/
+└── Cargo.toml          # Workspace configuration
 ```
 
 ## Getting Help
 
-- Check existing issues for similar questions or problems
-- Review the [README](README.md) and documentation
-- Look at the [integration tutorial](docs/INTEGRATION_TUTORIAL.md)
-- Open a new issue with your question
+Don't be shy about asking for help! We're here to support you.
 
-## Issue Reporting
+### Resources
 
-When reporting issues, please include:
-- git-perf version (`git perf --version`)
-- Operating system and version
-- Rust version (`rustc --version`)
-- Steps to reproduce the issue
-- Expected vs actual behavior
-- Relevant error messages or logs
+- **Documentation**:
+  - [README](README.md) - Project overview
+  - [Integration Tutorial](docs/INTEGRATION_TUTORIAL.md) - Setup guide
+  - [CLAUDE.md](CLAUDE.md) - Development guidelines
+
+- **Issues**:
+  - Search [existing issues](https://github.com/terragonlabs/git-perf/issues) for similar questions
+  - Open a new issue for bugs, features, or questions
+  - Use labels to help categorize your issue
+
+- **Pull Requests**:
+  - Look at [recent PRs](https://github.com/terragonlabs/git-perf/pulls?q=is%3Apr) for examples
+  - Review feedback is a learning opportunity, not criticism
+
+### Common Questions
+
+**Q: I'm new to Rust, can I still contribute?**
+A: Absolutely! Start with documentation, tests, or small bug fixes. We're happy to help you learn.
+
+**Q: How long does it take to get a PR reviewed?**
+A: We try to review PRs within a few days. If it's been longer, feel free to ping us.
+
+**Q: My PR got feedback asking for changes, what do I do?**
+A: Make the requested changes and push them to your branch. The PR will update automatically.
+
+**Q: Should I open an issue before submitting a PR?**
+A: For significant changes, yes. For small fixes (typos, bugs), you can submit a PR directly.
+
+**Q: Can I work on an issue that's already assigned?**
+A: Best to ask first! The assignee might be actively working on it.
 
 ## Recognition
 
-Contributors will be recognized in:
-- Git commit history
+We value all contributions and recognize contributors through:
+- Git commit history and co-author tags
 - Release notes and changelogs
 - Project README (for significant contributions)
+- Community shout-outs
 
-Thank you for contributing to git-perf!
+---
+
+Thank you for contributing to git-perf! Your efforts help make performance measurement better for everyone.
