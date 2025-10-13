@@ -342,7 +342,7 @@ git perf audit -m build_time -s env=prod
 1. Increase thresholds in `.gitperfconfig`:
    ```toml
    [measurement."build_time"]
-   min_relative_deviation = 10.0  # More lenient (default is 5.0)
+   min_relative_deviation = 10.0  # Percentage (0..100), unset by default
    ```
 2. Use MAD instead of stddev for more robust detection:
    ```toml
