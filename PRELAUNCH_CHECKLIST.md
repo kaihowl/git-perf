@@ -87,11 +87,11 @@ This checklist covers items to review and complete before publicly announcing th
 
 ### Community & Contribution
 - [x] Add `CONTRIBUTING.md` with:
-  - Development setup instructions
-  - Code style guidelines
-  - PR submission process
-  - Testing requirements
-  - Conventional commit requirements
+  - [x] Development setup instructions
+  - [x] Code style guidelines
+  - [x] PR submission process
+  - [x] Testing requirements
+  - [x] Conventional commit requirements
 - [ ] Add `CODE_OF_CONDUCT.md` (if planning community contributions)
 - [ ] Add issue templates for:
   - Bug reports
