@@ -93,11 +93,11 @@ This checklist covers items to review and complete before publicly announcing th
   - Testing requirements
   - Conventional commit requirements
 - [x] Add `CODE_OF_CONDUCT.md` (if planning community contributions)
-- [ ] Add issue templates for:
+- [x] Add issue templates for:
   - Bug reports
   - Feature requests
   - Documentation improvements
-- [ ] Add PR template
+- [x] Add PR template
 
 ### Documentation Enhancements
 - [x] Add installation instructions beyond quick start:
@@ -154,7 +154,7 @@ To announce the project publicly, at minimum complete:
 3. **📌 NICE TO HAVE** (Can be added post-launch):
    - [x] crates.io publishing
    - [x] CODE_OF_CONDUCT.md
-   - [ ] Issue/PR templates
+   - [x] Issue/PR templates
    - [ ] GitHub Actions Marketplace listing
 
 ## 📝 Notes
