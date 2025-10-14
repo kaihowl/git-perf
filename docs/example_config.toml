@@ -9,14 +9,20 @@
         # The relative deviation is calculated as: |(head_value / tail_median - 1.0) * 100%|
         # where tail_median is the median of historical measurements (excluding HEAD)
         min_relative_deviation = 5.0
-        
+
         # Statistical dispersion method for outlier detection
         # Options: "stddev" (standard deviation) or "mad" (median absolute deviation)
         # MAD is more robust to outliers, stddev is more sensitive
         dispersion_method = "mad"
-        
+
         # Default epoch for accepting performance changes (hex format)
         epoch = "00000000"
+
+        # Default unit for all measurements (optional)
+        # If set, this unit will be displayed in reports, audit output, and CSV exports
+        # for all measurements that don't have a specific unit configured
+        # Common units: "ms", "seconds", "bytes", "MB", "requests/sec", etc.
+        # unit = "ms"
 
 # Measurement-specific settings (override parent defaults)
 [measurement."build_time"]
@@ -25,6 +31,7 @@
 min_relative_deviation = 10.0
 dispersion_method = "mad"
 epoch = "12345678"
+unit = "ms"  # Display build time in milliseconds
 
 [measurement."memory_usage"]
 # Memory usage should be more stable, so use a lower threshold
@@ -32,22 +39,26 @@ epoch = "12345678"
 min_relative_deviation = 2.0
 dispersion_method = "stddev"
 epoch = "abcdef12"
+unit = "bytes"  # Display memory usage in bytes
 
 [measurement."test_runtime"]
 # Test runtime can vary significantly, use a moderate threshold
 # Use MAD for test times as they can have outliers from system performance
 min_relative_deviation = 7.5
 dispersion_method = "mad"
+unit = "seconds"  # Display test runtime in seconds
 
 [measurement."cpu_usage"]
 # CPU usage measurements - use stddev for more sensitive detection
 min_relative_deviation = 3.0
 dispersion_method = "stddev"
+unit = "%"  # Display CPU usage as percentage
 
 [measurement."network_latency"]
 # Network latency can have spikes, use MAD for robustness
 min_relative_deviation = 8.0
 dispersion_method = "mad"
+unit = "ms"  # Display network latency in milliseconds
 
 # Backoff settings for retry logic
 [backoff]
