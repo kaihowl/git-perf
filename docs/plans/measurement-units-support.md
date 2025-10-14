@@ -22,8 +22,9 @@ Currently, git-perf stores numeric measurement values without any associated uni
 1. **Configure units per measurement** - Define units in `.gitperfconfig`
 2. **Display units in reports** - Show units in HTML report legends and axis labels
 3. **Display units in CSV exports** - Include units in CSV column headers
-4. **No data model changes** - Keep measurements storage simple and unchanged
-5. **Backward compatibility** - Existing measurements and configs work without modification
+4. **Display units in audit output** - Show units in audit command results
+5. **No data model changes** - Keep measurements storage simple and unchanged
+6. **Backward compatibility** - Existing measurements and configs work without modification
 
 ## Non-Goals (Future Work)
 
@@ -31,7 +32,6 @@ Currently, git-perf stores numeric measurement values without any associated uni
 - Runtime unit validation or consistency checking
 - Automatic unit conversion (e.g., milliseconds to seconds)
 - CLI flags for specifying units (config-only)
-- Unit display in audit command output
 
 ## Design
 
@@ -92,12 +92,35 @@ pub fn measurement_unit(measurement: &str) -> Option<String> {
 
 Units are applied **only during display**, retrieved from configuration at report/output time.
 
+#### Audit Output
+Include units in audit command results in `git_perf/src/audit.rs`:
+
+**Current output:**
+```
+✓ build_time: 42.5 (within acceptable range)
+```
+
+**New output with unit:**
+```
+✓ build_time: 42.5 ms (within acceptable range)
+```
+
+**Implementation approach:**
+```rust
+// When displaying audit results
+let unit = config::measurement_unit(&measurement_name);
+let value_display = match unit {
+    Some(u) => format!("{} {}", value, u),
+    None => format!("{}", value),
+};
+```
+
 #### HTML Report
 Update report generation to include units in `git_perf/src/reporting.rs`:
 
 **Changes needed:**
 - **Legend entries:** Append unit to measurement name (e.g., "build_time (ms)")
-- **Axis labels:** Include unit in Y-axis label (e.g., "Performance (ms)")
+- **Axis labels:** When all measurements have the same unit, include in Y-axis label (e.g., "Performance (ms)")
 - **Hover tooltips:** Show value with unit (e.g., "42.5 ms")
 
 **Implementation approach:**
@@ -158,28 +181,36 @@ git perf report -o report.html -m build_time
 
 **Estimated effort:** Small (0.5 day)
 
-#### Phase 2: HTML Report Integration (Essential)
+#### Phase 2: Audit Output Integration (Essential)
+- [ ] Update audit output to query units from config
+- [ ] Format audit results to include units (e.g., "42.5 ms")
+- [ ] Handle measurements without units (backward compatibility)
+- [ ] Test audit with various unit configurations
+
+**Estimated effort:** Small (0.5-1 day)
+
+#### Phase 3: HTML Report Integration (Essential)
 - [ ] Update report generation to query units from config
 - [ ] Add units to legend entries (e.g., "build_time (ms)")
-- [ ] Add units to axis labels if all measurements share same unit
+- [ ] Add units to axis labels when appropriate
 - [ ] Add units to hover tooltips
 - [ ] Handle mixed measurements (some with units, some without)
 - [ ] Test report generation with various unit configurations
 
 **Estimated effort:** Medium (1-2 days)
 
-#### Phase 3: CSV Export Integration (If applicable)
+#### Phase 4: CSV Export Integration (If applicable)
 - [ ] Identify if CSV export exists in codebase
 - [ ] Add units to CSV column headers
 - [ ] Test CSV export with unit configurations
 
 **Estimated effort:** Small (0.5 day)
 
-#### Phase 4: Documentation (Essential)
+#### Phase 5: Documentation (Essential)
 - [ ] Update README with unit configuration examples
 - [ ] Update INTEGRATION_TUTORIAL with unit usage
 - [ ] Update `example_config.toml` with comprehensive unit examples
-- [ ] Document unit display behavior in reports
+- [ ] Document unit display behavior in audit and reports
 - [ ] Add FAQ about why units aren't stored with measurements
 
 **Estimated effort:** Small (0.5-1 day)
@@ -192,6 +223,8 @@ git perf report -o report.html -m build_time
 - Report display name generation with and without units
 
 ### Integration Tests
+- Audit command with measurements that have units configured
+- Audit command with measurements without units (backward compatibility)
 - Report generation with measurements that have units configured
 - Report generation with measurements without units
 - Mixed scenario: some measurements with units, some without
@@ -199,6 +232,9 @@ git perf report -o report.html -m build_time
 
 ### Manual Testing
 - Configure units for different measurements
+- Run audit command and verify:
+  - Output shows values with units (e.g., "42.5 ms")
+  - Measurements without units display correctly
 - Generate HTML reports and verify:
   - Legend shows measurement names with units
   - Axis labels include units appropriately
@@ -318,36 +354,41 @@ If `.gitperfconfig` has no unit settings:
 - Recommend stable unit choices in documentation
 - Users should pick appropriate units and stick with them
 
-## Open Questions
+## Resolved Questions
 
 1. **Should audit command output include units?**
-   - **Recommendation:** No, not in initial implementation (keep scope small)
-   - Future enhancement if users request it
+   - **Decision:** Yes, include units in audit output
+   - Provides consistency across all output formats
+   - Example: `✓ build_time: 42.5 ms (within acceptable range)`
 
 2. **Should we validate that unit config doesn't conflict with measurement name?**
-   - **Recommendation:** No, trust users to be consistent
+   - **Decision:** No validation
+   - Trust users to be consistent
    - Document best practices instead
 
 3. **How should we handle axis labels when measurements have different units?**
-   - **Recommendation:** Generic label like "Value" or no unit in axis label
-   - Units still appear in legend and tooltips
+   - **Decision:** Follow recommendation
+   - Use generic label like "Value" or no unit in axis label when measurements have different units
+   - When all measurements share the same unit, include it in axis label
+   - Units always appear in legend and tooltips
 
 ## Success Criteria
 
 1. ✅ Configuration supports per-measurement unit settings
-2. ✅ HTML reports display units in legends
-3. ✅ HTML reports display units in tooltips
-4. ✅ CSV exports include units in column headers (if CSV export exists)
-5. ✅ Existing measurements without unit config continue to work
-6. ✅ Documentation includes unit configuration examples
-7. ✅ All tests pass including new unit-related tests
-8. ✅ Zero changes to data serialization or MeasurementData struct
+2. ✅ Audit output displays units with values
+3. ✅ HTML reports display units in legends
+4. ✅ HTML reports display units in tooltips
+5. ✅ HTML reports display units in axis labels when appropriate
+6. ✅ CSV exports include units in column headers (if CSV export exists)
+7. ✅ Existing measurements without unit config continue to work
+8. ✅ Documentation includes unit configuration examples
+9. ✅ All tests pass including new unit-related tests
+10. ✅ Zero changes to data serialization or MeasurementData struct
 
 ## Future Enhancements (Out of Scope)
 
 - Store units with measurement data (for validation)
 - CLI flags for specifying units
-- Unit display in audit command output
 - Unit validation (warn if measurements have inconsistent units based on naming)
 - Unit conversion (e.g., auto-convert ms to seconds for display)
 - Automatic unit inference from measurement names
