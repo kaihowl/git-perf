@@ -265,31 +265,7 @@ git perf report -o report.html -m build_time -m memory_usage
 # - Tooltips: "42.5 ms", "256 MB"
 ```
 
-### Scenario 2: Change unit without re-recording
-```toml
-# Initially configured as milliseconds
-[measurement."response_time"]
-unit = "ms"
-```
-
-```bash
-# Generate report - shows "ms"
-git perf report -o report1.html -m response_time
-```
-
-```toml
-# Later, change to seconds for better readability
-[measurement."response_time"]
-unit = "seconds"
-```
-
-```bash
-# Generate report - now shows "seconds"
-# No need to re-record measurements!
-git perf report -o report2.html -m response_time
-```
-
-### Scenario 3: Mixed measurements (some with units, some without)
+### Scenario 2: Mixed measurements (some with units, some without)
 ```toml
 [measurement."build_time"]
 unit = "ms"
@@ -304,7 +280,7 @@ git perf report -o report.html -m build_time -m memory_usage
 # - "memory_usage" - without unit (as before)
 ```
 
-### Scenario 4: Default unit for all measurements
+### Scenario 3: Default unit for all measurements
 ```toml
 [measurement]
 unit = "ms"  # Default for all measurements
@@ -336,18 +312,17 @@ If `.gitperfconfig` has no unit settings:
 ## Advantages of Config-Only Approach
 
 1. **Simplicity:** No serialization changes, no data model changes
-2. **Flexibility:** Can change units without re-recording measurements
-3. **Centralized:** Single source of truth in configuration
-4. **Zero risk:** No backward compatibility concerns with data
-5. **Fast implementation:** Minimal code changes required
-6. **Clean separation:** Configuration vs. data storage concerns
+2. **Centralized:** Single source of truth in configuration
+3. **Zero risk:** No backward compatibility concerns with data
+4. **Fast implementation:** Minimal code changes required
+5. **Clean separation:** Configuration vs. data storage concerns
 
 ## Limitations of Config-Only Approach
 
 1. **No per-measurement validation:** Can't detect if measurements were recorded in different units
-2. **Manual consistency:** Users must ensure measurement names reflect units (e.g., don't call it `time_ms` if config says `seconds`)
-3. **No historical tracking:** Can't see if units changed over time
-4. **Display only:** Units don't affect audit calculations or comparisons
+2. **Manual consistency:** Users must ensure measurement names and config units match the actual data
+3. **Display only:** Units don't affect audit calculations or comparisons
+4. **User responsibility:** Changing unit config doesn't change the actual measurement values - users must ensure config accurately reflects how measurements were recorded
 
 **Mitigation:**
 - Document best practices for measurement naming
@@ -412,7 +387,6 @@ If `.gitperfconfig` has no unit settings:
 | Data model changes | None | Required |
 | Backward compatibility | Perfect | Requires careful handling |
 | Unit validation | No | Possible |
-| Change units retroactively | Yes | No |
 | Storage overhead | Zero | ~10-20 bytes per measurement |
 | Risk level | Minimal | Medium |
 
