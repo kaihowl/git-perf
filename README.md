@@ -14,6 +14,7 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
 - [Audit System](#audit-system)
+- [Understanding Audit Output](#understanding-audit-output)
 - [Configuration](#configuration)
 - [Migration](#migration)
 - [Remote Setup](#remote-setup)
@@ -242,6 +243,98 @@ Tail: μ: 101.7 σ: 45.8 MAD: 2.5 n: 3
 When the relative deviation is below the threshold, the audit passes even if
 the z-score indicates statistical significance. This helps focus on meaningful
 performance changes while ignoring noise.
+
+## Understanding Audit Output
+
+The audit system provides detailed statistical analysis of your performance measurements. Here's how to interpret the output:
+
+### Audit Status Indicators
+
+The first line shows the audit result with a status indicator:
+
+- **✅ 'measurement_name'** - Audit passed (no significant regression detected)
+- **❌ 'measurement_name'** - Audit failed (significant performance change detected)
+- **⏭️ 'measurement_name'** - Audit skipped (insufficient measurements)
+
+### Z-Score and Direction
+
+```
+z-score (mad): ↓ 2.15
+```
+
+- **z-score**: Statistical measure of how many standard deviations (or MADs) the HEAD measurement is from the tail mean
+- **Direction arrows**:
+  - **↑** - HEAD measurement is higher than tail average (potential regression for time metrics)
+  - **↓** - HEAD measurement is lower than tail average (potential improvement for time metrics)
+  - **→** - HEAD measurement is roughly equal to tail average
+- **Method indicator**: Shows which dispersion method was used (`stddev` or `mad`)
+
+### Statistical Summary
+
+```
+Head: μ: 110.0 σ: 0.0 MAD: 0.0 n: 1
+Tail: μ: 101.7 σ: 45.8 MAD: 2.5 n: 3
+```
+
+- **Head**: Statistics for the current commit's measurement(s)
+- **Tail**: Statistics for historical measurements
+- **μ (mu)**: Mean (average) value
+- **σ (sigma)**: Standard deviation
+- **MAD**: Median Absolute Deviation
+- **n**: Number of measurements
+
+### Sparkline Visualization
+
+```
+ [-1.0% – +96.0%] ▁▃▇▁
+```
+
+- **Percentage range**: Shows min and max measurements relative to the tail median
+  - Negative percentages indicate measurements below the tail median
+  - Positive percentages indicate measurements above the tail median
+- **Sparkline**: Visual representation of all measurements (tail + head)
+  - Each bar represents a measurement's relative magnitude
+  - Bars range from ▁ (lowest) to █ (highest)
+  - Helps quickly identify outliers and trends
+
+### Threshold Notes
+
+When configured with `min_relative_deviation`, you may see:
+
+```
+Note: Passed due to relative deviation (3.2%) being below threshold (5.0%)
+```
+
+This indicates the audit passed because the performance change was below the configured threshold, even though it may have been statistically significant. This prevents false alarms from minor fluctuations.
+
+### Skipped Audits
+
+When there aren't enough measurements:
+
+```
+⏭️ 'build_time'
+Only 3 measurements found. Less than requested min_measurements of 10. Skipping test.
+ [-2.5% – +5.1%] ▃▇▁▅
+```
+
+The audit is skipped but still shows the sparkline for available data. Adjust `--min-measurements` to change the requirement.
+
+### Interpreting Results
+
+**Audit Passed (✅)**:
+- Performance is stable or improved
+- Any changes are within acceptable thresholds
+- Safe to merge/deploy
+
+**Audit Failed (❌)**:
+- Significant performance regression detected
+- Review code changes that may have caused the regression
+- Consider optimization or investigation before merging
+
+**Audit Skipped (⏭️)**:
+- Not enough historical data for statistical analysis
+- Continue collecting measurements
+- Results will become more reliable over time
 
 ## Documentation
 
