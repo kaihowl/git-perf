@@ -124,6 +124,20 @@ feat: Add new measurement command   # Inconsistent capitalization
 
 **CRITICAL FOR AI AGENTS**: When creating pull requests using `gh pr create`, you MUST always use the `--title` parameter with a properly formatted Conventional Commits title. NEVER rely on auto-generated titles from GitHub.
 
+#### GitHub Templates
+
+The repository provides templates to help with contributions:
+- **Issue Templates** (`.github/ISSUE_TEMPLATE/`):
+  - `bug_report.md` - For reporting bugs
+  - `feature_request.md` - For requesting new features
+  - `documentation.md` - For documentation improvements
+- **PR Template** (`.github/pull_request_template.md`):
+  - Includes Conventional Commits checklist
+  - Testing and documentation requirements
+  - Pre-submission verification steps
+
+These templates will automatically populate when creating issues or pull requests via GitHub's web interface.
+
 #### Mandatory PR Creation Process
 
 1. **Create commits with proper format:**
