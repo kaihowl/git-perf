@@ -246,30 +246,50 @@ performance changes while ignoring noise.
 
 ## Understanding Audit Output
 
-The audit system provides detailed statistical analysis of your performance measurements. Here's how to interpret the output:
+The audit system provides detailed statistical analysis of your performance measurements. Here's a complete example followed by a breakdown of each component:
 
-### Audit Status Indicators
+### Complete Example
 
-The first line shows the audit result with a status indicator:
+```bash
+$ git perf audit -m build_time --dispersion-method mad
+
+✅ 'build_time'
+z-score (mad): ↓ 2.15
+Head: μ: 110.0 σ: 0.0 MAD: 0.0 n: 1
+Tail: μ: 101.7 σ: 45.8 MAD: 2.5 n: 3
+ [-1.0% – +96.0%] ▁▃▇▁
+```
+
+This output shows a **passing audit** where the current build time (110.0) is being compared against 3 historical measurements. Let's break down each component:
+
+### 1. Status Indicator
+
+```
+✅ 'build_time'
+```
+
+The first line shows the audit result:
 
 - **✅ 'measurement_name'** - Audit passed (no significant regression detected)
 - **❌ 'measurement_name'** - Audit failed (significant performance change detected)
 - **⏭️ 'measurement_name'** - Audit skipped (insufficient measurements)
 
-### Z-Score and Direction
+### 2. Z-Score and Direction
 
 ```
 z-score (mad): ↓ 2.15
 ```
 
-- **z-score**: Statistical measure of how many standard deviations (or MADs) the HEAD measurement is from the tail mean
+- **z-score**: `2.15` - Statistical measure of how many MADs (or standard deviations) the HEAD measurement is from the tail mean
+  - Higher values indicate more significant deviations
+  - Typically, z-scores above 4.0 (default sigma) indicate statistical significance
 - **Direction arrows**:
   - **↑** - HEAD measurement is higher than tail average (potential regression for time metrics)
   - **↓** - HEAD measurement is lower than tail average (potential improvement for time metrics)
   - **→** - HEAD measurement is roughly equal to tail average
-- **Method indicator**: Shows which dispersion method was used (`stddev` or `mad`)
+- **Method indicator**: `(mad)` - Shows which dispersion method was used (`stddev` or `mad`)
 
-### Statistical Summary
+### 3. Statistical Summary
 
 ```
 Head: μ: 110.0 σ: 0.0 MAD: 0.0 n: 1
@@ -277,27 +297,31 @@ Tail: μ: 101.7 σ: 45.8 MAD: 2.5 n: 3
 ```
 
 - **Head**: Statistics for the current commit's measurement(s)
+  - In this example: single measurement of 110.0
 - **Tail**: Statistics for historical measurements
+  - In this example: 3 measurements with mean of 101.7
 - **μ (mu)**: Mean (average) value
-- **σ (sigma)**: Standard deviation
-- **MAD**: Median Absolute Deviation
-- **n**: Number of measurements
+- **σ (sigma)**: Standard deviation (measure of variability)
+- **MAD**: Median Absolute Deviation (robust measure of variability)
+- **n**: Number of measurements used in the calculation
 
-### Sparkline Visualization
+### 4. Sparkline Visualization
 
 ```
  [-1.0% – +96.0%] ▁▃▇▁
 ```
 
-- **Percentage range**: Shows min and max measurements relative to the tail median
-  - Negative percentages indicate measurements below the tail median
-  - Positive percentages indicate measurements above the tail median
-- **Sparkline**: Visual representation of all measurements (tail + head)
+- **Percentage range**: `[-1.0% – +96.0%]` - Shows min and max measurements relative to the tail median
+  - `-1.0%` means the lowest measurement is 1% below the tail median
+  - `+96.0%` means the highest measurement is 96% above the tail median
+  - In this example, there's significant variation with one outlier
+- **Sparkline**: `▁▃▇▁` - Visual representation of all measurements (tail + head)
   - Each bar represents a measurement's relative magnitude
   - Bars range from ▁ (lowest) to █ (highest)
+  - Here: low value, medium value, very high outlier, another low value
   - Helps quickly identify outliers and trends
 
-### Threshold Notes
+### 5. Threshold Notes (Optional)
 
 When configured with `min_relative_deviation`, you may see:
 
@@ -307,7 +331,7 @@ Note: Passed due to relative deviation (3.2%) being below threshold (5.0%)
 
 This indicates the audit passed because the performance change was below the configured threshold, even though it may have been statistically significant. This prevents false alarms from minor fluctuations.
 
-### Skipped Audits
+### 6. Skipped Audits
 
 When there aren't enough measurements:
 
@@ -319,7 +343,22 @@ Only 3 measurements found. Less than requested min_measurements of 10. Skipping 
 
 The audit is skipped but still shows the sparkline for available data. Adjust `--min-measurements` to change the requirement.
 
-### Interpreting Results
+### 7. Failed Audit Example
+
+When a regression is detected:
+
+```
+❌ 'build_time'
+HEAD differs significantly from tail measurements.
+z-score (stddev): ↑ 5.23
+Head: μ: 250.0 σ: 0.0 MAD: 0.0 n: 1
+Tail: μ: 100.0 σ: 15.2 MAD: 8.3 n: 10
+ [-12.5% – +150.0%] ▃▅▄▆▅▄▅▄▅█
+```
+
+This shows build time increased from ~100 to 250 (150% increase) with high statistical significance (z-score of 5.23).
+
+### Quick Interpretation Guide
 
 **Audit Passed (✅)**:
 - Performance is stable or improved
