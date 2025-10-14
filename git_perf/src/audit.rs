@@ -22,6 +22,15 @@ fn format_z_score_display(z_score: f64) -> String {
     }
 }
 
+/// Formats a measurement value with its unit if configured.
+/// Returns "value unit" if unit is configured, otherwise just "value".
+fn format_value_with_unit(value: f64, unit: Option<&str>) -> String {
+    match unit {
+        Some(u) => format!("{} {}", value, u),
+        None => format!("{}", value),
+    }
+}
+
 /// Determines the direction arrow based on comparison of head and tail means.
 /// Returns ↑ for greater, ↓ for less, → for equal.
 /// Returns → for NaN values to avoid panicking.
@@ -193,6 +202,10 @@ fn audit_with_data(
     sigma: f64,
     dispersion_method: DispersionMethod,
 ) -> Result<AuditResult> {
+    // Get unit for this measurement from config
+    let unit = config::measurement_unit(measurement);
+    let unit_str = unit.as_deref();
+
     let head_summary = stats::aggregate_measurements(iter::once(&head));
     let tail_summary = stats::aggregate_measurements(tail.iter());
 
@@ -259,9 +272,18 @@ fn audit_with_data(
         DispersionMethod::MedianAbsoluteDeviation => "mad",
     };
 
+    // Format head with unit if configured
+    let head_display = format_value_with_unit(head_summary.mean, unit_str);
+
     let text_summary = format!(
-        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n{}",
-        z_score_display, &head_summary, &tail_summary, sparkline,
+        "z-score ({method_name}): {direction}{}\nHead: μ: {} σ: {} MAD: {} n: {}\nTail: {}\n{}",
+        z_score_display,
+        head_display,
+        head_summary.stddev,
+        head_summary.mad,
+        head_summary.len,
+        &tail_summary,
+        sparkline,
     );
 
     // MUTATION POINT: > vs >= (Line 178)
@@ -320,6 +342,20 @@ mod test {
             let result = format_z_score_display(z_score);
             assert_eq!(result, expected, "Failed for z_score: {}", z_score);
         }
+    }
+
+    #[test]
+    fn test_format_value_with_unit() {
+        // Test value formatting with and without units
+        assert_eq!(format_value_with_unit(42.5, Some("ms")), "42.5 ms");
+        assert_eq!(format_value_with_unit(42.5, None), "42.5");
+        assert_eq!(format_value_with_unit(1024.0, Some("bytes")), "1024 bytes");
+        assert_eq!(
+            format_value_with_unit(3.14159, Some("seconds")),
+            "3.14159 seconds"
+        );
+        assert_eq!(format_value_with_unit(0.0, Some("ms")), "0 ms");
+        assert_eq!(format_value_with_unit(-5.5, Some("°C")), "-5.5 °C");
     }
 
     #[test]
