@@ -261,6 +261,12 @@ pub fn audit_sigma(measurement: &str) -> Option<f64> {
     None
 }
 
+/// Returns the configured unit for a measurement, or None if not set.
+pub fn measurement_unit(measurement: &str) -> Option<String> {
+    let config = read_hierarchical_config().ok()?;
+    config.get_with_parent_fallback("measurement", measurement, "unit")
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -992,6 +998,121 @@ sigma = 2.0
             // Test no config
             fs::remove_file(&workspace_config_path).unwrap();
             assert_eq!(super::audit_sigma("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_measurement_unit() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with measurement-specific units
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+unit = "ms"
+
+[measurement."build_time"]
+unit = "ms"
+
+[measurement."memory_usage"]
+unit = "bytes"
+
+[measurement."throughput"]
+unit = "requests/sec"
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(
+                super::measurement_unit("build_time"),
+                Some("ms".to_string())
+            );
+            assert_eq!(
+                super::measurement_unit("memory_usage"),
+                Some("bytes".to_string())
+            );
+            assert_eq!(
+                super::measurement_unit("throughput"),
+                Some("requests/sec".to_string())
+            );
+
+            // Test fallback to parent table default
+            assert_eq!(
+                super::measurement_unit("other_measurement"),
+                Some("ms".to_string())
+            );
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::measurement_unit("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_measurement_unit_precedence() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config testing precedence
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let precedence_config = r#"
+[measurement]
+unit = "ms"
+
+[measurement."build_time"]
+unit = "seconds"
+"#;
+            fs::write(&workspace_config_path, precedence_config).unwrap();
+
+            // Measurement-specific should override parent default
+            assert_eq!(
+                super::measurement_unit("build_time"),
+                Some("seconds".to_string())
+            );
+
+            // Other measurements should use parent default
+            assert_eq!(
+                super::measurement_unit("other_measurement"),
+                Some("ms".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn test_measurement_unit_no_parent_default() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_git_repo(temp_dir);
+
+            // Create workspace config with only measurement-specific units (no parent default)
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement."build_time"]
+unit = "ms"
+
+[measurement."memory_usage"]
+unit = "bytes"
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(
+                super::measurement_unit("build_time"),
+                Some("ms".to_string())
+            );
+            assert_eq!(
+                super::measurement_unit("memory_usage"),
+                Some("bytes".to_string())
+            );
+
+            // Test measurement without unit (no parent default either)
+            assert_eq!(super::measurement_unit("other_measurement"), None);
         });
     }
 }
