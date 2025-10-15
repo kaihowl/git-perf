@@ -2,7 +2,7 @@ use crate::{
     config,
     data::MeasurementData,
     measurement_retrieval::{self, summarize_measurements},
-    stats::{self, DispersionMethod, ReductionFunc, VecAggregation},
+    stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
 use anyhow::{anyhow, bail, Result};
 use itertools::Itertools;
@@ -19,15 +19,6 @@ fn format_z_score_display(z_score: f64) -> String {
         format!(" {:.2}", z_score)
     } else {
         String::new()
-    }
-}
-
-/// Formats a measurement value with its unit if configured.
-/// Returns "value unit" if unit is configured, otherwise just "value".
-fn format_value_with_unit(value: f64, unit: Option<&str>) -> String {
-    match unit {
-        Some(u) => format!("{} {}", value, u),
-        None => format!("{}", value),
     }
 }
 
@@ -272,18 +263,19 @@ fn audit_with_data(
         DispersionMethod::MedianAbsoluteDeviation => "mad",
     };
 
-    // Format head with unit if configured
-    let head_display = format_value_with_unit(head_summary.mean, unit_str);
+    // Format head and tail with unit if configured (only mean gets the unit)
+    let head_display = StatsWithUnit {
+        stats: &head_summary,
+        unit: unit_str,
+    };
+    let tail_display = StatsWithUnit {
+        stats: &tail_summary,
+        unit: unit_str,
+    };
 
     let text_summary = format!(
-        "z-score ({method_name}): {direction}{}\nHead: μ: {} σ: {} MAD: {} n: {}\nTail: {}\n{}",
-        z_score_display,
-        head_display,
-        head_summary.stddev,
-        head_summary.mad,
-        head_summary.len,
-        &tail_summary,
-        sparkline,
+        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n{}",
+        z_score_display, head_display, tail_display, sparkline,
     );
 
     // MUTATION POINT: > vs >= (Line 178)
@@ -342,20 +334,6 @@ mod test {
             let result = format_z_score_display(z_score);
             assert_eq!(result, expected, "Failed for z_score: {}", z_score);
         }
-    }
-
-    #[test]
-    fn test_format_value_with_unit() {
-        // Test value formatting with and without units
-        assert_eq!(format_value_with_unit(42.5, Some("ms")), "42.5 ms");
-        assert_eq!(format_value_with_unit(42.5, None), "42.5");
-        assert_eq!(format_value_with_unit(1024.0, Some("bytes")), "1024 bytes");
-        assert_eq!(
-            format_value_with_unit(3.14159, Some("seconds")),
-            "3.14159 seconds"
-        );
-        assert_eq!(format_value_with_unit(0.0, Some("ms")), "0 ms");
-        assert_eq!(format_value_with_unit(-5.5, Some("°C")), "-5.5 °C");
     }
 
     #[test]
@@ -667,6 +645,143 @@ mod test {
         // Both should contain method indicators
         assert!(stddev_result.message.contains("stddev"));
         assert!(mad_result.message.contains("mad"));
+    }
+
+    #[test]
+    fn test_head_and_tail_have_units_and_separators() {
+        // Test that both head and tail measurements display units and thousands separators
+
+        // First, set up a test environment with a configured unit
+        use std::env;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        env::set_current_dir(&temp_dir).unwrap();
+
+        // Initialize git repo
+        std::process::Command::new("git")
+            .args(["init"])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .output()
+            .unwrap();
+
+        // Create .gitperfconfig with unit configuration
+        let config_content = r#"
+[measurement."build_time"]
+unit = "ms"
+"#;
+        let config_path = temp_dir.path().join(".gitperfconfig");
+        fs::write(&config_path, config_content).unwrap();
+
+        // Test with large values that should have thousands separators
+        let head = 12_345.67;
+        let tail = vec![10_000.0, 10_500.0, 11_000.0, 11_500.0, 12_000.0];
+
+        let result = audit_with_data(
+            "build_time",
+            head,
+            tail,
+            1,
+            10.0, // High sigma to ensure it passes
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        let message = &audit_result.message;
+
+        // Verify Head section has units
+        assert!(
+            message.contains("Head:"),
+            "Message should contain Head section"
+        );
+        assert!(message.contains("ms"), "Message should contain unit 'ms'");
+
+        // Verify Head has thousands separators (checking for formatted mean)
+        assert!(
+            message.contains("12,345") || message.contains("12_345"),
+            "Head mean should have thousands separators, got: {}",
+            message
+        );
+
+        // Verify Head stddev and MAD have units
+        // The format is: "Head: μ: VALUE UNIT σ: VALUE UNIT MAD: VALUE UNIT n: COUNT"
+        let head_section: Vec<&str> = message
+            .lines()
+            .filter(|line| line.contains("Head:"))
+            .collect();
+
+        assert!(
+            !head_section.is_empty(),
+            "Should find Head section in message"
+        );
+
+        let head_line = head_section[0];
+        // Only mean (μ) should have the unit, not σ or MAD (they are unitless)
+        let ms_count = head_line.matches(" ms").count();
+        assert_eq!(
+            ms_count, 1,
+            "Head line should have unit 'ms' only once (μ only), got {} times in: {}",
+            ms_count, head_line
+        );
+
+        // Verify format: unit comes right after mean value, before σ
+        // Expected: "μ: 12,345.670 ms σ: 0.000 MAD: 0.000 n: 1"
+        assert!(
+            head_line.contains("ms σ:") || head_line.contains("ms  σ:"),
+            "Unit should come before sigma (format: 'ms σ:'), got: {}",
+            head_line
+        );
+
+        // Verify Tail section has units
+        assert!(
+            message.contains("Tail:"),
+            "Message should contain Tail section"
+        );
+
+        let tail_section: Vec<&str> = message
+            .lines()
+            .filter(|line| line.contains("Tail:"))
+            .collect();
+
+        assert!(
+            !tail_section.is_empty(),
+            "Should find Tail section in message"
+        );
+
+        let tail_line = tail_section[0];
+        // Only mean (μ) should have the unit, not σ or MAD (they are unitless)
+        let tail_ms_count = tail_line.matches(" ms").count();
+        assert_eq!(
+            tail_ms_count, 1,
+            "Tail line should have unit 'ms' only once (μ only), got {} times in: {}",
+            tail_ms_count, tail_line
+        );
+
+        // Verify format: unit comes right after mean value, before σ
+        assert!(
+            tail_line.contains("ms σ:") || tail_line.contains("ms  σ:"),
+            "Unit should come before sigma (format: 'ms σ:'), got: {}",
+            tail_line
+        );
+
+        // Verify Tail has thousands separators
+        assert!(
+            tail_line.contains("10,000")
+                || tail_line.contains("10_000")
+                || tail_line.contains("11,")
+                || tail_line.contains("11_"),
+            "Tail should have thousands separators in values, got: {}",
+            tail_line
+        );
     }
 
     // Integration tests that verify per-measurement config determination
