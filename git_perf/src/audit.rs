@@ -7,7 +7,6 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use itertools::Itertools;
 use log::error;
-use readable::num::Float;
 use sparklines::spark;
 use std::cmp::Ordering;
 use std::iter;
@@ -20,16 +19,6 @@ fn format_z_score_display(z_score: f64) -> String {
         format!(" {:.2}", z_score)
     } else {
         String::new()
-    }
-}
-
-/// Formats a measurement value with its unit if configured.
-/// Returns "value unit" if unit is configured, otherwise just "value".
-/// Uses thousands separators for readability.
-fn format_value_with_unit(value: f64, unit: Option<&str>) -> String {
-    match unit {
-        Some(u) => format!("{} {}", Float::from(value), u),
-        None => format!("{}", Float::from(value)),
     }
 }
 
@@ -345,30 +334,6 @@ mod test {
             let result = format_z_score_display(z_score);
             assert_eq!(result, expected, "Failed for z_score: {}", z_score);
         }
-    }
-
-    #[test]
-    fn test_format_value_with_unit() {
-        // Test value formatting with and without units, including thousands separators
-        // Note: Float type from readable crate formats with 3 decimal places by default
-        assert_eq!(format_value_with_unit(42.5, Some("ms")), "42.500 ms");
-        assert_eq!(format_value_with_unit(42.5, None), "42.500");
-        assert_eq!(
-            format_value_with_unit(1024.0, Some("bytes")),
-            "1,024.000 bytes"
-        );
-        assert_eq!(
-            format_value_with_unit(3.14159, Some("seconds")),
-            "3.142 seconds"
-        );
-        assert_eq!(format_value_with_unit(0.0, Some("ms")), "0.000 ms");
-        assert_eq!(format_value_with_unit(98.6, Some("°F")), "98.600 °F");
-        // Test thousands separators
-        assert_eq!(
-            format_value_with_unit(1_234_567.89, Some("ns")),
-            "1,234,567.890 ns"
-        );
-        assert_eq!(format_value_with_unit(1_000_000.0, None), "1,000,000.000");
     }
 
     #[test]

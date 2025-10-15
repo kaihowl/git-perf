@@ -531,6 +531,130 @@ mod test {
     }
 
     #[test]
+    fn test_stats_with_unit_various_values() {
+        // Test various edge cases and value types
+
+        // Small decimal values
+        let small_stats = Stats {
+            mean: 42.5,
+            stddev: 2.0,
+            mad: 1.5,
+            len: 5,
+        };
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &small_stats,
+                unit: Some("ms")
+            }
+        );
+        assert!(
+            formatted.contains("42.500 ms"),
+            "Small decimal with unit: {}",
+            formatted
+        );
+
+        // Zero value
+        let zero_stats = Stats {
+            mean: 0.0,
+            stddev: 0.0,
+            mad: 0.0,
+            len: 1,
+        };
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &zero_stats,
+                unit: Some("ms")
+            }
+        );
+        assert!(
+            formatted.contains("0.000 ms"),
+            "Zero value with unit: {}",
+            formatted
+        );
+
+        // Value with more precision (gets rounded to 3 decimals by Float)
+        let precise_stats = Stats {
+            mean: 3.14159,
+            stddev: 0.5,
+            mad: 0.3,
+            len: 10,
+        };
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &precise_stats,
+                unit: Some("seconds")
+            }
+        );
+        assert!(
+            formatted.contains("3.142 seconds"),
+            "Precise value rounded: {}",
+            formatted
+        );
+
+        // Large round number with thousands separator
+        let million_stats = Stats {
+            mean: 1_000_000.0,
+            stddev: 50_000.0,
+            mad: 30_000.0,
+            len: 100,
+        };
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &million_stats,
+                unit: Some("bytes")
+            }
+        );
+        assert!(
+            formatted.contains("1,000,000.000 bytes"),
+            "Million with separator: {}",
+            formatted
+        );
+
+        // Different unit types
+        let temp_stats = Stats {
+            mean: 98.6,
+            stddev: 1.2,
+            mad: 0.8,
+            len: 20,
+        };
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &temp_stats,
+                unit: Some("°F")
+            }
+        );
+        assert!(
+            formatted.contains("98.600 °F"),
+            "Temperature unit: {}",
+            formatted
+        );
+
+        // Without unit - no unit should appear anywhere
+        let no_unit = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &small_stats,
+                unit: None
+            }
+        );
+        assert!(
+            !no_unit.contains(" ms"),
+            "Should have no units: {}",
+            no_unit
+        );
+        assert!(
+            !no_unit.contains(" bytes"),
+            "Should have no units: {}",
+            no_unit
+        );
+    }
+
+    #[test]
     fn test_is_significant_boundary() {
         // COVERS MUTATION: z_score > sigma vs >=
         let tail = Stats {
