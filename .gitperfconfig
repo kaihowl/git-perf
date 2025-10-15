@@ -1,13 +1,17 @@
 [measurement."report-size"]
 epoch = "439374ca"
 min_relative_deviation = 10.0
+unit = "bytes"
 
 [measurement."report"]
 epoch = "439374ca"
+unit = "ms"
 
 [measurement."test-measure2"]
 epoch = "439374ca"
 min_relative_deviation = 10.0
+unit = "ms"
 
 [measurement."release-binary-size"]
 epoch = "c692cdd"
+unit = "bytes"
