@@ -120,6 +120,23 @@ impl Stats {
         let z_score = self.z_score_with_method(other, method);
         z_score > sigma
     }
+
+    /// Formats the statistics with an optional unit suffix for measurements
+    pub fn format_with_unit(&self, unit: Option<&str>) -> String {
+        match unit {
+            Some(u) => format!(
+                "μ: {} {} σ: {} {} MAD: {} {} n: {}",
+                Float::from(self.mean),
+                u,
+                Float::from(self.stddev),
+                u,
+                Float::from(self.mad),
+                u,
+                Unsigned::from(self.len)
+            ),
+            None => format!("{}", self),
+        }
+    }
 }
 
 impl VecAggregation for Vec<f64> {
@@ -397,6 +414,78 @@ mod test {
         assert!(display.contains("σ: 2"));
         assert!(display.contains("MAD: 1.5"));
         assert!(display.contains("n: 5"));
+    }
+
+    #[test]
+    fn test_format_with_unit() {
+        let stats = Stats {
+            mean: 1_234.5,
+            stddev: 123.4,
+            mad: 98.7,
+            len: 10,
+        };
+
+        // Test with unit
+        // Note: Float type from readable crate formats with 3 decimal places by default
+        let with_unit = stats.format_with_unit(Some("ms"));
+        assert!(
+            with_unit.contains("μ: 1,234.500 ms"),
+            "Mean should have unit: {}",
+            with_unit
+        );
+        assert!(
+            with_unit.contains("σ: 123.400 ms"),
+            "Stddev should have unit: {}",
+            with_unit
+        );
+        assert!(
+            with_unit.contains("MAD: 98.700 ms"),
+            "MAD should have unit: {}",
+            with_unit
+        );
+        assert!(
+            with_unit.contains("n: 10"),
+            "Count should be present: {}",
+            with_unit
+        );
+
+        // Test without unit (should match Display trait)
+        let without_unit = stats.format_with_unit(None);
+        let display_format = format!("{}", stats);
+        assert_eq!(
+            without_unit, display_format,
+            "format_with_unit(None) should match Display"
+        );
+
+        // Test with large values that need thousands separators
+        let large_stats = Stats {
+            mean: 1_234_567.89,
+            stddev: 123_456.78,
+            mad: 12_345.67,
+            len: 1000,
+        };
+
+        let large_with_unit = large_stats.format_with_unit(Some("ns"));
+        assert!(
+            large_with_unit.contains("1,234,567.890 ns"),
+            "Large mean should have thousands separators: {}",
+            large_with_unit
+        );
+        assert!(
+            large_with_unit.contains("123,456.780 ns"),
+            "Large stddev should have thousands separators: {}",
+            large_with_unit
+        );
+        assert!(
+            large_with_unit.contains("12,345.670 ns"),
+            "Large MAD should have thousands separators: {}",
+            large_with_unit
+        );
+        assert!(
+            large_with_unit.contains("n: 1,000"),
+            "Large count should have thousands separators: {}",
+            large_with_unit
+        );
     }
 
     #[test]
