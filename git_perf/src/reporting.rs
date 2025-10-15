@@ -516,6 +516,125 @@ mod tests {
     }
 
     #[test]
+    fn test_format_measurement_with_unit_no_unit() {
+        // Test measurement without unit configured
+        let result = format_measurement_with_unit("unknown_measurement");
+        assert_eq!(result, "unknown_measurement");
+    }
+
+    #[test]
+    fn test_compute_y_axis_empty_measurements() {
+        let reporter = PlotlyReporter::new();
+        let y_axis = reporter.compute_y_axis();
+        assert!(y_axis.is_none());
+    }
+
+    #[test]
+    fn test_compute_y_axis_single_unit() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.measurement_units.push(Some("ms".to_string()));
+        reporter.measurement_units.push(Some("ms".to_string()));
+        reporter.measurement_units.push(Some("ms".to_string()));
+
+        let y_axis = reporter.compute_y_axis();
+        assert!(y_axis.is_some());
+    }
+
+    #[test]
+    fn test_compute_y_axis_mixed_units() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.measurement_units.push(Some("ms".to_string()));
+        reporter.measurement_units.push(Some("bytes".to_string()));
+
+        let y_axis = reporter.compute_y_axis();
+        assert!(y_axis.is_none());
+    }
+
+    #[test]
+    fn test_compute_y_axis_no_units() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.measurement_units.push(None);
+        reporter.measurement_units.push(None);
+
+        let y_axis = reporter.compute_y_axis();
+        assert!(y_axis.is_none());
+    }
+
+    #[test]
+    fn test_compute_y_axis_some_with_unit_some_without() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.measurement_units.push(Some("ms".to_string()));
+        reporter.measurement_units.push(None);
+
+        let y_axis = reporter.compute_y_axis();
+        assert!(y_axis.is_none());
+    }
+
+    #[test]
+    fn test_plotly_reporter_adds_units_to_legend() {
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        // Add commits
+        let commits = vec![
+            Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "def456".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        // Add trace with a measurement (simulate tracking units)
+        reporter.measurement_units.push(Some("ms".to_string()));
+
+        // Get HTML output
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+
+        // The HTML should be generated
+        assert!(!html.is_empty());
+        assert!(html.contains("plotly") || html.contains("Plotly"));
+    }
+
+    #[test]
+    fn test_plotly_reporter_y_axis_with_same_units() {
+        let mut reporter = PlotlyReporter::new();
+
+        // Simulate multiple measurements with same unit
+        reporter.measurement_units.push(Some("ms".to_string()));
+        reporter.measurement_units.push(Some("ms".to_string()));
+
+        // Get HTML output - should include Y-axis with unit
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+
+        // The HTML should contain the Y-axis label with unit
+        assert!(html.contains("Value (ms)"));
+    }
+
+    #[test]
+    fn test_plotly_reporter_no_y_axis_with_mixed_units() {
+        let mut reporter = PlotlyReporter::new();
+
+        // Simulate measurements with different units
+        reporter.measurement_units.push(Some("ms".to_string()));
+        reporter.measurement_units.push(Some("bytes".to_string()));
+
+        // Get HTML output - should NOT include Y-axis with unit
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+
+        // The HTML should not contain a Y-axis label with a specific unit
+        assert!(!html.contains("Value (ms)"));
+        assert!(!html.contains("Value (bytes)"));
+    }
+
+    #[test]
     fn test_csv_reporter_as_bytes_empty_on_init() {
         let reporter = CsvReporter::new();
         let bytes = reporter.as_bytes();
