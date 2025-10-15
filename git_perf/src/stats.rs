@@ -120,21 +120,29 @@ impl Stats {
         let z_score = self.z_score_with_method(other, method);
         z_score > sigma
     }
+}
 
-    /// Formats the statistics with an optional unit suffix for measurements
-    pub fn format_with_unit(&self, unit: Option<&str>) -> String {
-        match unit {
-            Some(u) => format!(
-                "μ: {} {} σ: {} {} MAD: {} {} n: {}",
-                Float::from(self.mean),
+/// A wrapper around Stats that includes an optional unit for the mean value.
+/// When displayed, only the mean (μ) will have the unit suffix.
+/// Sigma (σ) and MAD remain unitless as they are dispersion measures.
+pub struct StatsWithUnit<'a> {
+    pub stats: &'a Stats,
+    pub unit: Option<&'a str>,
+}
+
+impl<'a> Display for StatsWithUnit<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.unit {
+            Some(u) => write!(
+                f,
+                "μ: {} {} σ: {} MAD: {} n: {}",
+                Float::from(self.stats.mean),
                 u,
-                Float::from(self.stddev),
-                u,
-                Float::from(self.mad),
-                u,
-                Unsigned::from(self.len)
+                Float::from(self.stats.stddev),
+                Float::from(self.stats.mad),
+                Unsigned::from(self.stats.len)
             ),
-            None => format!("{}", self),
+            None => write!(f, "{}", self.stats),
         }
     }
 }
@@ -417,7 +425,7 @@ mod test {
     }
 
     #[test]
-    fn test_format_with_unit() {
+    fn test_stats_with_unit() {
         let stats = Stats {
             mean: 1_234.5,
             stddev: 123.4,
@@ -425,36 +433,55 @@ mod test {
             len: 10,
         };
 
-        // Test with unit
+        // Test with unit - only mean should have the unit
         // Note: Float type from readable crate formats with 3 decimal places by default
-        let with_unit = stats.format_with_unit(Some("ms"));
+        let with_unit = StatsWithUnit {
+            stats: &stats,
+            unit: Some("ms"),
+        };
+        let formatted = format!("{}", with_unit);
+
         assert!(
-            with_unit.contains("μ: 1,234.500 ms"),
+            formatted.contains("μ: 1,234.500 ms"),
             "Mean should have unit: {}",
-            with_unit
+            formatted
         );
         assert!(
-            with_unit.contains("σ: 123.400 ms"),
-            "Stddev should have unit: {}",
-            with_unit
+            formatted.contains("σ: 123.400"),
+            "Stddev should NOT have unit (it's unitless): {}",
+            formatted
         );
         assert!(
-            with_unit.contains("MAD: 98.700 ms"),
-            "MAD should have unit: {}",
-            with_unit
+            !formatted.contains("σ: 123.400 ms"),
+            "Stddev should NOT have unit suffix: {}",
+            formatted
         );
         assert!(
-            with_unit.contains("n: 10"),
+            formatted.contains("MAD: 98.700"),
+            "MAD should NOT have unit (it's unitless): {}",
+            formatted
+        );
+        assert!(
+            !formatted.contains("MAD: 98.700 ms"),
+            "MAD should NOT have unit suffix: {}",
+            formatted
+        );
+        assert!(
+            formatted.contains("n: 10"),
             "Count should be present: {}",
-            with_unit
+            formatted
         );
 
         // Test without unit (should match Display trait)
-        let without_unit = stats.format_with_unit(None);
+        let without_unit = StatsWithUnit {
+            stats: &stats,
+            unit: None,
+        };
+        let formatted_without = format!("{}", without_unit);
         let display_format = format!("{}", stats);
         assert_eq!(
-            without_unit, display_format,
-            "format_with_unit(None) should match Display"
+            formatted_without, display_format,
+            "StatsWithUnit with None should match Stats Display"
         );
 
         // Test with large values that need thousands separators
@@ -465,26 +492,41 @@ mod test {
             len: 1000,
         };
 
-        let large_with_unit = large_stats.format_with_unit(Some("ns"));
+        let large_with_unit = StatsWithUnit {
+            stats: &large_stats,
+            unit: Some("ns"),
+        };
+        let large_formatted = format!("{}", large_with_unit);
+
         assert!(
-            large_with_unit.contains("1,234,567.890 ns"),
-            "Large mean should have thousands separators: {}",
-            large_with_unit
+            large_formatted.contains("1,234,567.890 ns"),
+            "Large mean should have thousands separators and unit: {}",
+            large_formatted
         );
         assert!(
-            large_with_unit.contains("123,456.780 ns"),
-            "Large stddev should have thousands separators: {}",
-            large_with_unit
+            large_formatted.contains("σ: 123,456.780"),
+            "Large stddev should have thousands separators but NO unit: {}",
+            large_formatted
         );
         assert!(
-            large_with_unit.contains("12,345.670 ns"),
-            "Large MAD should have thousands separators: {}",
-            large_with_unit
+            !large_formatted.contains("σ: 123,456.780 ns"),
+            "Large stddev should NOT have unit suffix: {}",
+            large_formatted
         );
         assert!(
-            large_with_unit.contains("n: 1,000"),
+            large_formatted.contains("MAD: 12,345.670"),
+            "Large MAD should have thousands separators but NO unit: {}",
+            large_formatted
+        );
+        assert!(
+            !large_formatted.contains("MAD: 12,345.670 ns"),
+            "Large MAD should NOT have unit suffix: {}",
+            large_formatted
+        );
+        assert!(
+            large_formatted.contains("n: 1,000"),
             "Large count should have thousands separators: {}",
-            large_with_unit
+            large_formatted
         );
     }
 

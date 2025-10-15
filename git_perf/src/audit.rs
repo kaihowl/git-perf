@@ -2,7 +2,7 @@ use crate::{
     config,
     data::MeasurementData,
     measurement_retrieval::{self, summarize_measurements},
-    stats::{self, DispersionMethod, ReductionFunc, VecAggregation},
+    stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
 use anyhow::{anyhow, bail, Result};
 use itertools::Itertools;
@@ -274,20 +274,19 @@ fn audit_with_data(
         DispersionMethod::MedianAbsoluteDeviation => "mad",
     };
 
-    // Format head with unit if configured
-    let head_mean_display = format_value_with_unit(head_summary.mean, unit_str);
-    let head_stddev_display = format_value_with_unit(head_summary.stddev, unit_str);
-    let head_mad_display = format_value_with_unit(head_summary.mad, unit_str);
+    // Format head and tail with unit if configured (only mean gets the unit)
+    let head_display = StatsWithUnit {
+        stats: &head_summary,
+        unit: unit_str,
+    };
+    let tail_display = StatsWithUnit {
+        stats: &tail_summary,
+        unit: unit_str,
+    };
 
     let text_summary = format!(
-        "z-score ({method_name}): {direction}{}\nHead: μ: {} σ: {} MAD: {} n: {}\nTail: {}\n{}",
-        z_score_display,
-        head_mean_display,
-        head_stddev_display,
-        head_mad_display,
-        head_summary.len,
-        tail_summary.format_with_unit(unit_str),
-        sparkline,
+        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n{}",
+        z_score_display, head_display, tail_display, sparkline,
     );
 
     // MUTATION POINT: > vs >= (Line 178)
@@ -761,12 +760,20 @@ unit = "ms"
         );
 
         let head_line = head_section[0];
-        // Count occurrences of "ms" in the head line - should be 3 (μ, σ, MAD)
+        // Only mean (μ) should have the unit, not σ or MAD (they are unitless)
         let ms_count = head_line.matches(" ms").count();
         assert_eq!(
-            ms_count, 3,
-            "Head line should have unit 'ms' three times (μ, σ, MAD), got {} times in: {}",
+            ms_count, 1,
+            "Head line should have unit 'ms' only once (μ only), got {} times in: {}",
             ms_count, head_line
+        );
+
+        // Verify format: unit comes right after mean value, before σ
+        // Expected: "μ: 12,345.670 ms σ: 0.000 MAD: 0.000 n: 1"
+        assert!(
+            head_line.contains("ms σ:") || head_line.contains("ms  σ:"),
+            "Unit should come before sigma (format: 'ms σ:'), got: {}",
+            head_line
         );
 
         // Verify Tail section has units
@@ -786,12 +793,19 @@ unit = "ms"
         );
 
         let tail_line = tail_section[0];
-        // Count occurrences of "ms" in the tail line - should be 3 (μ, σ, MAD)
+        // Only mean (μ) should have the unit, not σ or MAD (they are unitless)
         let tail_ms_count = tail_line.matches(" ms").count();
         assert_eq!(
-            tail_ms_count, 3,
-            "Tail line should have unit 'ms' three times (μ, σ, MAD), got {} times in: {}",
+            tail_ms_count, 1,
+            "Tail line should have unit 'ms' only once (μ only), got {} times in: {}",
             tail_ms_count, tail_line
+        );
+
+        // Verify format: unit comes right after mean value, before σ
+        assert!(
+            tail_line.contains("ms σ:") || tail_line.contains("ms  σ:"),
+            "Unit should come before sigma (format: 'ms σ:'), got: {}",
+            tail_line
         );
 
         // Verify Tail has thousands separators
