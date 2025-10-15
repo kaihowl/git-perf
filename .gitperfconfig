@@ -10,4 +10,4 @@ epoch = "439374ca"
 min_relative_deviation = 10.0
 
 [measurement."release-binary-size"]
-epoch = "861493e"
+epoch = "c692cdd"
