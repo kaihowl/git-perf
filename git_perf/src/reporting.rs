@@ -14,11 +14,21 @@ use plotly::{
 };
 
 use crate::{
+    config,
     data::{Commit, MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, MeasurementReducer},
     serialization::{serialize_single, DELIMITER},
     stats::ReductionFunc,
 };
+
+/// Formats a measurement name with its configured unit, if available.
+/// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
+fn format_measurement_with_unit(measurement_name: &str) -> String {
+    match config::measurement_unit(measurement_name) {
+        Some(unit) => format!("{} ({})", measurement_name, unit),
+        None => measurement_name.to_string(),
+    }
+}
 
 trait Reporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]);
@@ -44,6 +54,8 @@ struct PlotlyReporter {
     // index reversal to achieve reversed axis display (newest commits on right, oldest on left)
     // See: https://github.com/kaihowl/git-perf/issues/339
     size: usize,
+    // Track units for all measurements to determine if we should add unit to Y-axis label
+    measurement_units: Vec<Option<String>>,
 }
 
 impl PlotlyReporter {
@@ -51,7 +63,11 @@ impl PlotlyReporter {
         let config = Configuration::default().responsive(true).fill_frame(true);
         let mut plot = Plot::new();
         plot.set_configuration(config);
-        PlotlyReporter { plot, size: 0 }
+        PlotlyReporter {
+            plot,
+            size: 0,
+            measurement_units: Vec::new(),
+        }
     }
 
     fn convert_to_x_y(&self, indexed_measurements: Vec<(usize, f64)>) -> (Vec<usize>, Vec<f64>) {
@@ -59,6 +75,28 @@ impl PlotlyReporter {
             .iter()
             .map(|(i, m)| (self.size - i - 1, *m))
             .unzip()
+    }
+
+    /// Returns the Y-axis with unit label if all measurements share the same unit.
+    fn compute_y_axis(&self) -> Option<Axis> {
+        // Check if all measurements have the same unit (and at least one unit exists)
+        if self.measurement_units.is_empty() {
+            return None;
+        }
+
+        let first_unit = self.measurement_units.first();
+        let all_same_unit = self
+            .measurement_units
+            .iter()
+            .all(|u| u == first_unit.unwrap());
+
+        if all_same_unit {
+            if let Some(Some(unit)) = first_unit {
+                // All measurements share the same unit - add it to Y-axis label
+                return Some(Axis::new().title(Title::from(format!("Value ({})", unit))));
+            }
+        }
+        None
     }
 }
 
@@ -100,15 +138,21 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .collect_vec(),
         );
 
+        // Track unit for this measurement
+        self.measurement_units
+            .push(config::measurement_unit(measurement_name));
+
+        let measurement_display = format_measurement_with_unit(measurement_name);
+
         let trace = plotly::BoxPlot::new_xy(x, y);
 
         let trace = if let Some(group_value) = group_value {
             trace
                 .name(group_value)
                 .legend_group(measurement_name)
-                .legend_group_title(LegendGroupTitle::from(measurement_name))
+                .legend_group_title(LegendGroupTitle::from(measurement_display))
         } else {
-            trace.name(measurement_name)
+            trace.name(&measurement_display)
         };
 
         self.plot.add_trace(trace);
@@ -127,22 +171,37 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .collect_vec(),
         );
 
-        let trace = plotly::Scatter::new(x, y).name(measurement_name);
+        // Track unit for this measurement
+        self.measurement_units
+            .push(config::measurement_unit(measurement_name));
+
+        let measurement_display = format_measurement_with_unit(measurement_name);
+
+        let trace = plotly::Scatter::new(x, y).name(&measurement_display);
 
         let trace = if let Some(group_value) = group_value {
             trace
                 .name(group_value)
                 .legend_group(measurement_name)
-                .legend_group_title(LegendGroupTitle::from(measurement_name))
+                .legend_group_title(LegendGroupTitle::from(measurement_display))
         } else {
-            trace.name(measurement_name)
+            trace.name(&measurement_display)
         };
 
         self.plot.add_trace(trace);
     }
 
     fn as_bytes(&self) -> Vec<u8> {
-        self.plot.to_html().as_bytes().to_vec()
+        // If all measurements share the same unit, add it to Y-axis label
+        if let Some(y_axis) = self.compute_y_axis() {
+            let mut plot_with_y_axis = self.plot.clone();
+            let mut layout = plot_with_y_axis.layout().clone();
+            layout = layout.y_axis(y_axis);
+            plot_with_y_axis.set_layout(layout);
+            plot_with_y_axis.to_html().as_bytes().to_vec()
+        } else {
+            self.plot.to_html().as_bytes().to_vec()
+        }
     }
 }
 
