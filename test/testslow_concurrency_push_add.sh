@@ -244,8 +244,8 @@ fi
 # Verify the results
 echo "Verifying results..."
 LINE_COUNT=$(git-perf report -o - | wc -l)
-# First seed measurement + measurements from adders
-EXPECTED_COUNT=$((NUM_ADD_ITERATIONS * CONCURRENT_ADDERS + 1))
+# First seed measurement + measurements from adders + header line
+EXPECTED_COUNT=$((NUM_ADD_ITERATIONS * CONCURRENT_ADDERS + 1 + 1))
 
 if [[ $LINE_COUNT -eq $EXPECTED_COUNT ]]; then
     echo "SUCCESS: Verification passed. Found exactly $EXPECTED_COUNT lines in the report."

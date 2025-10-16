@@ -68,14 +68,16 @@ pushd repo2
 git perf push
 git perf report -o -
 num_measurements=$(git perf report -o - | wc -l)
-[[ ${num_measurements} -eq 3 ]] || exit 1
+# CSV now includes header row, so 3 measurements + 1 header = 4 lines
+[[ ${num_measurements} -eq 4 ]] || exit 1
 popd
 
 echo In the first working copy, we should see all three measurements now
 pushd repo1
 git perf pull
 num_measurements=$(git perf report -o - | wc -l)
-[[ ${num_measurements} -eq 3 ]] || exit 1
+# CSV now includes header row, so 3 measurements + 1 header = 4 lines
+[[ ${num_measurements} -eq 4 ]] || exit 1
 popd
 
 echo ---- Test case 2: No conflicts but merge needed.
@@ -97,12 +99,14 @@ git pull
 create_commit
 git perf add -m echo 0.5 -k repo=second
 num_measurements=$(git perf report -o - | wc -l)
-[[ ${num_measurements} -eq 1 ]] || exit 1
+# CSV now includes header row, so 1 measurement + 1 header = 2 lines
+[[ ${num_measurements} -eq 2 ]] || exit 1
 git push
 # There is a conflict, it should automatically pull first
 git perf push
 num_measurements=$(git perf report -o - | wc -l)
-[[ ${num_measurements} -eq 2 ]] || exit 1
+# CSV now includes header row, so 2 measurements + 1 header = 3 lines
+[[ ${num_measurements} -eq 3 ]] || exit 1
 popd
 
 echo In the first working copy, we should also see both measurements on separate commits now
@@ -110,7 +114,8 @@ pushd repo1
 git pull
 git perf pull
 num_measurements=$(git perf report -o - | wc -l)
-[[ ${num_measurements} -eq 2 ]] || exit 1
+# CSV now includes header row, so 2 measurements + 1 header = 3 lines
+[[ ${num_measurements} -eq 3 ]] || exit 1
 popd
 
 

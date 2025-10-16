@@ -63,11 +63,11 @@ pushd my-first-checkout
 export FAKETIME='-28d'
 
 echo Add measurement on commit in the past
-create_commit 
+create_commit
 git perf add -m test-measure-one 10.0
 num_measurements=$(git perf report -o - | wc -l)
-# Exactly one measurement should be present
-[[ ${num_measurements} -eq 1 ]] || exit 1
+# Exactly one measurement should be present (plus header row = 2 lines)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 
 # Only published measurements can be expired
 git perf push
@@ -77,8 +77,8 @@ git perf push
 echo "Remove measurements on commits older than 7 days"
 git perf remove --older-than 7d || bash -i
 num_measurements=$(git perf report -o - | wc -l)
-# Nothing should have been removed
-[[ ${num_measurements} -eq 1 ]] || exit 1
+# Nothing should have been removed (1 measurement + header = 2 lines)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 
 # --- 14 days ago
 export FAKETIME='-14d'
@@ -87,8 +87,8 @@ echo "Add a commit with a newer measurement"
 create_commit
 git perf add -m test-measure-two 20.0
 num_measurements=$(git perf report -o - | wc -l)
-# Two measurements should be there
-[[ ${num_measurements} -eq 2 ]] || exit 1
+# Two measurements should be there (plus header = 3 lines)
+[[ ${num_measurements} -eq 3 ]] || exit 1
 
 # Only published measurements can be expired
 git perf push
@@ -103,8 +103,8 @@ git for-each-ref
 echo "Remove older than 7 days measurements"
 git perf remove --older-than 7d
 num_measurements=$(git perf report -o - | wc -l)
-# One measurement should still be there
-[[ ${num_measurements} -eq 1 ]] || exit 1
+# One measurement should still be there (plus header = 2 lines)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 # The measurement should be 20.0
 git perf report -o - | grep '20\.0'
 
@@ -174,8 +174,8 @@ git push
 git perf push
 
 num_measurements=$(git perf report -o - | wc -l)
-# One measurement should be there
-[[ ${num_measurements} -eq 1 ]] || exit 1
+# One measurement should be there (plus header = 2 lines)
+[[ ${num_measurements} -eq 2 ]] || exit 1
 
 # Verify that temporary write branches are cleaned up after push
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)

@@ -28,10 +28,10 @@ git perf add -m timer 6.0 -k os=mac
 echo "=== Test 1: CSV output contains correct measurement values ==="
 csv_output=$(git perf report -m timer -o - | grep -v '^[[:space:]]*$')
 
-# Verify we have data lines (should be 6 measurements)
+# Verify we have header + data lines (should be 1 header + 6 measurements = 7 lines)
 line_count=$(echo "$csv_output" | grep -v '^[[:space:]]*$' | wc -l)
-if [[ "$line_count" -ne 6 ]]; then
-  echo "Expected 6 measurement lines in CSV, got: $line_count"
+if [[ "$line_count" -ne 7 ]]; then
+  echo "Expected 7 lines in CSV (1 header + 6 measurements), got: $line_count"
   echo "Output: $csv_output"
   exit 1
 fi
@@ -62,8 +62,8 @@ echo "=== Test 2: CSV aggregation produces correct calculated values ==="
 agg_output=$(git perf report -m timer -a mean -o - | grep -v '^[[:space:]]*$')
 
 line_count=$(echo "$agg_output" | grep -v '^[[:space:]]*$' | wc -l)
-if [[ "$line_count" -ne 3 ]]; then
-  echo "Expected 3 aggregated lines (one per commit), got: $line_count"
+if [[ "$line_count" -ne 4 ]]; then
+  echo "Expected 4 lines (1 header + 3 aggregated), got: $line_count"
   echo "Output: $agg_output"
   exit 1
 fi
@@ -80,10 +80,10 @@ echo "=== Test 3: CSV output with key-value filtering ==="
 # Filter to only ubuntu measurements
 ubuntu_output=$(git perf report -m timer -k os=ubuntu -o - | grep -v '^[[:space:]]*$')
 
-# Should have 4 ubuntu measurements (2 per commit for first 2 commits)
+# Should have 1 header + 4 ubuntu measurements (2 per commit for first 2 commits) = 5 lines
 line_count=$(echo "$ubuntu_output" | grep -v '^[[:space:]]*$' | wc -l)
-if [[ "$line_count" -ne 4 ]]; then
-  echo "Expected 4 ubuntu measurements, got: $line_count"
+if [[ "$line_count" -ne 5 ]]; then
+  echo "Expected 5 lines (1 header + 4 measurements), got: $line_count"
   echo "Output: $ubuntu_output"
   exit 1
 fi

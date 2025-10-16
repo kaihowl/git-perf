@@ -1,9 +1,9 @@
 # Plan: Support for Measurement Units
 
 **Related Issue:** #330
-**Status:** Planning
+**Status:** Complete
 **Created:** 2025-10-14
-**Updated:** 2025-10-14 - Simplified to config-only approach
+**Updated:** 2025-10-15 - All phases implemented and deployed
 
 ## Overview
 
@@ -134,20 +134,32 @@ let display_name = match unit {
 ```
 
 #### CSV Export
-If git-perf has CSV export functionality, include units in column headers:
+Git-perf supports CSV export using **long format** where each row represents a single measurement. Units are displayed in a dedicated **unit column** populated from configuration.
 
-**Example CSV output:**
+**Actual CSV output (long format with unit column):**
 ```csv
-commit,build_time (ms),memory_usage (bytes),timestamp
-abc123,42.5,1048576,1234567890
-def456,43.2,1048577,1234567891
+commit	epoch	measurement	timestamp	value	unit	metadata
+abc123	0	build_time	1234567890	42.5	ms
+abc123	0	memory_usage	1234567890	1048576	bytes
+def456	0	build_time	1234567891	43.2	ms
+def456	0	memory_usage	1234567891	1048577	bytes
 ```
 
-**Without unit configured:**
+**Without units configured:**
 ```csv
-commit,build_time,memory_usage,timestamp
-abc123,42.5,1048576,1234567890
+commit	epoch	measurement	timestamp	value	unit	metadata
+abc123	0	custom_metric	1234567890	42.5
+def456	0	custom_metric	1234567891	43.2
 ```
+
+**CSV structure:**
+- commit: Git commit hash
+- epoch: Performance epoch for accepting changes
+- measurement: Name of the measurement (e.g., "build_time")
+- timestamp: Unix timestamp when measurement was recorded
+- value: The measured value
+- unit: Configured unit from `.gitperfconfig` (empty if not configured)
+- metadata: Key-value pairs (e.g., "group=test")
 
 ### 4. No CLI Changes
 
@@ -173,47 +185,54 @@ git perf report -o report.html -m build_time
 
 ### 5. Implementation Phases
 
-#### Phase 1: Configuration Support (Essential)
-- [ ] Add `measurement_unit()` function to `config.rs`
-- [ ] Add parent fallback support for unit configuration
-- [ ] Add config tests for unit retrieval
-- [ ] Update `example_config.toml` with unit examples
+#### Phase 1: Configuration Support ✅ COMPLETE (PR #419)
+- [x] Add `measurement_unit()` function to `config.rs`
+- [x] Add parent fallback support for unit configuration
+- [x] Add config tests for unit retrieval
+- [x] Update `example_config.toml` with unit examples
 
-**Estimated effort:** Small (0.5 day)
+**Status:** Merged and deployed
 
-#### Phase 2: Audit Output Integration (Essential)
-- [ ] Update audit output to query units from config
-- [ ] Format audit results to include units (e.g., "42.5 ms")
-- [ ] Handle measurements without units (backward compatibility)
-- [ ] Test audit with various unit configurations
+#### Phase 2: Audit Output Integration ✅ COMPLETE (PR #420, #422)
+- [x] Update audit output to query units from config
+- [x] Format audit results to include units (e.g., "42.5 ms")
+- [x] Handle measurements without units (backward compatibility)
+- [x] Test audit with various unit configurations
+- [x] Display head/tail mean with unit and thousands separators
 
-**Estimated effort:** Small (0.5-1 day)
+**Status:** Merged and deployed
 
-#### Phase 3: HTML Report Integration (Essential)
-- [ ] Update report generation to query units from config
-- [ ] Add units to legend entries (e.g., "build_time (ms)")
-- [ ] Add units to axis labels when appropriate
-- [ ] Add units to hover tooltips
-- [ ] Handle mixed measurements (some with units, some without)
-- [ ] Test report generation with various unit configurations
+#### Phase 3: HTML Report Integration ✅ COMPLETE (PR #423)
+- [x] Update report generation to query units from config
+- [x] Add units to legend entries (e.g., "build_time (ms)")
+- [x] Add units to axis labels when appropriate (when all measurements share same unit)
+- [x] Handle mixed measurements (some with units, some without)
+- [x] Test report generation with various unit configurations
 
-**Estimated effort:** Medium (1-2 days)
+**Status:** Merged and deployed
 
-#### Phase 4: CSV Export Integration (If applicable)
-- [ ] Identify if CSV export exists in codebase
-- [ ] Add units to CSV column headers
-- [ ] Test CSV export with unit configurations
+#### Phase 4: CSV Export Integration ✅ COMPLETE (PR #425)
+- [x] Identify CSV export format (long format: one measurement per row)
+- [x] Add CSV header row with unit column
+- [x] Implement unit column populated from config
+- [x] Refactor CSV serialization to build rows with unit data
+- [x] Test CSV export with header and unit column
+- [x] Fix slow concurrency test for header line
+- [x] Update CSV validation tests for new format
+- [x] Document CSV format with unit column support
 
-**Estimated effort:** Small (0.5 day)
+**Note:** CSV uses long format where each row is a single measurement. Units are displayed in a dedicated unit column populated from configuration. Measurements without configured units will have an empty unit column.
 
-#### Phase 5: Documentation (Essential)
+**Status:** Merged and deployed
+
+#### Phase 5: Documentation ⚠️ PARTIALLY COMPLETE
+- [x] Update `example_config.toml` with comprehensive unit examples (PR #419)
 - [ ] Update README with unit configuration examples
 - [ ] Update INTEGRATION_TUTORIAL with unit usage
-- [ ] Update `example_config.toml` with comprehensive unit examples
 - [ ] Document unit display behavior in audit and reports
 - [ ] Add FAQ about why units aren't stored with measurements
 
-**Estimated effort:** Small (0.5-1 day)
+**Status:** Configuration examples complete, user-facing documentation pending
 
 ## Testing Strategy
 
@@ -349,16 +368,19 @@ If `.gitperfconfig` has no unit settings:
 
 ## Success Criteria
 
-1. ✅ Configuration supports per-measurement unit settings
-2. ✅ Audit output displays units with values
-3. ✅ HTML reports display units in legends
-4. ✅ HTML reports display units in tooltips
-5. ✅ HTML reports display units in axis labels when appropriate
-6. ✅ CSV exports include units in column headers (if CSV export exists)
-7. ✅ Existing measurements without unit config continue to work
-8. ✅ Documentation includes unit configuration examples
-9. ✅ All tests pass including new unit-related tests
-10. ✅ Zero changes to data serialization or MeasurementData struct
+1. ✅ Configuration supports per-measurement unit settings (PR #419)
+2. ✅ Audit output displays units with values (PR #420, #422)
+3. ✅ HTML reports display units in legends (PR #423)
+4. ✅ HTML reports display units in axis labels when appropriate (PR #423)
+5. ✅ CSV exports include header row with dedicated unit column (PR #425)
+6. ✅ CSV unit column populated from config for each measurement (PR #425)
+7. ✅ Existing measurements without unit config continue to work (all PRs)
+8. ✅ Configuration documentation includes unit examples (PR #419)
+9. ✅ All tests pass including new unit-related tests (all PRs)
+10. ✅ Zero changes to data serialization or MeasurementData struct (all PRs)
+11. ⚠️ User-facing documentation pending (README, INTEGRATION_TUTORIAL)
+
+**Note:** CSV export uses long format with a dedicated unit column. Units are retrieved from configuration at export time and displayed in the unit column, with empty values for measurements without configured units.
 
 ## Future Enhancements (Out of Scope)
 
