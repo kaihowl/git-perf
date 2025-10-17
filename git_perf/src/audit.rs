@@ -235,8 +235,31 @@ fn audit_with_data(
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
 
+        // Build the skip message with sparkline and summaries if we have measurements
+        let mut skip_message = format!(
+            "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"
+        );
+
+        // Add summaries if there is at least one measurement
+        // Show head only if there's 1 measurement, show both head and tail if there are 2+
+        if number_measurements > 0 {
+            let head_display = StatsWithUnit {
+                stats: &head_summary,
+                unit: unit_str,
+            };
+            skip_message.push_str(&format!("\nHead: {}", head_display));
+
+            if number_measurements >= 2 {
+                let tail_display = StatsWithUnit {
+                    stats: &tail_summary,
+                    unit: unit_str,
+                };
+                skip_message.push_str(&format!("\nTail: {}", tail_display));
+            }
+        }
+
         return Ok(AuditResult {
-            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"),
+            message: skip_message,
             passed: true,
         });
     }
@@ -503,6 +526,58 @@ mod test {
         assert!(result.is_ok());
         let message = result.unwrap().message;
         assert!(message.contains("2 measurements found")); // Has 's'
+    }
+
+    #[test]
+    fn test_skip_with_summaries() {
+        // Test that when audit is skipped, summaries are shown based on measurement count
+
+        // Test with 0 measurements: should not show any summaries
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![], // 0 measurements
+            5,      // min_count > 0 to trigger skip
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("Skipping test"));
+        assert!(!message.contains("Head:")); // No summaries
+
+        // Test with 1 measurement: should show head only
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0], // 1 measurement
+            5,          // min_count > 1 to trigger skip
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("Skipping test"));
+        assert!(message.contains("Head:")); // Head summary shown
+        assert!(!message.contains("Tail:")); // Tail summary NOT shown (only 1 measurement)
+
+        // Test with 2 measurements: should show both head and tail
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0], // 2 measurements
+            5,                // min_count > 2 to trigger skip
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("Skipping test"));
+        assert!(message.contains("Head:")); // Head summary shown
+        assert!(message.contains("Tail:")); // Tail summary shown (2+ measurements)
     }
 
     #[test]
