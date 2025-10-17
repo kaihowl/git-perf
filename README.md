@@ -18,6 +18,7 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 - [Configuration](#configuration)
 - [Migration](#migration)
 - [Remote Setup](#remote-setup)
+- [Frequently Asked Questions](#frequently-asked-questions)
 - [Development](#development)
 - [Documentation](#documentation)
 
@@ -194,6 +195,58 @@ epoch = "abcdef12"
 [measurement."test_runtime"]
 min_relative_deviation = 7.5
 dispersion_method = "mad"  # Test times can vary significantly
+```
+
+### Unit Configuration
+
+git-perf supports specifying units for measurements in your configuration. Units are displayed in audit output, HTML reports, and CSV exports:
+
+```toml
+# Default unit for all measurements (optional)
+[measurement]
+unit = "ms"
+
+# Measurement-specific units (override defaults)
+[measurement."build_time"]
+unit = "ms"
+
+[measurement."memory_usage"]
+unit = "MB"
+
+[measurement."throughput"]
+unit = "requests/sec"
+
+[measurement."test_runtime"]
+unit = "seconds"
+```
+
+**How Units Work:**
+- Units are defined in configuration and applied at display time
+- Units are **not** stored with measurement data
+- Measurements without configured units display normally (backward compatible)
+- Units appear in:
+  - **Audit output**: `✓ build_time: 42.5 ms (within acceptable range)`
+  - **HTML reports**: Legend entries and axis labels show units (e.g., "build_time (ms)")
+  - **CSV exports**: Dedicated unit column populated from configuration
+
+**Example with units:**
+```bash
+# Configure units in .gitperfconfig
+cat >> .gitperfconfig << EOF
+[measurement."build_time"]
+unit = "ms"
+EOF
+
+# Add measurement (no CLI change needed)
+git perf add 42.5 -m build_time
+
+# Audit shows unit automatically
+git perf audit -m build_time
+# Output: ✓ build_time: 42.5 ms (within acceptable range)
+
+# Reports and exports automatically include units
+git perf report -o report.html -m build_time
+git perf export -m build_time > data.csv
 ```
 
 ### Usage Examples
@@ -374,6 +427,52 @@ This shows build time increased from ~100 to 250 (150% increase) with high stati
 - Not enough historical data for statistical analysis
 - Continue collecting measurements
 - Results will become more reliable over time
+
+## Frequently Asked Questions
+
+### Why aren't units stored with measurement data?
+
+git-perf uses a **configuration-only approach** for units rather than storing them with each measurement. This design decision provides several advantages:
+
+**Benefits:**
+- **Simplicity**: No changes to data model or serialization format
+- **Zero risk**: Perfect backward compatibility with existing measurements
+- **Centralized management**: Single source of truth in `.gitperfconfig`
+- **Flexibility**: Units can be updated without re-recording measurements
+- **No storage overhead**: No additional bytes per measurement
+
+**Trade-offs:**
+- **No per-measurement validation**: Can't detect if measurements were recorded in different units
+- **Manual consistency**: Users must ensure config units match actual measurement units
+- **User responsibility**: Changing unit config doesn't change values - config must accurately reflect how measurements were recorded
+
+**Best practices:**
+- Choose appropriate units when starting measurements and document them in config
+- Use consistent naming conventions (e.g., `build_time_ms` makes the unit clear)
+- Keep unit configuration stable once established
+
+This approach matches git-perf's configuration philosophy where display settings (like `dispersion_method`) are config-based. It provides 80% of the value (clear report display) with 20% of the complexity, and can be extended later if validation becomes important.
+
+### How do I migrate existing measurements to use units?
+
+No migration needed! Simply add unit configuration to your `.gitperfconfig`:
+
+```toml
+[measurement."your_metric"]
+unit = "ms"
+```
+
+Existing measurements will automatically display with units in all output (audit, reports, CSV exports). The configuration is applied at display time, so it works retroactively with all historical measurements.
+
+### Can I use different units for the same measurement over time?
+
+While technically possible by changing the configuration, this is **not recommended**. Units reflect how measurements were actually recorded. If you change from recording milliseconds to seconds, you should:
+
+1. Create a new measurement name (e.g., `build_time_sec` instead of `build_time_ms`)
+2. Update your configuration with the new unit
+3. Use the new measurement name going forward
+
+This ensures clarity and prevents confusion when analyzing historical data.
 
 ## Documentation
 
