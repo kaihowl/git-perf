@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
@@ -17,7 +18,6 @@ use crate::{
     config,
     data::{Commit, MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, MeasurementReducer},
-    serialization::{serialize_single, DELIMITER},
     stats::ReductionFunc,
 };
 
@@ -27,6 +27,90 @@ fn format_measurement_with_unit(measurement_name: &str) -> String {
     match config::measurement_unit(measurement_name) {
         Some(unit) => format!("{} ({})", measurement_name, unit),
         None => measurement_name.to_string(),
+    }
+}
+
+/// CSV row representation of a measurement with unit column.
+/// Metadata is stored separately and concatenated during serialization.
+struct CsvMeasurementRow {
+    commit: String,
+    epoch: u32,
+    measurement: String,
+    timestamp: f64,
+    value: f64,
+    unit: String,
+    metadata: HashMap<String, String>,
+}
+
+impl CsvMeasurementRow {
+    /// Create a CSV row from MeasurementData
+    fn from_measurement(commit: &str, measurement: &MeasurementData) -> Self {
+        let unit = config::measurement_unit(&measurement.name).unwrap_or_default();
+        CsvMeasurementRow {
+            commit: commit.to_string(),
+            epoch: measurement.epoch,
+            measurement: measurement.name.clone(),
+            timestamp: measurement.timestamp,
+            value: measurement.val,
+            unit,
+            metadata: measurement.key_values.clone(),
+        }
+    }
+
+    /// Create a CSV row from MeasurementSummary
+    fn from_summary(
+        commit: &str,
+        measurement_name: &str,
+        summary: &MeasurementSummary,
+        group_value: Option<&String>,
+    ) -> Self {
+        let unit = config::measurement_unit(measurement_name).unwrap_or_default();
+        let mut metadata = HashMap::new();
+        if let Some(gv) = group_value {
+            metadata.insert("group".to_string(), gv.clone());
+        }
+        CsvMeasurementRow {
+            commit: commit.to_string(),
+            epoch: summary.epoch,
+            measurement: measurement_name.to_string(),
+            timestamp: 0.0,
+            value: summary.val,
+            unit,
+            metadata,
+        }
+    }
+
+    /// Format as a tab-delimited CSV line
+    /// Float values are formatted to always include at least one decimal place
+    fn to_csv_line(&self) -> String {
+        // Format floats with appropriate precision
+        // If value is a whole number, format as X.0, otherwise use default precision
+        let value_str = if self.value.fract() == 0.0 && self.value.is_finite() {
+            format!("{:.1}", self.value)
+        } else {
+            self.value.to_string()
+        };
+
+        let timestamp_str = if self.timestamp.fract() == 0.0 && self.timestamp.is_finite() {
+            format!("{:.1}", self.timestamp)
+        } else {
+            self.timestamp.to_string()
+        };
+
+        let mut line = format!(
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            self.commit, self.epoch, self.measurement, timestamp_str, value_str, self.unit
+        );
+
+        // Add metadata key-value pairs
+        for (k, v) in &self.metadata {
+            line.push('\t');
+            line.push_str(k);
+            line.push('=');
+            line.push_str(v);
+        }
+
+        line
     }
 }
 
@@ -237,40 +321,37 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     }
 
     fn as_bytes(&self) -> Vec<u8> {
+        if self.indexed_measurements.is_empty() && self.summarized_measurements.is_empty() {
+            return Vec::new();
+        }
+
         let mut lines = Vec::new();
 
-        // Raw measurements
-        lines.extend(
-            self.indexed_measurements
-                .iter()
-                .map(|(index, measurement_data)| {
-                    let ser_measurement = serialize_single(measurement_data, "\t");
-                    let commit = &self.hashes[*index];
-                    format!("{commit}{DELIMITER}{ser_measurement}")
-                }),
-        );
+        // Add header
+        lines.push("commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit".to_string());
 
-        // Summarized measurements: synthesize a MeasurementData so we can reuse serialize_single
-        lines.extend(self.summarized_measurements.iter().map(
-            |(index, measurement_name, group_value, summary)| {
-                let mut key_values = std::collections::HashMap::new();
-                if let Some(gv) = group_value.as_ref() {
-                    key_values.insert("group".to_string(), gv.clone());
-                }
-                let synthesized = MeasurementData {
-                    epoch: summary.epoch,
-                    name: measurement_name.clone(),
-                    timestamp: 0.0,
-                    val: summary.val,
-                    key_values,
-                };
-                let ser_measurement = serialize_single(&synthesized, "\t");
-                let commit = &self.hashes[*index];
-                format!("{commit}{DELIMITER}{ser_measurement}")
-            },
-        ));
+        // Add raw measurements
+        for (index, measurement_data) in &self.indexed_measurements {
+            let commit = &self.hashes[*index];
+            let row = CsvMeasurementRow::from_measurement(commit, measurement_data);
+            lines.push(row.to_csv_line());
+        }
 
-        lines.join("").into_bytes()
+        // Add summarized measurements
+        for (index, measurement_name, group_value, summary) in &self.summarized_measurements {
+            let commit = &self.hashes[*index];
+            let row = CsvMeasurementRow::from_summary(
+                commit,
+                measurement_name,
+                summary,
+                group_value.as_ref(),
+            );
+            lines.push(row.to_csv_line());
+        }
+
+        let mut output = lines.join("\n");
+        output.push('\n');
+        output.into_bytes()
     }
 
     fn add_summarized_trace(
@@ -640,5 +721,212 @@ mod tests {
         let bytes = reporter.as_bytes();
         // Empty reporter should produce empty bytes
         assert!(bytes.is_empty() || String::from_utf8_lossy(&bytes).trim().is_empty());
+    }
+
+    #[test]
+    fn test_csv_reporter_includes_header() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        let mut reporter = CsvReporter::new();
+
+        // Add commits
+        let commits = vec![Commit {
+            commit: "abc123".to_string(),
+            measurements: vec![],
+        }];
+        reporter.add_commits(&commits);
+
+        // Add a measurement
+        let measurement = MeasurementData {
+            epoch: 0,
+            name: "test_measurement".to_string(),
+            timestamp: 1234.0,
+            val: 42.5,
+            key_values: HashMap::new(),
+        };
+        reporter.add_trace(vec![(0, &measurement)], "test_measurement", None);
+
+        // Get CSV output
+        let bytes = reporter.as_bytes();
+        let csv = String::from_utf8_lossy(&bytes);
+
+        // Should contain header row with unit column
+        assert!(csv.starts_with("commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\n"));
+
+        // Should contain data row with commit and measurement data
+        assert!(csv.contains("abc123"));
+        assert!(csv.contains("test_measurement"));
+        assert!(csv.contains("42.5"));
+    }
+
+    #[test]
+    fn test_csv_exact_output_single_measurement() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        let mut reporter = CsvReporter::new();
+
+        let commits = vec![Commit {
+            commit: "abc123def456".to_string(),
+            measurements: vec![],
+        }];
+        reporter.add_commits(&commits);
+
+        let measurement = MeasurementData {
+            epoch: 0,
+            name: "build_time".to_string(),
+            timestamp: 1234567890.5,
+            val: 42.0,
+            key_values: HashMap::new(),
+        };
+        reporter.add_trace(vec![(0, &measurement)], "build_time", None);
+
+        let bytes = reporter.as_bytes();
+        let csv = String::from_utf8_lossy(&bytes);
+
+        let expected = "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\nabc123def456\t0\tbuild_time\t1234567890.5\t42.0\t\n";
+        assert_eq!(csv, expected);
+    }
+
+    #[test]
+    fn test_csv_exact_output_with_metadata() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        let mut reporter = CsvReporter::new();
+
+        let commits = vec![Commit {
+            commit: "commit123".to_string(),
+            measurements: vec![],
+        }];
+        reporter.add_commits(&commits);
+
+        let mut metadata = HashMap::new();
+        metadata.insert("os".to_string(), "linux".to_string());
+        metadata.insert("arch".to_string(), "x64".to_string());
+
+        let measurement = MeasurementData {
+            epoch: 1,
+            name: "test".to_string(),
+            timestamp: 1000.0,
+            val: 3.5,
+            key_values: metadata,
+        };
+        reporter.add_trace(vec![(0, &measurement)], "test", None);
+
+        let bytes = reporter.as_bytes();
+        let csv = String::from_utf8_lossy(&bytes);
+
+        // Check that header and base fields are correct
+        assert!(csv.starts_with("commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\n"));
+        assert!(csv.contains("commit123\t1\ttest\t1000.0\t3.5\t"));
+        // Check that metadata is present (order may vary due to HashMap)
+        assert!(csv.contains("os=linux"));
+        assert!(csv.contains("arch=x64"));
+        // Check trailing newline
+        assert!(csv.ends_with('\n'));
+    }
+
+    #[test]
+    fn test_csv_exact_output_multiple_measurements() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        let mut reporter = CsvReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "commit1".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "commit2".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let m1 = MeasurementData {
+            epoch: 0,
+            name: "timer".to_string(),
+            timestamp: 100.0,
+            val: 1.5,
+            key_values: HashMap::new(),
+        };
+
+        let m2 = MeasurementData {
+            epoch: 0,
+            name: "timer".to_string(),
+            timestamp: 200.0,
+            val: 2.0,
+            key_values: HashMap::new(),
+        };
+
+        reporter.add_trace(vec![(0, &m1), (1, &m2)], "timer", None);
+
+        let bytes = reporter.as_bytes();
+        let csv = String::from_utf8_lossy(&bytes);
+
+        let expected = "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\n\
+                        commit1\t0\ttimer\t100.0\t1.5\t\n\
+                        commit2\t0\ttimer\t200.0\t2.0\t\n";
+        assert_eq!(csv, expected);
+    }
+
+    #[test]
+    fn test_csv_exact_output_whole_number_formatting() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        let mut reporter = CsvReporter::new();
+
+        let commits = vec![Commit {
+            commit: "hash1".to_string(),
+            measurements: vec![],
+        }];
+        reporter.add_commits(&commits);
+
+        let measurement = MeasurementData {
+            epoch: 0,
+            name: "count".to_string(),
+            timestamp: 500.0,
+            val: 10.0,
+            key_values: HashMap::new(),
+        };
+        reporter.add_trace(vec![(0, &measurement)], "count", None);
+
+        let bytes = reporter.as_bytes();
+        let csv = String::from_utf8_lossy(&bytes);
+
+        // Whole numbers should be formatted with .0
+        let expected =
+            "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\nhash1\t0\tcount\t500.0\t10.0\t\n";
+        assert_eq!(csv, expected);
+    }
+
+    #[test]
+    fn test_csv_exact_output_summarized_measurement() {
+        use crate::data::{Commit, MeasurementSummary};
+
+        let mut reporter = CsvReporter::new();
+
+        let commits = vec![Commit {
+            commit: "abc".to_string(),
+            measurements: vec![],
+        }];
+        reporter.add_commits(&commits);
+
+        let summary = MeasurementSummary { epoch: 0, val: 5.5 };
+
+        reporter.add_summarized_trace(vec![(0, summary)], "avg_time", None);
+
+        let bytes = reporter.as_bytes();
+        let csv = String::from_utf8_lossy(&bytes);
+
+        // Summarized measurements have timestamp 0.0
+        let expected =
+            "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\nabc\t0\tavg_time\t0.0\t5.5\t\n";
+        assert_eq!(csv, expected);
     }
 }

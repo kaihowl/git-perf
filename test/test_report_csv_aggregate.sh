@@ -25,16 +25,16 @@ git perf add -m timer 4.0
 agg_output=$(git perf report -m timer -a mean -o - | grep -v '^[[:space:]]*$')
 num_lines=$(echo "$agg_output" | grep -v '^[[:space:]]*$' | wc -l)
 
-if [[ "$num_lines" -ne 2 ]]; then
-  echo "Expected 2 summarized lines (one per commit), got: $num_lines"
+if [[ "$num_lines" -ne 3 ]]; then
+  echo "Expected 3 lines (1 header + 2 summarized), got: $num_lines"
   echo "Output: $agg_output"
   exit 1
 fi
 
-# Basic sanity: ensure measurement name appears on each line
+# Basic sanity: ensure measurement name appears on each data line + header
 name_count=$(echo "$agg_output" | grep -c "timer")
 if [[ "$name_count" -ne 2 ]]; then
-  echo "Expected measurement name 'timer' to appear on 2 lines, got: $name_count"
+  echo "Expected measurement name 'timer' to appear on 2 data lines, got: $name_count"
   exit 1
 fi
 

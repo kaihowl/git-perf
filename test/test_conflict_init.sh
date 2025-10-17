@@ -55,8 +55,9 @@ pushd "$myworkrepo"
 
 git perf pull
 num_measurements=$(git perf report -o -  | wc -l)
-if [[ $num_measurements -ne 2 ]]; then
-  echo "Expected two measurements, but only have these:"
+# CSV now includes header row, so 2 measurements + 1 header = 3 lines
+if [[ $num_measurements -ne 3 ]]; then
+  echo "Expected two measurements (3 lines with header), but have $num_measurements lines:"
   git perf report -o -
   exit 1
 fi
