@@ -3,7 +3,7 @@
 **Related Issue:** #330
 **Status:** Complete
 **Created:** 2025-10-14
-**Updated:** 2025-10-15 - All phases implemented and deployed
+**Updated:** 2025-10-17 - All phases including documentation fully implemented and deployed
 
 ## Overview
 
@@ -225,14 +225,14 @@ git perf report -o report.html -m build_time
 
 **Status:** Merged and deployed
 
-#### Phase 5: Documentation ⚠️ PARTIALLY COMPLETE
+#### Phase 5: Documentation ✅ COMPLETE (PR #427)
 - [x] Update `example_config.toml` with comprehensive unit examples (PR #419)
-- [ ] Update README with unit configuration examples
-- [ ] Update INTEGRATION_TUTORIAL with unit usage
-- [ ] Document unit display behavior in audit and reports
-- [ ] Add FAQ about why units aren't stored with measurements
+- [x] Update README with unit configuration examples
+- [x] Update INTEGRATION_TUTORIAL with unit usage
+- [x] Document unit display behavior in audit and reports
+- [x] Add FAQ about why units aren't stored with measurements
 
-**Status:** Configuration examples complete, user-facing documentation pending
+**Status:** All documentation complete and deployed
 
 ## Testing Strategy
 
@@ -378,7 +378,11 @@ If `.gitperfconfig` has no unit settings:
 8. ✅ Configuration documentation includes unit examples (PR #419)
 9. ✅ All tests pass including new unit-related tests (all PRs)
 10. ✅ Zero changes to data serialization or MeasurementData struct (all PRs)
-11. ⚠️ User-facing documentation pending (README, INTEGRATION_TUTORIAL)
+11. ✅ User-facing documentation complete (PR #427)
+    - README includes unit configuration section with examples
+    - INTEGRATION_TUTORIAL updated with unit usage examples
+    - FAQ section addresses why units aren't stored with measurements
+    - Unit display behavior documented for audit, reports, and CSV exports
 
 **Note:** CSV export uses long format with a dedicated unit column. Units are retrieved from configuration at export time and displayed in the unit column, with empty values for measurements without configured units.
 

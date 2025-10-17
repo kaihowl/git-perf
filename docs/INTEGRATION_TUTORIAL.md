@@ -51,16 +51,29 @@ Example configuration:
 [measurement]
 min_relative_deviation = 5.0
 dispersion_method = "mad"
+unit = "ms"  # Default unit for all measurements
 
 # Measurement-specific settings
 [measurement."build_time"]
 min_relative_deviation = 10.0
 dispersion_method = "mad"
+unit = "seconds"  # Override default unit for build_time
 
 [measurement."binary_size"]
 min_relative_deviation = 2.0
 dispersion_method = "stddev"
+unit = "bytes"
+
+[measurement."test_duration"]
+unit = "ms"
 ```
+
+**Unit Configuration:**
+Units are displayed in audit output, HTML reports, and CSV exports. They help make your performance data more readable and professional:
+- Configure units for each measurement in `.gitperfconfig`
+- Units are applied at display time (not stored with measurement data)
+- Existing measurements automatically display with units once configured
+- Measurements without units continue to work normally (backward compatible)
 
 ### Commit the Configuration
 
@@ -378,13 +391,32 @@ git perf audit -m build_time -s env=prod
 
 **Do:**
 - Measure discrete, meaningful metrics (build time, test duration, binary size)
+- Configure units in `.gitperfconfig` for clarity
 - Use consistent units across related measurements
 - Measure on the same hardware/environment for comparability
 
 **Don't:**
 - Measure every small operation (too much noise)
-- Mix units (use bytes, not "KB" or "MB" strings)
+- Change units for the same measurement over time (creates confusion)
+- Mix units (record bytes but configure as "MB", or vice versa)
 - Measure on different runner types without noting the environment
+
+**Unit Configuration Example:**
+```toml
+[measurement."build_time"]
+unit = "seconds"
+
+[measurement."binary_size"]
+unit = "bytes"
+
+[measurement."memory_peak"]
+unit = "MB"
+```
+
+Units will automatically appear in:
+- Audit output: `✓ build_time: 42.5 seconds (within acceptable range)`
+- HTML reports: Legend entries like "build_time (seconds)"
+- CSV exports: Dedicated unit column with configured units
 
 ### 2. Audit Configuration
 
