@@ -235,18 +235,34 @@ fn audit_with_data(
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
 
-        // Build the skip message with sparkline and summaries if we have measurements
+        // Build the skip message with the same format as passing/failing cases
         let mut skip_message = format!(
-            "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"
+            "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
         );
 
-        // Add summaries if there is at least one measurement
+        // Add summaries if there is at least one measurement, matching the format of passing cases
         // Show head only if there's 1 measurement, show both head and tail if there are 2+
         if number_measurements > 0 {
+            // Calculate z-score, direction, and method name (same as passing case)
+            let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
+            let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
+            let z_score_display = format_z_score_display(z_score);
+            let method_name = match dispersion_method {
+                DispersionMethod::StandardDeviation => "stddev",
+                DispersionMethod::MedianAbsoluteDeviation => "mad",
+            };
+
+            // Format displays with units
             let head_display = StatsWithUnit {
                 stats: &head_summary,
                 unit: unit_str,
             };
+
+            // Build the summary in the same order as passing case
+            skip_message.push_str(&format!(
+                "\nz-score ({method_name}): {direction}{}",
+                z_score_display
+            ));
             skip_message.push_str(&format!("\nHead: {}", head_display));
 
             if number_measurements >= 2 {
@@ -256,6 +272,11 @@ fn audit_with_data(
                 };
                 skip_message.push_str(&format!("\nTail: {}", tail_display));
             }
+
+            skip_message.push_str(&format!("\n{}", sparkline));
+        } else {
+            // No measurements, just add sparkline
+            skip_message.push_str(&format!("\n{}", sparkline));
         }
 
         return Ok(AuditResult {
@@ -531,6 +552,7 @@ mod test {
     #[test]
     fn test_skip_with_summaries() {
         // Test that when audit is skipped, summaries are shown based on measurement count
+        // and the format matches passing/failing cases
 
         // Test with 0 measurements: should not show any summaries
         let result = audit_with_data(
@@ -546,8 +568,10 @@ mod test {
         let message = result.unwrap().message;
         assert!(message.contains("Skipping test"));
         assert!(!message.contains("Head:")); // No summaries
+        assert!(!message.contains("z-score")); // No z-score
+        assert!(message.contains("[")); // Sparkline is present
 
-        // Test with 1 measurement: should show head only
+        // Test with 1 measurement: should show z-score, head only, and sparkline
         let result = audit_with_data(
             "test_measurement",
             15.0,
@@ -560,10 +584,18 @@ mod test {
         assert!(result.is_ok());
         let message = result.unwrap().message;
         assert!(message.contains("Skipping test"));
+        assert!(message.contains("z-score (stddev):")); // Z-score with method shown
         assert!(message.contains("Head:")); // Head summary shown
         assert!(!message.contains("Tail:")); // Tail summary NOT shown (only 1 measurement)
+        assert!(message.contains("[")); // Sparkline is present
+                                        // Verify order: z-score comes before Head, Head comes before sparkline
+        let z_pos = message.find("z-score").unwrap();
+        let head_pos = message.find("Head:").unwrap();
+        let spark_pos = message.find("[").unwrap();
+        assert!(z_pos < head_pos, "z-score should come before Head");
+        assert!(head_pos < spark_pos, "Head should come before sparkline");
 
-        // Test with 2 measurements: should show both head and tail
+        // Test with 2 measurements: should show z-score, both head and tail, and sparkline
         let result = audit_with_data(
             "test_measurement",
             15.0,
@@ -576,8 +608,32 @@ mod test {
         assert!(result.is_ok());
         let message = result.unwrap().message;
         assert!(message.contains("Skipping test"));
+        assert!(message.contains("z-score (stddev):")); // Z-score with method shown
         assert!(message.contains("Head:")); // Head summary shown
         assert!(message.contains("Tail:")); // Tail summary shown (2+ measurements)
+        assert!(message.contains("[")); // Sparkline is present
+                                        // Verify order: z-score, Head, Tail, sparkline
+        let z_pos = message.find("z-score").unwrap();
+        let head_pos = message.find("Head:").unwrap();
+        let tail_pos = message.find("Tail:").unwrap();
+        let spark_pos = message.find("[").unwrap();
+        assert!(z_pos < head_pos, "z-score should come before Head");
+        assert!(head_pos < tail_pos, "Head should come before Tail");
+        assert!(tail_pos < spark_pos, "Tail should come before sparkline");
+
+        // Test with MAD dispersion method to ensure method name is correct
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0], // 2 measurements
+            5,                // min_count > 2 to trigger skip
+            2.0,
+            DispersionMethod::MedianAbsoluteDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("z-score (mad):")); // MAD method shown
     }
 
     #[test]
