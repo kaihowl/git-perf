@@ -230,49 +230,47 @@ fn audit_with_data(
 
     // Helper function to build the measurement summary text
     // This is used for both skipped and normal audit results to avoid duplication
-    let build_summary = |show_tail: bool| -> String {
-        let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
+    let build_summary = || -> String {
+        let mut summary = String::new();
 
-        // Z-score calculation requires at least one tail measurement (tail_summary.len >= 1)
-        // Only calculate and show z-score if we have tail measurements
-        let (z_score_display, method_name) = if tail_summary.len >= 1 {
+        // Only show statistics if we have at least one tail measurement
+        if tail_summary.len >= 1 {
+            let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
             let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
-            let z_score_str = format_z_score_display(z_score);
-            let method = match dispersion_method {
+            let z_score_display = format_z_score_display(z_score);
+            let method_name = match dispersion_method {
                 DispersionMethod::StandardDeviation => "stddev",
                 DispersionMethod::MedianAbsoluteDeviation => "mad",
             };
-            (z_score_str, method)
-        } else {
-            (String::new(), "stddev") // Default, won't be used
-        };
 
-        let head_display = StatsWithUnit {
-            stats: &head_summary,
-            unit: unit_str,
-        };
+            let head_display = StatsWithUnit {
+                stats: &head_summary,
+                unit: unit_str,
+            };
 
-        let mut summary = String::new();
-
-        // Only show z-score line if we have tail measurements
-        if tail_summary.len >= 1 {
+            // Show z-score line
             summary.push_str(&format!(
                 "z-score ({method_name}): {direction}{}\n",
                 z_score_display
             ));
+
+            summary.push_str(&format!("Head: {}\n", head_display));
+
+            // Show tail only if we have 2+ tail measurements
+            if tail_summary.len >= 2 {
+                let tail_display = StatsWithUnit {
+                    stats: &tail_summary,
+                    unit: unit_str,
+                };
+                summary.push_str(&format!("Tail: {}\n", tail_display));
+            }
+
+            // Show sparkline only if we have 2+ tail measurements
+            if tail_summary.len >= 2 {
+                summary.push_str(&sparkline);
+            }
         }
 
-        summary.push_str(&format!("Head: {}\n", head_display));
-
-        if show_tail {
-            let tail_display = StatsWithUnit {
-                stats: &tail_summary,
-                unit: unit_str,
-            };
-            summary.push_str(&format!("Tail: {}\n", tail_display));
-        }
-
-        summary.push_str(&sparkline);
         summary
     };
 
@@ -287,14 +285,11 @@ fn audit_with_data(
             "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
         );
 
-        // Add summary if we have at least one measurement
-        // Show tail only if we have 2+ measurements (number_measurements counts tail only)
-        if number_measurements > 0 {
+        // Add summary using the same logic as passing/failing cases
+        let summary = build_summary();
+        if !summary.is_empty() {
             skip_message.push('\n');
-            skip_message.push_str(&build_summary(number_measurements >= 2));
-        } else {
-            // No tail measurements, just show sparkline
-            skip_message.push_str(&format!("\n{}", sparkline));
+            skip_message.push_str(&summary);
         }
 
         return Ok(AuditResult {
@@ -315,8 +310,7 @@ fn audit_with_data(
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
 
-    // Use conditional tail display: show tail only if we have 2+ tail measurements
-    let text_summary = build_summary(tail_summary.len >= 2);
+    let text_summary = build_summary();
 
     // MUTATION POINT: > vs >= (Line 178)
     let z_score_exceeds_sigma =
@@ -565,9 +559,9 @@ mod test {
         assert!(message.contains("Skipping test"));
         assert!(!message.contains("Head:")); // No summaries
         assert!(!message.contains("z-score")); // No z-score
-        assert!(message.contains("[")); // Sparkline is present
+        assert!(!message.contains("[")); // No sparkline (0 measurements)
 
-        // Test with 1 measurement: should show z-score, head only, and sparkline
+        // Test with 1 measurement: should show z-score and head only (NO sparkline)
         let result = audit_with_data(
             "test_measurement",
             15.0,
@@ -583,13 +577,11 @@ mod test {
         assert!(message.contains("z-score (stddev):")); // Z-score with method shown
         assert!(message.contains("Head:")); // Head summary shown
         assert!(!message.contains("Tail:")); // Tail summary NOT shown (only 1 measurement)
-        assert!(message.contains("[")); // Sparkline is present
-                                        // Verify order: z-score comes before Head, Head comes before sparkline
+        assert!(!message.contains("[")); // No sparkline (only 1 measurement)
+                                         // Verify order: z-score comes before Head
         let z_pos = message.find("z-score").unwrap();
         let head_pos = message.find("Head:").unwrap();
-        let spark_pos = message.find("[").unwrap();
         assert!(z_pos < head_pos, "z-score should come before Head");
-        assert!(head_pos < spark_pos, "Head should come before sparkline");
 
         // Test with 2 measurements: should show z-score, both head and tail, and sparkline
         let result = audit_with_data(
