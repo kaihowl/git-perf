@@ -315,7 +315,8 @@ fn audit_with_data(
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
 
-    let text_summary = build_summary(true);
+    // Use conditional tail display: show tail only if we have 2+ tail measurements
+    let text_summary = build_summary(tail_summary.len >= 2);
 
     // MUTATION POINT: > vs >= (Line 178)
     let z_score_exceeds_sigma =
