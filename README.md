@@ -244,9 +244,9 @@ git perf add 42.5 -m build_time
 git perf audit -m build_time
 # Output: ✓ build_time: 42.5 ms (within acceptable range)
 
-# Reports and exports automatically include units
+# Reports and CSV exports automatically include units
 git perf report -o report.html -m build_time
-git perf export -m build_time > data.csv
+git perf report -o data.csv -m build_time
 ```
 
 ### Usage Examples
@@ -647,24 +647,27 @@ The action will:
 
 2. **Pull fresh measurements**:
    ```bash
-   git perf pull --force
+   git perf pull
    ```
 
-3. **If needed, re-migrate** using the appropriate migration script (see [Migration](#migration))
+If measurements are still corrupted after pulling, check with your team about the state of the remote measurements or consider starting fresh measurements for the affected commits.
 
 #### Can I export measurements in different formats?
 
-Yes, git-perf supports CSV export:
+Yes, git-perf supports CSV export using the report command:
 
 ```bash
-# Export to CSV with unit column
-git perf export -m build_time > data.csv
+# Export to CSV file
+git perf report -m build_time -o data.csv
 
-# Long format with all metadata
-git perf export --long -m build_time > detailed.csv
+# Export to stdout
+git perf report -m build_time -o -
+
+# Export with aggregation (e.g., mean)
+git perf report -m build_time -a mean -o data.csv
 ```
 
-Units configured in `.gitperfconfig` automatically appear in the CSV unit column.
+Units configured in `.gitperfconfig` automatically appear in the CSV output.
 
 ## Documentation
 
