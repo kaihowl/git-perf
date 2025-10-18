@@ -228,6 +228,53 @@ fn audit_with_data(
         spark(all_measurements.as_slice())
     );
 
+    // Helper function to build the measurement summary text
+    // This is used for both skipped and normal audit results to avoid duplication
+    let build_summary = || -> String {
+        let mut summary = String::new();
+
+        // Use the length of all_measurements vector for total count
+        let total_measurements = all_measurements.len();
+
+        // If only 1 total measurement (head only, no tail), show only head summary
+        if total_measurements == 1 {
+            let head_display = StatsWithUnit {
+                stats: &head_summary,
+                unit: unit_str,
+            };
+            summary.push_str(&format!("Head: {}\n", head_display));
+        } else if total_measurements >= 2 {
+            // 2+ measurements: show z-score, head, tail, and sparkline
+            let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
+            let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
+            let z_score_display = format_z_score_display(z_score);
+            let method_name = match dispersion_method {
+                DispersionMethod::StandardDeviation => "stddev",
+                DispersionMethod::MedianAbsoluteDeviation => "mad",
+            };
+
+            let head_display = StatsWithUnit {
+                stats: &head_summary,
+                unit: unit_str,
+            };
+            let tail_display = StatsWithUnit {
+                stats: &tail_summary,
+                unit: unit_str,
+            };
+
+            summary.push_str(&format!(
+                "z-score ({method_name}): {direction}{}\n",
+                z_score_display
+            ));
+            summary.push_str(&format!("Head: {}\n", head_display));
+            summary.push_str(&format!("Tail: {}\n", tail_display));
+            summary.push_str(&sparkline);
+        }
+        // If 0 total measurements, return empty summary
+
+        summary
+    };
+
     // MUTATION POINT: < vs == (Line 120)
     if tail_summary.len < min_count.into() {
         let number_measurements = tail_summary.len;
@@ -235,13 +282,22 @@ fn audit_with_data(
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
 
+        let mut skip_message = format!(
+            "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
+        );
+
+        // Add summary using the same logic as passing/failing cases
+        let summary = build_summary();
+        if !summary.is_empty() {
+            skip_message.push('\n');
+            skip_message.push_str(&summary);
+        }
+
         return Ok(AuditResult {
-            message: format!("⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.\n{sparkline}"),
+            message: skip_message,
             passed: true,
         });
     }
-
-    let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
 
     // MUTATION POINT: / vs % (Line 150)
     let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
@@ -255,28 +311,7 @@ fn audit_with_data(
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
 
-    let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
-    let z_score_display = format_z_score_display(z_score);
-
-    let method_name = match dispersion_method {
-        DispersionMethod::StandardDeviation => "stddev",
-        DispersionMethod::MedianAbsoluteDeviation => "mad",
-    };
-
-    // Format head and tail with unit if configured (only mean gets the unit)
-    let head_display = StatsWithUnit {
-        stats: &head_summary,
-        unit: unit_str,
-    };
-    let tail_display = StatsWithUnit {
-        stats: &tail_summary,
-        unit: unit_str,
-    };
-
-    let text_summary = format!(
-        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n{}",
-        z_score_display, head_display, tail_display, sparkline,
-    );
+    let text_summary = build_summary();
 
     // MUTATION POINT: > vs >= (Line 178)
     let z_score_exceeds_sigma =
@@ -503,6 +538,97 @@ mod test {
         assert!(result.is_ok());
         let message = result.unwrap().message;
         assert!(message.contains("2 measurements found")); // Has 's'
+    }
+
+    #[test]
+    fn test_skip_with_summaries() {
+        // Test that when audit is skipped, summaries are shown based on TOTAL measurement count
+        // Total measurements = 1 head + N tail
+        // and the format matches passing/failing cases
+
+        // Test with 0 tail measurements (1 total): should show Head only
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![], // 0 tail measurements = 1 total measurement
+            5,      // min_count > 0 to trigger skip
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("Skipping test"));
+        assert!(message.contains("Head:")); // Head summary shown
+        assert!(!message.contains("z-score")); // No z-score (only 1 total measurement)
+        assert!(!message.contains("Tail:")); // No tail
+        assert!(!message.contains("[")); // No sparkline
+
+        // Test with 1 tail measurement (2 total): should show everything
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0], // 1 tail measurement = 2 total measurements
+            5,          // min_count > 1 to trigger skip
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("Skipping test"));
+        assert!(message.contains("z-score (stddev):")); // Z-score with method shown
+        assert!(message.contains("Head:")); // Head summary shown
+        assert!(message.contains("Tail:")); // Tail summary shown
+        assert!(message.contains("[")); // Sparkline shown
+                                        // Verify order: z-score, Head, Tail, sparkline
+        let z_pos = message.find("z-score").unwrap();
+        let head_pos = message.find("Head:").unwrap();
+        let tail_pos = message.find("Tail:").unwrap();
+        let spark_pos = message.find("[").unwrap();
+        assert!(z_pos < head_pos, "z-score should come before Head");
+        assert!(head_pos < tail_pos, "Head should come before Tail");
+        assert!(tail_pos < spark_pos, "Tail should come before sparkline");
+
+        // Test with 2 tail measurements (3 total): should show everything
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0], // 2 tail measurements = 3 total measurements
+            5,                // min_count > 2 to trigger skip
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("Skipping test"));
+        assert!(message.contains("z-score (stddev):")); // Z-score with method shown
+        assert!(message.contains("Head:")); // Head summary shown
+        assert!(message.contains("Tail:")); // Tail summary shown
+        assert!(message.contains("[")); // Sparkline shown
+                                        // Verify order: z-score, Head, Tail, sparkline
+        let z_pos = message.find("z-score").unwrap();
+        let head_pos = message.find("Head:").unwrap();
+        let tail_pos = message.find("Tail:").unwrap();
+        let spark_pos = message.find("[").unwrap();
+        assert!(z_pos < head_pos, "z-score should come before Head");
+        assert!(head_pos < tail_pos, "Head should come before Tail");
+        assert!(tail_pos < spark_pos, "Tail should come before sparkline");
+
+        // Test with MAD dispersion method to ensure method name is correct
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0], // 2 tail measurements = 3 total measurements
+            5,                // min_count > 2 to trigger skip
+            2.0,
+            DispersionMethod::MedianAbsoluteDeviation,
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(message.contains("z-score (mad):")); // MAD method shown
     }
 
     #[test]
