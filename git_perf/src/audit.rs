@@ -228,6 +228,54 @@ fn audit_with_data(
         spark(all_measurements.as_slice())
     );
 
+    // Helper function to build the measurement summary text
+    // This is used for both skipped and normal audit results to avoid duplication
+    let build_summary = |show_tail: bool| -> String {
+        let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
+
+        // Z-score calculation requires at least one tail measurement (tail_summary.len >= 1)
+        // Only calculate and show z-score if we have tail measurements
+        let (z_score_display, method_name) = if tail_summary.len >= 1 {
+            let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
+            let z_score_str = format_z_score_display(z_score);
+            let method = match dispersion_method {
+                DispersionMethod::StandardDeviation => "stddev",
+                DispersionMethod::MedianAbsoluteDeviation => "mad",
+            };
+            (z_score_str, method)
+        } else {
+            (String::new(), "stddev") // Default, won't be used
+        };
+
+        let head_display = StatsWithUnit {
+            stats: &head_summary,
+            unit: unit_str,
+        };
+
+        let mut summary = String::new();
+
+        // Only show z-score line if we have tail measurements
+        if tail_summary.len >= 1 {
+            summary.push_str(&format!(
+                "z-score ({method_name}): {direction}{}\n",
+                z_score_display
+            ));
+        }
+
+        summary.push_str(&format!("Head: {}\n", head_display));
+
+        if show_tail {
+            let tail_display = StatsWithUnit {
+                stats: &tail_summary,
+                unit: unit_str,
+            };
+            summary.push_str(&format!("Tail: {}\n", tail_display));
+        }
+
+        summary.push_str(&sparkline);
+        summary
+    };
+
     // MUTATION POINT: < vs == (Line 120)
     if tail_summary.len < min_count.into() {
         let number_measurements = tail_summary.len;
@@ -235,47 +283,17 @@ fn audit_with_data(
         let plural_s = if number_measurements > 1 { "s" } else { "" };
         error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
 
-        // Build the skip message with the same format as passing/failing cases
         let mut skip_message = format!(
             "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
         );
 
-        // Add summaries if there is at least one measurement, matching the format of passing cases
-        // Show head only if there's 1 measurement, show both head and tail if there are 2+
+        // Add summary if we have at least one measurement
+        // Show tail only if we have 2+ measurements (number_measurements counts tail only)
         if number_measurements > 0 {
-            // Calculate z-score, direction, and method name (same as passing case)
-            let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
-            let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
-            let z_score_display = format_z_score_display(z_score);
-            let method_name = match dispersion_method {
-                DispersionMethod::StandardDeviation => "stddev",
-                DispersionMethod::MedianAbsoluteDeviation => "mad",
-            };
-
-            // Format displays with units
-            let head_display = StatsWithUnit {
-                stats: &head_summary,
-                unit: unit_str,
-            };
-
-            // Build the summary in the same order as passing case
-            skip_message.push_str(&format!(
-                "\nz-score ({method_name}): {direction}{}",
-                z_score_display
-            ));
-            skip_message.push_str(&format!("\nHead: {}", head_display));
-
-            if number_measurements >= 2 {
-                let tail_display = StatsWithUnit {
-                    stats: &tail_summary,
-                    unit: unit_str,
-                };
-                skip_message.push_str(&format!("\nTail: {}", tail_display));
-            }
-
-            skip_message.push_str(&format!("\n{}", sparkline));
+            skip_message.push('\n');
+            skip_message.push_str(&build_summary(number_measurements >= 2));
         } else {
-            // No measurements, just add sparkline
+            // No tail measurements, just show sparkline
             skip_message.push_str(&format!("\n{}", sparkline));
         }
 
@@ -284,8 +302,6 @@ fn audit_with_data(
             passed: true,
         });
     }
-
-    let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
 
     // MUTATION POINT: / vs % (Line 150)
     let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
@@ -299,28 +315,7 @@ fn audit_with_data(
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
 
-    let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
-    let z_score_display = format_z_score_display(z_score);
-
-    let method_name = match dispersion_method {
-        DispersionMethod::StandardDeviation => "stddev",
-        DispersionMethod::MedianAbsoluteDeviation => "mad",
-    };
-
-    // Format head and tail with unit if configured (only mean gets the unit)
-    let head_display = StatsWithUnit {
-        stats: &head_summary,
-        unit: unit_str,
-    };
-    let tail_display = StatsWithUnit {
-        stats: &tail_summary,
-        unit: unit_str,
-    };
-
-    let text_summary = format!(
-        "z-score ({method_name}): {direction}{}\nHead: {}\nTail: {}\n{}",
-        z_score_display, head_display, tail_display, sparkline,
-    );
+    let text_summary = build_summary(true);
 
     // MUTATION POINT: > vs >= (Line 178)
     let z_score_exceeds_sigma =
