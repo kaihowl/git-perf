@@ -673,6 +673,46 @@ mod test {
     }
 
     #[test]
+    fn test_thousands_separator_with_unknown_unit() {
+        // Test that thousands separators are maintained for unknown units
+        // This uses the readable crate's Float formatter which adds separators
+        let large_stats = Stats {
+            mean: 12_345.67,
+            stddev: 1_234.56,
+            mad: 567.89,
+            len: 100,
+        };
+
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &large_stats,
+                unit: Some("widgets") // Unknown unit
+            }
+        );
+
+        // The Float formatter from readable crate should add thousands separators
+        assert!(
+            formatted.contains("12,345") || formatted.contains("12_345"),
+            "Mean should have thousands separators for unknown unit, got: {}",
+            formatted
+        );
+
+        assert!(
+            formatted.contains("widgets"),
+            "Unknown unit should be preserved, got: {}",
+            formatted
+        );
+
+        // Verify stddev also has separators
+        assert!(
+            formatted.contains("1,234") || formatted.contains("1_234"),
+            "Stddev should have thousands separators, got: {}",
+            formatted
+        );
+    }
+
+    #[test]
     fn test_is_significant_boundary() {
         // COVERS MUTATION: z_score > sigma vs >=
         let tail = Stats {

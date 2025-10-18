@@ -65,8 +65,23 @@ fn parse_duration(value: f64, unit: &str) -> Result<std::time::Duration, String>
 
 /// Helper: Parse data size from value + unit
 fn parse_data_size(value: f64, unit: &str) -> Result<u64, String> {
+    // Normalize unit: "bytes" -> "B", "byte" -> "B"
+    let normalized_unit = match unit.to_lowercase().as_str() {
+        "byte" | "bytes" => "B",
+        "kilobyte" | "kilobytes" => "KB",
+        "megabyte" | "megabytes" => "MB",
+        "gigabyte" | "gigabytes" => "GB",
+        "kibibyte" | "kibibytes" => "KiB",
+        "mebibyte" | "mebibytes" => "MiB",
+        "gibibyte" | "gibibytes" => "GiB",
+        _ => unit, // Keep original if not recognized
+    };
+
     // Try various input formats
-    let inputs = [format!("{}{}", value, unit), format!("{} {}", value, unit)];
+    let inputs = [
+        format!("{}{}", value, normalized_unit),
+        format!("{} {}", value, normalized_unit),
+    ];
 
     for input in &inputs {
         if let Ok(bs) = ByteSize::from_str(input) {
@@ -213,5 +228,36 @@ mod tests {
         let m = parse_value_with_unit(500.0, "ns").unwrap();
         let formatted = format_measurement(m);
         assert!(formatted.contains("ns") || formatted.contains("500"));
+    }
+
+    #[test]
+    fn test_bytes_unit_normalization() {
+        // Test that "bytes" is normalized to "B" and parsed correctly
+        let m = parse_value_with_unit(1000.0, "bytes").unwrap();
+        assert!(
+            matches!(m, Measurement::DataSize(_)),
+            "Should parse 'bytes' as DataSize, got: {:?}",
+            m
+        );
+        let formatted = format_measurement(m);
+        // human-repr auto-scales 1000B to 1kB
+        assert_eq!(formatted, "1kB");
+
+        // Test "byte" singular
+        let m = parse_value_with_unit(500.0, "byte").unwrap();
+        assert!(matches!(m, Measurement::DataSize(_)));
+        let formatted = format_measurement(m);
+        assert_eq!(formatted, "500B");
+
+        // Test other long forms
+        let m = parse_value_with_unit(5000.0, "kilobytes").unwrap();
+        assert!(matches!(m, Measurement::DataSize(_)));
+        // 5000 KB = 5 MB
+        assert_eq!(format_measurement(m), "5MB");
+
+        let m = parse_value_with_unit(2000.0, "megabytes").unwrap();
+        assert!(matches!(m, Measurement::DataSize(_)));
+        // 2000 MB = 2 GB
+        assert_eq!(format_measurement(m), "2GB");
     }
 }
