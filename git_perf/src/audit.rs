@@ -774,8 +774,8 @@ mod test {
     }
 
     #[test]
-    fn test_head_and_tail_have_units_and_separators() {
-        // Test that both head and tail measurements display units and thousands separators
+    fn test_head_and_tail_have_units_and_auto_scaling() {
+        // Test that both head and tail measurements display units with auto-scaling
 
         // First, set up a test environment with a configured unit
         use std::env;
@@ -807,9 +807,9 @@ unit = "ms"
         let config_path = temp_dir.path().join(".gitperfconfig");
         fs::write(&config_path, config_content).unwrap();
 
-        // Test with large values that should have thousands separators
-        let head = 12_345.67;
-        let tail = vec![10_000.0, 10_500.0, 11_000.0, 11_500.0, 12_000.0];
+        // Test with large millisecond values that should auto-scale to seconds
+        let head = 12_345.67; // Will auto-scale to ~12.35s
+        let tail = vec![10_000.0, 10_500.0, 11_000.0, 11_500.0, 12_000.0]; // Will auto-scale to 10s, 10.5s, 11s, etc.
 
         let result = audit_with_data(
             "build_time",
@@ -824,22 +824,20 @@ unit = "ms"
         let audit_result = result.unwrap();
         let message = &audit_result.message;
 
-        // Verify Head section has units
+        // Verify Head section exists
         assert!(
             message.contains("Head:"),
             "Message should contain Head section"
         );
-        assert!(message.contains("ms"), "Message should contain unit 'ms'");
 
-        // Verify Head has thousands separators (checking for formatted mean)
+        // With auto-scaling, 12345.67ms should become ~12.35s or 12.3s
+        // Check that the value is auto-scaled (contains 's' for seconds)
         assert!(
-            message.contains("12,345") || message.contains("12_345"),
-            "Head mean should have thousands separators, got: {}",
+            message.contains("12.3s") || message.contains("12.35s"),
+            "Head mean should be auto-scaled to seconds, got: {}",
             message
         );
 
-        // Verify Head stddev and MAD have units
-        // The format is: "Head: μ: VALUE UNIT σ: VALUE UNIT MAD: VALUE UNIT n: COUNT"
         let head_section: Vec<&str> = message
             .lines()
             .filter(|line| line.contains("Head:"))
@@ -851,19 +849,12 @@ unit = "ms"
         );
 
         let head_line = head_section[0];
-        // Only mean (μ) should have the unit, not σ or MAD (they are unitless)
-        let ms_count = head_line.matches(" ms").count();
-        assert_eq!(
-            ms_count, 1,
-            "Head line should have unit 'ms' only once (μ only), got {} times in: {}",
-            ms_count, head_line
-        );
 
-        // Verify format: unit comes right after mean value, before σ
-        // Expected: "μ: 12,345.670 ms σ: 0.000 MAD: 0.000 n: 1"
+        // With auto-scaling, all values (mean, stddev, MAD) get their units auto-scaled
+        // They should all have units now (not just mean)
         assert!(
-            head_line.contains("ms σ:") || head_line.contains("ms  σ:"),
-            "Unit should come before sigma (format: 'ms σ:'), got: {}",
+            head_line.contains("μ:") && head_line.contains("σ:") && head_line.contains("MAD:"),
+            "Head line should contain μ, σ, and MAD labels, got: {}",
             head_line
         );
 
@@ -884,28 +875,24 @@ unit = "ms"
         );
 
         let tail_line = tail_section[0];
-        // Only mean (μ) should have the unit, not σ or MAD (they are unitless)
-        let tail_ms_count = tail_line.matches(" ms").count();
-        assert_eq!(
-            tail_ms_count, 1,
-            "Tail line should have unit 'ms' only once (μ only), got {} times in: {}",
-            tail_ms_count, tail_line
-        );
 
-        // Verify format: unit comes right after mean value, before σ
+        // Tail mean should be auto-scaled to seconds (10000-12000ms → 10-12s)
         assert!(
-            tail_line.contains("ms σ:") || tail_line.contains("ms  σ:"),
-            "Unit should come before sigma (format: 'ms σ:'), got: {}",
+            tail_line.contains("11s")
+                || tail_line.contains("11.")
+                || tail_line.contains("10.")
+                || tail_line.contains("12."),
+            "Tail should contain auto-scaled second values, got: {}",
             tail_line
         );
 
-        // Verify Tail has thousands separators
+        // Verify the basic format structure is present
         assert!(
-            tail_line.contains("10,000")
-                || tail_line.contains("10_000")
-                || tail_line.contains("11,")
-                || tail_line.contains("11_"),
-            "Tail should have thousands separators in values, got: {}",
+            tail_line.contains("μ:")
+                && tail_line.contains("σ:")
+                && tail_line.contains("MAD:")
+                && tail_line.contains("n:"),
+            "Tail line should contain all stat labels, got: {}",
             tail_line
         );
     }

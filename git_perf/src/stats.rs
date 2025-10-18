@@ -132,16 +132,46 @@ pub struct StatsWithUnit<'a> {
 
 impl<'a> Display for StatsWithUnit<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::units::{format_measurement, parse_value_with_unit, Measurement};
+
         match self.unit {
-            Some(u) => write!(
-                f,
-                "μ: {} {} σ: {} MAD: {} n: {}",
-                Float::from(self.stats.mean),
-                u,
-                Float::from(self.stats.stddev),
-                Float::from(self.stats.mad),
-                Unsigned::from(self.stats.len)
-            ),
+            Some(u) => {
+                // Try to parse and format the mean value with auto-scaling
+                let mean_measurement = parse_value_with_unit(self.stats.mean, u);
+                let mean_display = match &mean_measurement {
+                    Ok(measurement) if !matches!(measurement, Measurement::Count(_)) => {
+                        format_measurement(measurement.clone())
+                    }
+                    _ => format!("{} {}", Float::from(self.stats.mean), u),
+                };
+
+                // Try to parse and format stddev with auto-scaling
+                let stddev_measurement = parse_value_with_unit(self.stats.stddev, u);
+                let stddev_display = match &stddev_measurement {
+                    Ok(measurement) if !matches!(measurement, Measurement::Count(_)) => {
+                        format_measurement(measurement.clone())
+                    }
+                    _ => format!("{}", Float::from(self.stats.stddev)),
+                };
+
+                // Try to parse and format MAD with auto-scaling
+                let mad_measurement = parse_value_with_unit(self.stats.mad, u);
+                let mad_display = match &mad_measurement {
+                    Ok(measurement) if !matches!(measurement, Measurement::Count(_)) => {
+                        format_measurement(measurement.clone())
+                    }
+                    _ => format!("{}", Float::from(self.stats.mad)),
+                };
+
+                write!(
+                    f,
+                    "μ: {} σ: {} MAD: {} n: {}",
+                    mean_display,
+                    stddev_display,
+                    mad_display,
+                    Unsigned::from(self.stats.len)
+                )
+            }
             None => write!(f, "{}", self.stats),
         }
     }
@@ -433,37 +463,29 @@ mod test {
             len: 10,
         };
 
-        // Test with unit - only mean should have the unit
-        // Note: Float type from readable crate formats with 3 decimal places by default
+        // Test with unit - values should be auto-scaled (1234.5ms → 1.23s)
         let with_unit = StatsWithUnit {
             stats: &stats,
             unit: Some("ms"),
         };
         let formatted = format!("{}", with_unit);
 
+        // Mean should be auto-scaled from 1234.5ms to ~1.23s
         assert!(
-            formatted.contains("μ: 1,234.500 ms"),
-            "Mean should have unit: {}",
+            formatted.contains("μ: 1.23s") || formatted.contains("μ: 1.2s"),
+            "Mean should be auto-scaled to seconds: {}",
             formatted
         );
+        // Stddev should be auto-scaled from 123.4ms to ~123ms or 123.4ms
         assert!(
-            formatted.contains("σ: 123.400"),
-            "Stddev should NOT have unit (it's unitless): {}",
+            formatted.contains("σ: 123") && formatted.contains("ms"),
+            "Stddev should be auto-scaled: {}",
             formatted
         );
+        // MAD should be auto-scaled from 98.7ms to ~98ms or 98.7ms
         assert!(
-            !formatted.contains("σ: 123.400 ms"),
-            "Stddev should NOT have unit suffix: {}",
-            formatted
-        );
-        assert!(
-            formatted.contains("MAD: 98.700"),
-            "MAD should NOT have unit (it's unitless): {}",
-            formatted
-        );
-        assert!(
-            !formatted.contains("MAD: 98.700 ms"),
-            "MAD should NOT have unit suffix: {}",
+            formatted.contains("MAD: 98") && formatted.contains("ms"),
+            "MAD should be auto-scaled: {}",
             formatted
         );
         assert!(
@@ -484,9 +506,9 @@ mod test {
             "StatsWithUnit with None should match Stats Display"
         );
 
-        // Test with large values that need thousands separators
+        // Test with large values - should be auto-scaled (1234567.89ns → 1.23ms)
         let large_stats = Stats {
-            mean: 1_234_567.89,
+            mean: 1_234_567.89, // nanoseconds
             stddev: 123_456.78,
             mad: 12_345.67,
             len: 1000,
@@ -498,34 +520,29 @@ mod test {
         };
         let large_formatted = format!("{}", large_with_unit);
 
+        // Mean should be auto-scaled from nanoseconds to milliseconds
         assert!(
-            large_formatted.contains("1,234,567.890 ns"),
-            "Large mean should have thousands separators and unit: {}",
+            large_formatted.contains("μ: 1.23ms") || large_formatted.contains("μ: 1.2ms"),
+            "Large mean should be auto-scaled to ms: {}",
+            large_formatted
+        );
+        // Stddev should be auto-scaled appropriately
+        assert!(
+            large_formatted.contains("σ:")
+                && (large_formatted.contains("ms") || large_formatted.contains("μs")),
+            "Large stddev should be auto-scaled: {}",
+            large_formatted
+        );
+        // MAD should be auto-scaled appropriately
+        assert!(
+            large_formatted.contains("MAD:")
+                && (large_formatted.contains("ms") || large_formatted.contains("μs")),
+            "Large MAD should be auto-scaled: {}",
             large_formatted
         );
         assert!(
-            large_formatted.contains("σ: 123,456.780"),
-            "Large stddev should have thousands separators but NO unit: {}",
-            large_formatted
-        );
-        assert!(
-            !large_formatted.contains("σ: 123,456.780 ns"),
-            "Large stddev should NOT have unit suffix: {}",
-            large_formatted
-        );
-        assert!(
-            large_formatted.contains("MAD: 12,345.670"),
-            "Large MAD should have thousands separators but NO unit: {}",
-            large_formatted
-        );
-        assert!(
-            !large_formatted.contains("MAD: 12,345.670 ns"),
-            "Large MAD should NOT have unit suffix: {}",
-            large_formatted
-        );
-        assert!(
-            large_formatted.contains("n: 1,000"),
-            "Large count should have thousands separators: {}",
+            large_formatted.contains("n: 1,000") || large_formatted.contains("n: 1000"),
+            "Large count should be present: {}",
             large_formatted
         );
     }
@@ -534,7 +551,7 @@ mod test {
     fn test_stats_with_unit_various_values() {
         // Test various edge cases and value types
 
-        // Small decimal values
+        // Small decimal values - should remain in ms (no auto-scaling needed)
         let small_stats = Stats {
             mean: 42.5,
             stddev: 2.0,
@@ -549,12 +566,12 @@ mod test {
             }
         );
         assert!(
-            formatted.contains("42.500 ms"),
+            formatted.contains("42.5ms") || formatted.contains("42ms"),
             "Small decimal with unit: {}",
             formatted
         );
 
-        // Zero value
+        // Zero value - should be formatted as 0ns or 0ms
         let zero_stats = Stats {
             mean: 0.0,
             stddev: 0.0,
@@ -569,12 +586,12 @@ mod test {
             }
         );
         assert!(
-            formatted.contains("0.000 ms"),
+            formatted.contains("0") && formatted.contains("ns"),
             "Zero value with unit: {}",
             formatted
         );
 
-        // Value with more precision (gets rounded to 3 decimals by Float)
+        // Value with more precision - "seconds" is unknown unit, falls back to Count
         let precise_stats = Stats {
             mean: 3.14159,
             stddev: 0.5,
@@ -589,12 +606,12 @@ mod test {
             }
         );
         assert!(
-            formatted.contains("3.142 seconds"),
-            "Precise value rounded: {}",
+            formatted.contains("3.14") && formatted.contains("seconds"),
+            "Precise value with unknown unit (fallback): {}",
             formatted
         );
 
-        // Large round number with thousands separator
+        // Large round number - should be auto-scaled if using "B" unit
         let million_stats = Stats {
             mean: 1_000_000.0,
             stddev: 50_000.0,
@@ -605,16 +622,17 @@ mod test {
             "{}",
             StatsWithUnit {
                 stats: &million_stats,
-                unit: Some("bytes")
+                unit: Some("B")
             }
         );
+        // 1,000,000 B = 1 MB
         assert!(
-            formatted.contains("1,000,000.000 bytes"),
-            "Million with separator: {}",
+            formatted.contains("1MB") || formatted.contains("1.0MB"),
+            "Million bytes should be auto-scaled to MB: {}",
             formatted
         );
 
-        // Different unit types
+        // Different unit types - unknown unit falls back to Count format
         let temp_stats = Stats {
             mean: 98.6,
             stddev: 1.2,
@@ -629,8 +647,8 @@ mod test {
             }
         );
         assert!(
-            formatted.contains("98.600 °F"),
-            "Temperature unit: {}",
+            formatted.contains("98.6") && formatted.contains("°F"),
+            "Temperature unit (unknown, fallback): {}",
             formatted
         );
 
@@ -651,6 +669,46 @@ mod test {
             !no_unit.contains(" bytes"),
             "Should have no units: {}",
             no_unit
+        );
+    }
+
+    #[test]
+    fn test_thousands_separator_with_unknown_unit() {
+        // Test that thousands separators are maintained for unknown units
+        // This uses the readable crate's Float formatter which adds separators
+        let large_stats = Stats {
+            mean: 12_345.67,
+            stddev: 1_234.56,
+            mad: 567.89,
+            len: 100,
+        };
+
+        let formatted = format!(
+            "{}",
+            StatsWithUnit {
+                stats: &large_stats,
+                unit: Some("widgets") // Unknown unit
+            }
+        );
+
+        // The Float formatter from readable crate should add thousands separators
+        assert!(
+            formatted.contains("12,345") || formatted.contains("12_345"),
+            "Mean should have thousands separators for unknown unit, got: {}",
+            formatted
+        );
+
+        assert!(
+            formatted.contains("widgets"),
+            "Unknown unit should be preserved, got: {}",
+            formatted
+        );
+
+        // Verify stddev also has separators
+        assert!(
+            formatted.contains("1,234") || formatted.contains("1_234"),
+            "Stddev should have thousands separators, got: {}",
+            formatted
         );
     }
 
