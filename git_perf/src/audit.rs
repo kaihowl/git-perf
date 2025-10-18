@@ -233,8 +233,8 @@ fn audit_with_data(
     let build_summary = || -> String {
         let mut summary = String::new();
 
-        // Calculate total measurements: 1 head + N tail
-        let total_measurements = 1 + tail_summary.len;
+        // Use the length of all_measurements vector for total count
+        let total_measurements = all_measurements.len();
 
         // If only 1 total measurement (head only, no tail), show only head summary
         if total_measurements == 1 {
