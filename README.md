@@ -574,8 +574,9 @@ Example: `[-1.0% – +96.0%] ▁▃▇▁` shows most values are low, with one s
 Configure cleanup retention:
 ```yaml
 # In .github/workflows/cleanup-measurements.yml
-retention-days: 90  # Standard retention
-reports-retention-days: 30  # Keep recent reports
+- uses: kaihowl/git-perf/.github/actions/cleanup@master
+  with:
+    retention-days: 90  # Days to retain measurements
 ```
 
 Adjust based on your needs:
@@ -637,20 +638,6 @@ The action will:
 - Fail the workflow if regressions are detected
 
 ### Troubleshooting
-
-#### What should I do if measurement data becomes corrupted?
-
-1. **Verify git-notes integrity**:
-   ```bash
-   git notes --ref refs/notes/perf-v3 show
-   ```
-
-2. **Pull fresh measurements**:
-   ```bash
-   git perf pull
-   ```
-
-If measurements are still corrupted after pulling, check with your team about the state of the remote measurements or consider starting fresh measurements for the affected commits.
 
 #### Can I export measurements in different formats?
 
