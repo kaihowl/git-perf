@@ -1021,8 +1021,10 @@ dependencies = [
  "itertools",
  "log",
  "plotly",
+ "quick-xml",
  "rand 0.8.5",
  "readable",
+ "serde",
  "serde_json",
  "sparklines",
  "tempfile",
@@ -1662,6 +1664,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.36.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
+dependencies = [
+ "memchr",
+ "serde",
 ]
 
 [[package]]

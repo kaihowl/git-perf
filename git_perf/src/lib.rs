@@ -6,6 +6,7 @@ pub mod data;
 pub mod git;
 pub mod measurement_retrieval;
 pub mod measurement_storage;
+pub mod parsers;
 pub mod reporting;
 pub mod serialization;
 pub mod stats;
