@@ -37,6 +37,8 @@ struct CriterionMessage {
     #[serde(default)]
     id: String,
     #[serde(default)]
+    group: Option<String>,
+    #[serde(default)]
     unit: Option<String>,
     #[serde(default)]
     mean: Option<Estimate>,
@@ -68,7 +70,9 @@ impl CriterionMessage {
 
         // Extract group, name, and input from the benchmark ID
         // Format: "group/name/input" or "group/name" or just "name"
-        let (group, bench_name, input) = parse_benchmark_id(&self.id);
+        // Prefer the explicit group field from criterion if available
+        let (parsed_group, bench_name, input) = parse_benchmark_id(&self.id);
+        let group = self.group.or(parsed_group);
 
         let statistics = BenchStatistics {
             mean_ns: self.mean.map(|e| convert_to_nanoseconds(e.estimate, &unit)),
