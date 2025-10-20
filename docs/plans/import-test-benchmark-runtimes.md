@@ -96,8 +96,6 @@ This feature enables:
 ```toml
 [profile.ci.junit]
 path = "junit.xml"
-store-success-output = false
-store-failure-output = true
 ```
 
 **Command:**
@@ -230,7 +228,7 @@ git-perf import junit --metadata ci=true --metadata branch=main
 
 ## Implementation Plan
 
-### Phase 1: Parser Infrastructure (2-3 days)
+### Phase 1: Parser Infrastructure
 
 **New Files:**
 ```
@@ -250,7 +248,7 @@ pub enum ParsedMeasurement {
 
 pub struct TestMeasurement {
     pub name: String,
-    pub duration_secs: Option<f64>,
+    pub duration: Option<std::time::Duration>,
     pub status: TestStatus,
     pub metadata: HashMap<String, String>,
 }
@@ -297,7 +295,7 @@ pub trait Parser {
 - [ ] Add comprehensive unit tests with sample XML/JSON data
 - [ ] Test error handling (malformed XML/JSON, missing fields)
 
-### Phase 2: Measurement Conversion (1-2 days)
+### Phase 2: Measurement Conversion
 
 **New Files:**
 ```
@@ -340,7 +338,7 @@ pub fn convert_to_measurements(
 - [ ] Add unit tests for conversion logic
 - [ ] Test edge cases (missing fields, zero values)
 
-### Phase 3: CLI Integration (1-2 days)
+### Phase 3: CLI Integration
 
 **Modified Files:**
 - `cli_types/src/lib.rs` - Add `ImportCommand`
@@ -391,7 +389,7 @@ pub enum ImportFormat {
 - [ ] Update `lib.rs` to export modules
 - [ ] Integration tests
 
-### Phase 4: CI Benchmark Integration (1 day)
+### Phase 4: CI Benchmark Integration
 
 **Goal:** Add a simple benchmark to CI that generates sample data for testing the import feature.
 
@@ -428,8 +426,6 @@ criterion_main!(benches);
 ```toml
 [profile.ci.junit]
 path = "junit.xml"
-store-success-output = false
-store-failure-output = true
 ```
 
 **Step 2:** Add to `.github/workflows/` (or existing workflow):
@@ -456,8 +452,8 @@ store-failure-output = true
       --metadata commit="${GITHUB_SHA:0:7}"
 
     # Show what was imported
-    cargo run -- audit --measurement-filter "test::" --num-commits 5
-    cargo run -- audit --measurement-filter "bench::" --num-commits 5
+    cargo run -- audit --measurement "test::*" --num-commits 5
+    cargo run -- audit --measurement "bench::*" --num-commits 5
 ```
 
 **Tasks:**
@@ -470,7 +466,7 @@ store-failure-output = true
 - [ ] Verify measurements stored in git notes
 - [ ] Document CI integration in README
 
-### Phase 5: Documentation (1 day)
+### Phase 5: Documentation
 
 **New Files:**
 - `docs/importing-measurements.md` - Feature guide
@@ -607,8 +603,8 @@ git-perf import criterion-json bench-results.json \
 git push origin refs/notes/perf-v3
 
 # Audit for regressions
-git-perf audit --measurement-filter "test::" --num-commits 20 --sigma 4.0
-git-perf audit --measurement-filter "bench::" --num-commits 20 --sigma 3.0
+git-perf audit --measurement "test::*" --num-commits 20 --sigma 4.0
+git-perf audit --measurement "bench::*" --num-commits 20 --sigma 3.0
 ```
 
 ## Testing Strategy
@@ -649,7 +645,7 @@ cargo run -- import junit target/nextest/ci/junit.xml --dry-run --verbose
 
 # Verify stored
 cargo run -- import junit target/nextest/ci/junit.xml
-cargo run -- audit --measurement-filter "test::" --num-commits 1
+cargo run -- audit --measurement "test::*" --num-commits 1
 ```
 
 ## Measurement Examples
@@ -738,13 +734,11 @@ Metadata: {
 
 ## Timeline
 
-- **Phase 1**: Parser infrastructure (2-3 days)
-- **Phase 2**: Measurement conversion (1-2 days)
-- **Phase 3**: CLI integration (1-2 days)
-- **Phase 4**: CI benchmark integration (1 day)
-- **Phase 5**: Documentation (1 day)
-
-**Total Estimated Effort:** 6-9 days
+- **Phase 1**: Parser infrastructure
+- **Phase 2**: Measurement conversion
+- **Phase 3**: CLI integration
+- **Phase 4**: CI benchmark integration
+- **Phase 5**: Documentation
 
 ## References
 
