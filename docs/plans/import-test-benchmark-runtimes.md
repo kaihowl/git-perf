@@ -25,20 +25,20 @@ This feature enables:
 
 ## Goals
 
-1. **Parse nextest JSON** - Support `cargo nextest --message-format libtest-json` output
+1. **Parse JUnit XML** - Support `cargo nextest` JUnit XML output (stable, broadly applicable)
 2. **Parse criterion JSON** - Support `cargo criterion --message-format json` output
 3. **Flexible input** - Read from stdin or files
 4. **Measurement conversion** - Transform parsed data to `MeasurementData` with appropriate naming
 5. **Metadata enrichment** - Allow custom metadata (CI info, branch, etc.)
 6. **Filtering** - Import subset of tests/benchmarks via regex
 7. **CI integration** - Add simple benchmark to CI for sample data collection
+8. **Broad applicability** - JUnit XML works with pytest, Jest, JUnit, and many other test frameworks
 
 ## Non-Goals
 
 - Running tests or benchmarks (user responsibility)
-- Supporting unstable libtest JSON format (requires nightly Rust)
+- Supporting unstable/experimental formats (libtest JSON requires nightly + experimental flag)
 - Parsing plain text output (too brittle)
-- JUnit XML support (future enhancement)
 - Custom unit parsing for benchmarks (use existing unit system)
 
 ## Architecture
@@ -46,10 +46,11 @@ This feature enables:
 ```
 ┌─────────────────────────────────────────────────┐
 │  User Runs Tests/Benchmarks                    │
-│  $ cargo nextest run --message-format json     │
+│  $ cargo nextest run --profile ci              │
+│  $   (outputs JUnit XML to file)               │
 │  $ cargo criterion --message-format json       │
 └─────────────────┬───────────────────────────────┘
-                  │ (stdout or save to file)
+                  │ (file or pipe to stdin)
                   │
       ┌───────────▼────────────────────┐
       │  git-perf import <format>      │
@@ -59,7 +60,7 @@ This feature enables:
                   │
       ┌───────────▼───────────┐
       │  Parser Module        │
-      │  - nextest JSON       │
+      │  - JUnit XML          │
       │  - criterion JSON     │
       └───────────┬───────────┘
                   │
@@ -81,32 +82,54 @@ This feature enables:
 
 ## Research Summary
 
-### Cargo Nextest Output Formats
+### JUnit XML Format (De Facto Standard)
 
-**Available Formats:**
+**Why JUnit XML:**
+- ✅ **Stable** - No experimental flags required
+- ✅ **Universal** - Works with pytest, Jest, JUnit, PHPUnit, RSpec, and countless other frameworks
+- ✅ **Well-supported** - Supported by all major CI/CD tools (Jenkins, GitHub Actions, CircleCI, etc.)
+- ✅ **Simple** - Well-documented XML structure
+- ✅ **nextest native** - cargo-nextest has built-in JUnit support via configuration
 
-| Format | Command | Status | Recommendation |
-|--------|---------|--------|----------------|
-| `libtest-json` | `NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --message-format libtest-json` | ⚠️ Experimental | **✅ Recommended** |
-| `libtest-json-plus` | Same with extra nextest field | ⚠️ Experimental | Alternative |
-| JUnit XML | `cargo nextest run --junit output.xml` | ✅ Stable | Future option |
+**Nextest Configuration** (`.config/nextest.toml`):
 
-**libtest-json Format** (Line-delimited JSON):
-
-```json
-{ "type": "suite", "event": "started", "test_count": 3 }
-{ "type": "test", "event": "started", "name": "tests::test_one" }
-{ "type": "test", "name": "tests::test_one", "event": "ok", "exec_time": 0.001234 }
-{ "type": "test", "event": "started", "name": "tests::test_two" }
-{ "type": "test", "name": "tests::test_two", "event": "ok", "exec_time": 0.015678 }
-{ "type": "suite", "event": "ok", "passed": 2, "failed": 1, "exec_time": 0.025432 }
+```toml
+[profile.ci.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
 ```
 
-**Key Fields:**
-- `type`: "suite" | "test"
-- `event`: "started" | "ok" | "failed" | "ignored"
-- `name`: Full test path (e.g., "module::test_name")
-- `exec_time`: Duration in seconds (only on completion events)
+**Command:**
+```bash
+cargo nextest run --profile ci
+# Outputs to: target/nextest/ci/junit.xml
+```
+
+**JUnit XML Structure:**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="3" failures="1" errors="0" skipped="0" time="5.2">
+  <testsuite name="test_binary_name" tests="3" failures="1" time="5.2">
+    <testcase name="test_one" classname="module::tests" time="1.5"/>
+    <testcase name="test_two" classname="module::tests" time="2.1">
+      <failure message="assertion failed" type="AssertionError"/>
+    </testcase>
+    <testcase name="test_three" classname="module::tests" time="1.6">
+      <skipped/>
+    </testcase>
+  </testsuite>
+</testsuites>
+```
+
+**Key Elements:**
+- `<testsuites>` - Root element (optional if single suite)
+- `<testsuite>` - Test group/binary (attributes: `name`, `tests`, `failures`, `errors`, `skipped`, `time`)
+- `<testcase>` - Individual test (attributes: `name`, `classname`, `time`)
+- `<failure>` - Test failure (attributes: `message`, `type`)
+- `<error>` - Test error (attributes: `message`, `type`)
+- `<skipped>` - Skipped test
 
 ### Cargo Criterion Output Formats
 
@@ -132,13 +155,15 @@ This feature enables:
 
 ### Recommended Formats
 
-1. **✅ nextest libtest-json** - For test runtimes
-   - Provides per-test timing
-   - Already experimental in nextest, will stabilize
-   - Command: `NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --message-format libtest-json`
+1. **✅ JUnit XML** - For test runtimes
+   - **Stable** - No experimental flags required
+   - **Universal** - Works with any test framework (Rust, Python, JavaScript, Java, etc.)
+   - **Per-test timing** - Provides individual test duration
+   - **Well-supported** - All CI/CD tools understand this format
+   - Command: `cargo nextest run --profile ci` (configure JUnit output in `.config/nextest.toml`)
 
 2. **✅ cargo-criterion JSON** - For benchmark runtimes
-   - Rich statistical data
+   - Rich statistical data (mean, median, slope, MAD)
    - Machine-readable, well-documented
    - Command: `cargo criterion --message-format json`
 
@@ -150,13 +175,13 @@ This feature enables:
 git-perf import <format> [FILE]
 
 # Formats:
-#   nextest-json     - nextest libtest-json format
+#   junit            - JUnit XML format (nextest, pytest, Jest, etc.)
 #   criterion-json   - cargo-criterion JSON format
 
 # Examples:
-#   git-perf import nextest-json              # Read from stdin
-#   git-perf import nextest-json -            # Read from stdin (explicit)
-#   git-perf import nextest-json results.json # Read from file
+#   git-perf import junit              # Read from stdin
+#   git-perf import junit -            # Read from stdin (explicit)
+#   git-perf import junit junit.xml    # Read from file
 ```
 
 ### Measurement Naming Convention
@@ -182,8 +207,8 @@ bench::add_measurements/add_measurement/50::slope
 ```rust
 {
     "type": "test",
-    "suite": "tests",           // Extracted from test name first component
-    "status": "passed" | "failed" | "ignored",
+    "classname": "module::tests",  // From JUnit XML classname attribute
+    "status": "passed" | "failed" | "error" | "skipped",
 }
 ```
 
@@ -200,7 +225,7 @@ bench::add_measurements/add_measurement/50::slope
 
 Users can add custom metadata via `--metadata` flag:
 ```bash
-git-perf import nextest-json --metadata ci=true --metadata branch=main
+git-perf import junit --metadata ci=true --metadata branch=main
 ```
 
 ## Implementation Plan
@@ -212,7 +237,7 @@ git-perf import nextest-json --metadata ci=true --metadata branch=main
 git_perf/src/parsers/
 ├── mod.rs              # Module root, public API
 ├── types.rs            # Shared types (ParsedMeasurement, TestMeasurement, etc.)
-├── nextest_json.rs     # Nextest libtest-json parser
+├── junit_xml.rs        # JUnit XML parser
 └── criterion_json.rs   # Criterion JSON parser
 ```
 
@@ -233,7 +258,8 @@ pub struct TestMeasurement {
 pub enum TestStatus {
     Passed,
     Failed,
-    Ignored,
+    Error,
+    Skipped,
 }
 
 pub struct BenchmarkMeasurement {
@@ -257,18 +283,19 @@ pub trait Parser {
 
 **Tasks:**
 - [ ] Create `parsers/` module structure
-- [ ] Implement `NextestJsonParser`
-  - Parse line-delimited JSON
-  - Extract test events (ok, failed, ignored)
-  - Capture exec_time field
-  - Extract suite from test name
+- [ ] Implement `JunitXmlParser`
+  - Parse XML using a Rust XML library (quick-xml or serde_xml_rs)
+  - Extract `<testcase>` elements
+  - Read attributes: `name`, `classname`, `time`
+  - Determine status from child elements (`<failure>`, `<error>`, `<skipped>`)
+  - Handle both single `<testsuite>` and `<testsuites>` root
 - [ ] Implement `CriterionJsonParser`
   - Parse line-delimited JSON
   - Filter benchmark-complete messages
   - Extract statistics (mean, median, slope, MAD)
   - Parse benchmark ID (group/name/input)
-- [ ] Add comprehensive unit tests with sample JSON data
-- [ ] Test error handling (malformed JSON, missing fields)
+- [ ] Add comprehensive unit tests with sample XML/JSON data
+- [ ] Test error handling (malformed XML/JSON, missing fields)
 
 ### Phase 2: Measurement Conversion (1-2 days)
 
@@ -334,7 +361,7 @@ pub struct ImportCommand {
 }
 
 pub enum ImportFormat {
-    NextestJson,
+    Junit,
     CriterionJson,
 }
 ```
@@ -397,28 +424,49 @@ criterion_main!(benches);
 
 **CI Workflow Changes:**
 
-Add to `.github/workflows/` (or existing workflow):
+**Step 1:** Add `.config/nextest.toml` to repository:
+```toml
+[profile.ci.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
+```
+
+**Step 2:** Add to `.github/workflows/` (or existing workflow):
 ```yaml
-- name: Run benchmarks and import results
+- name: Run tests and benchmarks, import results
   run: |
+    # Run tests with JUnit output
+    cargo nextest run --profile ci
+    # Outputs to: target/nextest/ci/junit.xml
+
+    # Import test results
+    cargo run -- import junit target/nextest/ci/junit.xml \
+      --metadata ci=true \
+      --metadata workflow="${GITHUB_WORKFLOW}" \
+      --metadata commit="${GITHUB_SHA:0:7}"
+
     # Run simple benchmark with JSON output
     cargo criterion --bench sample_ci_bench --message-format json > bench-results.json
 
-    # Import benchmark results (after implementing import command)
+    # Import benchmark results
     cargo run -- import criterion-json bench-results.json \
       --metadata ci=true \
       --metadata workflow="${GITHUB_WORKFLOW}" \
       --metadata commit="${GITHUB_SHA:0:7}"
 
     # Show what was imported
+    cargo run -- audit --measurement-filter "test::" --num-commits 5
     cargo run -- audit --measurement-filter "bench::" --num-commits 5
 ```
 
 **Tasks:**
+- [ ] Create `.config/nextest.toml` with JUnit configuration
 - [ ] Create `sample_ci_bench.rs` with simple fibonacci benchmark
 - [ ] Add benchmark to `Cargo.toml` [[bench]] section
+- [ ] Update CI workflow to run tests with JUnit output
 - [ ] Update CI workflow to run benchmark
-- [ ] Update CI workflow to import results
+- [ ] Update CI workflow to import both test and benchmark results
 - [ ] Verify measurements stored in git notes
 - [ ] Document CI integration in README
 
@@ -430,18 +478,19 @@ Add to `.github/workflows/` (or existing workflow):
 
 **Documentation Topics:**
 1. Overview and motivation
-2. Supported formats (nextest-json, criterion-json)
+2. Supported formats (junit, criterion-json)
 3. Command reference
 4. Usage examples
-   - Basic import from stdin
-   - Import from file
+   - Basic import from file (typical workflow)
+   - Import from stdin
    - With metadata
    - With filtering
    - Dry run mode
 5. Measurement naming conventions
 6. Metadata usage
-7. CI/CD integration
-8. Troubleshooting
+7. Cross-language support (pytest, Jest, JUnit, etc.)
+8. CI/CD integration
+9. Troubleshooting
 
 **Modified Files:**
 - `README.md` - Add import examples to main README
@@ -459,52 +508,72 @@ Add to `.github/workflows/` (or existing workflow):
 
 ## Usage Examples
 
-### Basic Import
+### Basic Import (Typical Workflow)
 
 ```bash
-# Run nextest and import results
-NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
-  cargo nextest run --message-format libtest-json | \
-  git-perf import nextest-json
+# Run tests with JUnit output (requires .config/nextest.toml configuration)
+cargo nextest run --profile ci
+# Outputs to: target/nextest/ci/junit.xml
+
+# Import test results
+git-perf import junit target/nextest/ci/junit.xml
 
 # Run benchmarks and import results
-cargo criterion --message-format json | \
-  git-perf import criterion-json
+cargo criterion --message-format json > bench-results.json
+git-perf import criterion-json bench-results.json
 ```
 
-### Import from Files
+### Import from stdin
 
 ```bash
-# Save results to file
-NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
-  cargo nextest run --message-format libtest-json > test-results.json
+# Pipe JUnit XML to git-perf
+cat target/nextest/ci/junit.xml | git-perf import junit
 
-# Import later
-git-perf import nextest-json test-results.json
+# Explicit stdin
+git-perf import junit -
+```
 
-# With metadata
-git-perf import nextest-json test-results.json \
+### Import with Metadata
+
+```bash
+# Add custom metadata for filtering/tracking
+git-perf import junit target/nextest/ci/junit.xml \
   --metadata ci=true \
-  --metadata branch=main
+  --metadata branch=main \
+  --metadata pr_number=123
 ```
 
 ### Filtering
 
 ```bash
-# Only import specific tests
-cargo nextest run --message-format libtest-json | \
-  git-perf import nextest-json --filter "^tests::unit::"
+# Only import specific tests matching regex
+git-perf import junit junit.xml --filter "^test_integration"
 
 # Only import specific benchmark group
-cargo criterion --message-format json | \
-  git-perf import criterion-json --filter "add_measurements"
+git-perf import criterion-json bench-results.json --filter "add_measurements"
 ```
 
 ### Dry Run
 
 ```bash
-# Preview what would be imported
-git-perf import nextest-json test-results.json --dry-run --verbose
+# Preview what would be imported without storing
+git-perf import junit junit.xml --dry-run --verbose
+```
+
+### Cross-Language Examples
+
+```bash
+# Python pytest
+pytest --junit-xml=pytest-results.xml
+git-perf import junit pytest-results.xml --metadata language=python
+
+# JavaScript Jest
+jest --ci --reporters=jest-junit
+git-perf import junit junit.xml --metadata language=javascript
+
+# Java JUnit
+mvn test  # Outputs to target/surefire-reports/TEST-*.xml
+git-perf import junit target/surefire-reports/TEST-MyTest.xml --metadata language=java
 ```
 
 ### CI/CD Integration
@@ -515,22 +584,24 @@ git-perf import nextest-json test-results.json --dry-run --verbose
 
 set -e
 
-# Run tests
-NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
-  cargo nextest run --message-format libtest-json > test-results.json
+# Run tests with JUnit output
+cargo nextest run --profile ci
+# Outputs to: target/nextest/ci/junit.xml
 
 # Import test results
-git-perf import nextest-json test-results.json \
+git-perf import junit target/nextest/ci/junit.xml \
   --metadata ci=true \
   --metadata workflow="${GITHUB_WORKFLOW}" \
-  --metadata run_id="${GITHUB_RUN_ID}"
+  --metadata run_id="${GITHUB_RUN_ID}" \
+  --metadata commit="${GITHUB_SHA:0:7}"
 
 # Run benchmarks
 cargo criterion --bench sample_ci_bench --message-format json > bench-results.json
 
 # Import benchmark results
 git-perf import criterion-json bench-results.json \
-  --metadata ci=true
+  --metadata ci=true \
+  --metadata workflow="${GITHUB_WORKFLOW}"
 
 # Push measurements
 git push origin refs/notes/perf-v3
@@ -545,11 +616,12 @@ git-perf audit --measurement-filter "bench::" --num-commits 20 --sigma 3.0
 ### Unit Tests
 
 **Parser Tests:**
-- Parse valid nextest JSON
+- Parse valid JUnit XML (single testsuite and testsuites)
 - Parse valid criterion JSON
-- Handle malformed JSON gracefully
-- Handle missing fields
+- Handle malformed XML/JSON gracefully
+- Handle missing fields/attributes
 - Handle empty input
+- Test different test statuses (passed, failed, error, skipped)
 
 **Converter Tests:**
 - Convert test measurements correctly
@@ -568,14 +640,15 @@ git-perf audit --measurement-filter "bench::" --num-commits 20 --sigma 3.0
 ### Manual Testing
 
 ```bash
-# Generate test data
-NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
-  cargo nextest run --message-format libtest-json > /tmp/test-data.json
+# Generate test data (requires .config/nextest.toml with JUnit config)
+cargo nextest run --profile ci
+# Outputs to: target/nextest/ci/junit.xml
 
 # Test import
-cargo run -- import nextest-json /tmp/test-data.json --dry-run --verbose
+cargo run -- import junit target/nextest/ci/junit.xml --dry-run --verbose
 
 # Verify stored
+cargo run -- import junit target/nextest/ci/junit.xml
 cargo run -- audit --measurement-filter "test::" --num-commits 1
 ```
 
@@ -584,11 +657,11 @@ cargo run -- audit --measurement-filter "test::" --num-commits 1
 ### Test Measurements
 
 ```
-Name: test::git_interop::test_add_note
+Name: test::test_add_note
 Value: 0.0123 seconds
 Metadata: {
   "type": "test",
-  "suite": "git_interop",
+  "classname": "git_perf::git_interop",
   "status": "passed"
 }
 ```
@@ -621,30 +694,31 @@ Metadata: {
 
 1. **Composability** - Unix philosophy: git-perf parses, doesn't run
 2. **Flexibility** - User controls test execution, git-perf stores results
-3. **Tool Agnostic** - Works with any tool that outputs supported formats
-4. **Simplicity** - No test execution logic, just parsing
-5. **Extensibility** - Easy to add new parsers
-6. **CI Integration** - Natural fit for CI/CD pipelines
-7. **Unified Analysis** - Use existing audit/report infrastructure
+3. **Universal** - JUnit XML works across all major programming languages
+4. **Stable** - No experimental flags or nightly compilers required
+5. **Simplicity** - No test execution logic, just parsing
+6. **Extensibility** - Easy to add new parsers
+7. **CI Integration** - Natural fit for CI/CD pipelines (all tools support JUnit)
+8. **Unified Analysis** - Use existing audit/report infrastructure
+9. **Broad Applicability** - Track test performance from Rust, Python, Java, JavaScript, etc.
 
 ## Limitations
 
-1. **Format Dependencies** - Requires specific output formats
-2. **Experimental Status** - nextest libtest-json is experimental
-3. **No Validation** - Can't verify units were consistent
-4. **Display Only** - Units for display, not audit calculations
+1. **Format Dependencies** - Requires specific output formats (JUnit XML, criterion JSON)
+2. **File-based for nextest** - JUnit output goes to file, not stdout (minor inconvenience)
+3. **No Validation** - Can't verify units were consistent across measurements
 
 ## Future Enhancements
 
-1. **JUnit XML Support** - Cross-language test import
-2. **Criterion CSV** - Alternative benchmark format
-3. **libtest JSON** - If/when stabilized in Rust
-4. **Generic JSON Parser** - User-configurable JSONPath mapping
-5. **Additional Formats** - pytest, Jest, other test frameworks
+1. **Criterion CSV** - Alternative benchmark format
+2. **Generic JSON Parser** - User-configurable JSONPath mapping
+3. **Additional benchmark formats** - Support other benchmark tools
+4. **TAP (Test Anything Protocol)** - Another universal test format
+5. **Subunit** - Binary test streaming protocol
 
 ## Success Criteria
 
-- [ ] Successfully parse nextest libtest-json output
+- [ ] Successfully parse JUnit XML output (nextest, pytest, etc.)
 - [ ] Successfully parse criterion JSON output
 - [ ] Store test measurements in git notes
 - [ ] Store benchmark measurements in git notes
@@ -654,6 +728,8 @@ Metadata: {
 - [ ] Support filtering by regex
 - [ ] Support stdin and file input
 - [ ] Simple CI benchmark runs and imports successfully
+- [ ] CI test runs produce JUnit XML and imports successfully
+- [ ] Cross-language example works (e.g., pytest)
 - [ ] Documentation complete
 - [ ] All tests pass (`cargo nextest run -- --skip slow`)
 - [ ] Code formatted (`cargo fmt`)
@@ -672,8 +748,8 @@ Metadata: {
 
 ## References
 
-- **cargo-nextest docs:** https://nexte.st/docs/machine-readable/
+- **cargo-nextest JUnit support:** https://nexte.st/docs/machine-readable/junit/
+- **JUnit XML format documentation:** https://github.com/testmoapp/junitxml
 - **Criterion.rs external tools:** https://bheisler.github.io/criterion.rs/book/cargo_criterion/external_tools.html
-- **libtest JSON RFC:** https://rust-lang.github.io/rfcs/3558-libtest-json.html
-- **Rust libtest tracking issue:** https://github.com/rust-lang/rust/issues/49359
-- **nextest libtest-json tracking issue:** https://github.com/nextest-rs/nextest/issues/1152
+- **quick-xml (Rust XML parser):** https://github.com/tafia/quick-xml
+- **Jenkins JUnit format:** https://llg.cubic.org/docs/junit/
