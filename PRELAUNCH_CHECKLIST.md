@@ -105,7 +105,7 @@ This checklist covers items to review and complete before publicly announcing th
   - [x] Add `cargo install git-perf` to README
   - [x] Building from source
   - [x] Pre-built binaries from releases
-- [ ] Add FAQ section to README
+- [x] Add FAQ section to README
 - [ ] Create evaluation README in `evaluation/` directory (referenced in INDEX.md but missing)
 - [ ] Add security policy (SECURITY.md) for vulnerability reporting
 - [ ] Add examples directory with real-world use cases
@@ -149,7 +149,7 @@ To announce the project publicly, at minimum complete:
    - [x] Published cleanup GitHub Action
    - [x] CONTRIBUTING.md
    - [ ] Repository topics/tags
-   - [ ] FAQ section
+   - [x] FAQ section
 
 3. **📌 NICE TO HAVE** (Can be added post-launch):
    - [x] crates.io publishing

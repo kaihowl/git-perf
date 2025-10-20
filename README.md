@@ -244,9 +244,9 @@ git perf add 42.5 -m build_time
 git perf audit -m build_time
 # Output: ✓ build_time: 42.5 ms (within acceptable range)
 
-# Reports and exports automatically include units
+# Reports and CSV exports automatically include units
 git perf report -o report.html -m build_time
-git perf export -m build_time > data.csv
+git perf report -o data.csv -m build_time
 ```
 
 ### Usage Examples
@@ -430,7 +430,38 @@ This shows build time increased from ~100 to 250 (150% increase) with high stati
 
 ## Frequently Asked Questions
 
-### Why aren't units stored with measurement data?
+### General Usage
+
+#### What are the system requirements for git-perf?
+
+- **Git**: Version 2.43.0 or higher
+- **Platforms**: Linux (x86_64, ARM64), macOS (ARM64/Apple Silicon)
+- **For building from source**: Rust toolchain (latest stable)
+
+#### Can I use git-perf with a private repository?
+
+Yes! git-perf works with both public and private repositories. For custom remote setups:
+
+```bash
+# Set up a custom remote for measurements
+git remote add perf-upstream git@github.com:org/private-repo.git
+git remote set-url git-perf-origin git@github.com:org/private-repo.git
+```
+
+See the [Remote Setup](#remote-setup) section for details.
+
+#### Is there a performance impact when using git-perf?
+
+Measurement operations have minimal overhead:
+- **Adding measurements**: Individual `add` commands are slower than bulk operations
+- **Recommendation**: Use `git perf measure` for automatic timing or bulk additions when possible
+- **Push/pull**: Operations are efficient and similar to git-notes operations
+
+For CI/CD usage, the overhead is typically negligible compared to build times.
+
+### Configuration & Units
+
+#### Why aren't units stored with measurement data?
 
 git-perf uses a **configuration-only approach** for units rather than storing them with each measurement. This design decision provides several advantages:
 
@@ -453,7 +484,7 @@ git-perf uses a **configuration-only approach** for units rather than storing th
 
 This approach matches git-perf's configuration philosophy where display settings (like `dispersion_method`) are config-based. It provides 80% of the value (clear report display) with 20% of the complexity, and can be extended later if validation becomes important.
 
-### How do I migrate existing measurements to use units?
+#### How do I migrate existing measurements to use units?
 
 No migration needed! Simply add unit configuration to your `.gitperfconfig`:
 
@@ -464,7 +495,7 @@ unit = "ms"
 
 Existing measurements will automatically display with units in all output (audit, reports, CSV exports). The configuration is applied at display time, so it works retroactively with all historical measurements.
 
-### Can I use different units for the same measurement over time?
+#### Can I use different units for the same measurement over time?
 
 While technically possible by changing the configuration, this is **not recommended**. Units reflect how measurements were actually recorded. If you change from recording milliseconds to seconds, you should:
 
@@ -473,6 +504,157 @@ While technically possible by changing the configuration, this is **not recommen
 3. Use the new measurement name going forward
 
 This ensures clarity and prevents confusion when analyzing historical data.
+
+### Audit & Regression Detection
+
+#### Why is my audit reporting false positives?
+
+If audits detect regressions for normal variations, try these solutions:
+
+1. **Increase relative deviation threshold** in `.gitperfconfig`:
+   ```toml
+   [measurement."build_time"]
+   min_relative_deviation = 10.0  # Percentage change required
+   ```
+
+2. **Switch to MAD for more robust detection**:
+   ```toml
+   [measurement."build_time"]
+   dispersion_method = "mad"  # Less sensitive to outliers
+   ```
+
+3. **Increase sigma threshold** via CLI:
+   ```bash
+   git perf audit -m build_time -d 6.0  # Default is 4.0
+   ```
+
+#### How do I choose between stddev and MAD?
+
+**Use Standard Deviation (stddev)** when:
+- Your performance data is normally distributed
+- You want to detect all changes, including outlier-caused ones
+- You have consistent, stable measurement environments
+
+**Use MAD (Median Absolute Deviation)** when:
+- Performance data has occasional outliers or spikes
+- You want to focus on typical performance changes
+- You're measuring in environments with variable system load
+- You need more robust regression detection
+
+See the [Audit System](#audit-system) section for complete details.
+
+#### What's the minimum number of measurements needed before auditing?
+
+By default, git-perf requires at least 10 measurements (configurable with `--min-measurements`). With fewer measurements:
+- Audits are skipped with a message
+- Sparkline is still shown for available data
+- Statistical analysis becomes more reliable as more data is collected
+
+```bash
+# Adjust minimum required measurements
+git perf audit -m build_time --min-measurements 5
+```
+
+#### What does the sparkline visualization show?
+
+The sparkline (e.g., `▁▃▇▁`) shows:
+- **Bars**: Each represents a measurement's relative magnitude
+- **Height**: From ▁ (lowest) to █ (highest)
+- **Percentage range**: Shows min/max measurements relative to tail median
+- **Purpose**: Quickly identify outliers, trends, and distribution
+
+Example: `[-1.0% – +96.0%] ▁▃▇▁` shows most values are low, with one significant outlier.
+
+### Data Management
+
+#### How long should I keep measurement data?
+
+**Recommended**: At least 90 days of measurement data for meaningful trend analysis.
+
+Configure cleanup retention:
+```yaml
+# In .github/workflows/cleanup-measurements.yml
+- uses: kaihowl/git-perf/.github/actions/cleanup@master
+  with:
+    retention-days: 90  # Days to retain measurements
+```
+
+Adjust based on your needs:
+- **Active development**: 90-180 days
+- **Stable projects**: 180-365 days
+- **Long-term analysis**: 365+ days
+
+#### Can I track the same metric across different environments?
+
+Yes! Use key-value pairs to track multi-environment measurements:
+
+```bash
+# Record with environment tag
+git perf measure -m build_time -k env=dev -- cargo build
+git perf measure -m build_time -k env=prod -- cargo build --release
+
+# Filter by environment
+git perf report -m build_time -k env=dev
+git perf audit -m build_time -s env=prod
+```
+
+### GitHub Actions Integration
+
+#### Why does push fail in GitHub Actions?
+
+Common causes and solutions:
+
+1. **Missing permissions**:
+   ```yaml
+   permissions:
+     contents: write  # Required for git perf push
+   ```
+
+2. **Insufficient fetch depth**:
+   ```yaml
+   - uses: actions/checkout@v4
+     with:
+       fetch-depth: 0  # Fetch full history
+   ```
+
+3. **Protected branch**: Add exception for GitHub Actions in branch protection settings
+
+#### How do I integrate audit results into my CI/CD pipeline?
+
+Use the report action for automatic PR comments:
+
+```yaml
+- name: Generate report with audit
+  uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    depth: 40
+    audit-args: '-m build_time -m binary_size -d 4.0'
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+The action will:
+- Run audits automatically
+- Comment on PRs with results
+- Fail the workflow if regressions are detected
+
+### Troubleshooting
+
+#### Can I export measurements in different formats?
+
+Yes, git-perf supports CSV export using the report command:
+
+```bash
+# Export to CSV file
+git perf report -m build_time -o data.csv
+
+# Export to stdout
+git perf report -m build_time -o -
+
+# Export with aggregation (e.g., mean)
+git perf report -m build_time -a mean -o data.csv
+```
+
+Units configured in `.gitperfconfig` automatically appear in the CSV output.
 
 ## Documentation
 
