@@ -71,13 +71,10 @@ struct TestCase {
     name: String,
     #[serde(rename = "@classname", default)]
     classname: String,
-    #[serde(rename = "@time", default)]
+    #[serde(rename = "@time")]
     time: Option<f64>,
-    #[serde(default)]
     failure: Option<Failure>,
-    #[serde(default)]
     error: Option<Error>,
-    #[serde(default)]
     skipped: Option<Skipped>,
 }
 

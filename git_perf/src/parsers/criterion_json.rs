@@ -36,17 +36,11 @@ struct CriterionMessage {
     reason: String,
     #[serde(default)]
     id: String,
-    #[serde(default)]
     group: Option<String>,
-    #[serde(default)]
     unit: Option<String>,
-    #[serde(default)]
     mean: Option<Estimate>,
-    #[serde(default)]
     median: Option<Estimate>,
-    #[serde(default)]
     slope: Option<Estimate>,
-    #[serde(default)]
     median_abs_dev: Option<Estimate>,
 }
 
@@ -54,9 +48,7 @@ struct CriterionMessage {
 #[allow(dead_code)]
 struct Estimate {
     estimate: f64,
-    #[serde(default)]
     lower_bound: Option<f64>,
-    #[serde(default)]
     upper_bound: Option<f64>,
 }
 
