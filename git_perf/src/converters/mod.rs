@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+use crate::config;
 use crate::data::MeasurementData;
 use crate::parsers::{BenchmarkMeasurement, ParsedMeasurement, TestMeasurement};
 
@@ -37,6 +38,16 @@ impl Default for ConversionOptions {
 /// This function takes a list of parsed measurements and converts them to
 /// the MeasurementData format, applying the specified conversion options.
 ///
+/// **Test Measurements:**
+/// - Only converted if duration is None (e.g., skipped/failed tests)
+/// - Tests WITH duration are skipped (don't track passing test performance)
+/// - Value set to 0.0 for tests without duration
+///
+/// **Benchmark Measurements:**
+/// - Value stored in the original unit from criterion (preserves unit field)
+/// - Creates one measurement per statistic (mean, median, slope, MAD)
+/// - Unit validation warnings logged for mismatches with config
+///
 /// # Arguments
 ///
 /// * `parsed` - Vector of parsed measurements to convert
@@ -60,15 +71,28 @@ pub fn convert_to_measurements(
 
 /// Convert a test measurement to MeasurementData
 ///
+/// **IMPORTANT**: Only converts tests that do NOT have a duration.
+/// Tests with durations are skipped entirely (returns empty vec).
+///
+/// This is because:
+/// - We don't want to track performance of passing tests via import
+/// - Only failed/skipped tests (no duration) are useful for tracking
+/// - Performance tracking should use direct measurement or benchmarks
+///
 /// Creates a single MeasurementData entry with:
 /// - Name: `[prefix::]test::<test_name>`
-/// - Value: duration in seconds (0.0 if missing)
+/// - Value: 0.0 (no duration available)
 /// - Metadata: type=test, status, classname (if present), plus extra metadata
 fn convert_test(test: TestMeasurement, options: &ConversionOptions) -> Vec<MeasurementData> {
+    // Skip tests that have duration - we don't want to track passing test performance
+    if test.duration.is_some() {
+        return vec![];
+    }
+
     let name = format_measurement_name("test", &test.name, None, options);
 
-    // Convert duration to seconds (default to 0.0 if missing)
-    let val = test.duration.map(|d| d.as_secs_f64()).unwrap_or(0.0);
+    // Value is 0.0 since we only convert tests without duration
+    let val = 0.0;
 
     // Build metadata
     let mut key_values = HashMap::new();
@@ -94,12 +118,63 @@ fn convert_test(test: TestMeasurement, options: &ConversionOptions) -> Vec<Measu
     }]
 }
 
+/// Convert benchmark unit to a standard representation and value
+///
+/// Criterion reports units as: "ns", "us", "ms", "s"
+/// We convert the value to the base unit and normalize the unit string.
+///
+/// Returns (value, normalized_unit_string)
+fn convert_benchmark_unit(value: f64, unit: &str) -> (f64, String) {
+    match unit.to_lowercase().as_str() {
+        "ns" => (value, "ns".to_string()),
+        "us" | "μs" => (value * 1_000.0, "ns".to_string()), // Convert to ns
+        "ms" => (value * 1_000_000.0, "ns".to_string()),    // Convert to ns
+        "s" => (value * 1_000_000_000.0, "ns".to_string()), // Convert to ns
+        _ => {
+            // Unknown unit - preserve as-is and warn
+            log::warn!("Unknown benchmark unit '{}', storing value as-is", unit);
+            (value, unit.to_string())
+        }
+    }
+}
+
+/// Validate unit consistency with config and log warnings if needed
+fn validate_unit(measurement_name: &str, unit: &str) {
+    if let Some(configured_unit) = config::measurement_unit(measurement_name) {
+        if configured_unit != unit {
+            log::warn!(
+                "Unit mismatch for '{}': importing '{}' but config specifies '{}'. \
+                 Consider updating .gitperfconfig to match.",
+                measurement_name,
+                unit,
+                configured_unit
+            );
+        }
+    } else {
+        log::info!(
+            "No unit configured for '{}'. Importing with unit '{}'. \
+             Consider adding to .gitperfconfig: [measurement.\"{}\"]\nunit = \"{}\"",
+            measurement_name,
+            unit,
+            measurement_name,
+            unit
+        );
+    }
+}
+
 /// Convert a benchmark measurement to MeasurementData
 ///
 /// Creates multiple MeasurementData entries (one per statistic):
 /// - Name: `[prefix::]bench::<bench_id>::<statistic>`
-/// - Value: statistic value in seconds (converted from nanoseconds)
-/// - Metadata: type=bench, group, bench_name, input (if present), statistic, plus extra metadata
+/// - Value: statistic value in ORIGINAL UNIT from criterion
+/// - Unit: Normalized to "ns" for time-based benchmarks
+/// - Metadata: type=bench, group, bench_name, input (if present), statistic, unit, plus extra metadata
+///
+/// **Unit Handling:**
+/// - Preserves the unit from criterion's output
+/// - Normalizes time units to "ns" (converts us/ms/s → ns)
+/// - Stores unit in metadata for validation and display
+/// - Validates against configured unit and logs warnings
 fn convert_benchmark(
     bench: BenchmarkMeasurement,
     options: &ConversionOptions,
@@ -119,53 +194,59 @@ fn convert_benchmark(
     };
 
     // Helper to create a measurement for a specific statistic
-    let create_measurement = |stat_name: &str, value_ns: Option<f64>| -> Option<MeasurementData> {
-        value_ns.map(|ns| {
-            let name = format_measurement_name("bench", &bench.id, Some(stat_name), options);
+    let create_measurement =
+        |stat_name: &str, value: Option<f64>, unit: &str| -> Option<MeasurementData> {
+            value.map(|v| {
+                let name = format_measurement_name("bench", &bench.id, Some(stat_name), options);
 
-            // Convert nanoseconds to seconds
-            let val = ns / 1_000_000_000.0;
+                // Convert value and normalize unit
+                let (converted_value, normalized_unit) = convert_benchmark_unit(v, unit);
 
-            let mut key_values = HashMap::new();
-            key_values.insert("type".to_string(), "bench".to_string());
-            key_values.insert("group".to_string(), group.to_string());
-            key_values.insert("bench_name".to_string(), bench_name.to_string());
-            if let Some(input_val) = input {
-                key_values.insert("input".to_string(), input_val.to_string());
-            }
-            key_values.insert("statistic".to_string(), stat_name.to_string());
+                // Validate unit consistency with config
+                validate_unit(&name, &normalized_unit);
 
-            // Add benchmark's own metadata
-            for (k, v) in &bench.metadata {
-                key_values.insert(k.clone(), v.clone());
-            }
+                let mut key_values = HashMap::new();
+                key_values.insert("type".to_string(), "bench".to_string());
+                key_values.insert("group".to_string(), group.to_string());
+                key_values.insert("bench_name".to_string(), bench_name.to_string());
+                if let Some(input_val) = input {
+                    key_values.insert("input".to_string(), input_val.to_string());
+                }
+                key_values.insert("statistic".to_string(), stat_name.to_string());
+                key_values.insert("unit".to_string(), normalized_unit);
 
-            // Add extra metadata from options
-            for (k, v) in &options.extra_metadata {
-                key_values.insert(k.clone(), v.clone());
-            }
+                // Add benchmark's own metadata
+                for (k, v) in &bench.metadata {
+                    key_values.insert(k.clone(), v.clone());
+                }
 
-            MeasurementData {
-                epoch: options.epoch,
-                name,
-                timestamp: options.timestamp,
-                val,
-                key_values,
-            }
-        })
-    };
+                // Add extra metadata from options
+                for (k, v) in &options.extra_metadata {
+                    key_values.insert(k.clone(), v.clone());
+                }
+
+                MeasurementData {
+                    epoch: options.epoch,
+                    name,
+                    timestamp: options.timestamp,
+                    val: converted_value,
+                    key_values,
+                }
+            })
+        };
 
     // Create measurements for available statistics
-    if let Some(m) = create_measurement("mean", bench.statistics.mean_ns) {
+    let unit = &bench.statistics.unit;
+    if let Some(m) = create_measurement("mean", bench.statistics.mean_ns, unit) {
         measurements.push(m);
     }
-    if let Some(m) = create_measurement("median", bench.statistics.median_ns) {
+    if let Some(m) = create_measurement("median", bench.statistics.median_ns, unit) {
         measurements.push(m);
     }
-    if let Some(m) = create_measurement("slope", bench.statistics.slope_ns) {
+    if let Some(m) = create_measurement("slope", bench.statistics.slope_ns, unit) {
         measurements.push(m);
     }
-    if let Some(m) = create_measurement("mad", bench.statistics.mad_ns) {
+    if let Some(m) = create_measurement("mad", bench.statistics.mad_ns, unit) {
         measurements.push(m);
     }
 
@@ -243,7 +324,8 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_test_passed() {
+    fn test_convert_test_with_duration_is_skipped() {
+        // Tests WITH duration should be skipped
         let test = TestMeasurement {
             name: "test_one".to_string(),
             duration: Some(Duration::from_secs_f64(1.5)),
@@ -263,29 +345,13 @@ mod tests {
         };
 
         let result = convert_test(test, &options);
-        assert_eq!(result.len(), 1);
-
-        let measurement = &result[0];
-        assert_eq!(measurement.name, "test::test_one");
-        assert_eq!(measurement.val, 1.5);
-        assert_eq!(measurement.epoch, 1);
-        assert_eq!(measurement.timestamp, 1234567890.0);
-        assert_eq!(
-            measurement.key_values.get("type"),
-            Some(&"test".to_string())
-        );
-        assert_eq!(
-            measurement.key_values.get("status"),
-            Some(&"passed".to_string())
-        );
-        assert_eq!(
-            measurement.key_values.get("classname"),
-            Some(&"module::tests".to_string())
-        );
+        // Should return empty vec - test with duration is skipped
+        assert_eq!(result.len(), 0);
     }
 
     #[test]
-    fn test_convert_test_missing_duration() {
+    fn test_convert_test_without_duration() {
+        // Tests WITHOUT duration should be converted
         let test = TestMeasurement {
             name: "test_skipped".to_string(),
             duration: None,
@@ -305,11 +371,32 @@ mod tests {
     }
 
     #[test]
+    fn test_convert_test_failed_without_duration() {
+        let test = TestMeasurement {
+            name: "test_failed".to_string(),
+            duration: None,
+            status: TestStatus::Failed,
+            metadata: HashMap::new(),
+        };
+
+        let options = ConversionOptions::default();
+        let result = convert_test(test, &options);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "test::test_failed");
+        assert_eq!(result[0].val, 0.0);
+        assert_eq!(
+            result[0].key_values.get("status"),
+            Some(&"failed".to_string())
+        );
+    }
+
+    #[test]
     fn test_convert_test_with_extra_metadata() {
         let test = TestMeasurement {
             name: "test_ci".to_string(),
-            duration: Some(Duration::from_secs_f64(2.0)),
-            status: TestStatus::Passed,
+            duration: None,
+            status: TestStatus::Error,
             metadata: HashMap::new(),
         };
 
@@ -323,6 +410,7 @@ mod tests {
         };
 
         let result = convert_test(test, &options);
+        assert_eq!(result.len(), 1);
         assert_eq!(result[0].key_values.get("ci"), Some(&"true".to_string()));
         assert_eq!(
             result[0].key_values.get("branch"),
@@ -331,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_benchmark_all_statistics() {
+    fn test_convert_benchmark_all_statistics_nanoseconds() {
         let bench = BenchmarkMeasurement {
             id: "group/bench_name/100".to_string(),
             statistics: BenchStatistics {
@@ -353,12 +441,12 @@ mod tests {
         let result = convert_benchmark(bench, &options);
         assert_eq!(result.len(), 4);
 
-        // Check mean measurement
+        // Check mean measurement - should be in nanoseconds
         let mean = result
             .iter()
             .find(|m| m.name == "bench::group/bench_name/100::mean")
             .unwrap();
-        assert_eq!(mean.val, 15000.0 / 1_000_000_000.0);
+        assert_eq!(mean.val, 15000.0); // Stored in nanoseconds
         assert_eq!(mean.key_values.get("type"), Some(&"bench".to_string()));
         assert_eq!(mean.key_values.get("group"), Some(&"group".to_string()));
         assert_eq!(
@@ -367,36 +455,42 @@ mod tests {
         );
         assert_eq!(mean.key_values.get("input"), Some(&"100".to_string()));
         assert_eq!(mean.key_values.get("statistic"), Some(&"mean".to_string()));
+        assert_eq!(mean.key_values.get("unit"), Some(&"ns".to_string()));
 
         // Check median measurement
         let median = result
             .iter()
             .find(|m| m.name == "bench::group/bench_name/100::median")
             .unwrap();
-        assert_eq!(median.val, 14500.0 / 1_000_000_000.0);
+        assert_eq!(median.val, 14500.0); // Stored in nanoseconds
         assert_eq!(
             median.key_values.get("statistic"),
             Some(&"median".to_string())
         );
+        assert_eq!(median.key_values.get("unit"), Some(&"ns".to_string()));
+    }
 
-        // Check slope measurement
-        let slope = result
-            .iter()
-            .find(|m| m.name == "bench::group/bench_name/100::slope")
-            .unwrap();
-        assert_eq!(slope.val, 15200.0 / 1_000_000_000.0);
-        assert_eq!(
-            slope.key_values.get("statistic"),
-            Some(&"slope".to_string())
-        );
+    #[test]
+    fn test_convert_benchmark_unit_conversion() {
+        // Test microseconds converted to nanoseconds
+        let (val, unit) = convert_benchmark_unit(15.5, "us");
+        assert_eq!(val, 15500.0); // 15.5 us = 15500 ns
+        assert_eq!(unit, "ns");
 
-        // Check MAD measurement
-        let mad = result
-            .iter()
-            .find(|m| m.name == "bench::group/bench_name/100::mad")
-            .unwrap();
-        assert_eq!(mad.val, 100.0 / 1_000_000_000.0);
-        assert_eq!(mad.key_values.get("statistic"), Some(&"mad".to_string()));
+        // Test milliseconds converted to nanoseconds
+        let (val, unit) = convert_benchmark_unit(2.5, "ms");
+        assert_eq!(val, 2_500_000.0); // 2.5 ms = 2,500,000 ns
+        assert_eq!(unit, "ns");
+
+        // Test seconds converted to nanoseconds
+        let (val, unit) = convert_benchmark_unit(1.5, "s");
+        assert_eq!(val, 1_500_000_000.0); // 1.5 s = 1,500,000,000 ns
+        assert_eq!(unit, "ns");
+
+        // Test nanoseconds preserved
+        let (val, unit) = convert_benchmark_unit(1000.0, "ns");
+        assert_eq!(val, 1000.0);
+        assert_eq!(unit, "ns");
     }
 
     #[test]
@@ -424,6 +518,11 @@ mod tests {
         assert!(result
             .iter()
             .any(|m| m.name == "bench::group/bench_name::slope"));
+
+        // Verify unit is stored
+        assert!(result
+            .iter()
+            .all(|m| m.key_values.get("unit") == Some(&"ns".to_string())));
     }
 
     #[test]
@@ -454,6 +553,7 @@ mod tests {
             Some(&"my_bench".to_string())
         );
         assert_eq!(measurement.key_values.get("input"), None);
+        assert_eq!(measurement.key_values.get("unit"), Some(&"ns".to_string()));
     }
 
     #[test]
@@ -461,8 +561,8 @@ mod tests {
         let parsed = vec![
             ParsedMeasurement::Test(TestMeasurement {
                 name: "test_one".to_string(),
-                duration: Some(Duration::from_secs(1)),
-                status: TestStatus::Passed,
+                duration: None, // Changed: no duration so it gets converted
+                status: TestStatus::Failed,
                 metadata: HashMap::new(),
             }),
             ParsedMeasurement::Benchmark(BenchmarkMeasurement {
@@ -481,7 +581,7 @@ mod tests {
         let options = ConversionOptions::default();
         let result = convert_to_measurements(parsed, &options);
 
-        // 1 test + 2 bench statistics = 3 measurements
+        // 1 test (failed, no duration) + 2 bench statistics = 3 measurements
         assert_eq!(result.len(), 3);
         assert!(result.iter().any(|m| m.name == "test::test_one"));
         assert!(result.iter().any(|m| m.name == "bench::group/bench::mean"));
@@ -491,11 +591,36 @@ mod tests {
     }
 
     #[test]
+    fn test_convert_to_measurements_skips_passing_tests() {
+        let parsed = vec![
+            ParsedMeasurement::Test(TestMeasurement {
+                name: "test_passing".to_string(),
+                duration: Some(Duration::from_secs(1)), // Has duration - should be skipped
+                status: TestStatus::Passed,
+                metadata: HashMap::new(),
+            }),
+            ParsedMeasurement::Test(TestMeasurement {
+                name: "test_failed".to_string(),
+                duration: None, // No duration - should be converted
+                status: TestStatus::Failed,
+                metadata: HashMap::new(),
+            }),
+        ];
+
+        let options = ConversionOptions::default();
+        let result = convert_to_measurements(parsed, &options);
+
+        // Only the failed test (without duration) should be converted
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "test::test_failed");
+    }
+
+    #[test]
     fn test_convert_with_prefix() {
         let parsed = vec![ParsedMeasurement::Test(TestMeasurement {
             name: "my_test".to_string(),
-            duration: Some(Duration::from_secs(1)),
-            status: TestStatus::Passed,
+            duration: None,
+            status: TestStatus::Error,
             metadata: HashMap::new(),
         })];
 
@@ -507,15 +632,15 @@ mod tests {
     }
 
     #[test]
-    fn test_nanoseconds_to_seconds_conversion() {
+    fn test_benchmark_preserves_unit() {
         let bench = BenchmarkMeasurement {
             id: "group/bench".to_string(),
             statistics: BenchStatistics {
-                mean_ns: Some(1_500_000_000.0), // 1.5 seconds in nanoseconds
+                mean_ns: Some(1500.0), // 1500 microseconds
                 median_ns: None,
                 slope_ns: None,
                 mad_ns: None,
-                unit: "ns".to_string(),
+                unit: "us".to_string(), // Microseconds
             },
             metadata: HashMap::new(),
         };
@@ -524,6 +649,9 @@ mod tests {
         let result = convert_benchmark(bench, &options);
 
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].val, 1.5); // Should be converted to seconds
+        // Value should be converted to nanoseconds: 1500 us = 1,500,000 ns
+        assert_eq!(result[0].val, 1_500_000.0);
+        // Unit should be normalized to ns
+        assert_eq!(result[0].key_values.get("unit"), Some(&"ns".to_string()));
     }
 }
