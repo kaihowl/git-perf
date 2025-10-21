@@ -39,12 +39,13 @@ impl Default for ConversionOptions {
 /// the MeasurementData format, applying the specified conversion options.
 ///
 /// **Test Measurements:**
-/// - Only converted if duration is None (e.g., skipped/failed tests)
-/// - Tests WITH duration are skipped (don't track passing test performance)
-/// - Value set to 0.0 for tests without duration
+/// - Only converted if duration is present (tests with performance data)
+/// - Tests WITHOUT duration are skipped (no performance to track)
+/// - Value stored in nanoseconds for consistency with benchmarks
+/// - Unit stored in metadata as "ns"
 ///
 /// **Benchmark Measurements:**
-/// - Value stored in the original unit from criterion (preserves unit field)
+/// - Value stored in nanoseconds (converts us/ms/s → ns)
 /// - Creates one measurement per statistic (mean, median, slope, MAD)
 /// - Unit validation warnings logged for mismatches with config
 ///
@@ -71,33 +72,37 @@ pub fn convert_to_measurements(
 
 /// Convert a test measurement to MeasurementData
 ///
-/// **IMPORTANT**: Only converts tests that do NOT have a duration.
-/// Tests with durations are skipped entirely (returns empty vec).
+/// **IMPORTANT**: Only converts tests that HAVE a duration.
+/// Tests without durations are skipped entirely (returns empty vec).
 ///
 /// This is because:
-/// - We don't want to track performance of passing tests via import
-/// - Only failed/skipped tests (no duration) are useful for tracking
-/// - Performance tracking should use direct measurement or benchmarks
+/// - We want to track test performance over time
+/// - Tests without duration (failed/skipped before execution) have no performance data
+/// - Duration is stored in nanoseconds for consistency with benchmarks
 ///
 /// Creates a single MeasurementData entry with:
 /// - Name: `[prefix::]test::<test_name>`
-/// - Value: 0.0 (no duration available)
-/// - Metadata: type=test, status, classname (if present), plus extra metadata
+/// - Value: duration in nanoseconds
+/// - Metadata: type=test, status, unit=ns, classname (if present), plus extra metadata
 fn convert_test(test: TestMeasurement, options: &ConversionOptions) -> Vec<MeasurementData> {
-    // Skip tests that have duration - we don't want to track passing test performance
-    if test.duration.is_some() {
+    // Skip tests that don't have duration - no performance data to track
+    let Some(duration) = test.duration else {
         return vec![];
-    }
+    };
 
     let name = format_measurement_name("test", &test.name, None, options);
 
-    // Value is 0.0 since we only convert tests without duration
-    let val = 0.0;
+    // Convert duration to nanoseconds for consistency with benchmarks
+    let val = duration.as_nanos() as f64;
+
+    // Validate unit consistency with config
+    validate_unit(&name, "ns");
 
     // Build metadata
     let mut key_values = HashMap::new();
     key_values.insert("type".to_string(), "test".to_string());
     key_values.insert("status".to_string(), test.status.as_str().to_string());
+    key_values.insert("unit".to_string(), "ns".to_string());
 
     // Add test's own metadata (like classname)
     for (k, v) in test.metadata {
@@ -324,8 +329,8 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_test_with_duration_is_skipped() {
-        // Tests WITH duration should be skipped
+    fn test_convert_test_with_duration() {
+        // Tests WITH duration should be converted
         let test = TestMeasurement {
             name: "test_one".to_string(),
             duration: Some(Duration::from_secs_f64(1.5)),
@@ -345,13 +350,33 @@ mod tests {
         };
 
         let result = convert_test(test, &options);
-        // Should return empty vec - test with duration is skipped
-        assert_eq!(result.len(), 0);
+        // Should convert test with duration
+        assert_eq!(result.len(), 1);
+
+        let measurement = &result[0];
+        assert_eq!(measurement.name, "test::test_one");
+        // 1.5 seconds = 1,500,000,000 nanoseconds
+        assert_eq!(measurement.val, 1_500_000_000.0);
+        assert_eq!(measurement.epoch, 1);
+        assert_eq!(measurement.timestamp, 1234567890.0);
+        assert_eq!(
+            measurement.key_values.get("type"),
+            Some(&"test".to_string())
+        );
+        assert_eq!(
+            measurement.key_values.get("status"),
+            Some(&"passed".to_string())
+        );
+        assert_eq!(measurement.key_values.get("unit"), Some(&"ns".to_string()));
+        assert_eq!(
+            measurement.key_values.get("classname"),
+            Some(&"module::tests".to_string())
+        );
     }
 
     #[test]
-    fn test_convert_test_without_duration() {
-        // Tests WITHOUT duration should be converted
+    fn test_convert_test_without_duration_is_skipped() {
+        // Tests WITHOUT duration should be skipped
         let test = TestMeasurement {
             name: "test_skipped".to_string(),
             duration: None,
@@ -362,16 +387,12 @@ mod tests {
         let options = ConversionOptions::default();
         let result = convert_test(test, &options);
 
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].val, 0.0);
-        assert_eq!(
-            result[0].key_values.get("status"),
-            Some(&"skipped".to_string())
-        );
+        // Should return empty vec - test without duration is skipped
+        assert_eq!(result.len(), 0);
     }
 
     #[test]
-    fn test_convert_test_failed_without_duration() {
+    fn test_convert_test_failed_without_duration_is_skipped() {
         let test = TestMeasurement {
             name: "test_failed".to_string(),
             duration: None,
@@ -382,21 +403,16 @@ mod tests {
         let options = ConversionOptions::default();
         let result = convert_test(test, &options);
 
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "test::test_failed");
-        assert_eq!(result[0].val, 0.0);
-        assert_eq!(
-            result[0].key_values.get("status"),
-            Some(&"failed".to_string())
-        );
+        // Should be skipped - no duration available
+        assert_eq!(result.len(), 0);
     }
 
     #[test]
     fn test_convert_test_with_extra_metadata() {
         let test = TestMeasurement {
             name: "test_ci".to_string(),
-            duration: None,
-            status: TestStatus::Error,
+            duration: Some(Duration::from_millis(250)), // Add duration so test is converted
+            status: TestStatus::Passed,
             metadata: HashMap::new(),
         };
 
@@ -416,6 +432,9 @@ mod tests {
             result[0].key_values.get("branch"),
             Some(&"main".to_string())
         );
+        assert_eq!(result[0].key_values.get("unit"), Some(&"ns".to_string()));
+        // 250 ms = 250,000,000 ns
+        assert_eq!(result[0].val, 250_000_000.0);
     }
 
     #[test]
@@ -561,8 +580,8 @@ mod tests {
         let parsed = vec![
             ParsedMeasurement::Test(TestMeasurement {
                 name: "test_one".to_string(),
-                duration: None, // Changed: no duration so it gets converted
-                status: TestStatus::Failed,
+                duration: Some(Duration::from_millis(100)), // Has duration so it gets converted
+                status: TestStatus::Passed,
                 metadata: HashMap::new(),
             }),
             ParsedMeasurement::Benchmark(BenchmarkMeasurement {
@@ -581,7 +600,7 @@ mod tests {
         let options = ConversionOptions::default();
         let result = convert_to_measurements(parsed, &options);
 
-        // 1 test (failed, no duration) + 2 bench statistics = 3 measurements
+        // 1 test (with duration) + 2 bench statistics = 3 measurements
         assert_eq!(result.len(), 3);
         assert!(result.iter().any(|m| m.name == "test::test_one"));
         assert!(result.iter().any(|m| m.name == "bench::group/bench::mean"));
@@ -591,17 +610,17 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_to_measurements_skips_passing_tests() {
+    fn test_convert_to_measurements_skips_tests_without_duration() {
         let parsed = vec![
             ParsedMeasurement::Test(TestMeasurement {
                 name: "test_passing".to_string(),
-                duration: Some(Duration::from_secs(1)), // Has duration - should be skipped
+                duration: Some(Duration::from_secs(1)), // Has duration - should be converted
                 status: TestStatus::Passed,
                 metadata: HashMap::new(),
             }),
             ParsedMeasurement::Test(TestMeasurement {
                 name: "test_failed".to_string(),
-                duration: None, // No duration - should be converted
+                duration: None, // No duration - should be skipped
                 status: TestStatus::Failed,
                 metadata: HashMap::new(),
             }),
@@ -610,17 +629,20 @@ mod tests {
         let options = ConversionOptions::default();
         let result = convert_to_measurements(parsed, &options);
 
-        // Only the failed test (without duration) should be converted
+        // Only the passing test (with duration) should be converted
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "test::test_failed");
+        assert_eq!(result[0].name, "test::test_passing");
+        // 1 second = 1,000,000,000 nanoseconds
+        assert_eq!(result[0].val, 1_000_000_000.0);
+        assert_eq!(result[0].key_values.get("unit"), Some(&"ns".to_string()));
     }
 
     #[test]
     fn test_convert_with_prefix() {
         let parsed = vec![ParsedMeasurement::Test(TestMeasurement {
             name: "my_test".to_string(),
-            duration: None,
-            status: TestStatus::Error,
+            duration: Some(Duration::from_millis(50)), // Add duration so test is converted
+            status: TestStatus::Passed,
             metadata: HashMap::new(),
         })];
 
@@ -629,6 +651,7 @@ mod tests {
 
         let result = convert_to_measurements(parsed, &options);
         assert_eq!(result[0].name, "ci::test::my_test");
+        assert_eq!(result[0].val, 50_000_000.0); // 50 ms in nanoseconds
     }
 
     #[test]

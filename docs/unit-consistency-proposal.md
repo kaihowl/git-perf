@@ -15,16 +15,17 @@ This document describes the approach taken to maintain unit consistency between 
 
 ### Test Measurements
 
-**Behavior**: Tests WITH duration are **skipped entirely** (not converted).
+**Behavior**: Tests WITHOUT duration are **skipped entirely** (not converted).
 
 **Rationale**:
-- We don't want to track performance of passing tests via import
-- Only failed/error/skipped tests (typically without duration) are useful for tracking
-- Performance tracking should use direct measurement or benchmarks
+- We want to track test performance over time
+- Tests without duration (failed/skipped before execution) have no performance data
+- Duration is stored in **nanoseconds** for consistency with benchmarks
 
-**For tests without duration**:
-- Value: `0.0` (no duration available)
-- No unit stored (no meaningful performance data)
+**For tests with duration**:
+- Value: Duration in **nanoseconds** (converted from Duration type)
+- Unit: `"ns"` stored in metadata
+- Unit validation against config performed
 
 ### Benchmark Measurements
 
@@ -72,7 +73,18 @@ The converter uses `config::measurement_unit()` to check for configured units.
 
 ### Metadata Storage
 
-Every benchmark measurement includes:
+**Test measurements include**:
+```rust
+key_values: {
+    "type": "test",
+    "status": "passed",
+    "unit": "ns",  // ← Stored unit
+    "classname": "module::tests",
+    // ... plus user metadata
+}
+```
+
+**Benchmark measurements include**:
 ```rust
 key_values: {
     "type": "bench",
