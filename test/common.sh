@@ -8,6 +8,12 @@ export RUST_BACKTRACE=1
 
 shopt -s nocasematch
 
+# Hermetic git environment - ignore system and global git config
+# This prevents issues with commit signing and other global git settings
+export GIT_CONFIG_NOSYSTEM=true
+export GIT_CONFIG_GLOBAL=/dev/null
+
+# Set git author and committer info for tests
 export GIT_COMMITTER_NAME="github-actions[bot]"
 export GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
 export GIT_AUTHOR_NAME="github-actions[bot]"

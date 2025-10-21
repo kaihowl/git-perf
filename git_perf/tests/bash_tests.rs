@@ -13,10 +13,14 @@ mod test {
         paths.insert(0, binary_path.parent().unwrap().to_path_buf());
         let new_path = env::join_paths(paths).expect("Failed to join PATH");
 
-        // Run the bash test script with the updated PATH
+        // Run the bash test script with the updated PATH and hermetic git environment
+        // These environment variables ensure tests don't use system/global git config
+        // which could have commit signing or other settings that interfere with tests
         let output = Command::new("bash")
             .args(["../test/run_tests.sh", start_filter])
             .env("PATH", new_path)
+            .env("GIT_CONFIG_NOSYSTEM", "true")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .output()
             .expect("Failed to run bash test");
 
