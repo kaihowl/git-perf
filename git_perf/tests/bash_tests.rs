@@ -21,6 +21,16 @@ mod test {
             .env("PATH", new_path)
             .env("GIT_CONFIG_NOSYSTEM", "true")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "github-actions[bot]")
+            .env(
+                "GIT_AUTHOR_EMAIL",
+                "41898282+github-actions[bot]@users.noreply.github.com",
+            )
+            .env("GIT_COMMITTER_NAME", "github-actions[bot]")
+            .env(
+                "GIT_COMMITTER_EMAIL",
+                "41898282+github-actions[bot]@users.noreply.github.com",
+            )
             .output()
             .expect("Failed to run bash test");
 
