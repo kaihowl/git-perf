@@ -43,11 +43,6 @@ jobs:
       with:
         fetch-depth: 40
 
-    - name: Set Git user and email
-      run: |
-        git config --global user.name "GitHub Actions Bot"
-        git config --global user.email "actions@github.com"
-
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -71,6 +66,11 @@ jobs:
       run: cargo nextest run --verbose
 
     - name: Run sample perf measurements
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
           cargo install --path git_perf
@@ -192,11 +192,6 @@ jobs:
       with:
         fetch-depth: 40
 
-    - name: Set Git user and email
-      run: |
-        git config --global user.name "GitHub Actions Bot"
-        git config --global user.email "actions@github.com"
-
     - name: Install Rust (stable)
       uses: dtolnay/rust-toolchain@master
       with:
@@ -206,6 +201,11 @@ jobs:
       run: cargo build --locked --release -p git-perf
 
     - name: Measure binary size and push metric
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
         set -euo pipefail
         BIN=target/release/git-perf
