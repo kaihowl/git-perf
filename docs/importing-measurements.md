@@ -19,8 +19,6 @@ While `git perf measure` can track arbitrary command execution times, it doesn't
 - **CI integration** - Track performance metrics alongside code changes in your CI pipeline
 - **Unified reporting** - Visualize test and benchmark trends using existing report infrastructure
 
-**Design Philosophy:** git-perf doesn't run tests or benchmarks - it only **parses their output**. This follows the Unix philosophy of composability and keeps git-perf focused on measurement storage and analysis.
-
 ## Supported Formats
 
 ### JUnit XML (Tests)
@@ -114,19 +112,6 @@ git perf import junit target/nextest/ci/junit.xml
 # Run benchmarks and import
 cargo criterion --message-format json > bench-results.json
 git perf import criterion-json bench-results.json
-```
-
-### Import from Stdin
-
-```bash
-# Pipe JUnit XML to git-perf
-cat target/nextest/ci/junit.xml | git perf import junit
-
-# Explicit stdin
-git perf import junit -
-
-# Inline criterion output
-cargo criterion --message-format json | git perf import criterion-json
 ```
 
 ### Add Custom Metadata
@@ -454,71 +439,6 @@ git perf report --measurement "test::my_module::test_slow_operation"
 
 # Generate report for benchmark group
 git perf report --measurement "bench::fibonacci*"
-```
-
-## Troubleshooting
-
-### JUnit XML Not Generated
-
-**Problem:** Running tests doesn't create JUnit XML file.
-
-**Solution:** Ensure you've configured nextest properly:
-
-```toml
-# .config/nextest.toml
-[profile.ci.junit]
-path = "junit.xml"
-```
-
-Then run with the `ci` profile:
-```bash
-cargo nextest run --profile ci
-```
-
-### Import Shows Zero Measurements
-
-**Problem:** Import completes but no measurements are shown.
-
-**Possible causes:**
-1. **Skipped/failed tests** - Only passed tests with timing data are imported
-2. **Filter too restrictive** - Check your `--filter` regex
-3. **Malformed XML/JSON** - Use `--dry-run --verbose` to see parsing errors
-
-**Debug steps:**
-```bash
-# Check what would be imported
-git perf import junit junit.xml --dry-run --verbose
-
-# Remove filter to see all measurements
-git perf import junit junit.xml --dry-run
-```
-
-### Criterion JSON Parse Errors
-
-**Problem:** Criterion JSON import fails with parse errors.
-
-**Solution:** Ensure you're using the correct output format:
-
-```bash
-# Correct: Use --message-format json
-cargo criterion --message-format json > bench.json
-
-# Incorrect: Standard output is not JSON
-cargo criterion > bench.txt  # Won't work with import
-```
-
-### CI Environment Variability
-
-**Problem:** Tests show regressions in CI but not locally.
-
-**Solution:** CI environments are noisy. Use higher sigma thresholds:
-
-```bash
-# Use 5-10 sigma for CI environments
-git perf audit --measurement "test::*" --sigma 10.0
-
-# Or filter out the fastest tests (they're most variable)
-git perf audit --measurement "test::*" --sigma 5.0 | grep -v "< 0.001s"
 ```
 
 ## Best Practices
