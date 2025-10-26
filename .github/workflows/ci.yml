@@ -73,6 +73,9 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
+          # Install cargo-criterion for JSON output support
+          cargo install cargo-criterion --version 1.1.0 --locked
+
           # Run fibonacci benchmark with JSON output
           cargo criterion --bench sample_ci_bench --message-format json > bench-results.json || true
 
