@@ -81,9 +81,9 @@ This checklist covers items to review and complete before publicly announcing th
 ### Repository Metadata
 - [x] Add repository description (currently empty)
   - Suggested: "Performance measurement tracking for Git repositories using git-notes. Track, analyze, and visualize metrics with automated regression detection."
-- [ ] Add repository topics/tags for discoverability:
+- [x] Add repository topics/tags for discoverability:
   - Suggested: `git`, `performance`, `metrics`, `benchmarking`, `rust`, `github-actions`, `continuous-integration`, `regression-testing`
-- [ ] Set homepage URL (could point to example report or docs)
+- [x] Set homepage URL (could point to example report or docs)
 
 ### Community & Contribution
 - [x] Add `CONTRIBUTING.md` with:
