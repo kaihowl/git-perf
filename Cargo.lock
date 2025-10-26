@@ -1024,6 +1024,7 @@ dependencies = [
  "quick-xml",
  "rand 0.8.5",
  "readable",
+ "regex",
  "serde",
  "serde_json",
  "sparklines",

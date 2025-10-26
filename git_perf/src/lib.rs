@@ -5,6 +5,7 @@ pub mod config;
 pub mod converters;
 pub mod data;
 pub mod git;
+pub mod import;
 pub mod measurement_retrieval;
 pub mod measurement_storage;
 pub mod parsers;

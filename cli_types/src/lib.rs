@@ -94,6 +94,14 @@ pub struct CliReportHistory {
     pub max_count: usize,
 }
 
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ImportFormat {
+    /// JUnit XML format (nextest, pytest, Jest, etc.)
+    Junit,
+    /// cargo-criterion JSON format
+    CriterionJson,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Measure the runtime of the supplied command (in nanoseconds)
@@ -117,6 +125,78 @@ pub enum Commands {
 
         #[command(flatten)]
         measurement: CliMeasurement,
+    },
+
+    /// Import measurements from test runners and benchmarks
+    ///
+    /// Parse and store runtime measurements from external tools like cargo-nextest
+    /// (JUnit XML) and cargo-criterion (JSON). This allows tracking test and benchmark
+    /// performance over time using git-perf's measurement infrastructure.
+    ///
+    /// ## Supported Formats
+    ///
+    /// **junit** - JUnit XML format
+    /// - Works with: cargo-nextest, pytest, Jest, JUnit, and many other test frameworks
+    /// - Requires: Configure nextest with JUnit output in `.config/nextest.toml`
+    /// - Command: `cargo nextest run --profile ci` (outputs to target/nextest/ci/junit.xml)
+    ///
+    /// **criterion-json** - cargo-criterion JSON format
+    /// - Works with: cargo-criterion benchmarks
+    /// - Command: `cargo criterion --message-format json`
+    ///
+    /// ## Measurement Naming
+    ///
+    /// Tests: `test::<test_name>`
+    /// Benchmarks: `bench::<benchmark_id>::<statistic>` (mean, median, slope, mad)
+    ///
+    /// ## Examples
+    ///
+    /// ```bash
+    /// # Import test results from file
+    /// git-perf import junit target/nextest/ci/junit.xml
+    ///
+    /// # Import from stdin
+    /// cat junit.xml | git-perf import junit
+    ///
+    /// # Import with metadata
+    /// git-perf import junit junit.xml --metadata ci=true --metadata branch=main
+    ///
+    /// # Import with filtering (regex)
+    /// git-perf import junit junit.xml --filter "^integration::"
+    ///
+    /// # Dry run to preview
+    /// git-perf import junit junit.xml --dry-run --verbose
+    ///
+    /// # Import benchmarks
+    /// cargo criterion --message-format json > bench.json
+    /// git-perf import criterion-json bench.json
+    /// ```
+    Import {
+        /// Format of the input data
+        format: ImportFormat,
+
+        /// Input file path (use '-' or omit for stdin)
+        file: Option<String>,
+
+        /// Optional prefix to prepend to measurement names
+        #[arg(short, long)]
+        prefix: Option<String>,
+
+        /// Key-value pairs separated by '=' to add as metadata to all measurements
+        #[arg(short, long, value_parser=parse_key_value)]
+        metadata: Vec<(String, String)>,
+
+        /// Regex filter to select specific tests/benchmarks
+        #[arg(short = 'f', long)]
+        filter: Option<String>,
+
+        /// Preview what would be imported without storing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Show detailed information about imported measurements
+        #[arg(short, long)]
+        verbose: bool,
     },
 
     /// Publish performance results to remote
