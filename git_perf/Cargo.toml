@@ -58,14 +58,17 @@ httptest = "0.15.4"
 
 [features]
 vendored-openssl = []
+test-helpers = []
 
 [[bench]]
 name = "read"
 harness = false
 path = "benches/read.rs"
+required-features = ["test-helpers"]
 
 [[bench]]
 name = "add"
 harness = false
 path = "benches/add.rs"
+required-features = ["test-helpers"]
 

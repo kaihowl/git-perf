@@ -169,51 +169,11 @@ fn store_measurements(measurements: &[MeasurementData]) -> Result<()> {
 mod tests {
     use super::*;
     use crate::git::git_interop::walk_commits;
+    use crate::test_helpers::{dir_with_repo, hermetic_git_env};
     use std::collections::HashMap;
-    use std::env::{self, set_current_dir};
+    use std::env::set_current_dir;
     use std::io::Write;
-    use std::process::{Command, Stdio};
-    use tempfile::{tempdir, NamedTempFile, TempDir};
-
-    // Helper functions for test setup
-    fn run_git_command(args: &[&str], dir: &std::path::Path) {
-        assert!(Command::new("git")
-            .args(args)
-            .envs([
-                ("GIT_CONFIG_NOSYSTEM", "true"),
-                ("GIT_CONFIG_GLOBAL", "/dev/null"),
-                ("GIT_AUTHOR_NAME", "testuser"),
-                ("GIT_AUTHOR_EMAIL", "testuser@example.com"),
-                ("GIT_COMMITTER_NAME", "testuser"),
-                ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .current_dir(dir)
-            .status()
-            .expect("Failed to spawn git command")
-            .success());
-    }
-
-    fn init_repo(dir: &std::path::Path) {
-        run_git_command(&["init", "--initial-branch", "master"], dir);
-        run_git_command(&["commit", "--allow-empty", "-m", "Initial commit"], dir);
-    }
-
-    fn dir_with_repo() -> TempDir {
-        let tempdir = tempdir().unwrap();
-        init_repo(tempdir.path());
-        tempdir
-    }
-
-    fn hermetic_git_env() {
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-        env::set_var("GIT_COMMITTER_NAME", "testuser");
-        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
-    }
+    use tempfile::NamedTempFile;
 
     // Sample test data
     const SAMPLE_JUNIT_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>

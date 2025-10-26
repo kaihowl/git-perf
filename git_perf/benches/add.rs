@@ -2,10 +2,8 @@ use std::env::set_current_dir;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use git_perf::git::git_interop::add_note_line_to_head;
+use git_perf::test_helpers::{empty_commit, hermetic_git_env, init_repo_simple};
 use tempfile::tempdir;
-use utils::{empty_commit, hermetic_git_env, init_repo};
-
-mod utils;
 
 fn prep_repo() -> tempfile::TempDir {
     let temp_dir = tempdir().unwrap();
@@ -13,7 +11,7 @@ fn prep_repo() -> tempfile::TempDir {
     set_current_dir(temp_dir.path()).expect("Failed to change current path");
     hermetic_git_env();
 
-    init_repo();
+    init_repo_simple();
 
     empty_commit();
 

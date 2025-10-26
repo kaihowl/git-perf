@@ -801,8 +801,10 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::env::{self, set_current_dir};
-    use std::process;
+    use crate::test_helpers::{dir_with_repo, hermetic_git_env, init_repo, run_git_command};
+    use std::env::set_current_dir;
+    use std::process::Command;
+    use tempfile::tempdir;
 
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
@@ -810,37 +812,6 @@ mod test {
         responders::status_code,
         Expectation, Server,
     };
-    use tempfile::{tempdir, TempDir};
-
-    fn run_git_command(args: &[&str], dir: &Path) {
-        assert!(process::Command::new("git")
-            .args(args)
-            .envs([
-                ("GIT_CONFIG_NOSYSTEM", "true"),
-                ("GIT_CONFIG_GLOBAL", "/dev/null"),
-                ("GIT_AUTHOR_NAME", "testuser"),
-                ("GIT_AUTHOR_EMAIL", "testuser@example.com"),
-                ("GIT_COMMITTER_NAME", "testuser"),
-                ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
-            ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .current_dir(dir)
-            .status()
-            .expect("Failed to spawn git command")
-            .success());
-    }
-
-    fn init_repo(dir: &Path) {
-        run_git_command(&["init", "--initial-branch", "master"], dir);
-        run_git_command(&["commit", "--allow-empty", "-m", "Initial commit"], dir);
-    }
-
-    fn dir_with_repo() -> TempDir {
-        let tempdir = tempdir().unwrap();
-        init_repo(tempdir.path());
-        tempdir
-    }
 
     fn add_server_remote(origin_url: Uri, extra_header: &str, dir: &Path) {
         let url = origin_url.to_string();
@@ -855,15 +826,6 @@ mod test {
             ],
             dir,
         );
-    }
-
-    fn hermetic_git_env() {
-        env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-        env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-        env::set_var("GIT_AUTHOR_NAME", "testuser");
-        env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-        env::set_var("GIT_COMMITTER_NAME", "testuser");
-        env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
     }
 
     #[test]
@@ -1107,7 +1069,7 @@ mod test {
 
         // Create a shallow clone (depth 2) which will have grafted commits
         let shallow_dir = tempdir.path().join("shallow");
-        let output = process::Command::new("git")
+        let output = Command::new("git")
             .args(&[
                 "clone",
                 "--depth",

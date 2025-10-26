@@ -222,39 +222,8 @@ pub fn get_repository_root() -> Result<String, String> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_helpers::dir_with_repo;
     use std::env::set_current_dir;
-
-    use tempfile::{tempdir, TempDir};
-
-    fn run_git_command(args: &[&str], dir: &Path) {
-        assert!(process::Command::new("git")
-            .args(args)
-            .envs([
-                ("GIT_CONFIG_NOSYSTEM", "true"),
-                ("GIT_CONFIG_GLOBAL", "/dev/null"),
-                ("GIT_AUTHOR_NAME", "testuser"),
-                ("GIT_AUTHOR_EMAIL", "testuser@example.com"),
-                ("GIT_COMMITTER_NAME", "testuser"),
-                ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
-            ])
-            .current_dir(dir)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .expect("Failed to spawn git command")
-            .success());
-    }
-
-    fn init_repo(dir: &Path) {
-        run_git_command(&["init", "--initial-branch", "master"], dir);
-        run_git_command(&["commit", "--allow-empty", "-m", "Initial commit"], dir);
-    }
-
-    fn dir_with_repo() -> TempDir {
-        let tempdir = tempdir().unwrap();
-        init_repo(tempdir.path());
-        tempdir
-    }
 
     #[test]
     fn test_get_head_revision() {
