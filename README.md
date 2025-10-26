@@ -70,6 +70,30 @@ git perf audit -m build_time
 git perf push
 ```
 
+### Importing Test and Benchmark Results
+
+Track test execution times and benchmark results automatically:
+
+```bash
+# Import test results (JUnit XML format)
+cargo nextest run --profile ci
+git perf import junit target/nextest/ci/junit.xml
+
+# Import benchmark results (Criterion JSON format)
+cargo criterion --message-format json > bench-results.json
+git perf import criterion-json bench-results.json
+
+# Audit for performance regressions
+git perf audit --measurement "test::*"
+git perf audit --measurement "bench::*"
+```
+
+**Supported formats:**
+- **JUnit XML** - Works with cargo-nextest, pytest, Jest, JUnit, and many other test frameworks
+- **Criterion JSON** - Rust benchmark results with statistical data
+
+See the [Importing Measurements Guide](./docs/importing-measurements.md) for comprehensive documentation.
+
 ## Key Features
 
 - **Git-notes Integration**: Store performance data alongside your Git history
@@ -660,7 +684,9 @@ Units configured in `.gitperfconfig` automatically appear in the CSV output.
 
 ### Available Documentation
 
+- **[Importing Measurements Guide](./docs/importing-measurements.md)** - Import test and benchmark results
 - **[Manpages](./docs/manpage.md)** - Complete CLI reference
+- **[Integration Tutorial](./docs/INTEGRATION_TUTORIAL.md)** - GitHub Actions integration guide
 - **[Evaluation Tools](./evaluation/README.md)** - Statistical method comparison tools
 
 ### Generating Documentation
