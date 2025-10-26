@@ -339,7 +339,7 @@ pub fn convert_to_measurements(
 - [x] Add unit tests for conversion logic (13 tests, all passing)
 - [x] Test edge cases (missing fields, zero values)
 
-### Phase 3: CLI Integration
+### Phase 3: CLI Integration ✅ COMPLETE
 
 **Modified Files:**
 - `cli_types/src/lib.rs` - Add `ImportCommand`
@@ -380,17 +380,17 @@ pub enum ImportFormat {
 - `Some(path)` → Read from file
 
 **Tasks:**
-- [ ] Add `ImportCommand` to `cli_types`
-- [ ] Implement `handle_import()` function
-- [ ] Add stdin/file reading logic
-- [ ] Integrate parsers and converters
-- [ ] Add filtering support (regex)
-- [ ] Add dry-run and verbose modes
-- [ ] Wire up command router in `cli.rs`
-- [ ] Update `lib.rs` to export modules
-- [ ] Integration tests
+- [x] Add `ImportCommand` to `cli_types`
+- [x] Implement `handle_import()` function
+- [x] Add stdin/file reading logic
+- [x] Integrate parsers and converters
+- [x] Add filtering support (regex)
+- [x] Add dry-run and verbose modes
+- [x] Wire up command router in `cli.rs`
+- [x] Update `lib.rs` to export modules
+- [x] Integration tests
 
-### Phase 4: CI Benchmark Integration
+### Phase 4: CI Benchmark Integration ✅ COMPLETE
 
 **Goal:** Add a simple benchmark to CI that generates sample data for testing the import feature.
 
@@ -458,14 +458,14 @@ path = "junit.xml"
 ```
 
 **Tasks:**
-- [ ] Create `.config/nextest.toml` with JUnit configuration
-- [ ] Create `sample_ci_bench.rs` with simple fibonacci benchmark
-- [ ] Add benchmark to `Cargo.toml` [[bench]] section
-- [ ] Update CI workflow to run tests with JUnit output
-- [ ] Update CI workflow to run benchmark
-- [ ] Update CI workflow to import both test and benchmark results
-- [ ] Verify measurements stored in git notes
-- [ ] Document CI integration in README
+- [x] Create `.config/nextest.toml` with JUnit configuration
+- [x] Create `sample_ci_bench.rs` with simple fibonacci benchmark
+- [x] Add benchmark to `Cargo.toml` [[bench]] section
+- [x] Update CI workflow to run tests with JUnit output
+- [x] Update CI workflow to run benchmark
+- [x] Update CI workflow to import both test and benchmark results
+- [ ] Verify measurements stored in git notes (will be verified in CI runs)
+- [ ] Document CI integration in README (deferred to Phase 5)
 
 ### Phase 5: Documentation
 

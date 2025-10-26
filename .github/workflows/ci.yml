@@ -65,6 +65,46 @@ jobs:
     - name: Run tests
       run: cargo nextest run --verbose
 
+    - name: Run tests with JUnit output and import results
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      run: |
+          set -x
+          # Run tests with JUnit output
+          cargo nextest run --profile ci --verbose
+          # Import test results
+          cargo run -- import junit target/nextest/ci/junit.xml \
+            --metadata ci=true \
+            --metadata workflow="${GITHUB_WORKFLOW}" \
+            --metadata os=${{matrix.os}} \
+            --metadata rust=${{matrix.rust}}
+          # Push imported measurements
+          git push origin refs/notes/perf-v3 || true
+
+    - name: Run benchmarks and import results
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      run: |
+          set -x
+          # Run simple benchmark with JSON output
+          cargo criterion --bench sample_ci_bench --message-format json > bench-results.json || true
+          # Import benchmark results (if benchmark succeeded)
+          if [ -s bench-results.json ]; then
+            cargo run -- import criterion-json bench-results.json \
+              --metadata ci=true \
+              --metadata workflow="${GITHUB_WORKFLOW}" \
+              --metadata os=${{matrix.os}} \
+              --metadata rust=${{matrix.rust}}
+            # Push imported measurements
+            git push origin refs/notes/perf-v3 || true
+          fi
+
     - name: Run sample perf measurements
       env:
         GIT_AUTHOR_NAME: github-actions[bot]
