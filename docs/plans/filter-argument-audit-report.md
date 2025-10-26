@@ -46,27 +46,42 @@ This is limiting when:
 ### CLI Syntax
 
 ```bash
-# Single filter
+# Single filter - matches any measurement containing "bench"
 git-perf report -f "bench.*"
 
-# Multiple filters (OR logic)
-git-perf report -f "benchmark_.*" -f "test_.*"
+# Multiple filters (OR logic) - matches measurements with "benchmark_" OR "test_"
+git-perf report -f "^benchmark_.*" -f "^test_.*"
 
-# Combined with --measurement
-git-perf report -m my_bench -f ".*_release"
+# Equivalent to --measurement using anchored regex
+git-perf report -f "^my_bench$"  # Same as: -m my_bench
 
-# Audit with filters
-git-perf audit -m my_bench -f ".*_x64"
+# Combined with --measurement (OR logic)
+# Includes "my_bench" (exact) OR anything matching "other.*" pattern
+git-perf report -m my_bench -f "^other.*"
+
+# Filter by pattern instead of exact names
+git-perf report -f ".*_(x64|arm64|riscv)"
+
+# Audit with filters - includes all measurements matching the filter
+git-perf audit -m benchmark_x64 -m benchmark_arm64 -f "benchmark_riscv"
 ```
 
 ### Filter Semantics
 
+**Relationship between `--measurement` and `--filter`:**
+
+The `--measurement` argument is effectively equivalent to using `--filter` with an anchored regex pattern. For example:
+- `--measurement somename` is equivalent to `--filter "^somename$"`
+- `--measurement bench1 --measurement bench2` is equivalent to `--filter "^bench1$" --filter "^bench2$"`
+
+When both are provided, they are combined with OR logic - a measurement matches if it satisfies EITHER the measurement list OR any filter pattern.
+
 **For Report:**
 ```
 Include measurement IF:
-  (measurement_names.empty OR name IN measurement_names)
-  AND
-  (filters.empty OR name MATCHES ANY filter_regex)
+  ((measurement_names.empty AND filters.empty) OR
+   name IN measurement_names OR
+   name MATCHES ANY filter_regex)
   AND
   key_values_is_superset_of(key_values)
 ```
@@ -74,12 +89,12 @@ Include measurement IF:
 **For Audit:**
 ```
 Include measurement IF:
-  name == measurement
-  AND
-  (filters.empty OR name MATCHES ANY filter_regex)
+  (name IN measurements OR name MATCHES ANY filter_regex)
   AND
   key_values_is_superset_of(selectors)
 ```
+
+**Note:** For Audit, the `--measurement` argument behavior changes slightly to use OR logic with filters, making it more flexible than the current exact-match-only behavior.
 
 ### Regex Matching
 
@@ -620,14 +635,16 @@ EXAMPLES:
 
 ## Edge Cases
 
-1. **Empty filter list:** Matches all (existing behavior)
+1. **Empty filter and measurement lists:** Matches all measurements (existing behavior)
 2. **Filter matches nothing:** Empty result (with warning)
 3. **Invalid regex:** Clear error message with pattern shown
-4. **Filter conflicts with --measurement:**
-   - Both must pass (AND logic between arg types)
-   - If conflict, results in empty set (expected behavior)
-5. **Case sensitivity:** Case-sensitive (use `(?i)pattern` for case-insensitive)
-6. **Special regex characters:** Fully supported (escaped by user if literal needed)
+4. **Using both --measurement and --filter:**
+   - Combined with OR logic - measurement matches if it's in the measurement list OR matches any filter
+   - Example: `-m bench1 -f "test.*"` includes "bench1" + anything matching "test.*"
+   - This makes filters complementary rather than conflicting
+5. **Equivalence:** `--measurement somename` ≡ `--filter "^somename$"`
+6. **Case sensitivity:** Case-sensitive (use `(?i)pattern` for case-insensitive)
+7. **Special regex characters:** Fully supported (escaped by user if literal needed)
 
 ## Future Enhancements
 
