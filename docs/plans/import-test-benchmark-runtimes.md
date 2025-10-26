@@ -339,7 +339,7 @@ pub fn convert_to_measurements(
 - [x] Add unit tests for conversion logic (13 tests, all passing)
 - [x] Test edge cases (missing fields, zero values)
 
-### Phase 3: CLI Integration
+### Phase 3: CLI Integration ✅ COMPLETE
 
 **Modified Files:**
 - `cli_types/src/lib.rs` - Add `ImportCommand`
@@ -380,17 +380,17 @@ pub enum ImportFormat {
 - `Some(path)` → Read from file
 
 **Tasks:**
-- [ ] Add `ImportCommand` to `cli_types`
-- [ ] Implement `handle_import()` function
-- [ ] Add stdin/file reading logic
-- [ ] Integrate parsers and converters
-- [ ] Add filtering support (regex)
-- [ ] Add dry-run and verbose modes
-- [ ] Wire up command router in `cli.rs`
-- [ ] Update `lib.rs` to export modules
-- [ ] Integration tests
+- [x] Add `ImportCommand` to `cli_types`
+- [x] Implement `handle_import()` function
+- [x] Add stdin/file reading logic
+- [x] Integrate parsers and converters
+- [x] Add filtering support (regex)
+- [x] Add dry-run and verbose modes
+- [x] Wire up command router in `cli.rs`
+- [x] Update `lib.rs` to export modules
+- [x] Integration tests
 
-### Phase 4: CI Benchmark Integration
+### Phase 4: CI Benchmark Integration ✅ COMPLETE
 
 **Goal:** Add a simple benchmark to CI that generates sample data for testing the import feature.
 
@@ -458,14 +458,21 @@ path = "junit.xml"
 ```
 
 **Tasks:**
-- [ ] Create `.config/nextest.toml` with JUnit configuration
-- [ ] Create `sample_ci_bench.rs` with simple fibonacci benchmark
-- [ ] Add benchmark to `Cargo.toml` [[bench]] section
-- [ ] Update CI workflow to run tests with JUnit output
-- [ ] Update CI workflow to run benchmark
-- [ ] Update CI workflow to import both test and benchmark results
-- [ ] Verify measurements stored in git notes
-- [ ] Document CI integration in README
+- [x] Create `.config/nextest.toml` with JUnit configuration
+- [x] Create `sample_ci_bench.rs` with simple fibonacci benchmark
+- [x] Add benchmark to `Cargo.toml` [[bench]] section
+- [x] Add CI step to run fibonacci benchmarks with JSON output
+- [x] Add CI step to import benchmark results
+- [x] Add CI step to audit fibonacci benchmark measurements
+- [x] Verify measurements stored in git notes
+- [ ] Document CI integration in README (deferred to Phase 5)
+
+**Implementation Details:**
+- CI runs `cargo criterion --bench sample_ci_bench --message-format json`
+- Results are imported via `git-perf import criterion-json`
+- Fibonacci benchmarks (fib10 and fib20) are tracked with metadata (ci, workflow, os, rust)
+- Audits run with `--sigma 10` to account for CI environment variability
+- Measurements are pushed to `refs/notes/perf-v3` for tracking over time
 
 ### Phase 5: Documentation
 

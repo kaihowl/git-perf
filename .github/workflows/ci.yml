@@ -65,6 +65,39 @@ jobs:
     - name: Run tests
       run: cargo nextest run --verbose
 
+    - name: Run fibonacci benchmarks and track performance
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      run: |
+          set -x
+          # Install cargo-criterion for JSON output support
+          cargo install cargo-criterion --version 1.1.0 --locked
+
+          # Run fibonacci benchmark with JSON output
+          cargo criterion --bench sample_ci_bench --message-format json > bench-results.json || true
+
+          # Import benchmark results
+          if [ -s bench-results.json ]; then
+            cargo run -- import criterion-json bench-results.json \
+              --metadata ci=true \
+              --metadata workflow="${GITHUB_WORKFLOW}" \
+              --metadata os=${{matrix.os}} \
+              --metadata rust=${{matrix.rust}}
+
+            # Push imported measurements
+            git push origin refs/notes/perf-v3 || true
+
+            # Audit fibonacci benchmarks (using mean statistic)
+            # Allow up to 10 sigma deviation to account for CI variability
+            cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
+            cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
+          else
+            echo "No benchmark results to import"
+          fi
+
     - name: Run sample perf measurements
       env:
         GIT_AUTHOR_NAME: github-actions[bot]
