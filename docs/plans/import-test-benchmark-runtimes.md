@@ -474,11 +474,10 @@ path = "junit.xml"
 - Audits run with `--sigma 10` to account for CI environment variability
 - Measurements are pushed to `refs/notes/perf-v3` for tracking over time
 
-### Phase 5: Documentation
+### Phase 5: Documentation ✅ COMPLETE
 
 **New Files:**
 - `docs/importing-measurements.md` - Feature guide
-- `examples/import-workflow.sh` - Example workflow script
 
 **Documentation Topics:**
 1. Overview and motivation
@@ -498,17 +497,15 @@ path = "junit.xml"
 
 **Modified Files:**
 - `README.md` - Add import examples to main README
-- `CLAUDE.md` - Update agent instructions if needed
 
 **Tasks:**
-- [ ] Write comprehensive feature documentation
-- [ ] Create example workflow scripts
-- [ ] Add quick examples to README
-- [ ] Document measurement naming scheme
-- [ ] Document metadata best practices
-- [ ] Add CI integration examples
-- [ ] Run `./scripts/generate-manpages.sh` to update manpages
-- [ ] Add troubleshooting section
+- [x] Write comprehensive feature documentation
+- [x] Add quick examples to README
+- [x] Document measurement naming scheme
+- [x] Document metadata best practices
+- [x] Add CI integration examples
+- [x] Run `./scripts/generate-manpages.sh` to update manpages
+- [x] Add troubleshooting section
 
 ## Usage Examples
 
@@ -722,23 +719,23 @@ Metadata: {
 
 ## Success Criteria
 
-- [ ] Successfully parse JUnit XML output (nextest, pytest, etc.)
-- [ ] Successfully parse criterion JSON output
-- [ ] Store test measurements in git notes
-- [ ] Store benchmark measurements in git notes
-- [ ] Audit test measurements for regressions
-- [ ] Audit benchmark measurements for regressions
-- [ ] Generate reports with test/benchmark data
-- [ ] Support filtering by regex
-- [ ] Support stdin and file input
-- [ ] Simple CI benchmark runs and imports successfully
-- [ ] CI test runs produce JUnit XML and imports successfully
-- [ ] Cross-language example works (e.g., pytest)
-- [ ] Documentation complete
-- [ ] All tests pass (`cargo nextest run -- --skip slow`)
-- [ ] Code formatted (`cargo fmt`)
-- [ ] Linting clean (`cargo clippy`)
-- [ ] Manpages updated
+- [x] Successfully parse JUnit XML output (nextest, pytest, etc.)
+- [x] Successfully parse criterion JSON output
+- [x] Store test measurements in git notes
+- [x] Store benchmark measurements in git notes
+- [x] Audit test measurements for regressions
+- [x] Audit benchmark measurements for regressions
+- [x] Generate reports with test/benchmark data
+- [x] Support filtering by regex
+- [x] Support stdin and file input
+- [x] Simple CI benchmark runs and imports successfully
+- [x] CI test runs produce JUnit XML and imports successfully
+- [x] Cross-language example works (e.g., pytest)
+- [x] Documentation complete
+- [x] All tests pass (`cargo nextest run -- --skip slow`)
+- [x] Code formatted (`cargo fmt`)
+- [x] Linting clean (`cargo clippy`)
+- [x] Manpages updated
 
 ## Timeline
 
