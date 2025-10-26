@@ -13,3 +13,9 @@ pub mod reporting;
 pub mod serialization;
 pub mod stats;
 pub mod units;
+
+// Test helpers module - made public for use in unit tests, integration tests, and benchmarks
+// This is conditionally compiled to avoid including test code in release builds
+#[doc(hidden)]
+#[cfg(any(test, doctest, feature = "test-helpers"))]
+pub mod test_helpers;

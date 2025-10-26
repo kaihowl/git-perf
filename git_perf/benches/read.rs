@@ -1,8 +1,6 @@
-mod utils;
-
 use std::env::set_current_dir;
 
-use utils::{empty_commit, hermetic_git_env, init_repo};
+use git_perf::test_helpers::{empty_commit, hermetic_git_env, init_repo_simple};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use git_perf::measurement_retrieval::{self, summarize_measurements};
@@ -15,7 +13,7 @@ fn prep_repo(number_commits: usize, number_measurements: usize) -> tempfile::Tem
     set_current_dir(temp_dir.path()).expect("Failed to change current path");
     hermetic_git_env();
 
-    init_repo();
+    init_repo_simple();
 
     for _ in 1..number_commits {
         empty_commit();
