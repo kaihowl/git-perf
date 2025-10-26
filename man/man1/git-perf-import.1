@@ -1,0 +1,70 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH import 1  "import " 
+.SH NAME
+import \- Import measurements from test runners and benchmarks
+.SH SYNOPSIS
+\fBimport\fR [\fB\-p\fR|\fB\-\-prefix\fR] [\fB\-m\fR|\fB\-\-metadata\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-\-dry\-run\fR] [\fB\-v\fR|\fB\-\-verbose\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIFORMAT\fR> [\fIFILE\fR] 
+.SH DESCRIPTION
+Import measurements from test runners and benchmarks
+.PP
+Parse and store runtime measurements from external tools like cargo\-nextest (JUnit XML) and cargo\-criterion (JSON). This allows tracking test and benchmark performance over time using git\-perf\*(Aqs measurement infrastructure.
+.PP
+## Supported Formats
+.PP
+**junit** \- JUnit XML format \- Works with: cargo\-nextest, pytest, Jest, JUnit, and many other test frameworks \- Requires: Configure nextest with JUnit output in `.config/nextest.toml` \- Command: `cargo nextest run \-\-profile ci` (outputs to target/nextest/ci/junit.xml)
+.PP
+**criterion\-json** \- cargo\-criterion JSON format \- Works with: cargo\-criterion benchmarks \- Command: `cargo criterion \-\-message\-format json`
+.PP
+## Measurement Naming
+.PP
+Tests: `test::<test_name>` Benchmarks: `bench::<benchmark_id>::<statistic>` (mean, median, slope, mad)
+.PP
+## Examples
+.PP
+```bash # Import test results from file git\-perf import junit target/nextest/ci/junit.xml
+.PP
+# Import from stdin cat junit.xml | git\-perf import junit
+.PP
+# Import with metadata git\-perf import junit junit.xml \-\-metadata ci=true \-\-metadata branch=main
+.PP
+# Import with filtering (regex) git\-perf import junit junit.xml \-\-filter "^integration::"
+.PP
+# Dry run to preview git\-perf import junit junit.xml \-\-dry\-run \-\-verbose
+.PP
+# Import benchmarks cargo criterion \-\-message\-format json > bench.json git\-perf import criterion\-json bench.json ```
+.SH OPTIONS
+.TP
+\fB\-p\fR, \fB\-\-prefix\fR \fI<PREFIX>\fR
+Optional prefix to prepend to measurement names
+.TP
+\fB\-m\fR, \fB\-\-metadata\fR \fI<METADATA>\fR
+Key\-value pairs separated by \*(Aq=\*(Aq to add as metadata to all measurements
+.TP
+\fB\-f\fR, \fB\-\-filter\fR \fI<FILTER>\fR
+Regex filter to select specific tests/benchmarks
+.TP
+\fB\-\-dry\-run\fR
+Preview what would be imported without storing
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Show detailed information about imported measurements
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+<\fIFORMAT\fR>
+Format of the input data
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+junit: JUnit XML format (nextest, pytest, Jest, etc.)
+.IP \(bu 2
+criterion\-json: cargo\-criterion JSON format
+.RE
+.TP
+[\fIFILE\fR]
+Input file path (use \*(Aq\-\*(Aq or omit for stdin)

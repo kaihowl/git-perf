@@ -7,6 +7,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf`↴](#git-perf)
 * [`git-perf measure`↴](#git-perf-measure)
 * [`git-perf add`↴](#git-perf-add)
+* [`git-perf import`↴](#git-perf-import)
 * [`git-perf push`↴](#git-perf-push)
 * [`git-perf pull`↴](#git-perf-pull)
 * [`git-perf report`↴](#git-perf-report)
@@ -24,6 +25,7 @@ This document contains the help content for the `git-perf` command-line program.
 
 * `measure` — Measure the runtime of the supplied command (in nanoseconds)
 * `add` — Add single measurement
+* `import` — Import measurements from test runners and benchmarks
 * `push` — Publish performance results to remote
 * `pull` — Pull performance results from remote
 * `report` — Create an HTML performance report
@@ -73,6 +75,60 @@ Add single measurement
 
 * `-m`, `--measurement <NAME>` — Name of the measurement
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '='
+
+
+
+## `git-perf import`
+
+Import measurements from test runners and benchmarks
+
+Parse and store runtime measurements from external tools like cargo-nextest (JUnit XML) and cargo-criterion (JSON). This allows tracking test and benchmark performance over time using git-perf's measurement infrastructure.
+
+## Supported Formats
+
+**junit** - JUnit XML format - Works with: cargo-nextest, pytest, Jest, JUnit, and many other test frameworks - Requires: Configure nextest with JUnit output in `.config/nextest.toml` - Command: `cargo nextest run --profile ci` (outputs to target/nextest/ci/junit.xml)
+
+**criterion-json** - cargo-criterion JSON format - Works with: cargo-criterion benchmarks - Command: `cargo criterion --message-format json`
+
+## Measurement Naming
+
+Tests: `test::<test_name>` Benchmarks: `bench::<benchmark_id>::<statistic>` (mean, median, slope, mad)
+
+## Examples
+
+```bash # Import test results from file git-perf import junit target/nextest/ci/junit.xml
+
+# Import from stdin cat junit.xml | git-perf import junit
+
+# Import with metadata git-perf import junit junit.xml --metadata ci=true --metadata branch=main
+
+# Import with filtering (regex) git-perf import junit junit.xml --filter "^integration::"
+
+# Dry run to preview git-perf import junit junit.xml --dry-run --verbose
+
+# Import benchmarks cargo criterion --message-format json > bench.json git-perf import criterion-json bench.json ```
+
+**Usage:** `git-perf import [OPTIONS] <FORMAT> [FILE]`
+
+###### **Arguments:**
+
+* `<FORMAT>` — Format of the input data
+
+  Possible values:
+  - `junit`:
+    JUnit XML format (nextest, pytest, Jest, etc.)
+  - `criterion-json`:
+    cargo-criterion JSON format
+
+* `<FILE>` — Input file path (use '-' or omit for stdin)
+
+###### **Options:**
+
+* `-p`, `--prefix <PREFIX>` — Optional prefix to prepend to measurement names
+* `-m`, `--metadata <METADATA>` — Key-value pairs separated by '=' to add as metadata to all measurements
+* `-f`, `--filter <FILTER>` — Regex filter to select specific tests/benchmarks
+* `--dry-run` — Preview what would be imported without storing
+* `-v`, `--verbose` — Show detailed information about imported measurements
 
 
 

@@ -9,6 +9,7 @@ use crate::basic_measure::measure;
 use crate::config::bump_epoch;
 use crate::git::git_interop::check_git_version;
 use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push};
+use crate::import::handle_import;
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
 use crate::stats::ReductionFunc;
@@ -40,6 +41,15 @@ pub fn handle_calls() -> Result<()> {
         Commands::Add { value, measurement } => {
             add(&measurement.name, value, &measurement.key_value)
         }
+        Commands::Import {
+            format,
+            file,
+            prefix,
+            metadata,
+            filter,
+            dry_run,
+            verbose,
+        } => handle_import(format, file, prefix, metadata, filter, dry_run, verbose),
         Commands::Push { remote } => push(None, remote.as_deref()),
         Commands::Pull {} => pull(None),
         Commands::Report {
