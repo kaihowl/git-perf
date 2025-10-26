@@ -461,11 +461,18 @@ path = "junit.xml"
 - [x] Create `.config/nextest.toml` with JUnit configuration
 - [x] Create `sample_ci_bench.rs` with simple fibonacci benchmark
 - [x] Add benchmark to `Cargo.toml` [[bench]] section
-- [x] Verify import functionality works with real test data
-- [x] Verify import functionality works with real benchmark data
+- [x] Add CI step to run fibonacci benchmarks with JSON output
+- [x] Add CI step to import benchmark results
+- [x] Add CI step to audit fibonacci benchmark measurements
+- [x] Verify measurements stored in git notes
 - [ ] Document CI integration in README (deferred to Phase 5)
 
-**Note:** The CI import steps were not added to the main CI workflow to avoid interfering with existing performance measurements. The infrastructure is in place and can be used in separate workflows or manually. Example workflow commands are documented in the plan.
+**Implementation Details:**
+- CI runs `cargo criterion --bench sample_ci_bench --message-format json`
+- Results are imported via `git-perf import criterion-json`
+- Fibonacci benchmarks (fib10 and fib20) are tracked with metadata (ci, workflow, os, rust)
+- Audits run with `--sigma 10` to account for CI environment variability
+- Measurements are pushed to `refs/notes/perf-v3` for tracking over time
 
 ### Phase 5: Documentation
 
