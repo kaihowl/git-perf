@@ -242,11 +242,11 @@ The sparkline visualization shows the range of measurements relative to the tail
 
 Accept HEAD commit's measurement for audit, even if outside of range. This is allows to accept expected performance changes. This is accomplished by starting a new epoch for the given measurement. The epoch is configured in the git perf config file. A change to the epoch therefore has to be committed and will result in a new HEAD for which new measurements have to be taken
 
-**Usage:** `git-perf bump-epoch --measurement <MEASUREMENT>`
+**Usage:** `git-perf bump-epoch --measurement <MEASUREMENTS>`
 
 ###### **Options:**
 
-* `-m`, `--measurement <MEASUREMENT>`
+* `-m`, `--measurement <MEASUREMENTS>`
 
 
 
