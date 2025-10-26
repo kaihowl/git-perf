@@ -186,3 +186,5 @@
 0test::test::run_slow_bash_tests_with_binary1761471127.257362447553000000.0suite=git-perf::bash_testsworkflow=cistatus=passedtype=testclassname=git-perf::bash_testsrust=stableos=ubuntu-22.04unit=nsci=true
 
 1133737162test-measure21761471200.47869681001032328.0rust=stableos=ubuntu-22.04
+
+1133737162test-measure21761471201.495351001057606.0rust=stableos=ubuntu-22.04
