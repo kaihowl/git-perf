@@ -93,7 +93,12 @@ pub fn handle_calls() -> Result<()> {
                 dispersion_method.map(crate::stats::DispersionMethod::from),
             )
         }
-        Commands::BumpEpoch { measurement } => bump_epoch(&measurement),
+        Commands::BumpEpoch { measurements } => {
+            for measurement in measurements {
+                bump_epoch(&measurement)?;
+            }
+            Ok(())
+        }
         Commands::Prune {} => prune(),
         Commands::Remove {
             older_than,

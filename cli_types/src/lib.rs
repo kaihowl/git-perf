@@ -351,8 +351,8 @@ pub enum Commands {
     /// A change to the epoch therefore has to be committed and will result in a new HEAD for which
     /// new measurements have to be taken.
     BumpEpoch {
-        #[arg(short = 'm', long = "measurement", value_parser=parse_spaceless_string)]
-        measurement: String,
+        #[arg(short = 'm', long = "measurement", value_parser=parse_spaceless_string, required = true)]
+        measurements: Vec<String>,
     },
 
     /// Remove all performance measurements for commits that have been committed
