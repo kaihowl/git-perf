@@ -286,110 +286,6 @@ go test -v 2>&1 | go-junit-report > report.xml
 git perf import junit report.xml --metadata language=go
 ```
 
-## CI/CD Integration
-
-### GitHub Actions Example
-
-```yaml
-name: Performance Tracking
-
-on: [push, pull_request]
-
-jobs:
-  track-performance:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Need full history for git-perf
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install git-perf
-        run: cargo install git-perf
-
-      - name: Install nextest
-        run: cargo install cargo-nextest
-
-      - name: Run tests with JUnit output
-        run: cargo nextest run --profile ci
-
-      - name: Import test results
-        run: |
-          git perf import junit target/nextest/ci/junit.xml \
-            --metadata ci=true \
-            --metadata workflow="${GITHUB_WORKFLOW}" \
-            --metadata run_id="${GITHUB_RUN_ID}" \
-            --metadata commit="${GITHUB_SHA:0:7}"
-
-      - name: Run benchmarks
-        run: |
-          cargo criterion --bench sample_ci_bench \
-            --message-format json > bench-results.json
-
-      - name: Import benchmark results
-        run: |
-          git perf import criterion-json bench-results.json \
-            --metadata ci=true \
-            --metadata workflow="${GITHUB_WORKFLOW}"
-
-      - name: Audit for regressions
-        run: |
-          git perf audit --measurement "test::*" --num-commits 20
-          git perf audit --measurement "bench::*" --num-commits 20
-
-      - name: Push measurements
-        if: github.ref == 'refs/heads/main'
-        run: git perf push
-```
-
-### Shell Script Example
-
-Create a reusable script for your CI pipeline:
-
-```bash
-#!/bin/bash
-# scripts/track-performance.sh
-
-set -e
-
-# Run tests with JUnit output
-echo "Running tests..."
-cargo nextest run --profile ci
-
-# Import test results
-echo "Importing test results..."
-git perf import junit target/nextest/ci/junit.xml \
-  --metadata ci=true \
-  --metadata workflow="${WORKFLOW_NAME:-local}" \
-  --metadata commit="$(git rev-parse --short HEAD)" \
-  --metadata timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-# Run benchmarks
-echo "Running benchmarks..."
-cargo criterion --message-format json > bench-results.json 2>&1
-
-# Import benchmark results
-echo "Importing benchmark results..."
-git perf import criterion-json bench-results.json \
-  --metadata ci=true \
-  --metadata workflow="${WORKFLOW_NAME:-local}"
-
-# Audit for regressions
-echo "Auditing for regressions..."
-git perf audit --measurement "test::*" --num-commits 20 --sigma 4.0
-git perf audit --measurement "bench::*" --num-commits 20 --sigma 3.0
-
-# Push to remote (only on main branch)
-if [ "$BRANCH" = "main" ]; then
-  echo "Pushing measurements to remote..."
-  git perf push
-fi
-
-echo "Performance tracking complete!"
-```
-
 ## Nextest Configuration
 
 To enable JUnit XML output with cargo-nextest, add this configuration:
@@ -414,8 +310,8 @@ Once you've imported measurements, use git-perf's existing commands:
 ### View Recent Measurements
 
 ```bash
-# List all test measurements
-git perf audit --measurement "test::*" --num-commits 5
+# List all measurements
+git perf audit --num-commits 5
 
 # List specific benchmark
 git perf audit --measurement "bench::fibonacci_10::mean" --num-commits 10
@@ -425,10 +321,10 @@ git perf audit --measurement "bench::fibonacci_10::mean" --num-commits 10
 
 ```bash
 # Audit tests for performance changes (4-sigma threshold)
-git perf audit --measurement "test::*" --sigma 4.0
+git perf audit --sigma 4.0
 
-# Audit benchmarks for performance changes (3-sigma threshold)
-git perf audit --measurement "bench::*" --sigma 3.0
+# Audit specific benchmark for performance changes (3-sigma threshold)
+git perf audit --measurement "bench::fibonacci_10::mean" --sigma 3.0
 ```
 
 ### Generate Reports
@@ -437,8 +333,8 @@ git perf audit --measurement "bench::*" --sigma 3.0
 # Generate report for specific test
 git perf report --measurement "test::my_module::test_slow_operation"
 
-# Generate report for benchmark group
-git perf report --measurement "bench::fibonacci*"
+# Generate report for specific benchmark
+git perf report --measurement "bench::fibonacci_10::mean"
 ```
 
 ## Best Practices
@@ -480,16 +376,16 @@ git perf import junit junit.xml
 git perf push
 ```
 
-### 5. Separate Test and Bench Audits
+### 5. Use Appropriate Sigma Thresholds
 
-Use different thresholds for tests vs benchmarks:
+Use different thresholds based on measurement variability:
 
 ```bash
 # Tests: higher threshold (more variable)
-git perf audit --measurement "test::*" --sigma 5.0
+git perf audit --sigma 5.0
 
 # Benchmarks: lower threshold (more stable)
-git perf audit --measurement "bench::*" --sigma 3.0
+git perf audit --sigma 3.0
 ```
 
 ## Limitations
@@ -499,16 +395,6 @@ git perf audit --measurement "bench::*" --sigma 3.0
 3. **No Unit Validation** - Can't verify units were consistent across measurements
 4. **Timing Precision** - Limited by test framework's timing precision
 
-## Future Enhancements
-
-Potential future additions:
-
-1. **Criterion CSV** - Alternative benchmark format
-2. **Generic JSON Parser** - User-configurable JSONPath mapping
-3. **TAP (Test Anything Protocol)** - Another universal test format
-4. **Subunit** - Binary test streaming protocol
-5. **Additional benchmark formats** - Support for other benchmark tools (e.g., hyperfine)
-
 ## Summary
 
 The import feature enables you to:
@@ -516,7 +402,6 @@ The import feature enables you to:
 - Track test execution times from any JUnit-compatible test framework
 - Monitor benchmark performance using Criterion
 - Detect performance regressions automatically
-- Integrate performance tracking into your CI/CD pipeline
 - Use a consistent workflow across multiple programming languages
 
 **Next Steps:**
