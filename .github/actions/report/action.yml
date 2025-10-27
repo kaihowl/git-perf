@@ -42,6 +42,9 @@ outputs:
   audit-output:
     description: 'Output from git-perf audit command'
     value: ${{ steps.audit.outputs.audit-output }}
+  size-output:
+    description: 'Output from git-perf size command'
+    value: ${{ steps.size.outputs.size-output }}
 
 runs:
   using: composite
@@ -90,6 +93,24 @@ runs:
           echo EOF
         } >> "$GITHUB_OUTPUT"
 
+    - name: Show measurement storage size
+      id: size
+      shell: bash
+      run: |
+        echo "=== Measurement Storage Size ==="
+        {
+          echo 'size-output<<EOF'
+          git perf size --include-objects 2>&1 || echo "Size command failed, but continuing..."
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+
+        # Also display to workflow log
+        git perf size --include-objects || true
+
+        echo ""
+        echo "=== Detailed Breakdown ==="
+        git perf size --detailed || true
+
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
@@ -119,7 +140,11 @@ runs:
 
           const auditOutput = `${{ steps.audit.outputs.audit-output }}`.trim()
           const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
-          const commentBody = `⏱  [Performance Results](${reportUrl})${auditSection}`
+
+          const sizeOutput = `${{ steps.size.outputs.size-output }}`.trim()
+          const sizeSection = sizeOutput ? `\n\n## Measurement Storage Size\n\n\`\`\`\n${sizeOutput}\n\`\`\`` : ''
+
+          const commentBody = `⏱  [Performance Results](${reportUrl})${auditSection}${sizeSection}`
 
           // Find existing performance comment
           const comments = await github.rest.issues.listComments({
