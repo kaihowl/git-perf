@@ -97,19 +97,19 @@ runs:
       id: size
       shell: bash
       run: |
-        echo "=== Measurement Storage Size ==="
+        echo "=== Measurement Storage Size (On-Disk) ==="
         {
           echo 'size-output<<EOF'
-          git perf size --include-objects 2>&1 || echo "Size command failed, but continuing..."
+          git perf size --disk-size --include-objects 2>&1 || echo "Size command failed, but continuing..."
           echo EOF
         } >> "$GITHUB_OUTPUT"
 
         # Also display to workflow log
-        git perf size --include-objects || true
+        git perf size --disk-size --include-objects || true
 
         echo ""
-        echo "=== Detailed Breakdown ==="
-        git perf size --detailed || true
+        echo "=== Detailed Breakdown (On-Disk) ==="
+        git perf size --disk-size --detailed || true
 
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
