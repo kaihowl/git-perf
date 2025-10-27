@@ -11,6 +11,26 @@ pub fn compile_filters(patterns: &[String]) -> Result<Vec<Regex>> {
         .collect()
 }
 
+/// Convert measurement names to anchored regex patterns for exact matching
+/// This escapes special regex characters and adds ^ and $ anchors
+pub fn measurements_to_anchored_regex(measurements: &[String]) -> Vec<String> {
+    measurements
+        .iter()
+        .map(|m| format!("^{}$", regex::escape(m)))
+        .collect()
+}
+
+/// Combine measurements (as exact matches) and filter patterns into a single list
+/// Measurements are converted to anchored regex patterns for exact matching
+pub fn combine_measurements_and_filters(
+    measurements: &[String],
+    filter_patterns: &[String],
+) -> Vec<String> {
+    let mut combined = measurements_to_anchored_regex(measurements);
+    combined.extend_from_slice(filter_patterns);
+    combined
+}
+
 /// Check if a measurement name matches any of the compiled filters
 /// Returns true if filters is empty (no filters = match all)
 pub fn matches_any_filter(name: &str, filters: &[Regex]) -> bool {
@@ -77,5 +97,66 @@ mod tests {
         assert!(matches_any_filter("bench_foo_v1", &filters));
         assert!(matches_any_filter("bench_bar_v23", &filters));
         assert!(!matches_any_filter("bench_baz_vX", &filters));
+    }
+
+    #[test]
+    fn test_measurements_to_anchored_regex() {
+        let measurements = vec![
+            "benchmark_x64".to_string(),
+            "test.with.dots".to_string(),
+            "name[with]brackets".to_string(),
+        ];
+        let anchored = measurements_to_anchored_regex(&measurements);
+
+        assert_eq!(anchored.len(), 3);
+        assert_eq!(anchored[0], "^benchmark_x64$");
+        assert_eq!(anchored[1], r"^test\.with\.dots$");
+        assert_eq!(anchored[2], r"^name\[with\]brackets$");
+    }
+
+    #[test]
+    fn test_measurements_to_anchored_regex_matches_exactly() {
+        let measurements = vec!["benchmark".to_string()];
+        let anchored = measurements_to_anchored_regex(&measurements);
+        let filters = compile_filters(&anchored).unwrap();
+
+        // Should match exact name
+        assert!(matches_any_filter("benchmark", &filters));
+
+        // Should NOT match partial matches
+        assert!(!matches_any_filter("benchmark_x64", &filters));
+        assert!(!matches_any_filter("my_benchmark", &filters));
+    }
+
+    #[test]
+    fn test_combine_measurements_and_filters() {
+        let measurements = vec!["exact_match".to_string()];
+        let filters = vec!["pattern.*".to_string()];
+
+        let combined = combine_measurements_and_filters(&measurements, &filters);
+
+        assert_eq!(combined.len(), 2);
+        assert_eq!(combined[0], "^exact_match$");
+        assert_eq!(combined[1], "pattern.*");
+    }
+
+    #[test]
+    fn test_combine_measurements_and_filters_matching() {
+        let measurements = vec!["benchmark_x64".to_string()];
+        let filters = vec!["test_.*".to_string()];
+
+        let combined = combine_measurements_and_filters(&measurements, &filters);
+        let compiled = compile_filters(&combined).unwrap();
+
+        // Should match exact measurement name
+        assert!(matches_any_filter("benchmark_x64", &compiled));
+
+        // Should match filter pattern
+        assert!(matches_any_filter("test_foo", &compiled));
+        assert!(matches_any_filter("test_bar", &compiled));
+
+        // Should NOT match other names
+        assert!(!matches_any_filter("benchmark_arm64", &compiled));
+        assert!(!matches_any_filter("other", &compiled));
     }
 }

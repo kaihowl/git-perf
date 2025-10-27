@@ -99,8 +99,12 @@ pub fn audit_multiple(
     dispersion_method: Option<DispersionMethod>,
     filter_patterns: &[String],
 ) -> Result<()> {
+    // Combine measurements (as exact matches) and filter patterns into a single list
+    let combined_patterns =
+        crate::filter::combine_measurements_and_filters(measurements, filter_patterns);
+
     // Compile regex filters early to fail fast on invalid patterns
-    let filters = crate::filter::compile_filters(filter_patterns)?;
+    let filters = crate::filter::compile_filters(&combined_patterns)?;
 
     let mut failed = false;
 
@@ -163,14 +167,19 @@ fn audit(
     let all = measurement_retrieval::walk_commits(max_count)?;
 
     // Filter using subset relation: selectors ⊆ measurement.key_values
+    // The filters now include both exact measurement matches (as anchored regex)
+    // and user-provided filter patterns, so we only need to check:
+    // 1. Does the name match any filter (which includes exact measurement name)
+    // 2. Do the selectors match
     let filter_by = |m: &MeasurementData| {
-        // Existing measurement name check
-        if m.name != measurement {
+        // Apply regex filters (handles both exact measurement match and patterns)
+        if !crate::filter::matches_any_filter(&m.name, filters) {
             return false;
         }
 
-        // Apply regex filters
-        if !crate::filter::matches_any_filter(&m.name, filters) {
+        // Check that we're looking at the right measurement for this audit
+        // (since filters may match multiple measurements)
+        if m.name != measurement {
             return false;
         }
 
