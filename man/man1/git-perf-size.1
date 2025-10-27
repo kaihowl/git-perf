@@ -1,0 +1,41 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH size 1  "size " 
+.SH NAME
+size \- Estimate storage size of live performance measurements
+.SH SYNOPSIS
+\fBsize\fR [\fB\-d\fR|\fB\-\-detailed\fR] [\fB\-f\fR|\fB\-\-format\fR] [\fB\-\-disk\-size\fR] [\fB\-\-include\-objects\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Estimate storage size of live performance measurements
+.PP
+This command calculates the total size of performance measurement data stored in git notes (refs/notes/perf\-v3). Use \-\-detailed to see a breakdown by measurement name.
+.PP
+By default, shows logical object sizes (uncompressed). Use \-\-disk\-size to see actual on\-disk sizes accounting for compression.
+.PP
+Examples: git perf size                    # Show total size in human\-readable format git perf size \-\-detailed         # Show breakdown by measurement name git perf size \-\-format bytes     # Show size in raw bytes git perf size \-\-disk\-size        # Show actual on\-disk sizes git perf size \-\-include\-objects  # Include git repository statistics
+.SH OPTIONS
+.TP
+\fB\-d\fR, \fB\-\-detailed\fR
+Show detailed breakdown by measurement name
+.TP
+\fB\-f\fR, \fB\-\-format\fR \fI<FORMAT>\fR [default: human]
+Output format (human\-readable or bytes)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+human: Human\-readable format (e.g., "1.2 MB")
+.IP \(bu 2
+bytes: Raw bytes as integer
+.RE
+.TP
+\fB\-\-disk\-size\fR
+Use on\-disk size (compressed) instead of logical size
+.TP
+\fB\-\-include\-objects\fR
+Include git repository statistics for context
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)

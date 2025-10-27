@@ -102,6 +102,14 @@ pub enum ImportFormat {
     CriterionJson,
 }
 
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SizeFormat {
+    /// Human-readable format (e.g., "1.2 MB")
+    Human,
+    /// Raw bytes as integer
+    Bytes,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Measure the runtime of the supplied command (in nanoseconds)
@@ -387,6 +395,39 @@ pub enum Commands {
     ///   git perf list-commits | wc -l  # Count commits with measurements
     ///   git perf list-commits | head   # Show first few commits
     ListCommits {},
+
+    /// Estimate storage size of live performance measurements
+    ///
+    /// This command calculates the total size of performance measurement data
+    /// stored in git notes (refs/notes/perf-v3). Use --detailed to see a
+    /// breakdown by measurement name.
+    ///
+    /// By default, shows logical object sizes (uncompressed). Use --disk-size
+    /// to see actual on-disk sizes accounting for compression.
+    ///
+    /// Examples:
+    ///   git perf size                    # Show total size in human-readable format
+    ///   git perf size --detailed         # Show breakdown by measurement name
+    ///   git perf size --format bytes     # Show size in raw bytes
+    ///   git perf size --disk-size        # Show actual on-disk sizes
+    ///   git perf size --include-objects  # Include git repository statistics
+    Size {
+        /// Show detailed breakdown by measurement name
+        #[arg(short, long)]
+        detailed: bool,
+
+        /// Output format (human-readable or bytes)
+        #[arg(short, long, value_enum, default_value = "human")]
+        format: SizeFormat,
+
+        /// Use on-disk size (compressed) instead of logical size
+        #[arg(long)]
+        disk_size: bool,
+
+        /// Include git repository statistics for context
+        #[arg(long)]
+        include_objects: bool,
+    },
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String)> {

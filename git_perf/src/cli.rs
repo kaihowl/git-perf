@@ -12,6 +12,7 @@ use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push}
 use crate::import::handle_import;
 use crate::measurement_storage::{add, remove_measurements_from_commits};
 use crate::reporting::report;
+use crate::size;
 use crate::stats::ReductionFunc;
 use git_perf_cli_types::{Cli, Commands};
 
@@ -111,5 +112,11 @@ pub fn handle_calls() -> Result<()> {
             }
             Ok(())
         }
+        Commands::Size {
+            detailed,
+            format,
+            disk_size,
+            include_objects,
+        } => size::calculate_measurement_size(detailed, format, disk_size, include_objects),
     }
 }
