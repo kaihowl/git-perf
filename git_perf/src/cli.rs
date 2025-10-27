@@ -59,6 +59,7 @@ pub fn handle_calls() -> Result<()> {
             measurement,
             key_value,
             aggregate_by,
+            filter,
         } => report(
             output,
             separate_by,
@@ -66,6 +67,7 @@ pub fn handle_calls() -> Result<()> {
             &measurement,
             &key_value,
             aggregate_by.map(ReductionFunc::from),
+            &filter,
         ),
         Commands::Audit {
             measurement,
@@ -75,6 +77,7 @@ pub fn handle_calls() -> Result<()> {
             aggregate_by,
             sigma,
             dispersion_method,
+            filter,
         } => {
             // Validate max_count vs min_measurements if min_measurements is specified via CLI
             if let Some(min_count) = min_measurements {
@@ -91,6 +94,7 @@ pub fn handle_calls() -> Result<()> {
                 aggregate_by.map(ReductionFunc::from),
                 sigma,
                 dispersion_method.map(crate::stats::DispersionMethod::from),
+                &filter,
             )
         }
         Commands::BumpEpoch { measurements } => {

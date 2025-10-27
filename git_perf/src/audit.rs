@@ -96,7 +96,11 @@ pub fn audit_multiple(
     summarize_by: Option<ReductionFunc>,
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
+    filter_patterns: &[String],
 ) -> Result<()> {
+    // Compile regex filters early to fail fast on invalid patterns
+    let filters = crate::filter::compile_filters(filter_patterns)?;
+
     let mut failed = false;
 
     for measurement in measurements {
@@ -127,6 +131,7 @@ pub fn audit_multiple(
             params.summarize_by,
             params.sigma,
             params.dispersion_method,
+            &filters,
         )?;
 
         println!("{}", result.message);
@@ -151,12 +156,25 @@ fn audit(
     summarize_by: ReductionFunc,
     sigma: f64,
     dispersion_method: DispersionMethod,
+    filters: &[regex::Regex],
 ) -> Result<AuditResult> {
     let all = measurement_retrieval::walk_commits(max_count)?;
 
     // Filter using subset relation: selectors ⊆ measurement.key_values
-    let filter_by =
-        |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
+    let filter_by = |m: &MeasurementData| {
+        // Existing measurement name check
+        if m.name != measurement {
+            return false;
+        }
+
+        // Apply regex filters
+        if !crate::filter::matches_any_filter(&m.name, filters) {
+            return false;
+        }
+
+        // Existing selector check
+        m.key_values_is_superset_of(selectors)
+    };
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
         all,
@@ -448,6 +466,7 @@ mod test {
             Some(ReductionFunc::Mean),
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
+            &[], // Empty filter patterns
         );
 
         // Should succeed when no measurements need to be audited

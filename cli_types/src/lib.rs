@@ -226,6 +226,13 @@ pub enum Commands {
         #[arg(short, long, value_parser=parse_key_value)]
         key_value: Vec<(String, String)>,
 
+        /// Filter measurements by regex pattern (can be specified multiple times).
+        /// If any filter matches, the measurement is included (OR logic).
+        /// Patterns are unanchored by default. Use ^pattern$ for exact matches.
+        /// Example: -f "bench.*" -f "test_.*"
+        #[arg(short = 'f', long = "filter")]
+        filter: Vec<String>,
+
         /// Create individual traces in the graph by grouping with the value of this selector
         #[arg(short, long, value_parser=parse_spaceless_string)]
         separate_by: Option<String>,
@@ -308,6 +315,13 @@ pub enum Commands {
         /// Key-value pair separated by "=" with no whitespaces to subselect measurements
         #[arg(short, long, value_parser=parse_key_value)]
         selectors: Vec<(String, String)>,
+
+        /// Filter measurements by regex pattern (can be specified multiple times).
+        /// If any filter matches, the measurement is included (OR logic).
+        /// Patterns are unanchored by default. Use ^pattern$ for exact matches.
+        /// Example: -f "bench.*_x64"
+        #[arg(short = 'f', long = "filter")]
+        filter: Vec<String>,
 
         /// Minimum number of measurements needed. If less, pass test and assume
         /// more measurements are needed.

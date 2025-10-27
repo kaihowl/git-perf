@@ -4,7 +4,7 @@
 .SH NAME
 report \- Create an HTML performance report
 .SH SYNOPSIS
-\fBreport\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-s\fR|\fB\-\-separate\-by\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBreport\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-s\fR|\fB\-\-separate\-by\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .SH DESCRIPTION
 Create an HTML performance report
 .SH OPTIONS
@@ -20,6 +20,9 @@ Select an individual measurements instead of all
 .TP
 \fB\-k\fR, \fB\-\-key\-value\fR \fI<KEY_VALUE>\fR
 Key\-value pairs separated by \*(Aq=\*(Aq, select only matching measurements
+.TP
+\fB\-f\fR, \fB\-\-filter\fR \fI<FILTER>\fR
+Filter measurements by regex pattern (can be specified multiple times). If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Example: \-f "bench.*" \-f "test_.*"
 .TP
 \fB\-s\fR, \fB\-\-separate\-by\fR \fI<SEPARATE_BY>\fR
 Create individual traces in the graph by grouping with the value of this selector

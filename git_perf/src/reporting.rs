@@ -399,7 +399,11 @@ pub fn report(
     measurement_names: &[String],
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
+    filter_patterns: &[String],
 ) -> Result<()> {
+    // Compile regex filters early to fail fast on invalid patterns
+    let filters = crate::filter::compile_filters(filter_patterns)?;
+
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
     if commits.is_empty() {
@@ -414,9 +418,16 @@ pub fn report(
     plot.add_commits(&commits);
 
     let relevant = |m: &MeasurementData| {
+        // Apply measurement name filter (existing logic)
         if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
             return false;
         }
+
+        // Apply regex filters (NEW logic)
+        if !crate::filter::matches_any_filter(&m.name, &filters) {
+            return false;
+        }
+
         // Filter using subset relation: key_values ⊆ measurement.key_values
         m.key_values_is_superset_of(key_values)
     };
