@@ -88,6 +88,7 @@ pub(crate) fn resolve_audit_params(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     measurements: &[String],
     max_count: usize,
@@ -148,6 +149,7 @@ pub fn audit_multiple(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn audit(
     measurement: &str,
     max_count: usize,
