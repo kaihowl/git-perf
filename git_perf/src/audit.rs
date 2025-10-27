@@ -1,6 +1,6 @@
 use crate::{
     config,
-    data::MeasurementData,
+    data::{Commit, MeasurementData},
     measurement_retrieval::{self, summarize_measurements},
     stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
@@ -9,6 +9,7 @@ use itertools::Itertools;
 use log::error;
 use sparklines::spark;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::iter;
 
 /// Formats a z-score for display in audit output.
@@ -88,6 +89,38 @@ pub(crate) fn resolve_audit_params(
     }
 }
 
+/// Discovers all unique measurement names from commits that match the filters and selectors.
+/// This is used to efficiently find which measurements to audit when filters are provided.
+fn discover_matching_measurements(
+    commits: &[Result<Commit>],
+    filters: &[regex::Regex],
+    selectors: &[(String, String)],
+) -> Vec<String> {
+    let mut unique_measurements = HashSet::new();
+
+    for commit in commits.iter().flatten() {
+        for measurement in &commit.measurements {
+            // Check if measurement name matches any filter
+            if !crate::filter::matches_any_filter(&measurement.name, filters) {
+                continue;
+            }
+
+            // Check if measurement matches selectors
+            if !measurement.key_values_is_superset_of(selectors) {
+                continue;
+            }
+
+            // This measurement matches - add to set
+            unique_measurements.insert(measurement.name.clone());
+        }
+    }
+
+    // Convert to sorted vector for deterministic ordering
+    let mut result: Vec<String> = unique_measurements.into_iter().collect();
+    result.sort();
+    result
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     measurements: &[String],
@@ -103,11 +136,28 @@ pub fn audit_multiple(
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
 
+    // Phase 1: Walk commits ONCE (optimization: scan commits only once)
+    // Collect into Vec so we can reuse the data for multiple measurements
+    let all_commits: Vec<Result<Commit>> =
+        measurement_retrieval::walk_commits(max_count)?.collect();
+
+    // Phase 2: Discover all measurements that match the filters from the commit data
+    let discovered_measurements = discover_matching_measurements(&all_commits, &filters, selectors);
+
+    // If explicit measurements were requested, use those instead of discovered ones
+    // This maintains backward compatibility when no filters are used
+    let measurements_to_audit: Vec<String> = if measurements.is_empty() {
+        discovered_measurements
+    } else {
+        measurements.to_vec()
+    };
+
     let mut failed = false;
 
-    for measurement in measurements {
+    // Phase 3: For each measurement, audit using the pre-loaded commit data
+    for measurement in measurements_to_audit {
         let params = resolve_audit_params(
-            measurement,
+            &measurement,
             min_count,
             summarize_by,
             sigma,
@@ -125,9 +175,9 @@ pub fn audit_multiple(
             );
         }
 
-        let result = audit(
-            measurement,
-            max_count,
+        let result = audit_with_commits(
+            &measurement,
+            &all_commits,
             params.min_count,
             selectors,
             params.summarize_by,
@@ -150,10 +200,13 @@ pub fn audit_multiple(
     Ok(())
 }
 
+/// Audits a measurement using pre-loaded commit data.
+/// This is more efficient than the old `audit` function when auditing multiple measurements,
+/// as it reuses the same commit data instead of walking commits multiple times.
 #[allow(clippy::too_many_arguments)]
-fn audit(
+fn audit_with_commits(
     measurement: &str,
-    max_count: usize,
+    commits: &[Result<Commit>],
     min_count: u16,
     selectors: &[(String, String)],
     summarize_by: ReductionFunc,
@@ -161,7 +214,15 @@ fn audit(
     dispersion_method: DispersionMethod,
     filters: &[regex::Regex],
 ) -> Result<AuditResult> {
-    let all = measurement_retrieval::walk_commits(max_count)?;
+    // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
+    // This is necessary because summarize_measurements expects an iterator of Result<Commit>
+    let commits_iter = commits.iter().map(|r| match r {
+        Ok(commit) => Ok(Commit {
+            commit: commit.commit.clone(),
+            measurements: commit.measurements.clone(),
+        }),
+        Err(e) => Err(anyhow::anyhow!("{}", e)),
+    });
 
     // Filter using subset relation: selectors ⊆ measurement.key_values
     // The filters now include both exact measurement matches (as anchored regex)
@@ -185,7 +246,7 @@ fn audit(
     };
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
-        all,
+        commits_iter,
         &summarize_by,
         &filter_by,
     ));
@@ -203,7 +264,6 @@ fn audit(
 
     let tail: Vec<_> = aggregates
         .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
-        .take(max_count)
         .try_collect()?;
 
     audit_with_data(measurement, head, tail, min_count, sigma, dispersion_method)
