@@ -97,14 +97,11 @@ pub fn audit_multiple(
     summarize_by: Option<ReductionFunc>,
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
-    filter_patterns: &[String],
+    combined_patterns: &[String],
 ) -> Result<()> {
-    // Combine measurements (as exact matches) and filter patterns into a single list
-    let combined_patterns =
-        crate::filter::combine_measurements_and_filters(measurements, filter_patterns);
-
-    // Compile regex filters early to fail fast on invalid patterns
-    let filters = crate::filter::compile_filters(&combined_patterns)?;
+    // Compile combined regex patterns (measurements as exact matches + filter patterns)
+    // early to fail fast on invalid patterns
+    let filters = crate::filter::compile_filters(combined_patterns)?;
 
     let mut failed = false;
 

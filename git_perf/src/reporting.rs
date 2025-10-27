@@ -396,13 +396,13 @@ pub fn report(
     output: PathBuf,
     separate_by: Option<String>,
     num_commits: usize,
-    measurement_names: &[String],
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
-    filter_patterns: &[String],
+    combined_patterns: &[String],
 ) -> Result<()> {
-    // Compile regex filters early to fail fast on invalid patterns
-    let filters = crate::filter::compile_filters(filter_patterns)?;
+    // Compile combined regex patterns (measurements as exact matches + filter patterns)
+    // early to fail fast on invalid patterns
+    let filters = crate::filter::compile_filters(combined_patterns)?;
 
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
@@ -418,12 +418,7 @@ pub fn report(
     plot.add_commits(&commits);
 
     let relevant = |m: &MeasurementData| {
-        // Apply measurement name filter (existing logic)
-        if !measurement_names.is_empty() && !measurement_names.contains(&m.name) {
-            return false;
-        }
-
-        // Apply regex filters (NEW logic)
+        // Apply regex filters (handles both exact measurement matches and filter patterns)
         if !crate::filter::matches_any_filter(&m.name, &filters) {
             return false;
         }

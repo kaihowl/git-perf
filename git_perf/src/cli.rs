@@ -60,15 +60,20 @@ pub fn handle_calls() -> Result<()> {
             key_value,
             aggregate_by,
             filter,
-        } => report(
-            output,
-            separate_by,
-            report_history.max_count,
-            &measurement,
-            &key_value,
-            aggregate_by.map(ReductionFunc::from),
-            &filter,
-        ),
+        } => {
+            // Combine measurements (as exact matches) and filter patterns into unified regex patterns
+            let combined_patterns =
+                crate::filter::combine_measurements_and_filters(&measurement, &filter);
+
+            report(
+                output,
+                separate_by,
+                report_history.max_count,
+                &key_value,
+                aggregate_by.map(ReductionFunc::from),
+                &combined_patterns,
+            )
+        }
         Commands::Audit {
             measurement,
             report_history,
@@ -86,6 +91,10 @@ pub fn handle_calls() -> Result<()> {
                 }
             }
 
+            // Combine measurements (as exact matches) and filter patterns into unified regex patterns
+            let combined_patterns =
+                crate::filter::combine_measurements_and_filters(&measurement, &filter);
+
             audit::audit_multiple(
                 &measurement,
                 report_history.max_count,
@@ -94,7 +103,7 @@ pub fn handle_calls() -> Result<()> {
                 aggregate_by.map(ReductionFunc::from),
                 sigma,
                 dispersion_method.map(crate::stats::DispersionMethod::from),
-                &filter,
+                &combined_patterns,
             )
         }
         Commands::BumpEpoch { measurements } => {
