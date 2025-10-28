@@ -136,6 +136,12 @@ pub fn audit_multiple(
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
 
+    // Early return if there are no measurements and no filters
+    // This avoids unnecessary git operations when there's nothing to audit
+    if measurements.is_empty() && combined_patterns.is_empty() {
+        return Ok(());
+    }
+
     // Phase 1: Walk commits ONCE (optimization: scan commits only once)
     // Collect into Vec so we can reuse the data for multiple measurements
     let all_commits: Vec<Result<Commit>> =
