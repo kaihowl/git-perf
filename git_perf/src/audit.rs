@@ -130,7 +130,6 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
-    explicit_measurements: &[String],
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {
@@ -148,18 +147,28 @@ pub fn audit_multiple(
 
     // Phase 2: Discover all measurements that match the combined patterns from the commit data
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
-    let mut measurements_to_audit =
-        discover_matching_measurements(&all_commits, &filters, selectors);
+    let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
 
-    // If no measurements were discovered and explicit measurements were requested,
-    // try to audit the first explicit measurement to get a proper error message
-    // (e.g., "No commit at HEAD" for empty repos, or "No measurement for HEAD" for missing measurements)
-    if measurements_to_audit.is_empty() && !explicit_measurements.is_empty() {
-        measurements_to_audit.push(explicit_measurements[0].clone());
-    }
-    // If no measurements were discovered and only filters were provided (no explicit measurements),
-    // fail with a clear message
-    else if measurements_to_audit.is_empty() {
+    // If no measurements were discovered, provide appropriate error message
+    if measurements_to_audit.is_empty() {
+        // Check if we have any commits at all
+        if all_commits.is_empty() {
+            bail!("No commit at HEAD");
+        }
+        // Check if any commits have any measurements at all
+        let has_any_measurements = all_commits.iter().any(|commit_result| {
+            if let Ok(commit) = commit_result {
+                !commit.measurements.is_empty()
+            } else {
+                false
+            }
+        });
+
+        if !has_any_measurements {
+            // No measurements exist in any commits - specific error for this case
+            bail!("No measurement for HEAD");
+        }
+        // Measurements exist but don't match the patterns
         bail!("No measurements found matching the provided patterns");
     }
 
@@ -526,7 +535,6 @@ mod test {
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
             &[], // Empty combined_patterns
-            &[], // Empty explicit_measurements
         );
 
         // Should succeed when no measurements need to be audited

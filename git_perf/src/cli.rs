@@ -103,7 +103,6 @@ pub fn handle_calls() -> Result<()> {
                 sigma,
                 dispersion_method.map(crate::stats::DispersionMethod::from),
                 &combined_patterns,
-                &measurement,
             )
         }
         Commands::BumpEpoch { measurements } => {
