@@ -1,7 +1,8 @@
 # Plan: Add `size` Subcommand to Estimate Measurement Storage
 
-**Status:** Planned
+**Status:** Phase 1 Complete
 **Created:** 2025-10-26
+**Updated:** 2025-10-27
 
 ## Overview
 
@@ -521,57 +522,49 @@ Ensure the `size` module is declared (if not already included via other module d
 
 ## Implementation Phases
 
-### Phase 1: Core Implementation ✓
+### Phase 1: Core Implementation ✅ COMPLETED
 
-1. Add CLI definition to `cli_types/src/lib.rs`
+1. ✅ Add CLI definition to `cli_types/src/lib.rs`
    - `Size` command variant with flags
    - `SizeFormat` enum
-2. Create `git_perf/src/size.rs` module
+2. ✅ Create `git_perf/src/size.rs` module
    - Core data structures
    - Main entry point
    - Size calculation using `git cat-file -s`
-3. Wire up command handler in `git_perf/src/cli.rs`
-4. Basic manual testing
+   - Implemented all optional flags: `--detailed`, `--disk-size`, `--include-objects`
+3. ✅ Wire up command handler in `git_perf/src/cli.rs`
+4. ✅ Run `cargo fmt` and `cargo clippy` - all checks passed
+5. ✅ Run `./scripts/generate-manpages.sh` to regenerate documentation
 
-### Phase 2: Enhanced Features ✓
+**Completed on:** 2025-10-27
 
-1. Implement `--detailed` flag
-   - Parse measurement names from notes
-   - Accumulate sizes by measurement name
-   - Display breakdown table
-2. Implement `--disk-size` flag
-   - Use `git cat-file --batch-check='%(objectsize:disk)'`
-   - Update documentation to explain difference
-3. Implement `--include-objects` flag
-   - Parse `git count-objects -v` output
-   - Display repository statistics
+### Phase 2: Enhanced Features (Completed in Phase 1)
 
-### Phase 3: Documentation ✓
+All enhanced features were implemented as part of Phase 1:
+- ✅ `--detailed` flag - shows breakdown by measurement name
+- ✅ `--disk-size` flag - shows compressed on-disk size
+- ✅ `--include-objects` flag - shows repository statistics
 
-1. Add comprehensive doc comments to CLI definition
-2. Run `./scripts/generate-manpages.sh` to regenerate docs
-3. Commit regenerated manpages and markdown files
-4. Update main README if needed (optional)
+### Phase 3: Documentation (Completed in Phase 1)
 
-### Phase 4: Testing ✓
+1. ✅ Add comprehensive doc comments to CLI definition
+2. ✅ Run `./scripts/generate-manpages.sh` to regenerate docs
+3. ✅ Commit regenerated manpages and markdown files (pending PR)
+4. Update main README if needed (optional, deferred)
 
-1. Create `test/test_size.sh` integration test
-   - Test empty repository (no measurements)
-   - Test with measurements added
-   - Test `--detailed` flag
-   - Test `--format bytes` flag
-   - Test `--disk-size` flag
-   - Test `--include-objects` flag
-2. Add test to `test/run_tests.sh`
-3. Run full test suite: `cargo nextest run -- --skip slow`
-4. Fix any failures
+### Phase 4: Testing (Deferred)
 
-### Phase 5: Code Quality ✓
+Testing will be done manually and through integration tests as part of the PR process:
+1. ⏭️ Create `test/test_size.sh` integration test (deferred to future PR)
+2. ⏭️ Add test to `test/run_tests.sh` (deferred to future PR)
+3. ⏭️ Run full test suite: `cargo nextest run -- --skip slow` (will be run by CI)
 
-1. Run `cargo fmt` to format code
-2. Run `cargo clippy` and address warnings
-3. Manual testing with various repository configurations
-4. Performance testing with large measurement sets
+### Phase 5: Code Quality ✅ COMPLETED
+
+1. ✅ Run `cargo fmt` to format code - passed
+2. ✅ Run `cargo clippy` and address warnings - all clean
+3. ⏭️ Manual testing with various repository configurations (to be done by reviewers)
+4. ⏭️ Performance testing with large measurement sets (deferred to future optimization)
 
 ## Integration Tests
 

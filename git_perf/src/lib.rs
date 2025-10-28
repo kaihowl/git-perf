@@ -11,6 +11,7 @@ pub mod measurement_storage;
 pub mod parsers;
 pub mod reporting;
 pub mod serialization;
+pub mod size;
 pub mod stats;
 pub mod units;
 

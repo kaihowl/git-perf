@@ -16,6 +16,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf remove`↴](#git-perf-remove)
 * [`git-perf prune`↴](#git-perf-prune)
 * [`git-perf list-commits`↴](#git-perf-list-commits)
+* [`git-perf size`↴](#git-perf-size)
 
 ## `git-perf`
 
@@ -34,6 +35,7 @@ This document contains the help content for the `git-perf` command-line program.
 * `remove` — Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=)
 * `prune` — Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
 * `list-commits` — List all commits that have performance measurements
+* `size` — Estimate storage size of live performance measurements
 
 ###### **Options:**
 
@@ -286,6 +288,36 @@ Outputs one commit SHA-1 hash per line. This can be used to identify which commi
 Example: git perf list-commits | wc -l  # Count commits with measurements git perf list-commits | head   # Show first few commits
 
 **Usage:** `git-perf list-commits`
+
+
+
+## `git-perf size`
+
+Estimate storage size of live performance measurements
+
+This command calculates the total size of performance measurement data stored in git notes (refs/notes/perf-v3). Use --detailed to see a breakdown by measurement name.
+
+By default, shows logical object sizes (uncompressed). Use --disk-size to see actual on-disk sizes accounting for compression.
+
+Examples: git perf size                    # Show total size in human-readable format git perf size --detailed         # Show breakdown by measurement name git perf size --format bytes     # Show size in raw bytes git perf size --disk-size        # Show actual on-disk sizes git perf size --include-objects  # Include git repository statistics
+
+**Usage:** `git-perf size [OPTIONS]`
+
+###### **Options:**
+
+* `-d`, `--detailed` — Show detailed breakdown by measurement name
+* `-f`, `--format <FORMAT>` — Output format (human-readable or bytes)
+
+  Default value: `human`
+
+  Possible values:
+  - `human`:
+    Human-readable format (e.g., "1.2 MB")
+  - `bytes`:
+    Raw bytes as integer
+
+* `--disk-size` — Use on-disk size (compressed) instead of logical size
+* `--include-objects` — Include git repository statistics for context
 
 
 

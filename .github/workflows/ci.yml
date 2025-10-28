@@ -215,6 +215,8 @@ jobs:
           audit-args: '-m report -m report-size -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
           git-perf-version: 'branch'
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          show-size: 'true'
+          size-use-disk-size: 'true'
 
   release-binary-size:
     name: release-binary-size

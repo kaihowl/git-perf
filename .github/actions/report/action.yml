@@ -34,6 +34,14 @@ inputs:
     description: 'Whether to comment on the PR with the report URL (only applies to pull_request events)'
     required: false
     default: 'true'
+  show-size:
+    description: 'Whether to show measurement storage size in output'
+    required: false
+    default: 'false'
+  size-use-disk-size:
+    description: 'Whether to use disk-size (compressed) instead of logical size'
+    required: false
+    default: 'true'
 
 outputs:
   report-url:
@@ -42,6 +50,9 @@ outputs:
   audit-output:
     description: 'Output from git-perf audit command'
     value: ${{ steps.audit.outputs.audit-output }}
+  size-output:
+    description: 'Output from git-perf size command'
+    value: ${{ steps.size.outputs.size-output }}
 
 runs:
   using: composite
@@ -90,6 +101,37 @@ runs:
           echo EOF
         } >> "$GITHUB_OUTPUT"
 
+    - name: Show measurement storage size
+      id: size
+      shell: bash
+      if: ${{ inputs.show-size == 'true' }}
+      run: |
+        # Determine size flags based on inputs
+        SIZE_FLAGS=""
+        if [ "${{ inputs.size-use-disk-size }}" = "true" ]; then
+          SIZE_FLAGS="--disk-size"
+          echo "=== Measurement Storage Size (On-Disk) ==="
+        else
+          echo "=== Measurement Storage Size (Logical) ==="
+        fi
+
+        {
+          echo 'size-output<<EOF'
+          git perf size $SIZE_FLAGS --include-objects 2>&1 || echo "Size command failed, but continuing..."
+          echo EOF
+        } >> "$GITHUB_OUTPUT"
+
+        # Also display to workflow log
+        git perf size $SIZE_FLAGS --include-objects || true
+
+        echo ""
+        if [ "${{ inputs.size-use-disk-size }}" = "true" ]; then
+          echo "=== Detailed Breakdown (On-Disk) ==="
+        else
+          echo "=== Detailed Breakdown (Logical) ==="
+        fi
+        git perf size $SIZE_FLAGS --detailed || true
+
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
@@ -119,7 +161,11 @@ runs:
 
           const auditOutput = `${{ steps.audit.outputs.audit-output }}`.trim()
           const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
-          const commentBody = `⏱  [Performance Results](${reportUrl})${auditSection}`
+
+          const sizeOutput = `${{ steps.size.outputs.size-output }}`.trim()
+          const sizeSection = sizeOutput ? `\n\n## Measurement Storage Size\n\n\`\`\`\n${sizeOutput}\n\`\`\`` : ''
+
+          const commentBody = `⏱  [Performance Results](${reportUrl})${auditSection}${sizeSection}`
 
           // Find existing performance comment
           const comments = await github.rest.issues.listComments({
