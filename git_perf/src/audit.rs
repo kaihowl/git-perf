@@ -130,6 +130,7 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
+    explicit_measurements: &[String],
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {
@@ -147,11 +148,18 @@ pub fn audit_multiple(
 
     // Phase 2: Discover all measurements that match the combined patterns from the commit data
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
-    let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
+    let mut measurements_to_audit =
+        discover_matching_measurements(&all_commits, &filters, selectors);
 
-    // If no measurements were discovered, fail with an error
-    // This happens when explicit measurements don't exist or filters match nothing
-    if measurements_to_audit.is_empty() {
+    // If no measurements were discovered and explicit measurements were requested,
+    // try to audit the first explicit measurement to get a proper error message
+    // (e.g., "No commit at HEAD" for empty repos, or "No measurement for HEAD" for missing measurements)
+    if measurements_to_audit.is_empty() && !explicit_measurements.is_empty() {
+        measurements_to_audit.push(explicit_measurements[0].clone());
+    }
+    // If no measurements were discovered and only filters were provided (no explicit measurements),
+    // fail with a clear message
+    else if measurements_to_audit.is_empty() {
         bail!("No measurements found matching the provided patterns");
     }
 
@@ -518,6 +526,7 @@ mod test {
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
             &[], // Empty combined_patterns
+            &[], // Empty explicit_measurements
         );
 
         // Should succeed when no measurements need to be audited
