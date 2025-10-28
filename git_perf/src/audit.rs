@@ -149,6 +149,12 @@ pub fn audit_multiple(
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
     let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
 
+    // If no measurements were discovered, fail with an error
+    // This happens when explicit measurements don't exist or filters match nothing
+    if measurements_to_audit.is_empty() {
+        bail!("No measurements found matching the provided patterns");
+    }
+
     let mut failed = false;
 
     // Phase 3: For each measurement, audit using the pre-loaded commit data
