@@ -1,311 +1,118 @@
 # Agent Instructions for git-perf Project
 
-This document provides clear instructions for AI agents working on this Rust workspace project.
+Rust workspace with `cli_types` and `git_perf` crates providing Git repository performance measurement tools.
 
-## 🚨 CRITICAL: Pull Request Title Requirements for AI Agents
+## 🚨 CRITICAL: Pull Request Requirements for AI Agents
 
-**MANDATORY**: When creating GitHub pull requests, you MUST:
-1. Always use the `--title` parameter with `gh pr create`
-2. Format the title using Conventional Commits: `type(scope): description`
-3. NEVER rely on GitHub's auto-generated titles
-4. Example: `gh pr create --title "docs(agents): enhance PR title guidelines" --body "..."`
-
-## Project Overview
-
-This is a Rust workspace with multiple crates (`cli_types`, `git_perf`) that provides performance measurement tools for Git repositories.
-
-## Code Quality & Formatting
-
-### Always Required
-- **Run `cargo fmt`** before creating any submissions or commits
-- **Run `cargo clippy`** for additional linting and suggestions
-- Follow Rust best practices and idiomatic code patterns
-- Use proper error handling with `Result` and `Option` types
-- Use meaningful variable and function names
-
-### Commands
+**MANDATORY PR Creation**:
 ```bash
-# Format code (REQUIRED before submission)
-cargo fmt
+# ALWAYS use --title with Conventional Commits format
+gh pr create --title "type(scope): description" --body "..."
 
-# Run linting (REQUIRED before submission)
-cargo clippy
-
-# Run tests (excluding slow ones)
-cargo nextest run -- --skip slow
+# NEVER rely on auto-generated titles
+gh pr create --body "..."  # ❌ FORBIDDEN
 ```
 
-## Testing Policy
-
-### Prerequisites
-
-**REQUIRED**: Install `cargo-nextest` before running tests:
-
-```bash
-# Install cargo-nextest
-cargo install cargo-nextest --locked
-
-# Verify installation
-cargo nextest --version
-```
-
-### Running Tests
-
-- **Test command**: `cargo nextest run -- --skip slow` (excludes slow tests)
-- Ensure all tests pass before submitting code
-- Use `cargo nextest run` for full test suite when needed
-- This is the standard command for CI and local pre-submit
-
-## Documentation & Build Process
-
-- If changes are made to the `cli_types` crate, ensure any documentation regenerated as part of the build process is included in the commit
-- Run `./scripts/generate-manpages.sh` and commit regenerated documentation
-- Commit the regenerated docs alongside the code changes
-
-### Manpage Documentation
-
-- **Always update manpages** when making CLI changes (commands, arguments, descriptions)
-- Run `./scripts/generate-manpages.sh` to regenerate manpages and markdown docs
-- Manpages are automatically generated using `clap_mangen` and `clap_markdown`
-- CI validates that documentation stays up-to-date with CLI definitions
-- Use `GIT_PERF_VERSION=1.0.0 ./scripts/generate-manpages.sh` for custom versioning
-
-## Pull Request Standards
-
-### Conventional Commits Requirement
-
-**CRITICAL**: Both commit messages AND pull request titles MUST follow the [Conventional Commits specification](https://www.conventionalcommits.org/). This is enforced by CI and is non-negotiable.
-
-### Conventional Commit Types
-
-| Type | Description | Examples |
-|------|-------------|----------|
-| `feat:` | New features | `feat(cli): add audit command`, `feat: implement MAD dispersion` |
-| `fix:` | Bug fixes | `fix(config): handle missing file gracefully`, `fix: resolve memory leak` |
-| `docs:` | Documentation changes | `docs: update README installation steps`, `docs(api): add examples` |
-| `refactor:` | Code refactoring (no functional changes) | `refactor(parser): simplify error handling` |
-| `chore:` | Maintenance tasks | `chore: update dependencies`, `chore(deps): bump clap to 4.0` |
-| `test:` | Test additions/changes | `test: add integration tests for audit`, `test(unit): cover edge cases` |
-| `perf:` | Performance improvements | `perf: optimize measurement parsing`, `perf(db): reduce query time` |
-| `build:` | Build system changes | `build: update cargo config`, `build(ci): optimize pipeline` |
-| `ci:` | CI/CD changes | `ci: add release workflow`, `ci(test): run on multiple OS` |
-| `revert:` | Reverts previous commits | `revert: undo performance optimization` |
-
-### Scopes (Optional but Recommended)
-
-Use scopes to specify the area of change:
-- `(cli_types)` - changes to the CLI types crate
-- `(git_perf)` - changes to the main git-perf crate
-- `(config)` - configuration-related changes
-- `(audit)` - audit system changes
-- `(docs)` - documentation changes
-- `(test)` - test-related changes
-
-### Examples of Proper Conventional Commits
-
-✅ **Good Examples:**
-```
-feat(cli_types): add new measurement command
-fix(audit): handle empty measurement data
-docs: improve installation instructions
-chore(deps): update clap to 4.5.0
-test(integration): add git interop tests
-```
-
-❌ **Bad Examples:**
-```
-Add new feature                     # Missing type prefix
-Update README                       # Missing type prefix
-fix stuff                          # Too vague
-feat: Add new measurement command   # Inconsistent capitalization
-```
-
-### Creating Pull Requests
-
-**CRITICAL FOR AI AGENTS**: When creating pull requests using `gh pr create`, you MUST always use the `--title` parameter with a properly formatted Conventional Commits title. NEVER rely on auto-generated titles from GitHub.
-
-#### GitHub Templates
-
-The repository provides templates to help with contributions:
-- **Issue Templates** (`.github/ISSUE_TEMPLATE/`):
-  - `bug_report.md` - For reporting bugs
-  - `feature_request.md` - For requesting new features
-  - `documentation.md` - For documentation improvements
-- **PR Template** (`.github/pull_request_template.md`):
-  - Includes Conventional Commits checklist
-  - Testing and documentation requirements
-  - Pre-submission verification steps
-
-These templates will automatically populate when creating issues or pull requests via GitHub's web interface.
-
-#### Mandatory PR Creation Process
-
-1. **Create commits with proper format:**
-   ```bash
-   git commit -m "docs(agents): enhance conventional commits guidance"
-   ```
-
-2. **Push branch:**
-   ```bash
-   git push -u origin feature-branch-name
-   ```
-
-3. **Create PR with EXPLICIT conventional title:**
-   ```bash
-   # REQUIRED: Always use --title with conventional format
-   gh pr create --title "docs(agents): enhance conventional commits guidance" --body "..."
-
-   # NEVER use these commands (they generate non-compliant titles):
-   # gh pr create --body "..."  # ❌ Will auto-generate title
-   # gh pr create              # ❌ Will auto-generate title
-   ```
-
-#### AI Agent Requirements
-
-**FOR CLAUDE AND OTHER AI AGENTS**:
-- You MUST always construct a conventional commit title for the PR
-- You MUST use the exact format: `type(scope): description`
-- You MUST never create a PR without explicitly specifying the title
-- You MUST ensure the title accurately reflects the primary change in the PR
-- You MUST use the `--title` parameter in all `gh pr create` commands
-
-#### Common PR Creation Pitfalls
-
-🚨 **WARNING**: GitHub often auto-generates PR titles from:
-- Branch names (e.g., `improve-readme` → `"Improve readme"`)
-- First commit messages
-- Repository patterns
-
-**Always manually verify and correct the PR title before submitting!**
-
-#### PR Title Validation
-
-Before submitting, verify your PR title:
-- ✅ Starts with a valid type (`feat:`, `fix:`, `docs:`, etc.)
-- ✅ Uses lowercase after the colon
-- ✅ Is descriptive but concise
-- ✅ Includes scope when relevant
-- ✅ Matches the actual changes made
-
-#### Examples of Title Corrections
-
-| Auto-Generated (❌) | Corrected (✅) |
-|-------------------|----------------|
-| `Improve README` | `docs: improve README readability and organization` |
-| `Fix bug in audit` | `fix(audit): handle missing measurement data` |
-| `Add new feature` | `feat(cli): add measurement export functionality` |
-| `Update dependencies` | `chore(deps): update clap and serde versions` |
+**AI Agent Requirements**:
+- MUST use `--title` parameter with `type(scope): description` format
+- NEVER create PR without explicit title
+- GitHub auto-generates non-compliant titles from branch names/commits
 
 ## Pre-Submission Checklist
 
-Before submitting any code, ensure:
-
-### Code Quality
-1. ✅ Run `cargo fmt` to format code
-2. ✅ Run `cargo nextest run -- --skip slow` to verify tests pass
-3. ✅ Run `cargo clippy` for additional code quality checks
-4. ✅ Ensure all changes compile without warnings
-5. ✅ If `cli_types` changed, run `./scripts/generate-manpages.sh` and commit regenerated documentation
-
-### Conventional Commits Compliance
-6. ✅ **Verify commit messages follow Conventional Commits format**
-   ```bash
-   # Check your commit messages
-   git log --oneline -5
-   # Each should start with: feat:, fix:, docs:, etc.
-   ```
-
-7. ✅ **CRITICAL: Manually craft PR title in Conventional Commits format**
-   - **AI Agents**: You MUST use `--title` parameter with `gh pr create`
-   - Must start with valid type prefix (`feat:`, `fix:`, `docs:`, etc.)
-   - Use lowercase after the colon
-   - Include scope when relevant (e.g., `feat(cli_types):`)
-   - Be descriptive but concise
-   - **Never rely on auto-generated GitHub titles**
-
-### Final Verification Commands
+**Required Commands** (run before every submission):
 ```bash
-# Verify formatting and tests
-cargo fmt --check && cargo nextest run -- --skip slow && cargo clippy
-
-# Check commit message format (should show proper conventional format)
-git log --oneline -1
-
-# When creating PR, ALWAYS use: gh pr create --title "conventional:format" --body "..."
-# NEVER create PR without explicit --title parameter
+cargo fmt                              # Format code
+cargo nextest run -- --skip slow       # Run tests (exclude slow)
+cargo clippy                           # Lint code
+./scripts/generate-manpages.sh         # If cli_types changed
 ```
 
-## Workspace Structure
+**Setup** (install once):
+```bash
+cargo install cargo-nextest --locked
+export PATH="/usr/local/cargo/bin:$PATH"  # Add to shell profile
+```
 
-- Follow workspace conventions for shared dependencies
-- Maintain proper module organization
-- This is a multi-crate workspace with `cli_types` and `git_perf` crates
+## Conventional Commits (CI-Enforced)
+
+**Format**: `type(scope): lowercase description`
+
+**Types**:
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `docs:` - Documentation only
+- `refactor:` - Code restructuring (no functional change)
+- `chore:` - Maintenance (deps, config)
+- `test:` - Test changes
+- `perf:` - Performance improvements
+- `build:` - Build system changes
+- `ci:` - CI/CD changes
+- `revert:` - Revert previous commit
+
+**Scopes**: `cli_types`, `git_perf`, `config`, `audit`, `docs`, `test`
+
+**Examples**:
+```
+✅ feat(cli_types): add measurement export
+✅ fix(audit): handle empty data
+✅ docs: improve installation steps
+✅ chore(deps): update clap to 4.5.0
+
+❌ Add new feature           # Missing type
+❌ fix stuff                 # Too vague
+❌ feat: Add Feature         # Wrong capitalization
+```
+
+**PR Title Validation**:
+- Starts with valid type (`feat:`, `fix:`, `docs:`, etc.)
+- Lowercase after colon
+- Includes scope when relevant
+- Descriptive but concise
+
+## Documentation
+
+**Manpages** (required for CLI changes):
+- Run `./scripts/generate-manpages.sh` after modifying `cli_types`
+- Commit regenerated docs with code changes
+- CI validates docs are up-to-date
+- Custom version: `GIT_PERF_VERSION=1.0.0 ./scripts/generate-manpages.sh`
+
+## Testing
+
+**Standard**: `cargo nextest run -- --skip slow`
+**Full suite**: `cargo nextest run`
+
+## Code Quality Standards
+
+- Follow Rust idioms and best practices
+- Use `Result` and `Option` for error handling
+- Meaningful variable/function names
+- No warnings allowed
 
 ## Environment Setup
 
-**IMPORTANT**: Rust toolchain must be in PATH for formatting to work:
-
+**PATH Configuration** (required for background agents):
 ```bash
-# Add Rust to PATH (required for background agents)
 export PATH="/usr/local/cargo/bin:$PATH"
 
-# Verify tools are available
-rustc --version
-cargo --version
-cargo fmt --version
-cargo clippy --version
-cargo nextest --version
-```
-
-### Installing Required Tools
-
-```bash
-# Install cargo-nextest (required for testing)
-cargo install cargo-nextest --locked
+# Verify
+rustc --version && cargo fmt --version && cargo nextest --version
 ```
 
 ## Why These Rules Matter
 
-### Code Quality Rules
-The `rustfmt` and `cargo clippy` rules are critical for:
-- **Consistency**: All code follows the same formatting standards
-- **Quality**: Catches potential bugs and enforces best practices
-- **Maintainability**: Clean, readable code that's easy to modify
-- **CI/CD**: Automated checks ensure code quality in the pipeline
+**Conventional Commits**: Non-compliant titles break automated changelog generation, version management, release automation, and documentation tools.
 
-### Conventional Commits Rules
-The Conventional Commits standard is essential for:
-- **Automated Releases**: Tools can automatically generate changelogs and determine version bumps
-- **Clear History**: Anyone can quickly understand what changed by looking at commit/PR titles
-- **Tooling Integration**: Various tools expect this format for automation
-- **Professional Standards**: Industry-standard practice for open source projects
-- **CI/CD Pipeline**: Automated workflows depend on consistent commit formatting
+**Code Quality**: Ensures consistency, catches bugs early, maintains readability, and passes CI/CD checks.
 
-**Real Impact**: A single non-compliant PR title can break:
-- Automated changelog generation
-- Version management tools
-- Release automation
-- Project documentation tools
+## GitHub Templates
 
-## Troubleshooting Background Agent Issues
+- `.github/ISSUE_TEMPLATE/`: bug_report.md, feature_request.md, documentation.md
+- `.github/pull_request_template.md`: Checklist for testing and verification
 
-**Common Issue**: Background agents not applying `rustfmt` consistently
+## Troubleshooting
 
-**Root Cause**: Rust toolchain not in PATH
-- Rust is installed at `/usr/local/cargo/bin/` but not in default PATH
-- Background agents may not have access to the full environment
-
-**Solutions**:
-1. **For Background Agents**: Ensure `export PATH="/usr/local/cargo/bin:$PATH"` is set
-2. **For CI/CD**: Add PATH export to build scripts
-3. **For Development**: Add to shell profile (`.bashrc`, `.zshrc`)
-
-**Verification**:
-```bash
-# Test that formatting works
-export PATH="/usr/local/cargo/bin:$PATH"
-cargo fmt --check
-cargo clippy --version
-```
-
-The project uses the default rustfmt configuration for consistent formatting across all environments.
+**Issue**: Background agents not applying rustfmt
+**Cause**: Rust toolchain not in PATH (`/usr/local/cargo/bin/`)
+**Fix**: Add PATH export to environment
