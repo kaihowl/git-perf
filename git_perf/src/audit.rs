@@ -121,9 +121,7 @@ fn discover_matching_measurements(
     result
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
-    measurements: &[String],
     max_count: usize,
     min_count: Option<u16>,
     selectors: &[(String, String)],
@@ -136,27 +134,22 @@ pub fn audit_multiple(
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
 
-    // Early return if there are no measurements and no filters
-    // This avoids unnecessary git operations when there's nothing to audit
-    if measurements.is_empty() && combined_patterns.is_empty() {
-        return Ok(());
-    }
-
     // Phase 1: Walk commits ONCE (optimization: scan commits only once)
     // Collect into Vec so we can reuse the data for multiple measurements
     let all_commits: Vec<Result<Commit>> =
         measurement_retrieval::walk_commits(max_count)?.collect();
 
-    // Phase 2: Discover all measurements that match the filters from the commit data
-    let discovered_measurements = discover_matching_measurements(&all_commits, &filters, selectors);
+    // Phase 2: Discover all measurements that match the combined patterns from the commit data
+    // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
+    let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
 
-    // If explicit measurements were requested, use those instead of discovered ones
-    // This maintains backward compatibility when no filters are used
-    let measurements_to_audit: Vec<String> = if measurements.is_empty() {
-        discovered_measurements
-    } else {
-        measurements.to_vec()
-    };
+    // Hard error if no measurements were discovered
+    if measurements_to_audit.is_empty() {
+        bail!(
+            "No measurements found matching the specified patterns and selectors. \
+             Check your measurement names, filters, and selectors."
+        );
+    }
 
     let mut failed = false;
 
@@ -189,7 +182,6 @@ pub fn audit_multiple(
             params.summarize_by,
             params.sigma,
             params.dispersion_method,
-            &filters,
         )?;
 
         println!("{}", result.message);
@@ -209,7 +201,6 @@ pub fn audit_multiple(
 /// Audits a measurement using pre-loaded commit data.
 /// This is more efficient than the old `audit` function when auditing multiple measurements,
 /// as it reuses the same commit data instead of walking commits multiple times.
-#[allow(clippy::too_many_arguments)]
 fn audit_with_commits(
     measurement: &str,
     commits: &[Result<Commit>],
@@ -218,7 +209,6 @@ fn audit_with_commits(
     summarize_by: ReductionFunc,
     sigma: f64,
     dispersion_method: DispersionMethod,
-    filters: &[regex::Regex],
 ) -> Result<AuditResult> {
     // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
     // This is necessary because summarize_measurements expects an iterator of Result<Commit>
@@ -230,26 +220,9 @@ fn audit_with_commits(
         Err(e) => Err(anyhow::anyhow!("{}", e)),
     });
 
-    // Filter using subset relation: selectors ⊆ measurement.key_values
-    // The filters now include both exact measurement matches (as anchored regex)
-    // and user-provided filter patterns, so we only need to check:
-    // 1. Does the name match any filter (which includes exact measurement name)
-    // 2. Do the selectors match
-    let filter_by = |m: &MeasurementData| {
-        // Apply regex filters (handles both exact measurement match and patterns)
-        if !crate::filter::matches_any_filter(&m.name, filters) {
-            return false;
-        }
-
-        // Check that we're looking at the right measurement for this audit
-        // (since filters may match multiple measurements)
-        if m.name != measurement {
-            return false;
-        }
-
-        // Existing selector check
-        m.key_values_is_superset_of(selectors)
-    };
+    // Filter to only this specific measurement with matching selectors
+    let filter_by =
+        |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
         commits_iter,
@@ -531,22 +504,28 @@ mod test {
     #[test]
     fn test_audit_multiple_with_no_measurements() {
         // This test exercises the actual production audit_multiple function
-        // Tests the case where no measurements are provided (empty list)
+        // Tests the case where no patterns are provided (empty list)
+        // This should now return an error because no measurements can be discovered
         let result = audit_multiple(
-            &[], // Empty measurements list
             100,
             Some(1),
             &[],
             Some(ReductionFunc::Mean),
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
-            &[], // Empty filter patterns
+            &[], // Empty combined_patterns
         );
 
-        // Should succeed when no measurements need to be audited
+        // Should fail with error when no measurements can be discovered
         assert!(
-            result.is_ok(),
-            "audit_multiple should succeed with empty measurement list"
+            result.is_err(),
+            "audit_multiple should fail when no patterns are provided"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("No measurements found"),
+            "Error should mention no measurements found, got: {}",
+            err_msg
         );
     }
 
