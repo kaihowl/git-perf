@@ -122,6 +122,7 @@ fn discover_matching_measurements(
 }
 
 pub fn audit_multiple(
+    measurements: &[String],
     max_count: usize,
     min_count: Option<u16>,
     selectors: &[(String, String)],
@@ -130,15 +131,6 @@ pub fn audit_multiple(
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
 ) -> Result<()> {
-    // Early check: if no patterns provided, return error immediately
-    // This must be done before walk_commits to avoid git errors in test environments
-    if combined_patterns.is_empty() {
-        bail!(
-            "No measurements found matching the specified patterns and selectors. \
-             Check your measurement names, filters, and selectors."
-        );
-    }
-
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
@@ -150,15 +142,17 @@ pub fn audit_multiple(
 
     // Phase 2: Discover all measurements that match the combined patterns from the commit data
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
-    let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
+    let discovered = discover_matching_measurements(&all_commits, &filters, selectors);
 
-    // Hard error if no measurements were discovered (patterns exist but don't match anything)
-    if measurements_to_audit.is_empty() {
-        bail!(
-            "No measurements found matching the specified patterns and selectors. \
-             Check your measurement names, filters, and selectors."
-        );
-    }
+    // Use discovered measurements if any found, otherwise fall back to explicit measurement names
+    // This allows explicit measurements to be audited even if they don't exist (will fail with
+    // specific error like "No measurement for HEAD"), while filters that match nothing just don't
+    // add any measurements to audit.
+    let measurements_to_audit = if !discovered.is_empty() {
+        discovered
+    } else {
+        measurements.to_vec()
+    };
 
     let mut failed = false;
 
@@ -514,8 +508,9 @@ mod test {
     fn test_audit_multiple_with_no_measurements() {
         // This test exercises the actual production audit_multiple function
         // Tests the case where no patterns are provided (empty list)
-        // This should now return an error because no measurements can be discovered
+        // With no measurements and no patterns, it should succeed (nothing to audit)
         let result = audit_multiple(
+            &[], // Empty measurements
             100,
             Some(1),
             &[],
@@ -525,16 +520,10 @@ mod test {
             &[], // Empty combined_patterns
         );
 
-        // Should fail with error when no measurements can be discovered
+        // Should succeed when no measurements need to be audited
         assert!(
-            result.is_err(),
-            "audit_multiple should fail when no patterns are provided"
-        );
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("No measurements found"),
-            "Error should mention no measurements found, got: {}",
-            err_msg
+            result.is_ok(),
+            "audit_multiple should succeed with empty measurement list"
         );
     }
 

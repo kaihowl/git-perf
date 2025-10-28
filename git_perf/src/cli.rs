@@ -96,6 +96,7 @@ pub fn handle_calls() -> Result<()> {
                 crate::filter::combine_measurements_and_filters(&measurement, &filter);
 
             audit::audit_multiple(
+                &measurement,
                 report_history.max_count,
                 min_measurements,
                 &selectors,
