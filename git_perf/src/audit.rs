@@ -132,6 +132,11 @@ pub fn audit_multiple(
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
 ) -> Result<()> {
+    // Early return if both measurements and patterns are empty - nothing to audit
+    if measurements.is_empty() && combined_patterns.is_empty() {
+        return Ok(());
+    }
+
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
