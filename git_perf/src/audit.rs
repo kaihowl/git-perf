@@ -130,6 +130,15 @@ pub fn audit_multiple(
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
 ) -> Result<()> {
+    // Early check: if no patterns provided, return error immediately
+    // This must be done before walk_commits to avoid git errors in test environments
+    if combined_patterns.is_empty() {
+        bail!(
+            "No measurements found matching the specified patterns and selectors. \
+             Check your measurement names, filters, and selectors."
+        );
+    }
+
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
@@ -143,7 +152,7 @@ pub fn audit_multiple(
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
     let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
 
-    // Hard error if no measurements were discovered
+    // Hard error if no measurements were discovered (patterns exist but don't match anything)
     if measurements_to_audit.is_empty() {
         bail!(
             "No measurements found matching the specified patterns and selectors. \
