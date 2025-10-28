@@ -34,6 +34,14 @@ inputs:
     description: 'Whether to comment on the PR with the report URL (only applies to pull_request events)'
     required: false
     default: 'true'
+  show-size:
+    description: 'Whether to show measurement storage size in output'
+    required: false
+    default: 'false'
+  size-use-disk-size:
+    description: 'Whether to use disk-size (compressed) instead of logical size'
+    required: false
+    default: 'true'
 
 outputs:
   report-url:
@@ -96,20 +104,33 @@ runs:
     - name: Show measurement storage size
       id: size
       shell: bash
+      if: ${{ inputs.show-size == 'true' }}
       run: |
-        echo "=== Measurement Storage Size (On-Disk) ==="
+        # Determine size flags based on inputs
+        SIZE_FLAGS=""
+        if [ "${{ inputs.size-use-disk-size }}" = "true" ]; then
+          SIZE_FLAGS="--disk-size"
+          echo "=== Measurement Storage Size (On-Disk) ==="
+        else
+          echo "=== Measurement Storage Size (Logical) ==="
+        fi
+
         {
           echo 'size-output<<EOF'
-          git perf size --disk-size --include-objects 2>&1 || echo "Size command failed, but continuing..."
+          git perf size $SIZE_FLAGS --include-objects 2>&1 || echo "Size command failed, but continuing..."
           echo EOF
         } >> "$GITHUB_OUTPUT"
 
         # Also display to workflow log
-        git perf size --disk-size --include-objects || true
+        git perf size $SIZE_FLAGS --include-objects || true
 
         echo ""
-        echo "=== Detailed Breakdown (On-Disk) ==="
-        git perf size --disk-size --detailed || true
+        if [ "${{ inputs.size-use-disk-size }}" = "true" ]; then
+          echo "=== Detailed Breakdown (On-Disk) ==="
+        else
+          echo "=== Detailed Breakdown (Logical) ==="
+        fi
+        git perf size $SIZE_FLAGS --detailed || true
 
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
