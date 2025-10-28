@@ -55,7 +55,7 @@ pub fn calculate_measurement_size(
     };
 
     // 3. Display results
-    display_size_report(&notes_info, repo_stats.as_ref(), format)?;
+    display_size_report(&notes_info, repo_stats.as_ref(), format, disk_size)?;
 
     Ok(())
 }
@@ -262,14 +262,22 @@ fn display_size_report(
     info: &NotesSizeInfo,
     repo_stats: Option<&RepoStats>,
     format: SizeFormat,
+    disk_size: bool,
 ) -> Result<()> {
+    let size_type = if disk_size {
+        "on-disk (compressed)"
+    } else {
+        "logical (uncompressed)"
+    };
+
     println!("Live Measurement Size Report");
     println!("============================");
     println!();
 
     println!("Number of commits with measurements: {}", info.note_count);
     println!(
-        "Total measurement data size: {}",
+        "Total measurement data size ({}): {}",
+        size_type,
         format_size(info.total_bytes, format)
     );
 
@@ -297,7 +305,7 @@ fn display_size_report(
     // Show detailed breakdown if requested
     if let Some(by_name) = &info.by_measurement {
         println!();
-        println!("Breakdown by Measurement Name:");
+        println!("Breakdown by Measurement Name ({}):", size_type);
         println!("------------------------------");
 
         // Sort by size descending
