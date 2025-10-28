@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use git_perf_cli_types::SizeFormat;
 use human_repr::HumanCount;
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -79,25 +80,37 @@ fn get_notes_size(detailed: bool, disk_size: bool) -> Result<NotesSizeInfo> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    let mut total_bytes = 0u64;
-    let mut note_count = 0usize;
+    // Collect all note OIDs first
+    let note_oids: Vec<&str> = stdout
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                Some(parts[0])
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let note_count = note_oids.len();
+    if note_count == 0 {
+        return Ok(NotesSizeInfo {
+            total_bytes: 0,
+            note_count: 0,
+            by_measurement: if detailed { Some(HashMap::new()) } else { None },
+        });
+    }
+
+    // Get sizes for all notes using streaming
+    let sizes = get_object_sizes_batch(Path::new(&repo_root), &note_oids, disk_size)?;
+    let total_bytes: u64 = sizes.iter().sum();
+
     let mut by_measurement = if detailed { Some(HashMap::new()) } else { None };
 
-    for line in stdout.lines() {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() < 2 {
-            continue;
-        }
-        let note_oid = parts[0];
-
-        // Get size of this note object
-        let size = get_object_size(Path::new(&repo_root), note_oid, disk_size)?;
-
-        total_bytes += size;
-        note_count += 1;
-
-        // If detailed breakdown requested, parse measurement names
-        if let Some(ref mut by_name) = by_measurement {
+    // If detailed breakdown requested, parse measurement names
+    if let Some(ref mut by_name) = by_measurement {
+        for (note_oid, &size) in note_oids.iter().zip(sizes.iter()) {
             accumulate_measurement_sizes(Path::new(&repo_root), note_oid, size, by_name)?;
         }
     }
@@ -109,57 +122,65 @@ fn get_notes_size(detailed: bool, disk_size: bool) -> Result<NotesSizeInfo> {
     })
 }
 
-/// Get size of a git object
-fn get_object_size(repo_root: &std::path::Path, oid: &str, disk_size: bool) -> Result<u64> {
-    if disk_size {
-        // Use cat-file --batch-check with objectsize:disk format
-        let mut child = Command::new("git")
-            .args(["cat-file", "--batch-check=%(objectsize:disk)"])
-            .current_dir(repo_root)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .context("Failed to spawn git cat-file")?;
-
-        {
-            use std::io::Write;
-            let stdin = child.stdin.as_mut().context("Failed to open stdin")?;
-            stdin
-                .write_all(format!("{}\n", oid).as_bytes())
-                .context("Failed to write to stdin")?;
-        }
-
-        let output = child
-            .wait_with_output()
-            .context("Failed to wait for git cat-file")?;
-
-        if !output.status.success() {
-            anyhow::bail!("git cat-file failed for {}", oid);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        stdout
-            .trim()
-            .parse::<u64>()
-            .context("Failed to parse disk size")
-    } else {
-        // Use cat-file -s for logical size
-        let output = Command::new("git")
-            .args(["cat-file", "-s", oid])
-            .current_dir(repo_root)
-            .output()
-            .context("Failed to execute git cat-file -s")?;
-
-        if !output.status.success() {
-            anyhow::bail!("git cat-file -s failed for {}", oid);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        stdout
-            .trim()
-            .parse::<u64>()
-            .context("Failed to parse object size")
+/// Get sizes of multiple git objects using a single git cat-file process with streaming
+fn get_object_sizes_batch(
+    repo_root: &std::path::Path,
+    oids: &[&str],
+    disk_size: bool,
+) -> Result<Vec<u64>> {
+    if oids.is_empty() {
+        return Ok(Vec::new());
     }
+
+    let batch_format = if disk_size {
+        "%(objectsize:disk)"
+    } else {
+        "%(objectsize)"
+    };
+
+    // Spawn git cat-file with batch-check mode
+    let mut child = Command::new("git")
+        .args(["cat-file", &format!("--batch-check={}", batch_format)])
+        .current_dir(repo_root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to spawn git cat-file")?;
+
+    // Write all OIDs to stdin
+    {
+        let stdin = child.stdin.take().context("Failed to take stdin")?;
+        let mut writer = BufWriter::new(stdin);
+        for oid in oids {
+            writeln!(writer, "{}", oid).context("Failed to write OID to stdin")?;
+        }
+        // writer is dropped here, closing stdin
+    }
+
+    // Read all sizes from stdout
+    let stdout = child.stdout.take().context("Failed to take stdout")?;
+    let reader = BufReader::new(stdout);
+    let mut sizes = Vec::with_capacity(oids.len());
+
+    for line in reader.lines() {
+        let line = line.context("Failed to read line from git cat-file")?;
+        let size = line
+            .trim()
+            .parse::<u64>()
+            .with_context(|| format!("Failed to parse size from: {}", line))?;
+        sizes.push(size);
+    }
+
+    let status = child.wait().context("Failed to wait for git cat-file")?;
+    if !status.success() {
+        anyhow::bail!("git cat-file process failed");
+    }
+
+    if sizes.len() != oids.len() {
+        anyhow::bail!("Expected {} sizes but got {}", oids.len(), sizes.len());
+    }
+
+    Ok(sizes)
 }
 
 /// Parse note contents and accumulate sizes by measurement name
