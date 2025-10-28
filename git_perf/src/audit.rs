@@ -123,7 +123,6 @@ fn discover_matching_measurements(
 
 #[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
-    measurements: &[String],
     max_count: usize,
     min_count: Option<u16>,
     selectors: &[(String, String)],
@@ -132,8 +131,8 @@ pub fn audit_multiple(
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
 ) -> Result<()> {
-    // Early return if both measurements and patterns are empty - nothing to audit
-    if measurements.is_empty() && combined_patterns.is_empty() {
+    // Early return if patterns are empty - nothing to audit
+    if combined_patterns.is_empty() {
         return Ok(());
     }
 
@@ -148,17 +147,7 @@ pub fn audit_multiple(
 
     // Phase 2: Discover all measurements that match the combined patterns from the commit data
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
-    let discovered = discover_matching_measurements(&all_commits, &filters, selectors);
-
-    // Use discovered measurements if any found, otherwise fall back to explicit measurement names
-    // This allows explicit measurements to be audited even if they don't exist (will fail with
-    // specific error like "No measurement for HEAD"), while filters that match nothing just don't
-    // add any measurements to audit.
-    let measurements_to_audit = if !discovered.is_empty() {
-        discovered
-    } else {
-        measurements.to_vec()
-    };
+    let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
 
     let mut failed = false;
 
@@ -514,9 +503,8 @@ mod test {
     fn test_audit_multiple_with_no_measurements() {
         // This test exercises the actual production audit_multiple function
         // Tests the case where no patterns are provided (empty list)
-        // With no measurements and no patterns, it should succeed (nothing to audit)
+        // With no patterns, it should succeed (nothing to audit)
         let result = audit_multiple(
-            &[], // Empty measurements
             100,
             Some(1),
             &[],
@@ -529,7 +517,7 @@ mod test {
         // Should succeed when no measurements need to be audited
         assert!(
             result.is_ok(),
-            "audit_multiple should succeed with empty measurement list"
+            "audit_multiple should succeed with empty pattern list"
         );
     }
 
