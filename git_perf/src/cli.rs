@@ -84,6 +84,17 @@ pub fn handle_calls() -> Result<()> {
             dispersion_method,
             filter,
         } => {
+            // Validate that at least one of measurement or filter is provided
+            // (clap's required_unless_present should handle this, but double-check for safety)
+            if measurement.is_empty() && filter.is_empty() {
+                Cli::command()
+                    .error(
+                        clap::error::ErrorKind::MissingRequiredArgument,
+                        "At least one of --measurement or --filter must be provided",
+                    )
+                    .exit()
+            }
+
             // Validate max_count vs min_measurements if min_measurements is specified via CLI
             if let Some(min_count) = min_measurements {
                 if report_history.max_count < min_count.into() {

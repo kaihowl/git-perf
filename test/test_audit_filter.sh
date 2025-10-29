@@ -41,10 +41,9 @@ git perf add -m bench_memory 230
 git perf add -m test_unit 56
 git perf add -m timer 13
 
-echo "Test 1: Filter with regex pattern matching bench_* measurements (with dummy -m)"
-# Note: CLI currently requires -m, but filter can expand the set
-# Use a non-existent -m to test pure filter behavior
-output=$(git perf audit -m nonexistent --filter "bench_.*" -d 10 2>&1)
+echo "Test 1: Filter with regex pattern matching bench_* measurements"
+# Test pure filter behavior without requiring -m
+output=$(git perf audit --filter "bench_.*" -d 10 2>&1)
 assert_output_contains "$output" "bench_cpu" "Should audit bench_cpu"
 assert_output_contains "$output" "bench_memory" "Should audit bench_memory"
 if echo "$output" | grep -q "test_unit"; then
@@ -72,7 +71,7 @@ fi
 echo "PASS: Combined -m and --filter work with OR behavior"
 
 echo "Test 3: Filter matches no measurements (should error)"
-if output=$(git perf audit -m nonexistent_dummy --filter "nonexistent.*" -d 10 2>&1); then
+if output=$(git perf audit --filter "nonexistent.*" -d 10 2>&1); then
   echo "FAIL: Should fail when filter matches no measurements"
   echo "Output: $output"
   exit 1
@@ -81,7 +80,7 @@ assert_output_contains "$output" "No measurements found matching the provided pa
 echo "PASS: Correctly errors when filter matches nothing"
 
 echo "Test 4: Invalid regex pattern (should error)"
-if output=$(git perf audit -m dummy --filter "[invalid" -d 10 2>&1); then
+if output=$(git perf audit --filter "[invalid" -d 10 2>&1); then
   echo "FAIL: Should fail with invalid regex pattern"
   echo "Output: $output"
   exit 1
@@ -112,7 +111,7 @@ git perf add -m bench_cpu 115 -k os=linux
 git perf add -m bench_cpu 165 -k os=mac
 git perf add -m test_unit 56 -k os=linux
 
-output=$(git perf audit -m dummy --filter "bench_.*" -s os=linux -d 10 2>&1)
+output=$(git perf audit --filter "bench_.*" -s os=linux -d 10 2>&1)
 assert_output_contains "$output" "bench_cpu" "Should audit bench_cpu with os=linux"
 if echo "$output" | grep -q "test_unit"; then
   echo "FAIL: test_unit should not match bench_.* filter"
@@ -142,7 +141,7 @@ git perf add -m bench_cpu 115
 git perf add -m test_unit 56
 git perf add -m other_metric 28
 
-output=$(git perf audit -m dummy --filter "bench_.*" --filter "test_.*" -d 10 2>&1)
+output=$(git perf audit --filter "bench_.*" --filter "test_.*" -d 10 2>&1)
 assert_output_contains "$output" "bench_cpu" "Should audit bench_cpu"
 assert_output_contains "$output" "test_unit" "Should audit test_unit"
 if echo "$output" | grep -q "other_metric"; then
@@ -167,7 +166,7 @@ create_commit
 git perf add -m bench_fast 100
 
 # Should fail with low sigma
-if output=$(git perf audit -m dummy --filter "bench_.*" -d 0.5 2>&1); then
+if output=$(git perf audit --filter "bench_.*" -d 0.5 2>&1); then
   echo "FAIL: Audit should fail with outlier value and strict sigma"
   echo "Output: $output"
   exit 1
