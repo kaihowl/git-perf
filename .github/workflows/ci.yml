@@ -118,7 +118,7 @@ jobs:
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
 
     - name: Archive report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       if: always()
       with:
         include-hidden-files: true
@@ -260,7 +260,7 @@ jobs:
         ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable --min-measurements 10
 
     - name: Upload size artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: release-binary-size
         path: metrics/release_binary_size.txt
