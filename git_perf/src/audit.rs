@@ -1259,4 +1259,244 @@ dispersion_method = "mad"
             );
         }
     }
+
+    #[test]
+    fn test_discover_matching_measurements() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        // Create mock commits with various measurements
+        let commits = vec![
+            Ok(Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![
+                    MeasurementData {
+                        epoch: 0,
+                        name: "bench_cpu".to_string(),
+                        timestamp: 1000.0,
+                        val: 100.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                    MeasurementData {
+                        epoch: 0,
+                        name: "bench_memory".to_string(),
+                        timestamp: 1000.0,
+                        val: 200.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                    MeasurementData {
+                        epoch: 0,
+                        name: "test_unit".to_string(),
+                        timestamp: 1000.0,
+                        val: 50.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                ],
+            }),
+            Ok(Commit {
+                commit: "def456".to_string(),
+                measurements: vec![
+                    MeasurementData {
+                        epoch: 0,
+                        name: "bench_cpu".to_string(),
+                        timestamp: 1000.0,
+                        val: 105.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "mac".to_string());
+                            map
+                        },
+                    },
+                    MeasurementData {
+                        epoch: 0,
+                        name: "other_metric".to_string(),
+                        timestamp: 1000.0,
+                        val: 75.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                ],
+            }),
+        ];
+
+        // Test 1: Single filter pattern matching "bench_*"
+        let patterns = vec!["bench_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"bench_memory".to_string()));
+        assert!(!discovered.contains(&"test_unit".to_string()));
+        assert!(!discovered.contains(&"other_metric".to_string()));
+
+        // Test 2: Multiple filter patterns (OR behavior)
+        let patterns = vec!["bench_cpu".to_string(), "test_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"test_unit".to_string()));
+        assert!(!discovered.contains(&"bench_memory".to_string()));
+
+        // Test 3: Filter with selectors
+        let patterns = vec!["bench_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![("os".to_string(), "linux".to_string())];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // bench_cpu and bench_memory both have os=linux (in first commit)
+        // bench_cpu also has os=mac (in second commit) but selector filters it to only linux
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"bench_memory".to_string()));
+
+        // Test 4: No matches
+        let patterns = vec!["nonexistent.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 0);
+
+        // Test 5: Empty filters (should match all)
+        let filters = vec![];
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Empty filters should match nothing based on the logic
+        // Actually, looking at matches_any_filter, empty filters return true
+        // So this should discover all measurements
+        assert_eq!(discovered.len(), 4);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"bench_memory".to_string()));
+        assert!(discovered.contains(&"test_unit".to_string()));
+        assert!(discovered.contains(&"other_metric".to_string()));
+
+        // Test 6: Selector filters out everything
+        let patterns = vec!["bench_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![("os".to_string(), "windows".to_string())];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 0);
+
+        // Test 7: Exact match with anchored regex (simulating -m argument)
+        let patterns = vec!["^bench_cpu$".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 1);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+
+        // Test 8: Sorted output (verify deterministic ordering)
+        let patterns = vec![".*".to_string()]; // Match all
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Should be sorted alphabetically
+        assert_eq!(discovered[0], "bench_cpu");
+        assert_eq!(discovered[1], "bench_memory");
+        assert_eq!(discovered[2], "other_metric");
+        assert_eq!(discovered[3], "test_unit");
+    }
+
+    #[test]
+    fn test_audit_multiple_with_combined_patterns() {
+        // This test verifies that combining explicit measurements (-m) and filter patterns (--filter)
+        // works correctly with OR behavior. Both should be audited.
+        // Note: This is an integration test that uses actual audit_multiple function,
+        // but we can't easily test it without a real git repo, so we test the pattern combination
+        // and discovery logic instead.
+
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        // Create mock commits
+        let commits = vec![Ok(Commit {
+            commit: "abc123".to_string(),
+            measurements: vec![
+                MeasurementData {
+                    epoch: 0,
+                    name: "timer".to_string(),
+                    timestamp: 1000.0,
+                    val: 10.0,
+                    key_values: HashMap::new(),
+                },
+                MeasurementData {
+                    epoch: 0,
+                    name: "bench_cpu".to_string(),
+                    timestamp: 1000.0,
+                    val: 100.0,
+                    key_values: HashMap::new(),
+                },
+                MeasurementData {
+                    epoch: 0,
+                    name: "memory".to_string(),
+                    timestamp: 1000.0,
+                    val: 500.0,
+                    key_values: HashMap::new(),
+                },
+            ],
+        })];
+
+        // Simulate combining -m timer with --filter "bench_.*"
+        // This is what combine_measurements_and_filters does in cli.rs
+        let measurements = vec!["timer".to_string()];
+        let filter_patterns = vec!["bench_.*".to_string()];
+        let combined =
+            crate::filter::combine_measurements_and_filters(&measurements, &filter_patterns);
+
+        // combined should have: ["^timer$", "bench_.*"]
+        assert_eq!(combined.len(), 2);
+        assert_eq!(combined[0], "^timer$");
+        assert_eq!(combined[1], "bench_.*");
+
+        // Now compile and discover
+        let filters = crate::filter::compile_filters(&combined).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Should discover both timer (exact match) and bench_cpu (pattern match)
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"timer".to_string()));
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(!discovered.contains(&"memory".to_string())); // Not in -m or filter
+
+        // Test with multiple explicit measurements and multiple filters
+        let measurements = vec!["timer".to_string(), "memory".to_string()];
+        let filter_patterns = vec!["bench_.*".to_string(), "test_.*".to_string()];
+        let combined =
+            crate::filter::combine_measurements_and_filters(&measurements, &filter_patterns);
+
+        assert_eq!(combined.len(), 4);
+
+        let filters = crate::filter::compile_filters(&combined).unwrap();
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Should discover timer, memory, and bench_cpu (no test_* in commits)
+        assert_eq!(discovered.len(), 3);
+        assert!(discovered.contains(&"timer".to_string()));
+        assert!(discovered.contains(&"memory".to_string()));
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+    }
 }
