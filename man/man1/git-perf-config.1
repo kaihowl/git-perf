@@ -1,0 +1,42 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH config 1  "config " 
+.SH NAME
+config \- Manage git\-perf configuration
+.SH SYNOPSIS
+\fBconfig\fR [\fB\-l\fR|\fB\-\-list\fR] [\fB\-d\fR|\fB\-\-detailed\fR] [\fB\-f\fR|\fB\-\-format\fR] [\fB\-v\fR|\fB\-\-validate\fR] [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Manage git\-perf configuration
+.PP
+Display and query git\-perf configuration settings, including git context (branch name, repository location), configuration sources, and measurement\-specific settings. This follows the git config pattern.
+.PP
+Examples: git perf config \-\-list                  # Show configuration summary git perf config \-\-list \-\-detailed       # Show all measurement settings git perf config \-\-list \-\-json           # Output as JSON git perf config \-\-list \-\-validate       # Check for config issues git perf config \-\-list \-\-measurement M  # Show specific measurement
+.SH OPTIONS
+.TP
+\fB\-l\fR, \fB\-\-list\fR
+List all configuration settings (similar to git config \-\-list)
+.TP
+\fB\-d\fR, \fB\-\-detailed\fR
+Show detailed configuration including all measurements
+.TP
+\fB\-f\fR, \fB\-\-format\fR \fI<FORMAT>\fR [default: human]
+Output format (human\-readable or JSON)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+human: Human\-readable format
+.IP \(bu 2
+json: JSON format for machine parsing
+.RE
+.TP
+\fB\-v\fR, \fB\-\-validate\fR
+Validate configuration and report issues
+.TP
+\fB\-m\fR, \fB\-\-measurement\fR \fI<MEASUREMENT>\fR
+Show specific measurement configuration only
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
