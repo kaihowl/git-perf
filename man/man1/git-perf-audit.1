@@ -4,7 +4,7 @@
 .SH NAME
 audit \- For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison
 .SH SYNOPSIS
-\fBaudit\fR <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-s\fR|\fB\-\-selectors\fR] [\fB\-\-min\-measurements\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-d\fR|\fB\-\-sigma\fR] [\fB\-D\fR|\fB\-\-dispersion\-method\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBaudit\fR [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-s\fR|\fB\-\-selectors\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-\-min\-measurements\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-d\fR|\fB\-\-sigma\fR] [\fB\-D\fR|\fB\-\-dispersion\-method\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .SH DESCRIPTION
 For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison.
 .PP
@@ -40,13 +40,16 @@ The sparkline visualization shows the range of measurements relative to the tail
 .SH OPTIONS
 .TP
 \fB\-m\fR, \fB\-\-measurement\fR \fI<MEASUREMENT>\fR
-
+Specific measurement names to audit (can be specified multiple times). At least one of \-\-measurement or \-\-filter must be provided. Multiple measurements use OR logic. Example: \-m timer \-m memory
 .TP
 \fB\-n\fR, \fB\-\-max\-count\fR \fI<MAX_COUNT>\fR [default: 40]
 Limit the number of previous commits considered. HEAD is included in this count
 .TP
 \fB\-s\fR, \fB\-\-selectors\fR \fI<SELECTORS>\fR
 Key\-value pair separated by "=" with no whitespaces to subselect measurements
+.TP
+\fB\-f\fR, \fB\-\-filter\fR \fI<FILTER>\fR
+Filter measurements by regex pattern (can be specified multiple times). At least one of \-\-measurement or \-\-filter must be provided. If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Examples: \-f "bench_.*" (prefix), \-f ".*_x64$" (suffix), \-f "^perf_" (anchored prefix)
 .TP
 \fB\-\-min\-measurements\fR \fI<MIN_MEASUREMENTS>\fR
 Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per\-measurement config or defaults to 2

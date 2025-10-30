@@ -60,14 +60,21 @@ pub fn handle_calls() -> Result<()> {
             measurement,
             key_value,
             aggregate_by,
-        } => report(
-            output,
-            separate_by,
-            report_history.max_count,
-            &measurement,
-            &key_value,
-            aggregate_by.map(ReductionFunc::from),
-        ),
+            filter,
+        } => {
+            // Combine measurements (as exact matches) and filter patterns into unified regex patterns
+            let combined_patterns =
+                crate::filter::combine_measurements_and_filters(&measurement, &filter);
+
+            report(
+                output,
+                separate_by,
+                report_history.max_count,
+                &key_value,
+                aggregate_by.map(ReductionFunc::from),
+                &combined_patterns,
+            )
+        }
         Commands::Audit {
             measurement,
             report_history,
@@ -76,7 +83,19 @@ pub fn handle_calls() -> Result<()> {
             aggregate_by,
             sigma,
             dispersion_method,
+            filter,
         } => {
+            // Validate that at least one of measurement or filter is provided
+            // (clap's required_unless_present should handle this, but double-check for safety)
+            if measurement.is_empty() && filter.is_empty() {
+                Cli::command()
+                    .error(
+                        clap::error::ErrorKind::MissingRequiredArgument,
+                        "At least one of --measurement or --filter must be provided",
+                    )
+                    .exit()
+            }
+
             // Validate max_count vs min_measurements if min_measurements is specified via CLI
             if let Some(min_count) = min_measurements {
                 if report_history.max_count < min_count.into() {
@@ -84,14 +103,18 @@ pub fn handle_calls() -> Result<()> {
                 }
             }
 
+            // Combine measurements (as exact matches) and filter patterns into unified regex patterns
+            let combined_patterns =
+                crate::filter::combine_measurements_and_filters(&measurement, &filter);
+
             audit::audit_multiple(
-                &measurement,
                 report_history.max_count,
                 min_measurements,
                 &selectors,
                 aggregate_by.map(ReductionFunc::from),
                 sigma,
                 dispersion_method.map(crate::stats::DispersionMethod::from),
+                &combined_patterns,
             )
         }
         Commands::BumpEpoch { measurements } => {

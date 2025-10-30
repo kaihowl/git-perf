@@ -12,7 +12,7 @@ pub struct CommitSummary {
     pub measurement: Option<MeasurementSummary>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MeasurementData {
     pub epoch: u32,
     pub name: String,

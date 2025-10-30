@@ -1,6 +1,6 @@
 use crate::{
     config,
-    data::MeasurementData,
+    data::{Commit, MeasurementData},
     measurement_retrieval::{self, summarize_measurements},
     stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
@@ -9,6 +9,7 @@ use itertools::Itertools;
 use log::error;
 use sparklines::spark;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::iter;
 
 /// Formats a z-score for display in audit output.
@@ -88,20 +89,95 @@ pub(crate) fn resolve_audit_params(
     }
 }
 
+/// Discovers all unique measurement names from commits that match the filters and selectors.
+/// This is used to efficiently find which measurements to audit when filters are provided.
+fn discover_matching_measurements(
+    commits: &[Result<Commit>],
+    filters: &[regex::Regex],
+    selectors: &[(String, String)],
+) -> Vec<String> {
+    let mut unique_measurements = HashSet::new();
+
+    for commit in commits.iter().flatten() {
+        for measurement in &commit.measurements {
+            // Check if measurement name matches any filter
+            if !crate::filter::matches_any_filter(&measurement.name, filters) {
+                continue;
+            }
+
+            // Check if measurement matches selectors
+            if !measurement.key_values_is_superset_of(selectors) {
+                continue;
+            }
+
+            // This measurement matches - add to set
+            unique_measurements.insert(measurement.name.clone());
+        }
+    }
+
+    // Convert to sorted vector for deterministic ordering
+    let mut result: Vec<String> = unique_measurements.into_iter().collect();
+    result.sort();
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
-    measurements: &[String],
     max_count: usize,
     min_count: Option<u16>,
     selectors: &[(String, String)],
     summarize_by: Option<ReductionFunc>,
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
+    combined_patterns: &[String],
 ) -> Result<()> {
+    // Early return if patterns are empty - nothing to audit
+    if combined_patterns.is_empty() {
+        return Ok(());
+    }
+
+    // Compile combined regex patterns (measurements as exact matches + filter patterns)
+    // early to fail fast on invalid patterns
+    let filters = crate::filter::compile_filters(combined_patterns)?;
+
+    // Phase 1: Walk commits ONCE (optimization: scan commits only once)
+    // Collect into Vec so we can reuse the data for multiple measurements
+    let all_commits: Vec<Result<Commit>> =
+        measurement_retrieval::walk_commits(max_count)?.collect();
+
+    // Phase 2: Discover all measurements that match the combined patterns from the commit data
+    // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
+    let measurements_to_audit = discover_matching_measurements(&all_commits, &filters, selectors);
+
+    // If no measurements were discovered, provide appropriate error message
+    if measurements_to_audit.is_empty() {
+        // Check if we have any commits at all
+        if all_commits.is_empty() {
+            bail!("No commit at HEAD");
+        }
+        // Check if any commits have any measurements at all
+        let has_any_measurements = all_commits.iter().any(|commit_result| {
+            if let Ok(commit) = commit_result {
+                !commit.measurements.is_empty()
+            } else {
+                false
+            }
+        });
+
+        if !has_any_measurements {
+            // No measurements exist in any commits - specific error for this case
+            bail!("No measurement for HEAD");
+        }
+        // Measurements exist but don't match the patterns
+        bail!("No measurements found matching the provided patterns");
+    }
+
     let mut failed = false;
 
-    for measurement in measurements {
+    // Phase 3: For each measurement, audit using the pre-loaded commit data
+    for measurement in measurements_to_audit {
         let params = resolve_audit_params(
-            measurement,
+            &measurement,
             min_count,
             summarize_by,
             sigma,
@@ -119,9 +195,9 @@ pub fn audit_multiple(
             );
         }
 
-        let result = audit(
-            measurement,
-            max_count,
+        let result = audit_with_commits(
+            &measurement,
+            &all_commits,
             params.min_count,
             selectors,
             params.summarize_by,
@@ -143,23 +219,34 @@ pub fn audit_multiple(
     Ok(())
 }
 
-fn audit(
+/// Audits a measurement using pre-loaded commit data.
+/// This is more efficient than the old `audit` function when auditing multiple measurements,
+/// as it reuses the same commit data instead of walking commits multiple times.
+fn audit_with_commits(
     measurement: &str,
-    max_count: usize,
+    commits: &[Result<Commit>],
     min_count: u16,
     selectors: &[(String, String)],
     summarize_by: ReductionFunc,
     sigma: f64,
     dispersion_method: DispersionMethod,
 ) -> Result<AuditResult> {
-    let all = measurement_retrieval::walk_commits(max_count)?;
+    // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
+    // This is necessary because summarize_measurements expects an iterator of Result<Commit>
+    let commits_iter = commits.iter().map(|r| match r {
+        Ok(commit) => Ok(Commit {
+            commit: commit.commit.clone(),
+            measurements: commit.measurements.clone(),
+        }),
+        Err(e) => Err(anyhow::anyhow!("{}", e)),
+    });
 
-    // Filter using subset relation: selectors ⊆ measurement.key_values
+    // Filter to only this specific measurement with matching selectors
     let filter_by =
         |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
-        all,
+        commits_iter,
         &summarize_by,
         &filter_by,
     ));
@@ -177,7 +264,6 @@ fn audit(
 
     let tail: Vec<_> = aggregates
         .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
-        .take(max_count)
         .try_collect()?;
 
     audit_with_data(measurement, head, tail, min_count, sigma, dispersion_method)
@@ -439,21 +525,22 @@ mod test {
     #[test]
     fn test_audit_multiple_with_no_measurements() {
         // This test exercises the actual production audit_multiple function
-        // Tests the case where no measurements are provided (empty list)
+        // Tests the case where no patterns are provided (empty list)
+        // With no patterns, it should succeed (nothing to audit)
         let result = audit_multiple(
-            &[], // Empty measurements list
             100,
             Some(1),
             &[],
             Some(ReductionFunc::Mean),
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
+            &[], // Empty combined_patterns
         );
 
         // Should succeed when no measurements need to be audited
         assert!(
             result.is_ok(),
-            "audit_multiple should succeed with empty measurement list"
+            "audit_multiple should succeed with empty pattern list"
         );
     }
 
@@ -1171,5 +1258,245 @@ dispersion_method = "mad"
                 "Should use default dispersion of stddev"
             );
         }
+    }
+
+    #[test]
+    fn test_discover_matching_measurements() {
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        // Create mock commits with various measurements
+        let commits = vec![
+            Ok(Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![
+                    MeasurementData {
+                        epoch: 0,
+                        name: "bench_cpu".to_string(),
+                        timestamp: 1000.0,
+                        val: 100.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                    MeasurementData {
+                        epoch: 0,
+                        name: "bench_memory".to_string(),
+                        timestamp: 1000.0,
+                        val: 200.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                    MeasurementData {
+                        epoch: 0,
+                        name: "test_unit".to_string(),
+                        timestamp: 1000.0,
+                        val: 50.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                ],
+            }),
+            Ok(Commit {
+                commit: "def456".to_string(),
+                measurements: vec![
+                    MeasurementData {
+                        epoch: 0,
+                        name: "bench_cpu".to_string(),
+                        timestamp: 1000.0,
+                        val: 105.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "mac".to_string());
+                            map
+                        },
+                    },
+                    MeasurementData {
+                        epoch: 0,
+                        name: "other_metric".to_string(),
+                        timestamp: 1000.0,
+                        val: 75.0,
+                        key_values: {
+                            let mut map = HashMap::new();
+                            map.insert("os".to_string(), "linux".to_string());
+                            map
+                        },
+                    },
+                ],
+            }),
+        ];
+
+        // Test 1: Single filter pattern matching "bench_*"
+        let patterns = vec!["bench_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"bench_memory".to_string()));
+        assert!(!discovered.contains(&"test_unit".to_string()));
+        assert!(!discovered.contains(&"other_metric".to_string()));
+
+        // Test 2: Multiple filter patterns (OR behavior)
+        let patterns = vec!["bench_cpu".to_string(), "test_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"test_unit".to_string()));
+        assert!(!discovered.contains(&"bench_memory".to_string()));
+
+        // Test 3: Filter with selectors
+        let patterns = vec!["bench_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![("os".to_string(), "linux".to_string())];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // bench_cpu and bench_memory both have os=linux (in first commit)
+        // bench_cpu also has os=mac (in second commit) but selector filters it to only linux
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"bench_memory".to_string()));
+
+        // Test 4: No matches
+        let patterns = vec!["nonexistent.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 0);
+
+        // Test 5: Empty filters (should match all)
+        let filters = vec![];
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Empty filters should match nothing based on the logic
+        // Actually, looking at matches_any_filter, empty filters return true
+        // So this should discover all measurements
+        assert_eq!(discovered.len(), 4);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(discovered.contains(&"bench_memory".to_string()));
+        assert!(discovered.contains(&"test_unit".to_string()));
+        assert!(discovered.contains(&"other_metric".to_string()));
+
+        // Test 6: Selector filters out everything
+        let patterns = vec!["bench_.*".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![("os".to_string(), "windows".to_string())];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 0);
+
+        // Test 7: Exact match with anchored regex (simulating -m argument)
+        let patterns = vec!["^bench_cpu$".to_string()];
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        assert_eq!(discovered.len(), 1);
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+
+        // Test 8: Sorted output (verify deterministic ordering)
+        let patterns = vec![".*".to_string()]; // Match all
+        let filters = crate::filter::compile_filters(&patterns).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Should be sorted alphabetically
+        assert_eq!(discovered[0], "bench_cpu");
+        assert_eq!(discovered[1], "bench_memory");
+        assert_eq!(discovered[2], "other_metric");
+        assert_eq!(discovered[3], "test_unit");
+    }
+
+    #[test]
+    fn test_audit_multiple_with_combined_patterns() {
+        // This test verifies that combining explicit measurements (-m) and filter patterns (--filter)
+        // works correctly with OR behavior. Both should be audited.
+        // Note: This is an integration test that uses actual audit_multiple function,
+        // but we can't easily test it without a real git repo, so we test the pattern combination
+        // and discovery logic instead.
+
+        use crate::data::{Commit, MeasurementData};
+        use std::collections::HashMap;
+
+        // Create mock commits
+        let commits = vec![Ok(Commit {
+            commit: "abc123".to_string(),
+            measurements: vec![
+                MeasurementData {
+                    epoch: 0,
+                    name: "timer".to_string(),
+                    timestamp: 1000.0,
+                    val: 10.0,
+                    key_values: HashMap::new(),
+                },
+                MeasurementData {
+                    epoch: 0,
+                    name: "bench_cpu".to_string(),
+                    timestamp: 1000.0,
+                    val: 100.0,
+                    key_values: HashMap::new(),
+                },
+                MeasurementData {
+                    epoch: 0,
+                    name: "memory".to_string(),
+                    timestamp: 1000.0,
+                    val: 500.0,
+                    key_values: HashMap::new(),
+                },
+            ],
+        })];
+
+        // Simulate combining -m timer with --filter "bench_.*"
+        // This is what combine_measurements_and_filters does in cli.rs
+        let measurements = vec!["timer".to_string()];
+        let filter_patterns = vec!["bench_.*".to_string()];
+        let combined =
+            crate::filter::combine_measurements_and_filters(&measurements, &filter_patterns);
+
+        // combined should have: ["^timer$", "bench_.*"]
+        assert_eq!(combined.len(), 2);
+        assert_eq!(combined[0], "^timer$");
+        assert_eq!(combined[1], "bench_.*");
+
+        // Now compile and discover
+        let filters = crate::filter::compile_filters(&combined).unwrap();
+        let selectors = vec![];
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Should discover both timer (exact match) and bench_cpu (pattern match)
+        assert_eq!(discovered.len(), 2);
+        assert!(discovered.contains(&"timer".to_string()));
+        assert!(discovered.contains(&"bench_cpu".to_string()));
+        assert!(!discovered.contains(&"memory".to_string())); // Not in -m or filter
+
+        // Test with multiple explicit measurements and multiple filters
+        let measurements = vec!["timer".to_string(), "memory".to_string()];
+        let filter_patterns = vec!["bench_.*".to_string(), "test_.*".to_string()];
+        let combined =
+            crate::filter::combine_measurements_and_filters(&measurements, &filter_patterns);
+
+        assert_eq!(combined.len(), 4);
+
+        let filters = crate::filter::compile_filters(&combined).unwrap();
+        let discovered = discover_matching_measurements(&commits, &filters, &selectors);
+
+        // Should discover timer, memory, and bench_cpu (no test_* in commits)
+        assert_eq!(discovered.len(), 3);
+        assert!(discovered.contains(&"timer".to_string()));
+        assert!(discovered.contains(&"memory".to_string()));
+        assert!(discovered.contains(&"bench_cpu".to_string()));
     }
 }
