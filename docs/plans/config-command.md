@@ -1,4 +1,4 @@
-# Plan: Add `config list` Subcommand
+# Plan: Add `config` Command with `--list` Flag
 
 **Status:** Planning
 **Created:** 2025-10-30
@@ -6,7 +6,7 @@
 
 ## Overview
 
-Add a new `config list` subcommand to git-perf that displays current configuration information and git context. This will help users understand their active git-perf configuration, including branch context, config sources, and measurement settings.
+Add a new `config` command to git-perf that displays current configuration information and git context when used with the `--list` flag. This follows the `git config --list` pattern and will help users understand their active git-perf configuration, including branch context, config sources, and measurement settings.
 
 ## Motivation
 
@@ -17,7 +17,7 @@ Currently, git-perf users have limited visibility into their active configuratio
 - Difficult to debug configuration issues
 - Users must manually inspect `.gitperfconfig` files
 
-A dedicated `config list` command would provide:
+A dedicated `config --list` command would provide:
 - Quick overview of current git-perf environment
 - Configuration debugging capabilities
 - Better understanding of hierarchical config resolution
@@ -123,36 +123,37 @@ From `config.rs`:
 Add to `Commands` enum (after `Size`, around line 431):
 
 ```rust
-/// Display current git-perf configuration and context
+/// Manage git-perf configuration
 ///
-/// Shows active configuration settings, including git context (branch name,
-/// repository location), configuration sources, and measurement-specific
-/// settings. This helps users understand their git-perf environment and
-/// debug configuration issues.
-///
-/// By default, shows a summary of configuration. Use --detailed to see
-/// all measurement-specific settings, or --json for machine-readable output.
+/// Display and query git-perf configuration settings, including git context
+/// (branch name, repository location), configuration sources, and
+/// measurement-specific settings. This follows the git config pattern.
 ///
 /// Examples:
-///   git perf config list                    # Show configuration summary
-///   git perf config list --detailed         # Show all measurement settings
-///   git perf config list --json             # Output as JSON
-///   git perf config list --validate         # Check for config issues
-ConfigList {
-    /// Show detailed configuration including all measurements
+///   git perf config --list                  # Show configuration summary
+///   git perf config --list --detailed       # Show all measurement settings
+///   git perf config --list --json           # Output as JSON
+///   git perf config --list --validate       # Check for config issues
+///   git perf config --list --measurement M  # Show specific measurement
+Config {
+    /// List all configuration settings (similar to git config --list)
     #[arg(short, long)]
+    list: bool,
+
+    /// Show detailed configuration including all measurements
+    #[arg(short, long, requires = "list")]
     detailed: bool,
 
     /// Output format (human-readable or JSON)
-    #[arg(short, long, value_enum, default_value = "human")]
-    format: ConfigInfoFormat,
+    #[arg(short, long, value_enum, default_value = "human", requires = "list")]
+    format: ConfigFormat,
 
     /// Validate configuration and report issues
-    #[arg(short, long)]
+    #[arg(short, long, requires = "list")]
     validate: bool,
 
     /// Show specific measurement configuration only
-    #[arg(short, long)]
+    #[arg(short, long, requires = "list")]
     measurement: Option<String>,
 },
 ```
@@ -161,7 +162,7 @@ Add enum for format (after `SizeFormat`, around line 106):
 
 ```rust
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum ConfigListFormat {
+pub enum ConfigFormat {
     /// Human-readable format
     Human,
     /// JSON format for machine parsing
@@ -169,9 +170,11 @@ pub enum ConfigListFormat {
 }
 ```
 
-### 2. Config List Module Implementation
+### 2. Config Module Implementation
 
-**File**: `git_perf/src/config_list.rs` (NEW FILE)
+**File**: `git_perf/src/config_cmd.rs` (NEW FILE)
+
+Note: Named `config_cmd.rs` to avoid confusion with the existing `config.rs` module.
 
 #### Core Data Structures
 
@@ -183,7 +186,7 @@ use crate::config::{
     read_hierarchical_config,
 };
 use crate::git::git_interop::{get_repository_root};
-use git_perf_cli_types::ConfigListFormat;
+use git_perf_cli_types::ConfigFormat;
 use anyhow::{Context, Result};
 use config::Config;
 use serde::{Deserialize, Serialize};
@@ -271,10 +274,10 @@ pub struct MeasurementConfig {
 #### Main Entry Point
 
 ```rust
-/// Display configuration information
-pub fn show_config_list(
+/// Display configuration information (implements config --list)
+pub fn list_config(
     detailed: bool,
-    format: ConfigListFormat,
+    format: ConfigFormat,
     validate: bool,
     measurement_filter: Option<String>,
 ) -> Result<()> {
@@ -283,8 +286,8 @@ pub fn show_config_list(
 
     // 2. Display based on format
     match format {
-        ConfigListFormat::Human => display_human_readable(&config_info, detailed)?,
-        ConfigListFormat::Json => display_json(&config_info)?,
+        ConfigFormat::Human => display_human_readable(&config_info, detailed)?,
+        ConfigFormat::Json => display_json(&config_info)?,
     }
 
     // 3. Exit with error if validation found issues
@@ -625,41 +628,48 @@ fn display_json(info: &ConfigInfo) -> Result<()> {
 Add to match statement (after `Size`, around line 130):
 
 ```rust
-Commands::ConfigList {
+Commands::Config {
+    list,
     detailed,
     format,
     validate,
     measurement,
 } => {
-    config_list::show_config_list(
-        *detailed,
-        *format,
-        *validate,
-        measurement.clone(),
-    )?;
+    if *list {
+        config_cmd::list_config(
+            *detailed,
+            *format,
+            *validate,
+            measurement.clone(),
+        )?;
+    } else {
+        // For now, --list is required. In the future, this could support
+        // other config operations like --get, --set, etc.
+        anyhow::bail!("config command requires --list flag (try: git perf config --list)");
+    }
 }
 ```
 
 Add module declaration at top of file:
 
 ```rust
-mod config_list;
+mod config_cmd;
 ```
 
 ### 4. Module Registration
 
 **File**: `git_perf/src/lib.rs`
 
-Ensure the `config_list` module is declared (if not already included via other module declarations).
+Ensure the `config_cmd` module is declared (if not already included via other module declarations).
 
 ## Implementation Phases
 
 ### Phase 1: Core Implementation
 
 1. Add CLI definition to `cli_types/src/lib.rs`
-   - `ConfigList` command variant with flags
-   - `ConfigListFormat` enum
-2. Create `git_perf/src/config_list.rs` module
+   - `Config` command variant with `--list` flag and options
+   - `ConfigFormat` enum
+2. Create `git_perf/src/config_cmd.rs` module
    - Core data structures
    - Main entry point
    - Information gathering functions
@@ -680,11 +690,11 @@ Ensure the `config_list` module is declared (if not already included via other m
 1. Add comprehensive doc comments to CLI definition
 2. Update main README if needed
 3. Add examples to manpage
-4. Update `docs/INTEGRATION_TUTORIAL.md` to reference `config list`
+4. Update `docs/INTEGRATION_TUTORIAL.md` to reference `config --list`
 
 ### Phase 4: Testing
 
-1. Create `test/test_config_list.sh` integration test
+1. Create `test/test_config.sh` integration test
 2. Add test to `test/run_tests.sh`
 3. Run full test suite: `cargo nextest run -- --skip slow`
 4. Manual testing with various configurations
@@ -701,7 +711,7 @@ Ensure the `config_list` module is declared (if not already included via other m
 ### Basic Summary
 
 ```bash
-$ git perf config list
+$ git perf config --list
 Git-Perf Configuration
 ======================
 
@@ -726,7 +736,7 @@ Measurements: (3 configured)
 ### Detailed View
 
 ```bash
-$ git perf config list --detailed
+$ git perf config --list --detailed
 Git-Perf Configuration
 ======================
 
@@ -766,7 +776,7 @@ Measurements: (2 configured)
 ### JSON Output
 
 ```bash
-$ git perf config list --json
+$ git perf config --list --json
 {
   "git_context": {
     "branch": "main",
@@ -799,7 +809,7 @@ $ git perf config list --json
 ### Validation
 
 ```bash
-$ git perf config list --validate
+$ git perf config --list --validate
 Git-Perf Configuration
 ======================
 
@@ -825,7 +835,7 @@ Validation Issues:
 ### Specific Measurement
 
 ```bash
-$ git perf config list --measurement benchmark_render --detailed
+$ git perf config --list --measurement benchmark_render --detailed
 Git-Perf Configuration
 ======================
 
@@ -1030,13 +1040,13 @@ dirs-next = "2.0"  # Already used in config.rs
 
 ## Appendix: Alternative Approaches Considered
 
-### Approach 1: Nested subcommands (config with list subcommand)
+### Approach 1: Separate command (config-list)
 
-**Example**: Nested structure with `config` parent and `list` child subcommand
+**Example**: `ConfigList` variant that becomes `git perf config-list` command
 
-**Pros**: Could allow future `config edit`, `config validate` commands
-**Cons**: More complex, requires nested subcommand structure in Clap
-**Decision**: Use simpler `ConfigList` variant that becomes `config-list` command, consistent with `ListCommits` → `list-commits` pattern
+**Pros**: Simple implementation, consistent with `list-commits` pattern
+**Cons**: Doesn't follow familiar `git config --list` pattern
+**Decision**: Use flag-based approach (`git perf config --list`) to match git's UX
 
 ### Approach 2: Multiple separate commands
 
@@ -1044,7 +1054,7 @@ dirs-next = "2.0"  # Already used in config.rs
 
 **Pros**: Very specific commands
 **Cons**: Too many commands, harder to discover
-**Decision**: Single `config list` command with optional filtering
+**Decision**: Single `config` command with `--list` flag and optional filtering
 
 ### Approach 3: Only JSON output
 
