@@ -659,8 +659,8 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
         .collect_vec())
 }
 
-struct TempRef {
-    ref_name: String,
+pub struct TempRef {
+    pub ref_name: String,
 }
 
 impl TempRef {
@@ -678,14 +678,16 @@ impl Drop for TempRef {
     }
 }
 
-fn update_read_branch() -> Result<TempRef, GitError> {
-    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
+pub fn update_read_branch() -> Result<TempRef> {
+    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)
+        .map_err(|e| anyhow!("Failed to create temporary ref: {:?}", e))?;
     // Create a fresh read branch from the remote and consolidate all pending write branches.
     // This ensures the read branch is always up to date with the remote branch, even after
     // a history cutoff, by checking against the current upstream state.
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
 
-    let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)?;
+    let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)
+        .map_err(|e| anyhow!("Failed to consolidate write branches: {:?}", e))?;
 
     Ok(temp_ref)
 }
