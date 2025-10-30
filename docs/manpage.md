@@ -211,16 +211,16 @@ When the relative deviation is below the threshold, the audit passes even if the
 
 The sparkline visualization shows the range of measurements relative to the tail median (historical measurements only).
 
-**Usage:** `git-perf audit [OPTIONS] --measurement <MEASUREMENT>`
+**Usage:** `git-perf audit [OPTIONS]`
 
 ###### **Options:**
 
-* `-m`, `--measurement <MEASUREMENT>`
+* `-m`, `--measurement <MEASUREMENT>` — Specific measurement names to audit (can be specified multiple times). At least one of --measurement or --filter must be provided. Multiple measurements use OR logic. Example: -m timer -m memory
 * `-n`, `--max-count <MAX_COUNT>` — Limit the number of previous commits considered. HEAD is included in this count
 
   Default value: `40`
 * `-s`, `--selectors <SELECTORS>` — Key-value pair separated by "=" with no whitespaces to subselect measurements
-* `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Example: -f "bench.*_x64"
+* `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). At least one of --measurement or --filter must be provided. If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Examples: -f "bench_.*" (prefix), -f ".*_x64$" (suffix), -f "^perf_" (anchored prefix)
 * `--min-measurements <MIN_MEASUREMENTS>` — Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per-measurement config or defaults to 2
 * `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min
 
