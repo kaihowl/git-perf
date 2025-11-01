@@ -686,7 +686,7 @@ pub fn update_read_branch() -> Result<TempRef> {
     // a history cutoff, by checking against the current upstream state.
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
 
-    let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)
+    consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)
         .map_err(|e| anyhow!("Failed to consolidate write branches: {:?}", e))?;
 
     Ok(temp_ref)
