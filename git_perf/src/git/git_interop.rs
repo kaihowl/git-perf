@@ -640,6 +640,27 @@ pub fn list_commits_with_measurements() -> Result<Vec<String>> {
     Ok(commits)
 }
 
+/// Guard for a temporary read branch that includes all pending writes.
+/// Automatically cleans up the temporary reference when dropped.
+pub struct ReadBranchGuard {
+    temp_ref: TempRef,
+}
+
+impl ReadBranchGuard {
+    /// Get the reference name for use in git commands
+    pub fn ref_name(&self) -> &str {
+        &self.temp_ref.ref_name
+    }
+}
+
+/// Creates a temporary read branch that consolidates all pending writes.
+/// The returned guard must be kept alive for as long as the reference is needed.
+/// The temporary reference is automatically cleaned up when the guard is dropped.
+pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
+    let temp_ref = update_read_branch()?;
+    Ok(ReadBranchGuard { temp_ref })
+}
+
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
@@ -659,8 +680,8 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
         .collect_vec())
 }
 
-pub struct TempRef {
-    pub ref_name: String,
+struct TempRef {
+    ref_name: String,
 }
 
 impl TempRef {
@@ -678,7 +699,7 @@ impl Drop for TempRef {
     }
 }
 
-pub fn update_read_branch() -> Result<TempRef> {
+fn update_read_branch() -> Result<TempRef> {
     let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)
         .map_err(|e| anyhow!("Failed to create temporary ref: {:?}", e))?;
     // Create a fresh read branch from the remote and consolidate all pending write branches.

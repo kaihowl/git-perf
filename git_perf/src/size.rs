@@ -1,4 +1,4 @@
-use crate::git::git_interop::{get_repository_root, update_read_branch};
+use crate::git::git_interop::{create_consolidated_read_branch, get_repository_root};
 use crate::serialization::deserialize;
 use anyhow::{Context, Result};
 use git_perf_cli_types::SizeFormat;
@@ -67,8 +67,8 @@ fn get_notes_size(detailed: bool, disk_size: bool) -> Result<NotesSizeInfo> {
     let repo_root =
         get_repository_root().map_err(|e| anyhow::anyhow!("Failed to get repo root: {}", e))?;
 
-    // Update local read branch to include pending writes (same as list-commits and walk-commits)
-    let temp_ref = update_read_branch()?;
+    // Create a consolidated read branch to include pending writes (same as list-commits and walk-commits)
+    let read_branch = create_consolidated_read_branch()?;
 
     let batch_format = if disk_size {
         "%(objectsize:disk)"
@@ -78,7 +78,7 @@ fn get_notes_size(detailed: bool, disk_size: bool) -> Result<NotesSizeInfo> {
 
     // Spawn git notes list process using the temporary read branch
     let mut list_notes = Command::new("git")
-        .args(["notes", "--ref", &temp_ref.ref_name, "list"])
+        .args(["notes", "--ref", read_branch.ref_name(), "list"])
         .current_dir(&repo_root)
         .stdout(Stdio::piped())
         .spawn()
