@@ -121,7 +121,6 @@ fn discover_matching_measurements(
     result
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     max_count: usize,
     min_count: Option<u16>,
