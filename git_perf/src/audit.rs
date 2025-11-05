@@ -292,33 +292,65 @@ fn audit_with_data(
     tail_measurements.pop(); // Remove head to get just tail for median calculation
     let tail_median = tail_measurements.median().unwrap_or(0.0);
 
-    // Check if tail_median is effectively zero to avoid division by zero
-    // Use a small epsilon for floating point comparison
-    let tail_median_is_zero = tail_median.abs() < f64::EPSILON;
-
-    let sparkline = if tail_median_is_zero {
-        // When median is zero (empty tail or all-zero measurements),
-        // omit the sparkline entirely as there's no meaningful baseline
-        String::new()
+    // Determine baseline for relative calculations using cascading fallback:
+    // 1. Prefer median (robust to outliers)
+    // 2. Fall back to mean if median is effectively zero
+    // 3. Fall back to max absolute value if both median and mean are zero
+    // 4. Use absolute values if everything is effectively zero
+    let baseline = if tail_median.abs() >= f64::EPSILON {
+        Some(tail_median)
+    } else if tail_summary.mean.abs() >= f64::EPSILON {
+        Some(tail_summary.mean)
     } else {
+        // Try to find max absolute value as last resort before giving up
+        let max_abs = all_measurements
+            .iter()
+            .map(|v| v.abs())
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(0.0);
+        if max_abs >= f64::EPSILON {
+            Some(max_abs)
+        } else {
+            None // All measurements effectively zero, use absolute values
+        }
+    };
+
+    let sparkline = if let Some(baseline_value) = baseline {
         // MUTATION POINT: / vs % (Line 140)
         let relative_min = all_measurements
             .iter()
             .min_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap()
-            / tail_median
+            / baseline_value
             - 1.0;
         let relative_max = all_measurements
             .iter()
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap()
-            / tail_median
+            / baseline_value
             - 1.0;
 
         format!(
             " [{:+.2}% – {:+.2}%] {}",
             (relative_min * 100.0),
             (relative_max * 100.0),
+            spark(all_measurements.as_slice())
+        )
+    } else {
+        // All measurements effectively zero - show absolute range
+        let abs_min = all_measurements
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let abs_max = all_measurements
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        format!(
+            " [{} – {}] {}",
+            abs_min,
+            abs_max,
             spark(all_measurements.as_slice())
         )
     };
@@ -395,17 +427,16 @@ fn audit_with_data(
     }
 
     // MUTATION POINT: / vs % (Line 150)
-    // Calculate relative deviation, handling the case where tail_median is zero
-    let head_relative_deviation = if tail_median_is_zero {
-        // If median is zero and head is also effectively zero, deviation is 0
-        // Otherwise, deviation is effectively infinite (use a large value)
-        if head.abs() < f64::EPSILON {
-            0.0
-        } else {
-            f64::INFINITY
-        }
+    // Calculate relative deviation using the same baseline logic
+    let head_relative_deviation = if let Some(baseline_value) = baseline {
+        (head / baseline_value - 1.0).abs() * 100.0
     } else {
-        (head / tail_median - 1.0).abs() * 100.0
+        // All measurements effectively zero
+        if head.abs() < f64::EPSILON {
+            0.0 // Head is also zero, no deviation
+        } else {
+            f64::INFINITY // Head is non-zero but baseline is zero, infinite deviation
+        }
     };
 
     // Check if we have a minimum relative deviation threshold configured
@@ -1565,6 +1596,62 @@ dispersion_method = "mad"
         let audit_result = result.unwrap();
 
         // The message should not contain inf or NaN
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+        assert!(!audit_result.message.to_lowercase().contains("nan"));
+    }
+
+    #[test]
+    fn test_cascading_baseline_selection() {
+        // Test that baseline selection cascades properly:
+        // median -> mean -> max -> absolute values
+
+        // Case 1: Median is zero, but mean is non-zero
+        // This happens with asymmetric distributions like [0, 0, 0, 10]
+        let result = audit_with_data(
+            "test_measurement",
+            8.0,                       // head
+            vec![0.0, 0.0, 0.0, 10.0], // median=0, mean=2.5
+            3,
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should use mean as baseline and show percentage
+        assert!(audit_result.message.contains('%'));
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+
+        // Case 2: Both median and mean are zero, but max is non-zero
+        let result = audit_with_data(
+            "test_measurement",
+            5.0,                 // head
+            vec![0.0, 0.0, 0.0], // median=0, mean=0, max=5 (from head)
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should use max as baseline and show percentage
+        assert!(audit_result.message.contains('%'));
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+
+        // Case 3: Everything is effectively zero
+        let result = audit_with_data(
+            "test_measurement",
+            0.0,                 // head
+            vec![0.0, 0.0, 0.0], // median=0, mean=0, max=0
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should show absolute values (not percentages) since no baseline exists
+        // The sparkline should show [0 - 0] format instead of percentage format
         assert!(!audit_result.message.to_lowercase().contains("inf"));
         assert!(!audit_result.message.to_lowercase().contains("nan"));
     }
