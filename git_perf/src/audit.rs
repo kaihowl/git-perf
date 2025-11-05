@@ -297,22 +297,9 @@ fn audit_with_data(
     let tail_median_is_zero = tail_median.abs() < f64::EPSILON;
 
     let sparkline = if tail_median_is_zero {
-        // When median is zero, show absolute range instead of relative percentage
-        let abs_min = all_measurements
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-        let abs_max = all_measurements
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-
-        format!(
-            " [{} – {}] {}",
-            abs_min,
-            abs_max,
-            spark(all_measurements.as_slice())
-        )
+        // When median is zero (empty tail or all-zero measurements),
+        // omit the sparkline entirely as there's no meaningful baseline
+        String::new()
     } else {
         // MUTATION POINT: / vs % (Line 140)
         let relative_min = all_measurements
