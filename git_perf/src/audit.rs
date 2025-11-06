@@ -292,43 +292,34 @@ fn audit_with_data(
     tail_measurements.pop(); // Remove head to get just tail for median calculation
     let tail_median = tail_measurements.median().unwrap_or(0.0);
 
+    // Calculate min and max once for use in both branches
+    let min_val = all_measurements
+        .iter()
+        .min_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
+    let max_val = all_measurements
+        .iter()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
+
     // Tiered approach for sparkline display:
     // 1. If tail median is non-zero: use median as baseline, show percentages (default behavior)
     // 2. If tail median is zero: show absolute differences instead
     let tail_median_is_zero = tail_median.abs() < f64::EPSILON;
 
     let sparkline = if tail_median_is_zero {
-        // Median is zero - show absolute range instead of percentages
-        let abs_min = all_measurements
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-        let abs_max = all_measurements
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-
+        // Median is zero - show absolute range
         format!(
             " [{} – {}] {}",
-            abs_min,
-            abs_max,
+            min_val,
+            max_val,
             spark(all_measurements.as_slice())
         )
     } else {
         // MUTATION POINT: / vs % (Line 140)
         // Median is non-zero - use it as baseline for percentage ranges
-        let relative_min = all_measurements
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap()
-            / tail_median
-            - 1.0;
-        let relative_max = all_measurements
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap()
-            / tail_median
-            - 1.0;
+        let relative_min = min_val / tail_median - 1.0;
+        let relative_max = max_val / tail_median - 1.0;
 
         format!(
             " [{:+.2}% – {:+.2}%] {}",
@@ -410,18 +401,8 @@ fn audit_with_data(
     }
 
     // MUTATION POINT: / vs % (Line 150)
-    // Calculate relative deviation using the same tiered approach
-    let head_relative_deviation = if tail_median_is_zero {
-        // Median is zero - calculate absolute deviation
-        if head.abs() < f64::EPSILON {
-            0.0 // Head is also zero, no deviation
-        } else {
-            f64::INFINITY // Head is non-zero but baseline is zero, infinite deviation
-        }
-    } else {
-        // Median is non-zero - calculate percentage deviation
-        (head / tail_median - 1.0).abs() * 100.0
-    };
+    // Calculate relative deviation - naturally handles infinity when tail_median is zero
+    let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
 
     // Check if we have a minimum relative deviation threshold configured
     let min_relative_deviation = config::audit_min_relative_deviation(measurement);
