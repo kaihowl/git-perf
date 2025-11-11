@@ -450,7 +450,7 @@ pub fn report(
             // Find all unique combinations of the split keys
             filtered_measurements
                 .clone()
-                .flat_map(|ms| ms)
+                .flatten()
                 .filter_map(|m| {
                     // Extract values for all split keys
                     let values: Vec<String> = separate_by
