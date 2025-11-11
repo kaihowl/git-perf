@@ -241,9 +241,11 @@ pub enum Commands {
         #[arg(short = 'f', long = "filter")]
         filter: Vec<String>,
 
-        /// Create individual traces in the graph by grouping with the value of this selector
+        /// Create individual traces in the graph by grouping with the value of this selector.
+        /// Can be specified multiple times to split on multiple dimensions (e.g., -s os -s arch).
+        /// Multiple splits create combined group labels like "ubuntu/x64".
         #[arg(short, long, value_parser=parse_spaceless_string)]
-        separate_by: Option<String>,
+        separate_by: Vec<String>,
 
         /// What to aggregate the measurements in each group with
         #[arg(short, long)]

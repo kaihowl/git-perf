@@ -394,7 +394,7 @@ impl ReporterFactory {
 
 pub fn report(
     output: PathBuf,
-    separate_by: Option<String>,
+    separate_by: Vec<String>,
     num_commits: usize,
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
@@ -446,34 +446,64 @@ pub fn report(
             .clone()
             .map(|ms| ms.filter(|m| m.name == *measurement_name));
 
-        let group_values = if let Some(separate_by) = &separate_by {
+        let group_values = if !separate_by.is_empty() {
+            // Find all unique combinations of the split keys
             filtered_measurements
                 .clone()
-                .flat_map(|ms| {
-                    ms.flat_map(|m| {
-                        m.key_values
-                            .iter()
-                            .filter(|(k, _v)| *k == separate_by)
-                            .map(|(_k, v)| v)
-                    })
+                .flat_map(|ms| ms)
+                .filter_map(|m| {
+                    // Extract values for all split keys
+                    let values: Vec<String> = separate_by
+                        .iter()
+                        .filter_map(|key| m.key_values.get(key).cloned())
+                        .collect();
+
+                    // Only include if all split keys are present
+                    if values.len() == separate_by.len() {
+                        Some(values.join("/"))
+                    } else {
+                        None
+                    }
                 })
                 .unique()
-                .map(|val| (Some(separate_by), Some(val)))
                 .collect_vec()
         } else {
-            vec![(None, None)]
+            vec![]
         };
 
-        if group_values.is_empty() {
-            bail!("Invalid separator supplied, no measurements.")
-        }
+        // When no splits specified, create a single group with all measurements
+        let group_values_to_process = if group_values.is_empty() {
+            if !separate_by.is_empty() {
+                bail!(
+                    "Invalid separator supplied, no measurements have all required keys: {:?}",
+                    separate_by
+                );
+            }
+            vec![None]
+        } else {
+            group_values.into_iter().map(Some).collect_vec()
+        };
 
-        for (group_key, group_value) in group_values {
+        for group_value in group_values_to_process {
             let group_measurements = filtered_measurements.clone().map(|ms| {
                 ms.filter(|m| {
-                    group_key
-                        .map(|gk| m.key_values.get(gk) == group_value)
-                        .unwrap_or(true)
+                    if let Some(ref gv) = group_value {
+                        // Parse the combined group value "ubuntu/x64"
+                        let expected_values: Vec<&str> = gv.split('/').collect();
+
+                        // Check if measurement has ALL the expected key-value pairs
+                        separate_by
+                            .iter()
+                            .zip(expected_values.iter())
+                            .all(|(key, expected_val)| {
+                                m.key_values
+                                    .get(key)
+                                    .map(|v| v.as_str() == *expected_val)
+                                    .unwrap_or(false)
+                            })
+                    } else {
+                        true
+                    }
                 })
             });
 
@@ -487,14 +517,18 @@ pub fn report(
                             .map(move |m| (i, m))
                     })
                     .collect_vec();
-                plot.add_summarized_trace(trace_measurements, measurement_name, group_value);
+                plot.add_summarized_trace(
+                    trace_measurements,
+                    measurement_name,
+                    group_value.as_ref(),
+                );
             } else {
                 let trace_measurements: Vec<_> = group_measurements
                     .clone()
                     .enumerate()
                     .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
                     .collect();
-                plot.add_trace(trace_measurements, measurement_name, group_value);
+                plot.add_trace(trace_measurements, measurement_name, group_value.as_ref());
             }
         }
     }
