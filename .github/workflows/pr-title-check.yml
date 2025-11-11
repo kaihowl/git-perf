@@ -34,21 +34,12 @@ jobs:
               'revert'
             ];
 
-            // Valid scopes according to CLAUDE.md
-            const validScopes = [
-              'cli_types',
-              'git_perf',
-              'config',
-              'audit',
-              'docs',
-              'test'
-            ];
-
             // Regex pattern: type(optional-scope): lowercase description
             // - Must start with valid type
             // - Optional scope in parentheses (alphanumeric, hyphens, underscores)
             // - Colon and space required
             // - Description must start with lowercase letter
+            // Note: Scope validation is disabled - any scope is accepted
             const conventionalCommitRegex = /^(feat|fix|docs|refactor|chore|test|perf|build|ci|revert)(\([a-z0-9_-]+\))?: [a-z].+$/;
 
             if (!conventionalCommitRegex.test(prTitle)) {
@@ -56,7 +47,7 @@ jobs:
               errorMessage += `**Current title:** "${prTitle}"\n\n`;
               errorMessage += `**Required format:** \`type(scope): lowercase description\`\n\n`;
               errorMessage += `**Valid types:** ${validTypes.join(', ')}\n`;
-              errorMessage += `**Valid scopes (optional):** ${validScopes.join(', ')}\n\n`;
+              errorMessage += `**Note:** Scope is optional and any scope value is accepted\n\n`;
               errorMessage += `**Examples:**\n`;
               errorMessage += `✅ \`feat(cli_types): add measurement export\`\n`;
               errorMessage += `✅ \`fix(audit): handle empty data\`\n`;
@@ -66,28 +57,22 @@ jobs:
               errorMessage += `❌ Missing type prefix\n`;
               errorMessage += `❌ Capital letter after colon (must be lowercase)\n`;
               errorMessage += `❌ Missing colon\n`;
-              errorMessage += `❌ Invalid type or scope\n\n`;
+              errorMessage += `❌ Invalid type\n\n`;
               errorMessage += `See CLAUDE.md for more details.`;
 
               core.setFailed(errorMessage);
               return;
             }
 
-            // Extract type and scope for additional validation
+            // Extract type for validation (scope validation is disabled)
             const match = prTitle.match(/^([a-z]+)(\(([a-z0-9_-]+)\))?:/);
             if (match) {
               const type = match[1];
-              const scope = match[3];
 
               // Check if type is valid
               if (!validTypes.includes(type)) {
                 core.setFailed(`❌ Invalid commit type: "${type}". Valid types are: ${validTypes.join(', ')}`);
                 return;
-              }
-
-              // Check if scope is valid (if provided)
-              if (scope && !validScopes.includes(scope)) {
-                core.warning(`⚠️ Scope "${scope}" is not in the standard list: ${validScopes.join(', ')}. This is allowed but please verify it's intentional.`);
               }
             }
 
