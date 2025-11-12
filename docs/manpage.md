@@ -171,7 +171,7 @@ Create an HTML performance report
 * `-m`, `--measurement <MEASUREMENT>` — Select an individual measurements instead of all
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '=', select only matching measurements
 * `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Example: -f "bench.*" -f "test_.*"
-* `-s`, `--separate-by <SEPARATE_BY>` — Create individual traces in the graph by grouping with the value of this selector
+* `-s`, `--separate-by <SEPARATE_BY>` — Create individual traces in the graph by grouping with the value of this selector. Can be specified multiple times to split on multiple dimensions (e.g., -s os -s arch). Multiple splits create combined group labels like "ubuntu/x64"
 * `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with
 
   Possible values: `min`, `max`, `median`, `mean`
