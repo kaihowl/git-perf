@@ -789,7 +789,7 @@ mod tests {
             val: 42.5,
             key_values: HashMap::new(),
         };
-        reporter.add_trace(vec![(0, &measurement)], "test_measurement", None);
+        reporter.add_trace(vec![(0, &measurement)], "test_measurement", &[]);
 
         // Get CSV output
         let bytes = reporter.as_bytes();
@@ -824,7 +824,7 @@ mod tests {
             val: 42.0,
             key_values: HashMap::new(),
         };
-        reporter.add_trace(vec![(0, &measurement)], "build_time", None);
+        reporter.add_trace(vec![(0, &measurement)], "build_time", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -857,7 +857,7 @@ mod tests {
             val: 3.5,
             key_values: metadata,
         };
-        reporter.add_trace(vec![(0, &measurement)], "test", None);
+        reporter.add_trace(vec![(0, &measurement)], "test", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -907,7 +907,7 @@ mod tests {
             key_values: HashMap::new(),
         };
 
-        reporter.add_trace(vec![(0, &m1), (1, &m2)], "timer", None);
+        reporter.add_trace(vec![(0, &m1), (1, &m2)], "timer", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -938,7 +938,7 @@ mod tests {
             val: 10.0,
             key_values: HashMap::new(),
         };
-        reporter.add_trace(vec![(0, &measurement)], "count", None);
+        reporter.add_trace(vec![(0, &measurement)], "count", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -963,7 +963,7 @@ mod tests {
 
         let summary = MeasurementSummary { epoch: 0, val: 5.5 };
 
-        reporter.add_summarized_trace(vec![(0, summary)], "avg_time", None);
+        reporter.add_summarized_trace(vec![(0, summary)], "avg_time", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
