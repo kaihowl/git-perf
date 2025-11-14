@@ -871,7 +871,7 @@ mod test {
 [measurement."build_time"]
 unit = "ms"
 "#;
-        let (_temp_dir, original_dir) = setup_test_env_with_config(config_content);
+        let (_temp_dir, _dir_guard) = setup_test_env_with_config(config_content);
 
         // Test with large millisecond values that should auto-scale to seconds
         let head = 12_345.67; // Will auto-scale to ~12.35s
@@ -961,9 +961,6 @@ unit = "ms"
             "Tail line should contain all stat labels, got: {}",
             tail_line
         );
-
-        // Restore original directory
-        env::set_current_dir(original_dir).unwrap();
     }
 
     // Integration tests that verify per-measurement config determination
@@ -1043,7 +1040,6 @@ min_measurements = 3
                 Some(5),
                 "other_metric should use default 5 measurements"
             );
-
         }
 
         #[test]
@@ -1076,7 +1072,6 @@ aggregate_by = "mean"
                 Some(git_perf_cli_types::ReductionFunc::Median),
                 "other_metric should use default median"
             );
-
         }
 
         #[test]
@@ -1109,7 +1104,6 @@ sigma = 2.0
                 Some(3.0),
                 "other_metric should use default sigma 3.0"
             );
-
         }
 
         #[test]
@@ -1148,7 +1142,6 @@ dispersion_method = "mad"
                 DispersionMethod::StandardDeviation,
                 "CLI dispersion should override config"
             );
-
         }
 
         #[test]
@@ -1187,7 +1180,6 @@ dispersion_method = "mad"
                 DispersionMethod::MedianAbsoluteDeviation,
                 "Config dispersion should override default"
             );
-
         }
 
         #[test]
@@ -1218,7 +1210,6 @@ dispersion_method = "mad"
                 DispersionMethod::StandardDeviation,
                 "Should use default dispersion of stddev"
             );
-
         }
     }
 
