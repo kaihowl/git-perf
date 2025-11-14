@@ -215,26 +215,51 @@ pub fn write_gitperfconfig(dir: &Path, content: &str) {
     std::fs::write(&config_path, content).expect("Failed to write .gitperfconfig");
 }
 
-/// Sets up a complete test environment with git repo and config.
+/// RAII guard that restores the current directory when dropped.
+///
+/// This ensures tests that change the current directory don't affect other tests.
+pub struct DirGuard {
+    original_dir: std::path::PathBuf,
+}
+
+impl DirGuard {
+    /// Creates a new DirGuard and changes to the specified directory.
+    pub fn new(new_dir: &Path) -> Self {
+        let original_dir = env::current_dir().expect("Failed to get current directory");
+        env::set_current_dir(new_dir).expect("Failed to change directory");
+        DirGuard { original_dir }
+    }
+}
+
+impl Drop for DirGuard {
+    fn drop(&mut self) {
+        let _ = env::set_current_dir(&self.original_dir);
+    }
+}
+
+/// Sets up a complete test environment with git repo and config, and changes to that directory.
 ///
 /// This is a convenience function that:
 /// 1. Sets up hermetic git environment variables
 /// 2. Creates a temporary directory with an initialized git repository
 /// 3. Writes the provided config content to .gitperfconfig
+/// 4. Changes the current directory to the temp directory (with automatic restoration)
 ///
 /// # Arguments
 /// * `config_content` - TOML content for .gitperfconfig
 ///
 /// # Returns
-/// A `TempDir` that will be automatically cleaned up when dropped.
+/// A tuple of (`TempDir`, `DirGuard`). Both will be automatically cleaned up when dropped.
+/// The `DirGuard` ensures the original directory is restored.
 ///
 /// # Panics
 /// Panics if any step fails.
-pub fn setup_test_env_with_config(config_content: &str) -> TempDir {
+pub fn setup_test_env_with_config(config_content: &str) -> (TempDir, DirGuard) {
     hermetic_git_env();
     let temp_dir = dir_with_repo();
     write_gitperfconfig(temp_dir.path(), config_content);
-    temp_dir
+    let guard = DirGuard::new(temp_dir.path());
+    (temp_dir, guard)
 }
 
 #[cfg(test)]

@@ -871,8 +871,7 @@ mod test {
 [measurement."build_time"]
 unit = "ms"
 "#;
-        let temp_dir = setup_test_env_with_config(config_content);
-        env::set_current_dir(&temp_dir).unwrap();
+        let (_temp_dir, original_dir) = setup_test_env_with_config(config_content);
 
         // Test with large millisecond values that should auto-scale to seconds
         let head = 12_345.67; // Will auto-scale to ~12.35s
@@ -962,6 +961,9 @@ unit = "ms"
             "Tail line should contain all stat labels, got: {}",
             tail_line
         );
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
     }
 
     // Integration tests that verify per-measurement config determination
@@ -976,7 +978,7 @@ unit = "ms"
 
         #[test]
         fn test_different_dispersion_methods_per_measurement() {
-            let temp_dir = setup_test_env_with_config(
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config(
                 r#"
 [measurement]
 dispersion_method = "stddev"
@@ -988,7 +990,6 @@ dispersion_method = "mad"
 dispersion_method = "stddev"
 "#,
             );
-            env::set_current_dir(&temp_dir).unwrap();
 
             // Verify each measurement gets its own config
             let build_time_method = audit_dispersion_method("build_time");
@@ -1014,7 +1015,7 @@ dispersion_method = "stddev"
 
         #[test]
         fn test_different_min_measurements_per_measurement() {
-            let temp_dir = setup_test_env_with_config(
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config(
                 r#"
 [measurement]
 min_measurements = 5
@@ -1026,7 +1027,6 @@ min_measurements = 10
 min_measurements = 3
 "#,
             );
-            env::set_current_dir(&temp_dir).unwrap();
 
             assert_eq!(
                 audit_min_measurements("build_time"),
@@ -1043,11 +1043,12 @@ min_measurements = 3
                 Some(5),
                 "other_metric should use default 5 measurements"
             );
+
         }
 
         #[test]
         fn test_different_aggregate_by_per_measurement() {
-            let temp_dir = setup_test_env_with_config(
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config(
                 r#"
 [measurement]
 aggregate_by = "median"
@@ -1059,7 +1060,6 @@ aggregate_by = "max"
 aggregate_by = "mean"
 "#,
             );
-            env::set_current_dir(&temp_dir).unwrap();
 
             assert_eq!(
                 audit_aggregate_by("build_time"),
@@ -1076,11 +1076,12 @@ aggregate_by = "mean"
                 Some(git_perf_cli_types::ReductionFunc::Median),
                 "other_metric should use default median"
             );
+
         }
 
         #[test]
         fn test_different_sigma_per_measurement() {
-            let temp_dir = setup_test_env_with_config(
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config(
                 r#"
 [measurement]
 sigma = 3.0
@@ -1092,7 +1093,6 @@ sigma = 5.5
 sigma = 2.0
 "#,
             );
-            env::set_current_dir(&temp_dir).unwrap();
 
             assert_eq!(
                 audit_sigma("build_time"),
@@ -1109,11 +1109,12 @@ sigma = 2.0
                 Some(3.0),
                 "other_metric should use default sigma 3.0"
             );
+
         }
 
         #[test]
         fn test_cli_overrides_config() {
-            let temp_dir = setup_test_env_with_config(
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config(
                 r#"
 [measurement."build_time"]
 min_measurements = 10
@@ -1122,7 +1123,6 @@ sigma = 5.5
 dispersion_method = "mad"
 "#,
             );
-            env::set_current_dir(&temp_dir).unwrap();
 
             // Test that CLI values override config
             let params = super::resolve_audit_params(
@@ -1148,11 +1148,12 @@ dispersion_method = "mad"
                 DispersionMethod::StandardDeviation,
                 "CLI dispersion should override config"
             );
+
         }
 
         #[test]
         fn test_config_overrides_defaults() {
-            let temp_dir = setup_test_env_with_config(
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config(
                 r#"
 [measurement."build_time"]
 min_measurements = 10
@@ -1161,7 +1162,6 @@ sigma = 5.5
 dispersion_method = "mad"
 "#,
             );
-            env::set_current_dir(&temp_dir).unwrap();
 
             // Test that config values are used when no CLI values provided
             let params = super::resolve_audit_params(
@@ -1187,11 +1187,12 @@ dispersion_method = "mad"
                 DispersionMethod::MedianAbsoluteDeviation,
                 "Config dispersion should override default"
             );
+
         }
 
         #[test]
         fn test_uses_defaults_when_no_config_or_cli() {
-            let _temp_dir = setup_test_env_with_config("");
+            let (_temp_dir, _dir_guard) = setup_test_env_with_config("");
 
             // Test that defaults are used when no CLI or config
             let params = super::resolve_audit_params(
@@ -1217,6 +1218,7 @@ dispersion_method = "mad"
                 DispersionMethod::StandardDeviation,
                 "Should use default dispersion of stddev"
             );
+
         }
     }
 
