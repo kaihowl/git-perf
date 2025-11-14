@@ -30,6 +30,7 @@ use super::git_lowlevel::{
     map_git_error, set_git_perf_remote, spawn_git_command,
 };
 use super::git_types::GitError;
+use super::git_types::GitOutput;
 use super::git_types::Reference;
 
 pub use super::git_lowlevel::get_head_revision;
@@ -666,18 +667,27 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     args.extend(additional_args.iter().map(|s| s.as_str()));
 
     let output = capture_git_output(&args, &None)?;
-    Ok(output
+    let refs: Result<Vec<Reference>, _> = output
         .stdout
         .lines()
         .map(|s| {
             let items = s.split('\0').take(2).collect_vec();
-            assert!(items.len() == 2);
-            Reference {
+            if items.len() != 2 {
+                return Err(GitError::ExecError {
+                    command: format!("git {}", args.join(" ")),
+                    output: GitOutput {
+                        stdout: format!("Unexpected git for-each-ref output format: {}", s),
+                        stderr: String::new(),
+                    },
+                });
+            }
+            Ok(Reference {
                 refname: items[0].to_string(),
                 oid: items[1].to_string(),
-            }
+            })
         })
-        .collect_vec())
+        .collect();
+    refs
 }
 
 struct TempRef {
