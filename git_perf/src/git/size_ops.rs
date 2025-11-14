@@ -255,3 +255,49 @@ pub fn get_repo_stats() -> Result<RepoStats> {
         pack_size: pack_size * 1024, // Convert KiB to bytes
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::dir_with_repo;
+
+    #[test]
+    fn test_get_repo_stats_basic() {
+        // Test that get_repo_stats works and returns proper values
+        let temp_dir = dir_with_repo();
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        let stats = get_repo_stats().unwrap();
+
+        // Should have some objects after initial commit
+        assert!(stats.loose_objects > 0 || stats.packed_objects > 0);
+
+        // Sizes should be multiples of 1024 (tests * 1024 conversion)
+        if stats.loose_size > 0 {
+            assert_eq!(
+                stats.loose_size % 1024,
+                0,
+                "loose_size should be multiple of 1024"
+            );
+        }
+        if stats.pack_size > 0 {
+            assert_eq!(
+                stats.pack_size % 1024,
+                0,
+                "pack_size should be multiple of 1024"
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_notes_size_empty_repo() {
+        // Test with a repo that has no notes - exercises the empty case
+        let temp_dir = dir_with_repo();
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        let result = get_notes_size(false, false).unwrap();
+        assert_eq!(result.total_bytes, 0);
+        assert_eq!(result.note_count, 0);
+        assert!(result.by_measurement.is_none());
+    }
+}
