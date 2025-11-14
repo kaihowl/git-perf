@@ -864,34 +864,15 @@ mod test {
         // Test that both head and tail measurements display units with auto-scaling
 
         // First, set up a test environment with a configured unit
+        use crate::test_helpers::setup_test_env_with_config;
         use std::env;
-        use std::fs;
-        use tempfile::TempDir;
 
-        let temp_dir = TempDir::new().unwrap();
-        env::set_current_dir(&temp_dir).unwrap();
-
-        // Initialize git repo
-        std::process::Command::new("git")
-            .args(["init"])
-            .output()
-            .unwrap();
-        std::process::Command::new("git")
-            .args(["config", "user.email", "test@example.com"])
-            .output()
-            .unwrap();
-        std::process::Command::new("git")
-            .args(["config", "user.name", "Test User"])
-            .output()
-            .unwrap();
-
-        // Create .gitperfconfig with unit configuration
         let config_content = r#"
 [measurement."build_time"]
 unit = "ms"
 "#;
-        let config_path = temp_dir.path().join(".gitperfconfig");
-        fs::write(&config_path, config_content).unwrap();
+        let temp_dir = setup_test_env_with_config(config_content);
+        env::set_current_dir(&temp_dir).unwrap();
 
         // Test with large millisecond values that should auto-scale to seconds
         let head = 12_345.67; // Will auto-scale to ~12.35s
@@ -990,38 +971,12 @@ unit = "ms"
         use crate::config::{
             audit_aggregate_by, audit_dispersion_method, audit_min_measurements, audit_sigma,
         };
+        use crate::test_helpers::setup_test_env_with_config;
         use std::env;
-        use std::fs;
-        use tempfile::TempDir;
-
-        fn setup_test_env_with_config(config_content: &str) -> TempDir {
-            let temp_dir = TempDir::new().unwrap();
-
-            // Initialize git repo
-            env::set_current_dir(&temp_dir).unwrap();
-            std::process::Command::new("git")
-                .args(["init"])
-                .output()
-                .unwrap();
-            std::process::Command::new("git")
-                .args(["config", "user.email", "test@example.com"])
-                .output()
-                .unwrap();
-            std::process::Command::new("git")
-                .args(["config", "user.name", "Test User"])
-                .output()
-                .unwrap();
-
-            // Create .gitperfconfig
-            let config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(&config_path, config_content).unwrap();
-
-            temp_dir
-        }
 
         #[test]
         fn test_different_dispersion_methods_per_measurement() {
-            let _temp_dir = setup_test_env_with_config(
+            let temp_dir = setup_test_env_with_config(
                 r#"
 [measurement]
 dispersion_method = "stddev"
@@ -1033,6 +988,7 @@ dispersion_method = "mad"
 dispersion_method = "stddev"
 "#,
             );
+            env::set_current_dir(&temp_dir).unwrap();
 
             // Verify each measurement gets its own config
             let build_time_method = audit_dispersion_method("build_time");
@@ -1058,7 +1014,7 @@ dispersion_method = "stddev"
 
         #[test]
         fn test_different_min_measurements_per_measurement() {
-            let _temp_dir = setup_test_env_with_config(
+            let temp_dir = setup_test_env_with_config(
                 r#"
 [measurement]
 min_measurements = 5
@@ -1070,6 +1026,7 @@ min_measurements = 10
 min_measurements = 3
 "#,
             );
+            env::set_current_dir(&temp_dir).unwrap();
 
             assert_eq!(
                 audit_min_measurements("build_time"),
@@ -1090,7 +1047,7 @@ min_measurements = 3
 
         #[test]
         fn test_different_aggregate_by_per_measurement() {
-            let _temp_dir = setup_test_env_with_config(
+            let temp_dir = setup_test_env_with_config(
                 r#"
 [measurement]
 aggregate_by = "median"
@@ -1102,6 +1059,7 @@ aggregate_by = "max"
 aggregate_by = "mean"
 "#,
             );
+            env::set_current_dir(&temp_dir).unwrap();
 
             assert_eq!(
                 audit_aggregate_by("build_time"),
@@ -1122,7 +1080,7 @@ aggregate_by = "mean"
 
         #[test]
         fn test_different_sigma_per_measurement() {
-            let _temp_dir = setup_test_env_with_config(
+            let temp_dir = setup_test_env_with_config(
                 r#"
 [measurement]
 sigma = 3.0
@@ -1134,6 +1092,7 @@ sigma = 5.5
 sigma = 2.0
 "#,
             );
+            env::set_current_dir(&temp_dir).unwrap();
 
             assert_eq!(
                 audit_sigma("build_time"),
@@ -1154,7 +1113,7 @@ sigma = 2.0
 
         #[test]
         fn test_cli_overrides_config() {
-            let _temp_dir = setup_test_env_with_config(
+            let temp_dir = setup_test_env_with_config(
                 r#"
 [measurement."build_time"]
 min_measurements = 10
@@ -1163,6 +1122,7 @@ sigma = 5.5
 dispersion_method = "mad"
 "#,
             );
+            env::set_current_dir(&temp_dir).unwrap();
 
             // Test that CLI values override config
             let params = super::resolve_audit_params(
@@ -1192,7 +1152,7 @@ dispersion_method = "mad"
 
         #[test]
         fn test_config_overrides_defaults() {
-            let _temp_dir = setup_test_env_with_config(
+            let temp_dir = setup_test_env_with_config(
                 r#"
 [measurement."build_time"]
 min_measurements = 10
@@ -1201,6 +1161,7 @@ sigma = 5.5
 dispersion_method = "mad"
 "#,
             );
+            env::set_current_dir(&temp_dir).unwrap();
 
             // Test that config values are used when no CLI values provided
             let params = super::resolve_audit_params(

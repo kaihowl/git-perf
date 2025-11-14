@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod test {
+    use git_perf::test_helpers::hermetic_git_env_vars;
     use std::env;
     use std::path::Path;
     use std::process::Command;
@@ -19,18 +20,7 @@ mod test {
         let output = Command::new("bash")
             .args(["../test/run_tests.sh", start_filter])
             .env("PATH", new_path)
-            .env("GIT_CONFIG_NOSYSTEM", "true")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_AUTHOR_NAME", "github-actions[bot]")
-            .env(
-                "GIT_AUTHOR_EMAIL",
-                "41898282+github-actions[bot]@users.noreply.github.com",
-            )
-            .env("GIT_COMMITTER_NAME", "github-actions[bot]")
-            .env(
-                "GIT_COMMITTER_EMAIL",
-                "41898282+github-actions[bot]@users.noreply.github.com",
-            )
+            .envs(hermetic_git_env_vars())
             .output()
             .expect("Failed to run bash test");
 

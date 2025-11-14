@@ -25,6 +25,24 @@ pub fn hermetic_git_env() {
     env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
 }
 
+/// Returns hermetic git environment variables as an array of tuples.
+///
+/// This is useful for passing to `Command::envs()` when spawning processes
+/// that need isolated git environment.
+///
+/// # Returns
+/// Array of (key, value) tuples for hermetic git environment variables
+pub fn hermetic_git_env_vars() -> [(&'static str, &'static str); 6] {
+    [
+        ("GIT_CONFIG_NOSYSTEM", "true"),
+        ("GIT_CONFIG_GLOBAL", "/dev/null"),
+        ("GIT_AUTHOR_NAME", "testuser"),
+        ("GIT_AUTHOR_EMAIL", "testuser@example.com"),
+        ("GIT_COMMITTER_NAME", "testuser"),
+        ("GIT_COMMITTER_EMAIL", "testuser@example.com"),
+    ]
+}
+
 /// Runs a git command in a hermetic environment with the specified directory.
 ///
 /// # Arguments
@@ -107,6 +125,116 @@ pub fn empty_commit() {
         .expect("Failed to create empty commit")
         .status
         .success());
+}
+
+/// Initializes a git repository in the specified directory with a real file commit.
+///
+/// Creates a test.txt file with "test content" and commits it.
+///
+/// # Arguments
+/// * `dir` - Directory to initialize the repository in
+///
+/// # Panics
+/// Panics if git initialization, file creation, or commit fails.
+pub fn init_repo_with_file(dir: &Path) {
+    run_git_command(&["init", "--initial-branch", "master"], dir);
+
+    // Create a test file and commit it
+    std::fs::write(dir.join("test.txt"), "test content").expect("Failed to create test file");
+    run_git_command(&["add", "test.txt"], dir);
+    run_git_command(&["commit", "-m", "Initial commit"], dir);
+}
+
+/// Creates a temporary directory with an initialized git repository and a file commit.
+///
+/// The repository will have:
+/// - A master branch as the initial branch
+/// - A test.txt file committed
+///
+/// # Returns
+/// A `TempDir` that will be automatically cleaned up when dropped.
+///
+/// # Panics
+/// Panics if the temporary directory cannot be created or git initialization fails.
+pub fn dir_with_repo_and_file() -> TempDir {
+    let tempdir = tempdir().unwrap();
+    init_repo_with_file(tempdir.path());
+    tempdir
+}
+
+/// Sets up an isolated HOME directory for config isolation tests.
+///
+/// This helper creates a temporary HOME directory and removes XDG_CONFIG_HOME
+/// to ensure tests run in complete isolation. The original HOME is restored
+/// after the test closure completes.
+///
+/// # Arguments
+/// * `f` - Closure that takes the temporary home path and returns a result
+///
+/// # Returns
+/// The result from the closure
+pub fn with_isolated_home<F, R>(f: F) -> R
+where
+    F: FnOnce(&Path) -> R,
+{
+    let temp_dir = TempDir::new().unwrap();
+
+    // Save original HOME
+    let original_home = env::var("HOME").ok();
+    let original_xdg = env::var("XDG_CONFIG_HOME").ok();
+
+    // Set up isolated HOME directory
+    env::set_var("HOME", temp_dir.path());
+    env::remove_var("XDG_CONFIG_HOME");
+
+    let result = f(temp_dir.path());
+
+    // Restore original environment
+    if let Some(home) = original_home {
+        env::set_var("HOME", home);
+    } else {
+        env::remove_var("HOME");
+    }
+    if let Some(xdg) = original_xdg {
+        env::set_var("XDG_CONFIG_HOME", xdg);
+    }
+
+    result
+}
+
+/// Writes a .gitperfconfig file in the specified directory.
+///
+/// # Arguments
+/// * `dir` - Directory where .gitperfconfig should be written
+/// * `content` - TOML content to write to the config file
+///
+/// # Panics
+/// Panics if the file cannot be written.
+pub fn write_gitperfconfig(dir: &Path, content: &str) {
+    let config_path = dir.join(".gitperfconfig");
+    std::fs::write(&config_path, content).expect("Failed to write .gitperfconfig");
+}
+
+/// Sets up a complete test environment with git repo and config.
+///
+/// This is a convenience function that:
+/// 1. Sets up hermetic git environment variables
+/// 2. Creates a temporary directory with an initialized git repository
+/// 3. Writes the provided config content to .gitperfconfig
+///
+/// # Arguments
+/// * `config_content` - TOML content for .gitperfconfig
+///
+/// # Returns
+/// A `TempDir` that will be automatically cleaned up when dropped.
+///
+/// # Panics
+/// Panics if any step fails.
+pub fn setup_test_env_with_config(config_content: &str) -> TempDir {
+    hermetic_git_env();
+    let temp_dir = dir_with_repo();
+    write_gitperfconfig(temp_dir.path(), config_content);
+    temp_dir
 }
 
 #[cfg(test)]
