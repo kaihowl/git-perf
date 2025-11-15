@@ -998,7 +998,7 @@ checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 
 [[package]]
 name = "git-perf"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "average",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "git_perf_cli_types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",

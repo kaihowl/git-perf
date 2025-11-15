@@ -1,6 +1,6 @@
 [package]
 name = "git-perf"
-version = "0.18.0"
+version = "0.18.1"
 edition = "2021"
 description = "Track, plot, and statistically validate simple measurements using git-notes for storage"
 license = "MIT"
@@ -15,7 +15,7 @@ path = "src/main.rs"
 path = "src/lib.rs"
 
 [dependencies]
-git_perf_cli_types = { version = "0.2.0", path = "../cli_types" }
+git_perf_cli_types = { version = "0.2.1", path = "../cli_types" }
 anyhow = "1.0.75"
 average = "0.13.1"
 backoff = "0.4.0"
@@ -49,7 +49,7 @@ serde = { version = "1", features = ["derive"] }
 clap = { version="4", features=["derive"] }
 clap_mangen = "0.2.5"
 clap-markdown = "0.1.0"
-git_perf_cli_types = { version = "0.2.0", path = "../cli_types" }
+git_perf_cli_types = { version = "0.2.1", path = "../cli_types" }
 
 [dev-dependencies]
 criterion = "0.5.1"
