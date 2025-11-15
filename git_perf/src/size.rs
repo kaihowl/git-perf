@@ -1,3 +1,4 @@
+use crate::git::git_interop::is_shallow_repository;
 use crate::git::size_ops::{get_notes_size, get_repo_stats, NotesSizeInfo, RepoStats};
 use anyhow::Result;
 use git_perf_cli_types::SizeFormat;
@@ -10,6 +11,9 @@ pub fn calculate_measurement_size(
     disk_size: bool,
     include_objects: bool,
 ) -> Result<()> {
+    // 0. Check for shallow repository
+    let is_shallow = is_shallow_repository().unwrap_or(false);
+
     // 1. Get notes size information
     let notes_info = get_notes_size(detailed, disk_size)?;
 
@@ -21,7 +25,13 @@ pub fn calculate_measurement_size(
     };
 
     // 3. Display results
-    display_size_report(&notes_info, repo_stats.as_ref(), format, disk_size)?;
+    display_size_report(
+        &notes_info,
+        repo_stats.as_ref(),
+        format,
+        disk_size,
+        is_shallow,
+    )?;
 
     Ok(())
 }
@@ -32,6 +42,7 @@ fn display_size_report(
     repo_stats: Option<&RepoStats>,
     format: SizeFormat,
     disk_size: bool,
+    is_shallow: bool,
 ) -> Result<()> {
     let size_type = if disk_size {
         "on-disk (compressed)"
@@ -42,6 +53,12 @@ fn display_size_report(
     println!("Live Measurement Size Report");
     println!("============================");
     println!();
+
+    // Display prominent warning for shallow clones
+    if is_shallow {
+        println!("⚠️  Shallow clone detected - measurement counts may be incomplete (see FAQ)");
+        println!();
+    }
 
     println!("Number of commits with measurements: {}", info.note_count);
     println!(
