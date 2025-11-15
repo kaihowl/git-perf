@@ -406,7 +406,8 @@ fn audit_with_data(
     let passed = !z_score_exceeds_sigma || passed_due_to_threshold;
 
     // Add threshold information to output if applicable
-    let threshold_note = if threshold_applied && passed_due_to_threshold {
+    // Only show note when the audit would have failed without the threshold
+    let threshold_note = if threshold_applied && passed_due_to_threshold && z_score_exceeds_sigma {
         format!(
             "\nNote: Passed due to relative deviation ({:.1}%) being below threshold ({:.1}%)",
             head_relative_deviation,
@@ -960,6 +961,89 @@ unit = "ms"
                 && tail_line.contains("n:"),
             "Tail line should contain all stat labels, got: {}",
             tail_line
+        );
+    }
+
+    #[test]
+    fn test_threshold_note_only_shown_when_audit_would_fail() {
+        // Test that the threshold note is only shown when the audit would have
+        // failed without the threshold (i.e., when z_score_exceeds_sigma is true)
+        use crate::test_helpers::setup_test_env_with_config;
+
+        let config_content = r#"
+[measurement."build_time"]
+min_relative_deviation = 10.0
+"#;
+        let (_temp_dir, _dir_guard) = setup_test_env_with_config(config_content);
+
+        // Case 1: Low z-score AND low relative deviation (threshold is configured but not needed)
+        // Should pass without showing the note
+        let result = audit_with_data(
+            "build_time",
+            10.1,                               // Very close to tail values
+            vec![10.0, 10.1, 10.0, 10.1, 10.0], // Low variance
+            1,
+            100.0, // Very high sigma threshold - won't be exceeded
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(audit_result.passed);
+        assert!(audit_result.message.contains("✅"));
+        // The note should NOT be shown because the audit would have passed anyway
+        assert!(
+            !audit_result
+                .message
+                .contains("Note: Passed due to relative deviation"),
+            "Note should not appear when audit passes without needing threshold bypass"
+        );
+
+        // Case 2: High z-score but low relative deviation (threshold saves the audit)
+        // Should pass and show the note
+        let result = audit_with_data(
+            "build_time",
+            1002.0, // High z-score outlier but low relative deviation
+            vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
+            1,
+            0.5, // Low sigma threshold - will be exceeded
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(audit_result.passed);
+        assert!(audit_result.message.contains("✅"));
+        // The note SHOULD be shown because the audit would have failed without the threshold
+        assert!(
+            audit_result
+                .message
+                .contains("Note: Passed due to relative deviation"),
+            "Note should appear when audit passes due to threshold bypass. Got: {}",
+            audit_result.message
+        );
+
+        // Case 3: High z-score AND high relative deviation (threshold doesn't help)
+        // Should fail
+        let result = audit_with_data(
+            "build_time",
+            1200.0, // High z-score AND high relative deviation
+            vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
+            1,
+            0.5, // Low sigma threshold - will be exceeded
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(!audit_result.passed);
+        assert!(audit_result.message.contains("❌"));
+        // No note shown because the audit still failed
+        assert!(
+            !audit_result
+                .message
+                .contains("Note: Passed due to relative deviation"),
+            "Note should not appear when audit fails"
         );
     }
 
