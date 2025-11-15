@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.0...git-perf-v0.18.1) - 2025-11-15
+
+### Added
+
+- *(config)* add git-perf config command (list, json, validate) ([#451](https://github.com/kaihowl/git-perf/pull/451))
+- *(git_size)* add shallow clone detection and warning in size measurement ([#469](https://github.com/kaihowl/git-perf/pull/469))
+- *(reporting)* support multiple split keys for grouping measurements ([#461](https://github.com/kaihowl/git-perf/pull/461))
+- *(size)* sync read-branch with pending writes for accurate measurements ([#454](https://github.com/kaihowl/git-perf/pull/454))
+- *(cli)* add regex filter for audit and report (OR, anchored) ([#445](https://github.com/kaihowl/git-perf/pull/445))
+- *(cli)* size subcommand (phases 1-3 complete) ([#446](https://github.com/kaihowl/git-perf/pull/446))
+- *(cli)* allow multiple -m flags for bump-epoch command ([#441](https://github.com/kaihowl/git-perf/pull/441))
+- *(ci)* CI benchmark + import integration (sample bench) ([#439](https://github.com/kaihowl/git-perf/pull/439))
+- *(cli)* add import command for JUnit XML and Criterion JSON ([#437](https://github.com/kaihowl/git-perf/pull/437))
+- *(converters)* implement and complete import-test benchmark phase ([#434](https://github.com/kaihowl/git-perf/pull/434))
+- *(parsers)* Phase 1 complete: JUnit XML and Criterion JSON parsers ([#433](https://github.com/kaihowl/git-perf/pull/433))
+- *(units)* implement parse and auto-scale units in audit output ([#428](https://github.com/kaihowl/git-perf/pull/428))
+- *(audit)* show summaries on skip with sparkline ([#429](https://github.com/kaihowl/git-perf/pull/429))
+- CSV header and unit column in long-format export ([#425](https://github.com/kaihowl/git-perf/pull/425))
+- *(report)* render unit-aware names and axis labels in HTML reports (phase 3) ([#423](https://github.com/kaihowl/git-perf/pull/423))
+- *(audit)* display head/tail mean with unit and thousands separators ([#422](https://github.com/kaihowl/git-perf/pull/422))
+- *(audit)* display measurement units in audit output (phase 2) ([#420](https://github.com/kaihowl/git-perf/pull/420))
+- *(config)* add measurement unit configuration support (phase 1) ([#419](https://github.com/kaihowl/git-perf/pull/419))
+- *(audit)* unify per-measurement config resolution and CLI precedence ([#405](https://github.com/kaihowl/git-perf/pull/405))
+- *(audit)* sparkline for all measurements in skip and normal audits ([#408](https://github.com/kaihowl/git-perf/pull/408))
+
+### Fixed
+
+- handle zero tail median in audit ([#458](https://github.com/kaihowl/git-perf/pull/458))
+- *(audit)* show threshold note only when audit would fail without it ([#468](https://github.com/kaihowl/git-perf/pull/468))
+- *(git_interop)* filter out empty lines when parsing refs ([#467](https://github.com/kaihowl/git-perf/pull/467))
+- *(git_interop)* handle unexpected output format in get_refs ([#466](https://github.com/kaihowl/git-perf/pull/466))
+- *(audit)* handle NaN safely in direction arrow computation ([#409](https://github.com/kaihowl/git-perf/pull/409))
+
+### Other
+
+- *(tests)* centralize hermetic test setup with shared helpers ([#465](https://github.com/kaihowl/git-perf/pull/465))
+- *(git)* add unit tests for size_ops.rs (get_repo_stats, get_notes_size) ([#464](https://github.com/kaihowl/git-perf/pull/464))
+- *(audit)* remove #[allow(clippy::too_many_arguments)] attribute ([#457](https://github.com/kaihowl/git-perf/pull/457))
+- localize temp ref with ReadBranchGuard and size_ops ([#456](https://github.com/kaihowl/git-perf/pull/456))
+- *(size)* batch OIDs to git cat-file to reduce spawns ([#449](https://github.com/kaihowl/git-perf/pull/449))
+- *(test)* centralize test helpers into shared module ([#438](https://github.com/kaihowl/git-perf/pull/438))
+- hermetic git env for tests; remove CI git config steps ([#435](https://github.com/kaihowl/git-perf/pull/435))
+- *(dependencies)* move criterion to dev-dependencies in Cargo.toml ([#436](https://github.com/kaihowl/git-perf/pull/436))
+- add mutation testing analysis and tests for git_interop ([#410](https://github.com/kaihowl/git-perf/pull/410))
+- *(deps)* upgrade plotly from 0.8.3 to 0.13.5 and update related dependencies ([#396](https://github.com/kaihowl/git-perf/pull/396))
+
 ## [0.18.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.17.2...git-perf-v0.18.0) - 2025-10-05
 
 ### Added
