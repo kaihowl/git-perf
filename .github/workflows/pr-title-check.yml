@@ -1,0 +1,77 @@
+name: PR Title Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  check-pr-title:
+    name: Validate PR title follows Conventional Commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prTitle = context.payload.pull_request.title;
+
+            // Valid types according to CLAUDE.md
+            const validTypes = [
+              'feat',
+              'fix',
+              'docs',
+              'refactor',
+              'chore',
+              'test',
+              'perf',
+              'build',
+              'ci',
+              'revert'
+            ];
+
+            // Regex pattern: type(optional-scope): lowercase description
+            // - Must start with valid type
+            // - Optional scope in parentheses (alphanumeric, hyphens, underscores)
+            // - Colon and space required
+            // - Description must start with lowercase letter
+            // Note: Scope validation is disabled - any scope is accepted
+            const conventionalCommitRegex = /^(feat|fix|docs|refactor|chore|test|perf|build|ci|revert)(\([a-z0-9_-]+\))?: [a-z].+$/;
+
+            if (!conventionalCommitRegex.test(prTitle)) {
+              let errorMessage = `❌ PR title does not follow Conventional Commits format.\n\n`;
+              errorMessage += `**Current title:** "${prTitle}"\n\n`;
+              errorMessage += `**Required format:** \`type(scope): lowercase description\`\n\n`;
+              errorMessage += `**Valid types:** ${validTypes.join(', ')}\n`;
+              errorMessage += `**Note:** Scope is optional and any scope value is accepted\n\n`;
+              errorMessage += `**Examples:**\n`;
+              errorMessage += `✅ \`feat(cli_types): add measurement export\`\n`;
+              errorMessage += `✅ \`fix(audit): handle empty data\`\n`;
+              errorMessage += `✅ \`docs: improve installation steps\`\n`;
+              errorMessage += `✅ \`chore(deps): update clap to 4.5.0\`\n\n`;
+              errorMessage += `**Common mistakes:**\n`;
+              errorMessage += `❌ Missing type prefix\n`;
+              errorMessage += `❌ Capital letter after colon (must be lowercase)\n`;
+              errorMessage += `❌ Missing colon\n`;
+              errorMessage += `❌ Invalid type\n\n`;
+              errorMessage += `See CLAUDE.md for more details.`;
+
+              core.setFailed(errorMessage);
+              return;
+            }
+
+            // Extract type for validation (scope validation is disabled)
+            const match = prTitle.match(/^([a-z]+)(\(([a-z0-9_-]+)\))?:/);
+            if (match) {
+              const type = match[1];
+
+              // Check if type is valid
+              if (!validTypes.includes(type)) {
+                core.setFailed(`❌ Invalid commit type: "${type}". Valid types are: ${validTypes.join(', ')}`);
+                return;
+              }
+            }
+
+            core.info(`✅ PR title follows Conventional Commits format: "${prTitle}"`);

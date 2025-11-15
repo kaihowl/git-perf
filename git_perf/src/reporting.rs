@@ -120,13 +120,13 @@ trait Reporter<'a> {
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
         measurement_name: &str,
-        group_value: Option<&String>,
+        group_values: &[String],
     );
     fn add_summarized_trace(
         &mut self,
         indexed_measurements: Vec<(usize, MeasurementSummary)>,
         measurement_name: &str,
-        group_value: Option<&String>,
+        group_values: &[String],
     );
     fn as_bytes(&self) -> Vec<u8>;
 }
@@ -213,7 +213,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
         measurement_name: &str,
-        group_value: Option<&String>,
+        group_values: &[String],
     ) {
         let (x, y) = self.convert_to_x_y(
             indexed_measurements
@@ -230,9 +230,11 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         let trace = plotly::BoxPlot::new_xy(x, y);
 
-        let trace = if let Some(group_value) = group_value {
+        let trace = if !group_values.is_empty() {
+            // Join group values with "/" for display (only at display time)
+            let group_label = group_values.join("/");
             trace
-                .name(group_value)
+                .name(&group_label)
                 .legend_group(measurement_name)
                 .legend_group_title(LegendGroupTitle::from(measurement_display))
         } else {
@@ -246,7 +248,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         &mut self,
         indexed_measurements: Vec<(usize, MeasurementSummary)>,
         measurement_name: &str,
-        group_value: Option<&String>,
+        group_values: &[String],
     ) {
         let (x, y) = self.convert_to_x_y(
             indexed_measurements
@@ -263,9 +265,11 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         let trace = plotly::Scatter::new(x, y).name(&measurement_display);
 
-        let trace = if let Some(group_value) = group_value {
+        let trace = if !group_values.is_empty() {
+            // Join group values with "/" for display (only at display time)
+            let group_label = group_values.join("/");
             trace
-                .name(group_value)
+                .name(&group_label)
                 .legend_group(measurement_name)
                 .legend_group_title(LegendGroupTitle::from(measurement_display))
         } else {
@@ -314,7 +318,7 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
         _measurement_name: &str,
-        _group_value: Option<&String>,
+        _group_values: &[String],
     ) {
         self.indexed_measurements
             .extend_from_slice(indexed_measurements.as_slice());
@@ -358,14 +362,21 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         &mut self,
         _indexed_measurements: Vec<(usize, MeasurementSummary)>,
         _measurement_name: &str,
-        _group_value: Option<&String>,
+        _group_values: &[String],
     ) {
         // Store summarized data to be serialized in as_bytes
+        // Join group values for CSV output (flat format)
+        let group_label = if !_group_values.is_empty() {
+            Some(_group_values.join("/"))
+        } else {
+            None
+        };
+
         for (index, summary) in _indexed_measurements.into_iter() {
             self.summarized_measurements.push((
                 index,
                 _measurement_name.to_string(),
-                _group_value.cloned(),
+                group_label.clone(),
                 summary,
             ));
         }
@@ -394,7 +405,7 @@ impl ReporterFactory {
 
 pub fn report(
     output: PathBuf,
-    separate_by: Option<String>,
+    separate_by: Vec<String>,
     num_commits: usize,
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
@@ -446,34 +457,61 @@ pub fn report(
             .clone()
             .map(|ms| ms.filter(|m| m.name == *measurement_name));
 
-        let group_values = if let Some(separate_by) = &separate_by {
+        let group_values: Vec<Vec<String>> = if !separate_by.is_empty() {
+            // Find all unique combinations of the split keys
             filtered_measurements
                 .clone()
-                .flat_map(|ms| {
-                    ms.flat_map(|m| {
-                        m.key_values
-                            .iter()
-                            .filter(|(k, _v)| *k == separate_by)
-                            .map(|(_k, v)| v)
-                    })
+                .flatten()
+                .filter_map(|m| {
+                    // Extract values for all split keys
+                    let values: Vec<String> = separate_by
+                        .iter()
+                        .filter_map(|key| m.key_values.get(key).cloned())
+                        .collect();
+
+                    // Only include if all split keys are present
+                    if values.len() == separate_by.len() {
+                        Some(values)
+                    } else {
+                        None
+                    }
                 })
                 .unique()
-                .map(|val| (Some(separate_by), Some(val)))
                 .collect_vec()
         } else {
-            vec![(None, None)]
+            vec![]
         };
 
-        if group_values.is_empty() {
-            bail!("Invalid separator supplied, no measurements.")
-        }
+        // When no splits specified, create a single group with all measurements
+        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
+            if !separate_by.is_empty() {
+                bail!(
+                    "Invalid separator supplied, no measurements have all required keys: {:?}",
+                    separate_by
+                );
+            }
+            vec![vec![]]
+        } else {
+            group_values
+        };
 
-        for (group_key, group_value) in group_values {
+        for group_value in group_values_to_process {
             let group_measurements = filtered_measurements.clone().map(|ms| {
                 ms.filter(|m| {
-                    group_key
-                        .map(|gk| m.key_values.get(gk) == group_value)
-                        .unwrap_or(true)
+                    if !group_value.is_empty() {
+                        // Check if measurement has ALL the expected key-value pairs
+                        separate_by
+                            .iter()
+                            .zip(group_value.iter())
+                            .all(|(key, expected_val)| {
+                                m.key_values
+                                    .get(key)
+                                    .map(|v| v == expected_val)
+                                    .unwrap_or(false)
+                            })
+                    } else {
+                        true
+                    }
                 })
             });
 
@@ -487,14 +525,14 @@ pub fn report(
                             .map(move |m| (i, m))
                     })
                     .collect_vec();
-                plot.add_summarized_trace(trace_measurements, measurement_name, group_value);
+                plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
             } else {
                 let trace_measurements: Vec<_> = group_measurements
                     .clone()
                     .enumerate()
                     .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
                     .collect();
-                plot.add_trace(trace_measurements, measurement_name, group_value);
+                plot.add_trace(trace_measurements, measurement_name, &group_value);
             }
         }
     }
@@ -751,7 +789,7 @@ mod tests {
             val: 42.5,
             key_values: HashMap::new(),
         };
-        reporter.add_trace(vec![(0, &measurement)], "test_measurement", None);
+        reporter.add_trace(vec![(0, &measurement)], "test_measurement", &[]);
 
         // Get CSV output
         let bytes = reporter.as_bytes();
@@ -786,7 +824,7 @@ mod tests {
             val: 42.0,
             key_values: HashMap::new(),
         };
-        reporter.add_trace(vec![(0, &measurement)], "build_time", None);
+        reporter.add_trace(vec![(0, &measurement)], "build_time", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -819,7 +857,7 @@ mod tests {
             val: 3.5,
             key_values: metadata,
         };
-        reporter.add_trace(vec![(0, &measurement)], "test", None);
+        reporter.add_trace(vec![(0, &measurement)], "test", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -869,7 +907,7 @@ mod tests {
             key_values: HashMap::new(),
         };
 
-        reporter.add_trace(vec![(0, &m1), (1, &m2)], "timer", None);
+        reporter.add_trace(vec![(0, &m1), (1, &m2)], "timer", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -900,7 +938,7 @@ mod tests {
             val: 10.0,
             key_values: HashMap::new(),
         };
-        reporter.add_trace(vec![(0, &measurement)], "count", None);
+        reporter.add_trace(vec![(0, &measurement)], "count", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);
@@ -925,7 +963,7 @@ mod tests {
 
         let summary = MeasurementSummary { epoch: 0, val: 5.5 };
 
-        reporter.add_summarized_trace(vec![(0, summary)], "avg_time", None);
+        reporter.add_summarized_trace(vec![(0, summary)], "avg_time", &[]);
 
         let bytes = reporter.as_bytes();
         let csv = String::from_utf8_lossy(&bytes);

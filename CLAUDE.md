@@ -1,94 +1,141 @@
-# Agent Instructions for git-perf Project
+# Agent Instructions for git-perf
 
-Rust workspace with `cli_types` and `git_perf` crates providing Git repository performance measurement tools.
+Rust workspace (2 crates: `cli_types` v0.2.0, `git-perf` v0.18.0) providing Git repository performance measurement tools with git-notes storage, statistical analysis, and interactive reporting.
 
-## 🚨 CRITICAL: Pull Request Requirements for AI Agents
+## Quick Reference Commands
 
-**MANDATORY PR Creation**:
 ```bash
-# ALWAYS use --title with Conventional Commits format
-gh pr create --title "type(scope): description" --body "..."
-
-# NEVER rely on auto-generated titles
-gh pr create --body "..."  # ❌ FORBIDDEN
+cargo fmt                              # Format code (required before commit)
+cargo clippy                           # Lint code (must pass)
+cargo nextest run -- --skip slow       # Run tests (standard)
+cargo nextest run                      # Run full test suite including slow tests
+./scripts/generate-manpages.sh        # Regenerate docs after CLI changes
 ```
 
-**AI Agent Requirements**:
-- MUST use `--title` parameter with `type(scope): description` format
-- NEVER create PR without explicit title
-- GitHub auto-generates non-compliant titles from branch names/commits
-
-## Pre-Submission Checklist
-
-**Required Commands** (run before every submission):
-```bash
-cargo fmt                              # Format code
-cargo nextest run -- --skip slow       # Run tests (exclude slow)
-cargo clippy                           # Lint code
-./scripts/generate-manpages.sh         # If cli_types changed
-```
-
-**Setup** (install once):
+**Setup (one-time)**:
 ```bash
 cargo install cargo-nextest --locked
 export PATH="/usr/local/cargo/bin:$PATH"  # Add to shell profile
 ```
 
-## Conventional Commits (CI-Enforced)
+## Pull Request Requirements
+
+**MANDATORY for AI Agents**:
+```bash
+# ALWAYS use --title with Conventional Commits format
+gh pr create --title "type(scope): description" --body "..."
+
+# NEVER rely on auto-generated titles - they break CI
+gh pr create --body "..."  # FORBIDDEN
+```
 
 **Format**: `type(scope): lowercase description`
 
-**Types**:
-- `feat:` - New features
-- `fix:` - Bug fixes
-- `docs:` - Documentation only
-- `refactor:` - Code restructuring (no functional change)
-- `chore:` - Maintenance (deps, config)
-- `test:` - Test changes
-- `perf:` - Performance improvements
-- `build:` - Build system changes
-- `ci:` - CI/CD changes
-- `revert:` - Revert previous commit
+**Types**: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `perf`, `build`, `ci`, `revert`
 
-**Scopes**: `cli_types`, `git_perf`, `config`, `audit`, `docs`, `test`
+**Scopes** (primary crates): `cli_types`, `git_perf`
+**Scopes** (modules): `config`, `audit`, `import`, `git`, `stats`, `reporting`, `parsers`
 
 **Examples**:
 ```
-✅ feat(cli_types): add measurement export
-✅ fix(audit): handle empty data
-✅ docs: improve installation steps
-✅ chore(deps): update clap to 4.5.0
-
-❌ Add new feature           # Missing type
-❌ fix stuff                 # Too vague
-❌ feat: Add Feature         # Wrong capitalization
+feat(cli_types): add measurement export option
+fix(audit): handle empty measurement data correctly
+docs: update installation guide
+chore(deps): update clap to 4.5.0
+refactor(git): simplify notes retrieval logic
 ```
-
-**PR Title Validation**:
-- Starts with valid type (`feat:`, `fix:`, `docs:`, etc.)
-- Lowercase after colon
-- Includes scope when relevant
-- Descriptive but concise
-
-## Documentation
-
-**Manpages** (required for CLI changes):
-- Run `./scripts/generate-manpages.sh` after modifying `cli_types`
-- Commit regenerated docs with code changes
-- CI validates docs are up-to-date
-- Custom version: `GIT_PERF_VERSION=1.0.0 ./scripts/generate-manpages.sh`
 
 ## Testing
 
-**Standard**: `cargo nextest run -- --skip slow`
-**Full suite**: `cargo nextest run`
+**Test Types**:
+- **Bash integration tests**: 46+ scripts in `/test/` (primary test suite)
+- **Rust unit tests**: Throughout `git_perf/src/` modules
+- **Criterion benchmarks**: `git_perf/benches/` (read.rs, add.rs, sample_ci_bench.rs)
+- **Mutation testing**: Configured in `.cargo/mutants.toml`
+
+**Key test commands**:
+```bash
+cargo nextest run -- --skip slow       # Skip slow tests (default)
+cargo nextest run                      # Full suite including slow tests
+./test/run_tests.sh                   # Run all bash integration tests
+```
+
+## Documentation Generation
+
+**IMPORTANT**: Run `./scripts/generate-manpages.sh` after modifying:
+- `cli_types/src/lib.rs` (CLI type definitions)
+- `git_perf/src/cli.rs` (CLI implementation)
+- Any command-line argument changes
+
+**What it generates**:
+- Man pages: `man/man1/git-perf*.1`
+- Markdown docs: `docs/manpage.md`
+
+**CI validates** that generated docs match source. Commit regenerated docs with your changes.
 
 ## Code Quality Standards
 
 - Follow Rust idioms and best practices
 - Use `Result` and `Option` for error handling
 - Meaningful variable/function names
-- No warnings allowed
+- No compiler warnings allowed
+- No clippy warnings allowed
+
+## Project Architecture
+
+**Crate Structure**:
+- `cli_types/` - Shared CLI types (Commands, ReductionFunc, DispersionMethod, etc.)
+- `git_perf/` - Main application (11 commands, git integration, statistics, reporting)
+
+**Key Modules** (git_perf/src/):
+- `audit.rs` (56KB) - Performance validation and threshold checking
+- `config.rs` (35KB) - Configuration file management (.gitperfconfig)
+- `reporting.rs` (31KB) - Plotly-based interactive HTML reports
+- `git/git_interop.rs` (39KB) - Git-notes operations, push/pull
+- `stats.rs` (23KB) - Statistical analysis (stddev, MAD, z-scores)
+- `import.rs` (19KB) - JUnit XML and Criterion JSON import
+- `parsers/` - Format parsers (criterion_json.rs, junit_xml.rs)
+
+**Core Features**:
+- Git-notes storage (`refs/notes/perf-v3`)
+- Statistical validation (configurable dispersion methods: stddev, MAD)
+- Multi-format import (JUnit XML from nextest/pytest/Jest, Criterion JSON)
+- Interactive Plotly HTML reports with filtering/aggregation
+- Sparkline terminal visualization
+- Shallow clone detection and warnings
+
+## Configuration
+
+**File**: `.gitperfconfig` (TOML format)
+```toml
+[measurement]
+dispersion_method = "mad"           # or "stddev"
+min_relative_deviation = 5.0
+min_measurements = 3
+aggregate_by = "median"             # min, max, median, mean
+sigma = 3.5
+
+[measurement."specific_test"]       # Per-measurement overrides
+min_relative_deviation = 10.0
+```
+
+**Precedence**: CLI flags > Per-measurement config > Default config > Built-in defaults
+
+## Requirements
+
+- **Git**: 2.40+ (version checked automatically)
+- **Rust**: Edition 2021
+- **nextest**: Required for test execution
+
+## Build & Release
+
+**Build script** (`build.rs`): Auto-generates manpages and markdown docs during `cargo build`
+
+**Distribution** (dist-workspace.toml):
+- Tool: cargo-dist 0.29.0
+- Targets: macOS ARM64/x86_64, Linux ARM64/x86_64/musl
+- Installer: Shell script
+- Release automation: release-plz
 
 ## Environment Setup
 
@@ -96,23 +143,22 @@ export PATH="/usr/local/cargo/bin:$PATH"  # Add to shell profile
 ```bash
 export PATH="/usr/local/cargo/bin:$PATH"
 
-# Verify
+# Verify setup
 rustc --version && cargo fmt --version && cargo nextest --version
 ```
 
-## Why These Rules Matter
+## Troubleshooting
 
-**Conventional Commits**: Non-compliant titles break automated changelog generation, version management, release automation, and documentation tools.
+**Issue**: Rust toolchain not found
+**Fix**: Add PATH export to environment: `export PATH="/usr/local/cargo/bin:$PATH"`
 
-**Code Quality**: Ensures consistency, catches bugs early, maintains readability, and passes CI/CD checks.
+**Issue**: Tests fail on shallow clone
+**Fix**: Git operations require full history. Use `git fetch --unshallow` or clone with full depth.
+
+**Issue**: Manpage validation fails in CI
+**Fix**: Run `./scripts/generate-manpages.sh` and commit the regenerated docs.
 
 ## GitHub Templates
 
 - `.github/ISSUE_TEMPLATE/`: bug_report.md, feature_request.md, documentation.md
 - `.github/pull_request_template.md`: Checklist for testing and verification
-
-## Troubleshooting
-
-**Issue**: Background agents not applying rustfmt
-**Cause**: Rust toolchain not in PATH (`/usr/local/cargo/bin/`)
-**Fix**: Add PATH export to environment

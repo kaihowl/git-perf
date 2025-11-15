@@ -110,6 +110,14 @@ pub enum SizeFormat {
     Bytes,
 }
 
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ConfigFormat {
+    /// Human-readable format
+    Human,
+    /// JSON format for machine parsing
+    Json,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Measure the runtime of the supplied command (in nanoseconds)
@@ -241,9 +249,11 @@ pub enum Commands {
         #[arg(short = 'f', long = "filter")]
         filter: Vec<String>,
 
-        /// Create individual traces in the graph by grouping with the value of this selector
+        /// Create individual traces in the graph by grouping with the value of this selector.
+        /// Can be specified multiple times to split on multiple dimensions (e.g., -s os -s arch).
+        /// Multiple splits create combined group labels like "ubuntu/x64".
         #[arg(short, long, value_parser=parse_spaceless_string)]
-        separate_by: Option<String>,
+        separate_by: Vec<String>,
 
         /// What to aggregate the measurements in each group with
         #[arg(short, long)]
@@ -446,6 +456,40 @@ pub enum Commands {
         /// Include git repository statistics for context
         #[arg(long)]
         include_objects: bool,
+    },
+
+    /// Manage git-perf configuration
+    ///
+    /// Display and query git-perf configuration settings, including git context
+    /// (branch name, repository location), configuration sources, and
+    /// measurement-specific settings. This follows the git config pattern.
+    ///
+    /// Examples:
+    ///   git perf config --list                  # Show configuration summary
+    ///   git perf config --list --detailed       # Show all measurement settings
+    ///   git perf config --list --json           # Output as JSON
+    ///   git perf config --list --validate       # Check for config issues
+    ///   git perf config --list --measurement M  # Show specific measurement
+    Config {
+        /// List all configuration settings (similar to git config --list)
+        #[arg(short, long)]
+        list: bool,
+
+        /// Show detailed configuration including all measurements
+        #[arg(short, long, requires = "list")]
+        detailed: bool,
+
+        /// Output format (human-readable or JSON)
+        #[arg(short, long, value_enum, default_value = "human", requires = "list")]
+        format: ConfigFormat,
+
+        /// Validate configuration and report issues
+        #[arg(short, long, requires = "list")]
+        validate: bool,
+
+        /// Show specific measurement configuration only
+        #[arg(short, long, requires = "list")]
+        measurement: Option<String>,
     },
 }
 

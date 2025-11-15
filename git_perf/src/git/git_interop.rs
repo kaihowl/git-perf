@@ -30,6 +30,7 @@ use super::git_lowlevel::{
     map_git_error, set_git_perf_remote, spawn_git_command,
 };
 use super::git_types::GitError;
+use super::git_types::GitOutput;
 use super::git_types::Reference;
 
 pub use super::git_lowlevel::get_head_revision;
@@ -37,6 +38,12 @@ pub use super::git_lowlevel::get_head_revision;
 pub use super::git_lowlevel::check_git_version;
 
 pub use super::git_lowlevel::get_repository_root;
+
+/// Check if the current repository is a shallow clone
+pub fn is_shallow_repository() -> Result<bool> {
+    super::git_lowlevel::is_shallow_repo()
+        .map_err(|e| anyhow!("Failed to check if repository is shallow: {}", e))
+}
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
@@ -666,18 +673,28 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     args.extend(additional_args.iter().map(|s| s.as_str()));
 
     let output = capture_git_output(&args, &None)?;
-    Ok(output
+    let refs: Result<Vec<Reference>, _> = output
         .stdout
         .lines()
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let items = s.split('\0').take(2).collect_vec();
-            assert!(items.len() == 2);
-            Reference {
+            if items.len() != 2 {
+                return Err(GitError::ExecError {
+                    command: format!("git {}", args.join(" ")),
+                    output: GitOutput {
+                        stdout: format!("Unexpected git for-each-ref output format: {}", s),
+                        stderr: String::new(),
+                    },
+                });
+            }
+            Ok(Reference {
                 refname: items[0].to_string(),
                 oid: items[1].to_string(),
-            }
+            })
         })
-        .collect_vec())
+        .collect();
+    refs
 }
 
 struct TempRef {

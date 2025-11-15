@@ -25,7 +25,7 @@ Key\-value pairs separated by \*(Aq=\*(Aq, select only matching measurements
 Filter measurements by regex pattern (can be specified multiple times). If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Example: \-f "bench.*" \-f "test_.*"
 .TP
 \fB\-s\fR, \fB\-\-separate\-by\fR \fI<SEPARATE_BY>\fR
-Create individual traces in the graph by grouping with the value of this selector
+Create individual traces in the graph by grouping with the value of this selector. Can be specified multiple times to split on multiple dimensions (e.g., \-s os \-s arch). Multiple splits create combined group labels like "ubuntu/x64"
 .TP
 \fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR
 What to aggregate the measurements in each group with
