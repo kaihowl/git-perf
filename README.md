@@ -591,6 +591,33 @@ Example: `[-1.0% – +96.0%] ▁▃▇▁` shows most values are low, with one s
 
 ### Data Management
 
+#### Why does the size command show a warning about shallow clones?
+
+When running `git perf size` in a shallow clone, you'll see:
+
+```
+⚠️  Shallow clone detected - measurement counts may be incomplete (see FAQ)
+```
+
+**What this means:**
+- The measurement counts for commits in your current lineage are accurate
+- However, measurements for commits outside your shallow clone's history are not counted
+- The `git notes list` command only sees notes for locally available commits
+
+**Example:**
+If your full repository has 1000 commits with 800 measurements, but your shallow clone only has 100 commits, you might see only ~80 measurements instead of the full 800.
+
+**Important distinction:**
+- ✅ **Measurements in your lineage**: Correctly captured and counted
+- ❌ **Measurements outside your lineage**: Not visible in shallow clones (e.g., measurements on branches not in your history)
+
+**To see all measurements:**
+```bash
+git fetch --unshallow
+```
+
+This converts your shallow clone to a full clone, allowing all measurements to be counted.
+
 #### How long should I keep measurement data?
 
 **Recommended**: At least 90 days of measurement data for meaningful trend analysis.

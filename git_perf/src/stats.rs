@@ -593,7 +593,7 @@ mod test {
 
         // Value with more precision - "seconds" is unknown unit, falls back to Count
         let precise_stats = Stats {
-            mean: 3.14159,
+            mean: 3.21, // Arbitrary value to avoid clippy::approx_constant warning
             stddev: 0.5,
             mad: 0.3,
             len: 10,
@@ -606,7 +606,7 @@ mod test {
             }
         );
         assert!(
-            formatted.contains("3.14") && formatted.contains("seconds"),
+            formatted.contains("3.21") && formatted.contains("seconds"),
             "Precise value with unknown unit (fallback): {}",
             formatted
         );

@@ -270,51 +270,11 @@ pub fn measurement_unit(measurement: &str) -> Option<String> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_helpers::{
+        hermetic_git_env, init_repo, init_repo_with_file, with_isolated_home,
+    };
     use std::fs;
     use tempfile::TempDir;
-
-    /// Test helper to set up an independent HOME directory
-    /// This eliminates the need for #[serial] tests by ensuring each test
-    /// has its own isolated environment
-    fn with_isolated_home<F, R>(f: F) -> R
-    where
-        F: FnOnce(&Path) -> R,
-    {
-        let temp_dir = TempDir::new().unwrap();
-
-        // Set up isolated HOME directory
-        env::set_var("HOME", temp_dir.path());
-        env::remove_var("XDG_CONFIG_HOME");
-
-        f(temp_dir.path())
-    }
-
-    /// Initialize a git repository in the given directory
-    fn init_git_repo(dir: &Path) {
-        std::process::Command::new("git")
-            .args(["init", "--initial-branch=master"])
-            .current_dir(dir)
-            .output()
-            .expect("Failed to initialize git repository");
-    }
-
-    /// Initialize a git repository with an initial commit in the given directory
-    fn init_git_repo_with_commit(dir: &Path) {
-        init_git_repo(dir);
-
-        // Create a test file and commit it
-        fs::write(dir.join("test.txt"), "test content").unwrap();
-        std::process::Command::new("git")
-            .args(["add", "test.txt"])
-            .current_dir(dir)
-            .output()
-            .expect("Failed to add file");
-        std::process::Command::new("git")
-            .args(["commit", "-m", "test commit"])
-            .current_dir(dir)
-            .output()
-            .expect("Failed to commit");
-    }
 
     /// Create a HOME config directory structure and return the config path
     fn create_home_config_dir(home_dir: &Path) -> PathBuf {
@@ -328,7 +288,7 @@ mod test {
         with_isolated_home(|temp_dir| {
             // Create a git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with epochs
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -363,15 +323,10 @@ epoch="a3dead"
             env::set_current_dir(temp_dir).unwrap();
 
             // Set up hermetic git environment
-            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-            env::set_var("GIT_AUTHOR_NAME", "testuser");
-            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-            env::set_var("GIT_COMMITTER_NAME", "testuser");
-            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+            hermetic_git_env();
 
             // Initialize git repository with initial commit
-            init_git_repo_with_commit(temp_dir);
+            init_repo_with_file(temp_dir);
 
             let configfile = r#"[measurement."something"]
 #My comment
@@ -400,15 +355,10 @@ epoch = "{}"
             env::set_current_dir(temp_dir).unwrap();
 
             // Set up hermetic git environment
-            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-            env::set_var("GIT_AUTHOR_NAME", "testuser");
-            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-            env::set_var("GIT_COMMITTER_NAME", "testuser");
-            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+            hermetic_git_env();
 
             // Initialize git repository with initial commit
-            init_git_repo_with_commit(temp_dir);
+            init_repo_with_file(temp_dir);
 
             let mut conf = String::new();
             bump_epoch_in_conf("mymeasurement", &mut conf).expect("Failed to bump epoch");
@@ -427,7 +377,7 @@ epoch = "{}"
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with explicit value
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -448,7 +398,7 @@ epoch = "{}"
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -518,7 +468,7 @@ min_relative_deviation = 10.0
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -594,14 +544,9 @@ dispersion_method = "stddev"
             env::set_current_dir(temp_dir).unwrap();
 
             // Set up minimal git environment
-            env::set_var("GIT_CONFIG_NOSYSTEM", "true");
-            env::set_var("GIT_CONFIG_GLOBAL", "/dev/null");
-            env::set_var("GIT_AUTHOR_NAME", "testuser");
-            env::set_var("GIT_AUTHOR_EMAIL", "testuser@example.com");
-            env::set_var("GIT_COMMITTER_NAME", "testuser");
-            env::set_var("GIT_COMMITTER_EMAIL", "testuser@example.com");
+            hermetic_git_env();
 
-            init_git_repo_with_commit(temp_dir);
+            init_repo_with_file(temp_dir);
 
             // Test case 1: Empty config string should create proper table structure
             let mut empty_config = String::new();
@@ -643,7 +588,7 @@ epoch = "oldvalue"
             env::set_current_dir(temp_dir).unwrap();
 
             // Initialize git repository
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create config in git root
             let config_path = temp_dir.join(".gitperfconfig");
@@ -667,7 +612,7 @@ epoch = "oldvalue"
             env::set_current_dir(temp_dir).unwrap();
 
             // Initialize git repository
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Test that find_config_path returns None when no .gitperfconfig exists
             let found_path = find_config_path();
@@ -682,7 +627,7 @@ epoch = "oldvalue"
             env::set_current_dir(temp_dir).unwrap();
 
             // Initialize git repository
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create home config
             let home_config_path = create_home_config_dir(temp_dir);
@@ -757,7 +702,7 @@ backoff_max_elapsed_seconds = 60
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create a subdirectory to test that config is written to repo root
             let subdir = temp_dir.join("a").join("b").join("c");
@@ -796,7 +741,7 @@ max_elapsed_seconds = 120
 
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config that overrides system config
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -901,7 +846,7 @@ dispersion_method = "stddev"
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -933,7 +878,7 @@ min_measurements = 3
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -974,7 +919,7 @@ aggregate_by = "mean"
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with measurement-specific settings
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -1006,7 +951,7 @@ sigma = 2.0
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with measurement-specific units
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -1056,7 +1001,7 @@ unit = "requests/sec"
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config testing precedence
             let workspace_config_path = temp_dir.join(".gitperfconfig");
@@ -1088,7 +1033,7 @@ unit = "seconds"
         with_isolated_home(|temp_dir| {
             // Create git repository
             env::set_current_dir(temp_dir).unwrap();
-            init_git_repo(temp_dir);
+            init_repo(temp_dir);
 
             // Create workspace config with only measurement-specific units (no parent default)
             let workspace_config_path = temp_dir.join(".gitperfconfig");

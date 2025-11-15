@@ -30,6 +30,7 @@ use super::git_lowlevel::{
     map_git_error, set_git_perf_remote, spawn_git_command,
 };
 use super::git_types::GitError;
+use super::git_types::GitOutput;
 use super::git_types::Reference;
 
 pub use super::git_lowlevel::get_head_revision;
@@ -37,6 +38,12 @@ pub use super::git_lowlevel::get_head_revision;
 pub use super::git_lowlevel::check_git_version;
 
 pub use super::git_lowlevel::get_repository_root;
+
+/// Check if the current repository is a shallow clone
+pub fn is_shallow_repository() -> Result<bool> {
+    super::git_lowlevel::is_shallow_repo()
+        .map_err(|e| anyhow!("Failed to check if repository is shallow: {}", e))
+}
 
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
@@ -640,23 +647,54 @@ pub fn list_commits_with_measurements() -> Result<Vec<String>> {
     Ok(commits)
 }
 
+/// Guard for a temporary read branch that includes all pending writes.
+/// Automatically cleans up the temporary reference when dropped.
+pub struct ReadBranchGuard {
+    temp_ref: TempRef,
+}
+
+impl ReadBranchGuard {
+    /// Get the reference name for use in git commands
+    pub fn ref_name(&self) -> &str {
+        &self.temp_ref.ref_name
+    }
+}
+
+/// Creates a temporary read branch that consolidates all pending writes.
+/// The returned guard must be kept alive for as long as the reference is needed.
+/// The temporary reference is automatically cleaned up when the guard is dropped.
+pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
+    let temp_ref = update_read_branch()?;
+    Ok(ReadBranchGuard { temp_ref })
+}
+
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
 
     let output = capture_git_output(&args, &None)?;
-    Ok(output
+    let refs: Result<Vec<Reference>, _> = output
         .stdout
         .lines()
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let items = s.split('\0').take(2).collect_vec();
-            assert!(items.len() == 2);
-            Reference {
+            if items.len() != 2 {
+                return Err(GitError::ExecError {
+                    command: format!("git {}", args.join(" ")),
+                    output: GitOutput {
+                        stdout: format!("Unexpected git for-each-ref output format: {}", s),
+                        stderr: String::new(),
+                    },
+                });
+            }
+            Ok(Reference {
                 refname: items[0].to_string(),
                 oid: items[1].to_string(),
-            }
+            })
         })
-        .collect_vec())
+        .collect();
+    refs
 }
 
 struct TempRef {
@@ -678,14 +716,16 @@ impl Drop for TempRef {
     }
 }
 
-fn update_read_branch() -> Result<TempRef, GitError> {
-    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
+fn update_read_branch() -> Result<TempRef> {
+    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)
+        .map_err(|e| anyhow!("Failed to create temporary ref: {:?}", e))?;
     // Create a fresh read branch from the remote and consolidate all pending write branches.
     // This ensures the read branch is always up to date with the remote branch, even after
     // a history cutoff, by checking against the current upstream state.
     let current_upstream_oid = git_rev_parse(REFS_NOTES_BRANCH).unwrap_or(EMPTY_OID.to_string());
 
-    let _ = consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)?;
+    consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)
+        .map_err(|e| anyhow!("Failed to consolidate write branches: {:?}", e))?;
 
     Ok(temp_ref)
 }
