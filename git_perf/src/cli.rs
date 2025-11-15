@@ -7,6 +7,7 @@ use log::Level;
 use crate::audit;
 use crate::basic_measure::measure;
 use crate::config::bump_epoch;
+use crate::config_cmd;
 use crate::git::git_interop::check_git_version;
 use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push};
 use crate::import::handle_import;
@@ -141,5 +142,20 @@ pub fn handle_calls() -> Result<()> {
             disk_size,
             include_objects,
         } => size::calculate_measurement_size(detailed, format, disk_size, include_objects),
+        Commands::Config {
+            list,
+            detailed,
+            format,
+            validate,
+            measurement,
+        } => {
+            if list {
+                config_cmd::list_config(detailed, format, validate, measurement)
+            } else {
+                // For now, --list is required. In the future, this could support
+                // other config operations like --get, --set, etc.
+                anyhow::bail!("config command requires --list flag (try: git perf config --list)");
+            }
+        }
     }
 }

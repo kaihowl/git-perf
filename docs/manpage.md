@@ -17,6 +17,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf prune`↴](#git-perf-prune)
 * [`git-perf list-commits`↴](#git-perf-list-commits)
 * [`git-perf size`↴](#git-perf-size)
+* [`git-perf config`↴](#git-perf-config)
 
 ## `git-perf`
 
@@ -36,6 +37,7 @@ This document contains the help content for the `git-perf` command-line program.
 * `prune` — Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
 * `list-commits` — List all commits that have performance measurements
 * `size` — Estimate storage size of live performance measurements
+* `config` — Manage git-perf configuration
 
 ###### **Options:**
 
@@ -320,6 +322,35 @@ Examples: git perf size                    # Show total size in human-readable f
 
 * `--disk-size` — Use on-disk size (compressed) instead of logical size
 * `--include-objects` — Include git repository statistics for context
+
+
+
+## `git-perf config`
+
+Manage git-perf configuration
+
+Display and query git-perf configuration settings, including git context (branch name, repository location), configuration sources, and measurement-specific settings. This follows the git config pattern.
+
+Examples: git perf config --list                  # Show configuration summary git perf config --list --detailed       # Show all measurement settings git perf config --list --json           # Output as JSON git perf config --list --validate       # Check for config issues git perf config --list --measurement M  # Show specific measurement
+
+**Usage:** `git-perf config [OPTIONS]`
+
+###### **Options:**
+
+* `-l`, `--list` — List all configuration settings (similar to git config --list)
+* `-d`, `--detailed` — Show detailed configuration including all measurements
+* `-f`, `--format <FORMAT>` — Output format (human-readable or JSON)
+
+  Default value: `human`
+
+  Possible values:
+  - `human`:
+    Human-readable format
+  - `json`:
+    JSON format for machine parsing
+
+* `-v`, `--validate` — Validate configuration and report issues
+* `-m`, `--measurement <MEASUREMENT>` — Show specific measurement configuration only
 
 
 

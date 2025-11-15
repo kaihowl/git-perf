@@ -2,6 +2,7 @@ pub mod audit;
 pub mod basic_measure;
 pub mod cli;
 pub mod config;
+pub mod config_cmd;
 pub mod converters;
 pub mod data;
 pub mod filter;
