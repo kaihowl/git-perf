@@ -1,8 +1,19 @@
 # Change Point Detection Implementation Proposal for git-perf
 
 **Date**: November 12, 2025
+**Updated**: November 15, 2025
 **Author**: Terry (Terragon Labs)
 **Reference**: Netflix Tech Blog - "Fixing Performance Regressions Before They Happen"
+
+---
+
+> **IMPORTANT UPDATE (November 15, 2025)**
+>
+> See `CHANGE_POINT_DETECTION_REVISED_REQUIREMENTS.md` for updated priorities:
+> 1. **Primary Focus**: HTML report visualization (epoch boundaries + change points)
+> 2. **Audit Behavior**: Warn if change point detected in current epoch (makes z-score results potentially irrelevant)
+> 3. **Visualization**: Hidden by default, user-toggleable via legend click
+> 4. **Key Insight**: Offline algorithms (PELT, E-Divisive) require history and cannot immediately classify single values. Z-score regression detection remains essential for real-time alerts.
 
 ---
 
