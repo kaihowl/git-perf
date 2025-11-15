@@ -56,12 +56,7 @@ fn display_size_report(
 
     // Display prominent warning for shallow clones
     if is_shallow {
-        println!("WARNING: Shallow Clone Detected");
-        println!("--------------------------------");
-        println!("This repository is a shallow clone. The measurement counts below may be");
-        println!("incomplete because only notes for locally available commits can be counted.");
-        println!("To see all measurements, unshallow the repository with:");
-        println!("  git fetch --unshallow");
+        println!("⚠️  Shallow clone detected - measurement counts may be incomplete (see FAQ)");
         println!();
     }
 
