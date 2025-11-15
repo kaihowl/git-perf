@@ -670,6 +670,7 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let refs: Result<Vec<Reference>, _> = output
         .stdout
         .lines()
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let items = s.split('\0').take(2).collect_vec();
             if items.len() != 2 {
