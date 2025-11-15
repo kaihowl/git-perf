@@ -462,34 +462,20 @@ fn display_json(info: &ConfigInfo) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{hermetic_git_env, init_repo};
+    use crate::test_helpers::{
+        dir_with_repo, hermetic_git_env, with_isolated_home, write_gitperfconfig, DirGuard,
+    };
     use std::env;
     use std::fs;
-    use tempfile::TempDir;
-
-    /// Helper to create isolated test environment with home dir
-    fn with_isolated_home<F, R>(f: F) -> R
-    where
-        F: FnOnce(&TempDir) -> R,
-    {
-        hermetic_git_env();
-        let temp_dir = TempDir::new().unwrap();
-        env::set_var("HOME", temp_dir.path());
-        env::remove_var("XDG_CONFIG_HOME");
-        temp_dir
-            .path()
-            .join(".config")
-            .join("git-perf")
-            .parent()
-            .map(|p| fs::create_dir_all(p).ok());
-        f(&temp_dir)
-    }
+    use std::path::Path;
 
     #[test]
     fn test_gather_git_context() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
             let context = gather_git_context().unwrap();
             assert_eq!(context.branch, "master");
@@ -499,9 +485,10 @@ mod tests {
 
     #[test]
     fn test_find_system_config_xdg() {
-        with_isolated_home(|temp_dir| {
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
             // Set XDG_CONFIG_HOME
-            let xdg_config_dir = temp_dir.path().join("xdg_config");
+            let xdg_config_dir = Path::new(home_path).join("xdg_config");
             env::set_var("XDG_CONFIG_HOME", &xdg_config_dir);
 
             // Create system config
@@ -517,12 +504,10 @@ mod tests {
 
     #[test]
     fn test_find_system_config_home_fallback() {
-        with_isolated_home(|temp_dir| {
-            // Don't set XDG_CONFIG_HOME, use HOME instead
-            env::remove_var("XDG_CONFIG_HOME");
-
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
             // Create config in HOME/.config
-            let config_dir = temp_dir.path().join(".config").join("git-perf");
+            let config_dir = Path::new(home_path).join(".config").join("git-perf");
             fs::create_dir_all(&config_dir).unwrap();
             let config_path = config_dir.join("config.toml");
             fs::write(&config_path, "# test config\n").unwrap();
@@ -534,7 +519,8 @@ mod tests {
 
     #[test]
     fn test_find_system_config_none() {
-        with_isolated_home(|_temp_dir| {
+        hermetic_git_env();
+        with_isolated_home(|_home_path| {
             let result = find_system_config();
             assert_eq!(result, None);
         });
@@ -542,24 +528,26 @@ mod tests {
 
     #[test]
     fn test_get_local_config_path_exists() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
-            // Create local config
-            let local_config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(&local_config_path, "[measurement]\n").unwrap();
+            write_gitperfconfig(temp_dir.path(), "[measurement]\n");
 
             let result = get_local_config_path();
-            assert_eq!(result, Some(local_config_path));
+            assert_eq!(result, Some(temp_dir.path().join(".gitperfconfig")));
         });
     }
 
     #[test]
     fn test_get_local_config_path_none() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
             let result = get_local_config_path();
             assert_eq!(result, None);
@@ -568,28 +556,33 @@ mod tests {
 
     #[test]
     fn test_gather_config_sources() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
-            // Create both configs
-            let system_config_dir = temp_dir.path().join(".config").join("git-perf");
+            // Create system config in HOME/.config
+            let system_config_dir = Path::new(home_path).join(".config").join("git-perf");
             fs::create_dir_all(&system_config_dir).unwrap();
             let system_config_path = system_config_dir.join("config.toml");
             fs::write(&system_config_path, "# system config\n").unwrap();
 
-            let local_config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(&local_config_path, "[measurement]\n").unwrap();
+            write_gitperfconfig(temp_dir.path(), "[measurement]\n");
 
             let sources = gather_config_sources().unwrap();
             assert_eq!(sources.system_config, Some(system_config_path));
-            assert_eq!(sources.local_config, Some(local_config_path));
+            assert_eq!(
+                sources.local_config,
+                Some(temp_dir.path().join(".gitperfconfig"))
+            );
         });
     }
 
     #[test]
     fn test_gather_global_settings() {
-        with_isolated_home(|_temp_dir| {
+        hermetic_git_env();
+        with_isolated_home(|_home_path| {
             let settings = gather_global_settings();
             // Default value is 60 seconds
             assert_eq!(settings.backoff_max_elapsed_seconds, 60);
@@ -598,9 +591,11 @@ mod tests {
 
     #[test]
     fn test_extract_measurement_names_empty() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
             let config = Config::builder().build().unwrap();
             let names = extract_measurement_names(&config).unwrap();
@@ -610,14 +605,14 @@ mod tests {
 
     #[test]
     fn test_extract_measurement_names_with_measurements() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
-            // Create config with measurements
-            let local_config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(
-                &local_config_path,
+            write_gitperfconfig(
+                temp_dir.path(),
                 r#"
 [measurement.build_time]
 epoch = 0x12345678
@@ -625,8 +620,7 @@ epoch = 0x12345678
 [measurement.test_time]
 epoch = 0x87654321
 "#,
-            )
-            .unwrap();
+            );
 
             let config = read_hierarchical_config().unwrap();
             let mut names = extract_measurement_names(&config).unwrap();
@@ -638,14 +632,14 @@ epoch = 0x87654321
 
     #[test]
     fn test_gather_single_measurement_config() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
-            // Create config with specific measurement
-            let local_config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(
-                &local_config_path,
+            write_gitperfconfig(
+                temp_dir.path(),
                 r#"
 [measurement.build_time]
 epoch = "12345678"
@@ -656,8 +650,7 @@ aggregate_by = "median"
 sigma = 2.0
 unit = "ms"
 "#,
-            )
-            .unwrap();
+            );
 
             let config = read_hierarchical_config().unwrap();
             let meas_config = gather_single_measurement_config("build_time", &config);
@@ -676,20 +669,19 @@ unit = "ms"
 
     #[test]
     fn test_gather_single_measurement_config_parent_fallback() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
-            // Create config with parent defaults only
-            let local_config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(
-                &local_config_path,
+            write_gitperfconfig(
+                temp_dir.path(),
                 r#"
 [measurement]
 dispersion_method = "stddev"
 "#,
-            )
-            .unwrap();
+            );
 
             let config = read_hierarchical_config().unwrap();
             let meas_config = gather_single_measurement_config("build_time", &config);
@@ -702,157 +694,147 @@ dispersion_method = "stddev"
 
     #[test]
     fn test_validate_config_valid() {
-        with_isolated_home(|_temp_dir| {
-            let mut measurements = HashMap::new();
-            measurements.insert(
-                "build_time".to_string(),
-                MeasurementConfig {
-                    name: "build_time".to_string(),
-                    epoch: Some("12345678".to_string()),
-                    min_relative_deviation: Some(5.0),
-                    dispersion_method: "stddev".to_string(),
-                    min_measurements: Some(10),
-                    aggregate_by: Some("mean".to_string()),
-                    sigma: Some(3.0),
-                    unit: Some("ms".to_string()),
-                    from_parent_fallback: false,
-                },
-            );
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
 
-            let issues = validate_config(&measurements).unwrap();
-            assert!(issues.is_empty());
-        });
+        let issues = validate_config(&measurements).unwrap();
+        assert!(issues.is_empty());
     }
 
     #[test]
     fn test_validate_config_missing_epoch() {
-        with_isolated_home(|_temp_dir| {
-            let mut measurements = HashMap::new();
-            measurements.insert(
-                "build_time".to_string(),
-                MeasurementConfig {
-                    name: "build_time".to_string(),
-                    epoch: None,
-                    min_relative_deviation: Some(5.0),
-                    dispersion_method: "stddev".to_string(),
-                    min_measurements: Some(10),
-                    aggregate_by: Some("mean".to_string()),
-                    sigma: Some(3.0),
-                    unit: Some("ms".to_string()),
-                    from_parent_fallback: false,
-                },
-            );
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: None,
+                min_relative_deviation: Some(5.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
 
-            let issues = validate_config(&measurements).unwrap();
-            assert_eq!(issues.len(), 1);
-            assert!(issues[0].contains("No epoch configured"));
-        });
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("No epoch configured"));
     }
 
     #[test]
     fn test_validate_config_invalid_sigma() {
-        with_isolated_home(|_temp_dir| {
-            let mut measurements = HashMap::new();
-            measurements.insert(
-                "build_time".to_string(),
-                MeasurementConfig {
-                    name: "build_time".to_string(),
-                    epoch: Some("12345678".to_string()),
-                    min_relative_deviation: Some(5.0),
-                    dispersion_method: "stddev".to_string(),
-                    min_measurements: Some(10),
-                    aggregate_by: Some("mean".to_string()),
-                    sigma: Some(-1.0),
-                    unit: Some("ms".to_string()),
-                    from_parent_fallback: false,
-                },
-            );
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(-1.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
 
-            let issues = validate_config(&measurements).unwrap();
-            assert_eq!(issues.len(), 1);
-            assert!(issues[0].contains("Invalid sigma value"));
-        });
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("Invalid sigma value"));
     }
 
     #[test]
     fn test_validate_config_invalid_min_relative_deviation() {
-        with_isolated_home(|_temp_dir| {
-            let mut measurements = HashMap::new();
-            measurements.insert(
-                "build_time".to_string(),
-                MeasurementConfig {
-                    name: "build_time".to_string(),
-                    epoch: Some("12345678".to_string()),
-                    min_relative_deviation: Some(-5.0),
-                    dispersion_method: "stddev".to_string(),
-                    min_measurements: Some(10),
-                    aggregate_by: Some("mean".to_string()),
-                    sigma: Some(3.0),
-                    unit: Some("ms".to_string()),
-                    from_parent_fallback: false,
-                },
-            );
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(-5.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
 
-            let issues = validate_config(&measurements).unwrap();
-            assert_eq!(issues.len(), 1);
-            assert!(issues[0].contains("Invalid min_relative_deviation"));
-        });
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("Invalid min_relative_deviation"));
     }
 
     #[test]
     fn test_validate_config_invalid_min_measurements() {
-        with_isolated_home(|_temp_dir| {
-            let mut measurements = HashMap::new();
-            measurements.insert(
-                "build_time".to_string(),
-                MeasurementConfig {
-                    name: "build_time".to_string(),
-                    epoch: Some("12345678".to_string()),
-                    min_relative_deviation: Some(5.0),
-                    dispersion_method: "stddev".to_string(),
-                    min_measurements: Some(1),
-                    aggregate_by: Some("mean".to_string()),
-                    sigma: Some(3.0),
-                    unit: Some("ms".to_string()),
-                    from_parent_fallback: false,
-                },
-            );
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(1),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
 
-            let issues = validate_config(&measurements).unwrap();
-            assert_eq!(issues.len(), 1);
-            assert!(issues[0].contains("Invalid min_measurements"));
-        });
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("Invalid min_measurements"));
     }
 
     #[test]
     fn test_validate_config_multiple_issues() {
-        with_isolated_home(|_temp_dir| {
-            let mut measurements = HashMap::new();
-            measurements.insert(
-                "build_time".to_string(),
-                MeasurementConfig {
-                    name: "build_time".to_string(),
-                    epoch: None,
-                    min_relative_deviation: Some(-5.0),
-                    dispersion_method: "stddev".to_string(),
-                    min_measurements: Some(1),
-                    aggregate_by: Some("mean".to_string()),
-                    sigma: Some(-3.0),
-                    unit: Some("ms".to_string()),
-                    from_parent_fallback: false,
-                },
-            );
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: None,
+                min_relative_deviation: Some(-5.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(1),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(-3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
 
-            let issues = validate_config(&measurements).unwrap();
-            assert_eq!(issues.len(), 4); // epoch, sigma, min_relative_deviation, min_measurements
-        });
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 4); // epoch, sigma, min_relative_deviation, min_measurements
     }
 
     #[test]
     fn test_gather_measurement_configs_empty() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
             // No config file
             let measurements = gather_measurement_configs(None).unwrap();
@@ -862,14 +844,14 @@ dispersion_method = "stddev"
 
     #[test]
     fn test_gather_measurement_configs_with_filter() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir.path()).unwrap();
-            init_repo(temp_dir.path());
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
 
-            // Create config with multiple measurements
-            let local_config_path = temp_dir.path().join(".gitperfconfig");
-            fs::write(
-                &local_config_path,
+            write_gitperfconfig(
+                temp_dir.path(),
                 r#"
 [measurement.build_time]
 epoch = 0x12345678
@@ -877,8 +859,7 @@ epoch = 0x12345678
 [measurement.test_time]
 epoch = 0x87654321
 "#,
-            )
-            .unwrap();
+            );
 
             let measurements = gather_measurement_configs(Some("build_time")).unwrap();
             assert_eq!(measurements.len(), 1);
@@ -889,15 +870,16 @@ epoch = 0x87654321
 
     #[test]
     fn test_config_info_serialization() {
-        with_isolated_home(|temp_dir| {
+        hermetic_git_env();
+        with_isolated_home(|home_path| {
             let config_info = ConfigInfo {
                 git_context: GitContext {
                     branch: "master".to_string(),
-                    repository_root: temp_dir.path().to_path_buf(),
+                    repository_root: PathBuf::from(home_path),
                 },
                 config_sources: ConfigSources {
                     system_config: None,
-                    local_config: Some(temp_dir.path().join(".gitperfconfig")),
+                    local_config: Some(PathBuf::from(home_path).join(".gitperfconfig")),
                 },
                 global_settings: GlobalSettings {
                     backoff_max_elapsed_seconds: 60,
@@ -919,41 +901,37 @@ epoch = 0x87654321
 
     #[test]
     fn test_display_measurement_human_detailed() {
-        with_isolated_home(|_temp_dir| {
-            let measurement = MeasurementConfig {
-                name: "build_time".to_string(),
-                epoch: Some("12345678".to_string()),
-                min_relative_deviation: Some(5.0),
-                dispersion_method: "stddev".to_string(),
-                min_measurements: Some(10),
-                aggregate_by: Some("mean".to_string()),
-                sigma: Some(3.0),
-                unit: Some("ms".to_string()),
-                from_parent_fallback: false,
-            };
+        let measurement = MeasurementConfig {
+            name: "build_time".to_string(),
+            epoch: Some("12345678".to_string()),
+            min_relative_deviation: Some(5.0),
+            dispersion_method: "stddev".to_string(),
+            min_measurements: Some(10),
+            aggregate_by: Some("mean".to_string()),
+            sigma: Some(3.0),
+            unit: Some("ms".to_string()),
+            from_parent_fallback: false,
+        };
 
-            // This test just ensures the function doesn't panic
-            display_measurement_human(&measurement, true);
-        });
+        // This test just ensures the function doesn't panic
+        display_measurement_human(&measurement, true);
     }
 
     #[test]
     fn test_display_measurement_human_summary() {
-        with_isolated_home(|_temp_dir| {
-            let measurement = MeasurementConfig {
-                name: "build_time".to_string(),
-                epoch: Some("12345678".to_string()),
-                min_relative_deviation: Some(5.0),
-                dispersion_method: "stddev".to_string(),
-                min_measurements: Some(10),
-                aggregate_by: Some("mean".to_string()),
-                sigma: Some(3.0),
-                unit: Some("ms".to_string()),
-                from_parent_fallback: false,
-            };
+        let measurement = MeasurementConfig {
+            name: "build_time".to_string(),
+            epoch: Some("12345678".to_string()),
+            min_relative_deviation: Some(5.0),
+            dispersion_method: "stddev".to_string(),
+            min_measurements: Some(10),
+            aggregate_by: Some("mean".to_string()),
+            sigma: Some(3.0),
+            unit: Some("ms".to_string()),
+            from_parent_fallback: false,
+        };
 
-            // This test just ensures the function doesn't panic
-            display_measurement_human(&measurement, false);
-        });
+        // This test just ensures the function doesn't panic
+        display_measurement_human(&measurement, false);
     }
 }
