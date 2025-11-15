@@ -292,26 +292,42 @@ fn audit_with_data(
     tail_measurements.pop(); // Remove head to get just tail for median calculation
     let tail_median = tail_measurements.median().unwrap_or(0.0);
 
-    // MUTATION POINT: / vs % (Line 140)
-    let relative_min = all_measurements
+    // Calculate min and max once for use in both branches
+    let min_val = all_measurements
         .iter()
         .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        / tail_median
-        - 1.0;
-    let relative_max = all_measurements
+        .unwrap();
+    let max_val = all_measurements
         .iter()
         .max_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap()
-        / tail_median
-        - 1.0;
+        .unwrap();
 
-    let sparkline = format!(
-        " [{:+.2}% – {:+.2}%] {}",
-        (relative_min * 100.0),
-        (relative_max * 100.0),
-        spark(all_measurements.as_slice())
-    );
+    // Tiered approach for sparkline display:
+    // 1. If tail median is non-zero: use median as baseline, show percentages (default behavior)
+    // 2. If tail median is zero: show absolute differences instead
+    let tail_median_is_zero = tail_median.abs() < f64::EPSILON;
+
+    let sparkline = if tail_median_is_zero {
+        // Median is zero - show absolute range
+        format!(
+            " [{} – {}] {}",
+            min_val,
+            max_val,
+            spark(all_measurements.as_slice())
+        )
+    } else {
+        // MUTATION POINT: / vs % (Line 140)
+        // Median is non-zero - use it as baseline for percentage ranges
+        let relative_min = min_val / tail_median - 1.0;
+        let relative_max = max_val / tail_median - 1.0;
+
+        format!(
+            " [{:+.2}% – {:+.2}%] {}",
+            (relative_min * 100.0),
+            (relative_max * 100.0),
+            spark(all_measurements.as_slice())
+        )
+    };
 
     // Helper function to build the measurement summary text
     // This is used for both skipped and normal audit results to avoid duplication
@@ -385,6 +401,7 @@ fn audit_with_data(
     }
 
     // MUTATION POINT: / vs % (Line 150)
+    // Calculate relative deviation - naturally handles infinity when tail_median is zero
     let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
 
     // Check if we have a minimum relative deviation threshold configured
@@ -1535,5 +1552,112 @@ dispersion_method = "mad"
         assert!(discovered.contains(&"timer".to_string()));
         assert!(discovered.contains(&"memory".to_string()));
         assert!(discovered.contains(&"bench_cpu".to_string()));
+    }
+
+    #[test]
+    fn test_audit_with_empty_tail() {
+        // Test for division by zero bug when tail is empty
+        // This test reproduces the bug where tail_median is 0.0 when tail is empty,
+        // causing division by zero in sparkline calculation
+        let result = audit_with_data(
+            "test_measurement",
+            10.0,   // head
+            vec![], // empty tail - triggers the bug
+            2,      // min_count
+            2.0,    // sigma
+            DispersionMethod::StandardDeviation,
+        );
+
+        // Should succeed and skip (not crash with division by zero)
+        assert!(result.is_ok(), "Should not crash on empty tail");
+        let audit_result = result.unwrap();
+
+        // Should be skipped due to insufficient measurements
+        assert!(audit_result.passed);
+        assert!(audit_result.message.contains("Skipping test"));
+
+        // The message should not contain inf or NaN
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+        assert!(!audit_result.message.to_lowercase().contains("nan"));
+    }
+
+    #[test]
+    fn test_audit_with_all_zero_tail() {
+        // Test for division by zero when all tail measurements are 0.0
+        // This tests the edge case where median is 0.0 even with measurements
+        let result = audit_with_data(
+            "test_measurement",
+            5.0,                 // non-zero head
+            vec![0.0, 0.0, 0.0], // all zeros in tail
+            2,                   // min_count
+            2.0,                 // sigma
+            DispersionMethod::StandardDeviation,
+        );
+
+        // Should succeed (not crash with division by zero)
+        assert!(result.is_ok(), "Should not crash when tail median is 0.0");
+        let audit_result = result.unwrap();
+
+        // The message should not contain inf or NaN
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+        assert!(!audit_result.message.to_lowercase().contains("nan"));
+    }
+
+    #[test]
+    fn test_tiered_baseline_approach() {
+        // Test the tiered approach:
+        // 1. Non-zero median → use median, show percentages
+        // 2. Zero median → show absolute values
+
+        // Case 1: Median is non-zero - use percentages (default behavior)
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,                   // head
+            vec![10.0, 11.0, 12.0], // median=11.0 (non-zero)
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should use median as baseline and show percentage
+        assert!(audit_result.message.contains('%'));
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+
+        // Case 2: Median is zero with non-zero head - use absolute values
+        let result = audit_with_data(
+            "test_measurement",
+            5.0,                 // head (non-zero)
+            vec![0.0, 0.0, 0.0], // median=0
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should show absolute values instead of percentages
+        // The message should contain the sparkline but not percentage symbols
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+        assert!(!audit_result.message.to_lowercase().contains("nan"));
+        // Check that sparkline exists (contains the dash character)
+        assert!(audit_result.message.contains('–') || audit_result.message.contains('-'));
+
+        // Case 3: Everything is zero - show absolute values [0 - 0]
+        let result = audit_with_data(
+            "test_measurement",
+            0.0,                 // head
+            vec![0.0, 0.0, 0.0], // median=0
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should show absolute range [0 - 0]
+        assert!(!audit_result.message.to_lowercase().contains("inf"));
+        assert!(!audit_result.message.to_lowercase().contains("nan"));
     }
 }
