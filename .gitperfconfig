@@ -4,7 +4,7 @@ min_relative_deviation = 10.0
 unit = "bytes"
 
 [measurement."report"]
-epoch = "bf8ddff9"
+epoch = "cef149b0"
 unit = "ns"
 
 [measurement."test-measure2"]
