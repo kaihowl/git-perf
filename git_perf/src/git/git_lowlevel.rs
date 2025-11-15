@@ -169,7 +169,7 @@ pub(super) fn git_symbolic_ref_create_or_update(
         .map(|_| ())
 }
 
-pub(super) fn is_shallow_repo() -> Result<bool, GitError> {
+pub fn is_shallow_repo() -> Result<bool, GitError> {
     let output = capture_git_output(&["rev-parse", "--is-shallow-repository"], &None)?;
 
     Ok(output.stdout.starts_with("true"))

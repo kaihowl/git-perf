@@ -39,6 +39,12 @@ pub use super::git_lowlevel::check_git_version;
 
 pub use super::git_lowlevel::get_repository_root;
 
+/// Check if the current repository is a shallow clone
+pub fn is_shallow_repository() -> Result<bool> {
+    super::git_lowlevel::is_shallow_repo()
+        .map_err(|e| anyhow!("Failed to check if repository is shallow: {}", e))
+}
+
 fn map_git_error_for_backoff(e: GitError) -> ::backoff::Error<GitError> {
     match e {
         GitError::RefFailedToPush { .. }
