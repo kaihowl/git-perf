@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.2.0...git_perf_cli_types-v0.2.1) - 2025-11-15
+
+### Added
+
+- *(config)* add git-perf config command (list, json, validate) ([#451](https://github.com/kaihowl/git-perf/pull/451))
+- *(reporting)* support multiple split keys for grouping measurements ([#461](https://github.com/kaihowl/git-perf/pull/461))
+- *(cli)* add regex filter for audit and report (OR, anchored) ([#445](https://github.com/kaihowl/git-perf/pull/445))
+- *(cli)* size subcommand (phases 1-3 complete) ([#446](https://github.com/kaihowl/git-perf/pull/446))
+- *(cli)* allow multiple -m flags for bump-epoch command ([#441](https://github.com/kaihowl/git-perf/pull/441))
+- *(cli)* add import command for JUnit XML and Criterion JSON ([#437](https://github.com/kaihowl/git-perf/pull/437))
+- *(audit)* unify per-measurement config resolution and CLI precedence ([#405](https://github.com/kaihowl/git-perf/pull/405))
+
 ## [0.2.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.1.1...git_perf_cli_types-v0.2.0) - 2025-10-05
 
 ### Added
