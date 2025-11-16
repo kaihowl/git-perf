@@ -178,6 +178,8 @@ Create an HTML performance report
 
   Possible values: `min`, `max`, `median`, `mean`
 
+* `--show-epochs` — Show epoch boundary markers in the report (hidden by default, toggleable via legend)
+* `--detect-changes` — Detect and show change points in the report (hidden by default, toggleable via legend)
 
 
 
@@ -241,6 +243,7 @@ The sparkline visualization shows the range of measurements relative to the tail
 
   Possible values: `stddev`, `mad`
 
+* `--no-change-point-warning` — Suppress warning when change points are detected in the current epoch. By default, audit will warn if a change point (regime shift) is detected within the current measurement epoch, as this may affect z-score reliability
 
 
 

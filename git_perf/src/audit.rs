@@ -121,6 +121,7 @@ fn discover_matching_measurements(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     max_count: usize,
     min_count: Option<u16>,
@@ -129,6 +130,7 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
+    _no_change_point_warning: bool,
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {
@@ -552,6 +554,7 @@ mod test {
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
             &[], // Empty combined_patterns
+            false,
         );
 
         // Should succeed when no measurements need to be audited

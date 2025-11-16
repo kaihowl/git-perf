@@ -574,6 +574,7 @@ impl ReporterFactory {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn report(
     output: PathBuf,
     separate_by: Vec<String>,
@@ -581,6 +582,8 @@ pub fn report(
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
     combined_patterns: &[String],
+    _show_epochs: bool,
+    _detect_changes: bool,
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
