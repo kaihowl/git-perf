@@ -886,7 +886,6 @@ mod test {
 
         // First, set up a test environment with a configured unit
         use crate::test_helpers::setup_test_env_with_config;
-        
 
         let config_content = r#"
 [measurement."build_time"]
@@ -1075,7 +1074,6 @@ min_relative_deviation = 10.0
             audit_aggregate_by, audit_dispersion_method, audit_min_measurements, audit_sigma,
         };
         use crate::test_helpers::setup_test_env_with_config;
-        
 
         #[test]
         fn test_different_dispersion_methods_per_measurement() {
