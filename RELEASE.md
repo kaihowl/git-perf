@@ -46,7 +46,8 @@ sequenceDiagram
     GH->>R: Trigger release workflow (on tag)
     activate R
 
-
+    R->>CD: Build artifacts for all platforms
+    CD->>R: Return built artifacts
     R->>GH: Upload all artifacts
 
     Developer->>GH:Publish the draft release
