@@ -8,3 +8,5 @@
 0bench::fibonacci_20::mad1763283947.60500838.00124921231274statistic=madrust=betaunit=nsci=trueworkflow=cibench_name=fibonacci_20type=benchgroup=unknownos=ubuntu-22.04
 
 1133737162test-measure21763284019.9148671000818715.0rust=betaos=ubuntu-22.04
+
+1133737162test-measure21763284020.92768881000796786.0rust=betaos=ubuntu-22.04
