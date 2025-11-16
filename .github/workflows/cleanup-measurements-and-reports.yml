@@ -25,7 +25,7 @@ jobs:
       - name: Cleanup old measurements and reports
         uses: ./.github/actions/cleanup
         with:
-          retention-days: 90
+          retention-days: 730
           backup: true
           cleanup-reports: true
           git-perf-version: latest
