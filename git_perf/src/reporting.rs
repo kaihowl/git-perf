@@ -9,12 +9,13 @@ use anyhow::anyhow;
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use plotly::{
-    common::{Font, LegendGroupTitle, Title},
+    common::{DashType, Font, LegendGroupTitle, Line, Mode, Title, Visible},
     layout::{Axis, Legend},
-    Configuration, Layout, Plot,
+    Configuration, Layout, Plot, Scatter,
 };
 
 use crate::{
+    change_point::{ChangeDirection, ChangePoint, EpochTransition},
     config,
     data::{Commit, MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, MeasurementReducer},
@@ -181,6 +182,176 @@ impl PlotlyReporter {
             }
         }
         None
+    }
+
+    /// Add epoch boundary traces to the plot.
+    ///
+    /// These are vertical dashed gray lines where measurement epochs change.
+    /// Hidden by default (legendonly), user clicks legend to toggle visibility.
+    #[allow(dead_code)] // Will be integrated in Phase 2
+    pub fn add_epoch_boundary_traces(
+        &mut self,
+        transitions: &[EpochTransition],
+        measurement_name: &str,
+        y_min: f64,
+        y_max: f64,
+    ) {
+        if transitions.is_empty() {
+            return;
+        }
+
+        // Create a single trace for all epoch boundaries of this measurement
+        // Using multiple (x,y) pairs with None separators to create multiple vertical lines
+        let mut x_coords: Vec<Option<usize>> = vec![];
+        let mut y_coords: Vec<Option<f64>> = vec![];
+        let mut hover_texts: Vec<String> = vec![];
+
+        for transition in transitions {
+            let x_pos = self.size - transition.index - 1;
+
+            // Add line segment (two points for vertical line)
+            x_coords.push(Some(x_pos));
+            y_coords.push(Some(y_min));
+            hover_texts.push(format!(
+                "Epoch {}→{}",
+                transition.from_epoch, transition.to_epoch
+            ));
+
+            x_coords.push(Some(x_pos));
+            y_coords.push(Some(y_max));
+            hover_texts.push(format!(
+                "Epoch {}→{}",
+                transition.from_epoch, transition.to_epoch
+            ));
+
+            // Add None to create a break between lines
+            x_coords.push(None);
+            y_coords.push(None);
+            hover_texts.push(String::new());
+        }
+
+        let trace = Scatter::new(x_coords, y_coords)
+            .name(format!("{} (Epochs)", measurement_name))
+            .legend_group(format!("{}_epochs", measurement_name))
+            .visible(Visible::LegendOnly)
+            .mode(Mode::Lines)
+            .line(Line::new().color("gray").dash(DashType::Dash).width(2.0))
+            .show_legend(true)
+            .hover_text_array(hover_texts);
+
+        self.plot.add_trace(trace);
+    }
+
+    /// Add change point traces to the plot.
+    ///
+    /// These are vertical solid lines at detected regime shifts.
+    /// Red for regressions, green for improvements.
+    /// Hidden by default (legendonly), user clicks legend to toggle visibility.
+    #[allow(dead_code)] // Will be integrated in Phase 2
+    pub fn add_change_point_traces(
+        &mut self,
+        change_points: &[ChangePoint],
+        measurement_name: &str,
+        y_min: f64,
+        y_max: f64,
+    ) {
+        if change_points.is_empty() {
+            return;
+        }
+
+        // Separate into increases (regressions) and decreases (improvements)
+        let increases: Vec<_> = change_points
+            .iter()
+            .filter(|cp| cp.direction == ChangeDirection::Increase)
+            .collect();
+        let decreases: Vec<_> = change_points
+            .iter()
+            .filter(|cp| cp.direction == ChangeDirection::Decrease)
+            .collect();
+
+        // Add regression trace (red)
+        if !increases.is_empty() {
+            let mut x_coords: Vec<Option<usize>> = vec![];
+            let mut y_coords: Vec<Option<f64>> = vec![];
+            let mut hover_texts: Vec<String> = vec![];
+
+            for cp in &increases {
+                let x_pos = self.size - cp.index - 1;
+
+                x_coords.push(Some(x_pos));
+                y_coords.push(Some(y_min));
+                hover_texts.push(format!(
+                    "Regression {:+.1}% at {}",
+                    cp.magnitude_pct,
+                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                ));
+
+                x_coords.push(Some(x_pos));
+                y_coords.push(Some(y_max));
+                hover_texts.push(format!(
+                    "Regression {:+.1}% at {}",
+                    cp.magnitude_pct,
+                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                ));
+
+                x_coords.push(None);
+                y_coords.push(None);
+                hover_texts.push(String::new());
+            }
+
+            let trace = Scatter::new(x_coords, y_coords)
+                .name(format!("{} (Regressions)", measurement_name))
+                .legend_group(format!("{}_changes", measurement_name))
+                .visible(Visible::LegendOnly)
+                .mode(Mode::Lines)
+                .line(Line::new().color("rgba(220, 53, 69, 0.8)").width(3.0))
+                .show_legend(true)
+                .hover_text_array(hover_texts);
+
+            self.plot.add_trace(trace);
+        }
+
+        // Add improvement trace (green)
+        if !decreases.is_empty() {
+            let mut x_coords: Vec<Option<usize>> = vec![];
+            let mut y_coords: Vec<Option<f64>> = vec![];
+            let mut hover_texts: Vec<String> = vec![];
+
+            for cp in &decreases {
+                let x_pos = self.size - cp.index - 1;
+
+                x_coords.push(Some(x_pos));
+                y_coords.push(Some(y_min));
+                hover_texts.push(format!(
+                    "Improvement {:+.1}% at {}",
+                    cp.magnitude_pct,
+                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                ));
+
+                x_coords.push(Some(x_pos));
+                y_coords.push(Some(y_max));
+                hover_texts.push(format!(
+                    "Improvement {:+.1}% at {}",
+                    cp.magnitude_pct,
+                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                ));
+
+                x_coords.push(None);
+                y_coords.push(None);
+                hover_texts.push(String::new());
+            }
+
+            let trace = Scatter::new(x_coords, y_coords)
+                .name(format!("{} (Improvements)", measurement_name))
+                .legend_group(format!("{}_changes", measurement_name))
+                .visible(Visible::LegendOnly)
+                .mode(Mode::Lines)
+                .line(Line::new().color("rgba(40, 167, 69, 0.8)").width(3.0))
+                .show_legend(true)
+                .hover_text_array(hover_texts);
+
+            self.plot.add_trace(trace);
+        }
     }
 }
 
@@ -972,5 +1143,184 @@ mod tests {
         let expected =
             "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\nabc\t0\tavg_time\t0.0\t5.5\t\n";
         assert_eq!(csv, expected);
+    }
+
+    #[test]
+    fn test_epoch_boundary_traces_hidden_by_default() {
+        use crate::change_point::EpochTransition;
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "def456".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "ghi789".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let transitions = vec![EpochTransition {
+            index: 1,
+            from_epoch: 1,
+            to_epoch: 2,
+        }];
+
+        reporter.add_epoch_boundary_traces(&transitions, "test_metric", 0.0, 100.0);
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Check that trace is set to legendonly (hidden by default)
+        assert!(html.contains("legendonly"));
+        // Check that the trace name includes "Epochs"
+        assert!(html.contains("test_metric (Epochs)"));
+    }
+
+    #[test]
+    fn test_epoch_boundary_traces_empty() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 10;
+
+        let transitions: Vec<EpochTransition> = vec![];
+        reporter.add_epoch_boundary_traces(&transitions, "test", 0.0, 100.0);
+
+        // Should not crash and plot should still be valid
+        let bytes = reporter.as_bytes();
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_change_point_traces_hidden_by_default() {
+        use crate::change_point::{ChangeDirection, ChangePoint};
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "def456".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let change_points = vec![ChangePoint {
+            index: 1,
+            commit_sha: "def456".to_string(),
+            magnitude_pct: 50.0,
+            confidence: 0.9,
+            direction: ChangeDirection::Increase,
+        }];
+
+        reporter.add_change_point_traces(&change_points, "build_time", 0.0, 100.0);
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Check that trace is set to legendonly
+        assert!(html.contains("legendonly"));
+        // Check for regression trace
+        assert!(html.contains("build_time (Regressions)"));
+    }
+
+    #[test]
+    fn test_change_point_traces_both_directions() {
+        use crate::change_point::{ChangeDirection, ChangePoint};
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits: Vec<Commit> = (0..5)
+            .map(|i| Commit {
+                commit: format!("sha{:06}", i),
+                measurements: vec![],
+            })
+            .collect();
+        reporter.add_commits(&commits);
+
+        let change_points = vec![
+            ChangePoint {
+                index: 2,
+                commit_sha: "sha000002".to_string(),
+                magnitude_pct: 25.0,
+                confidence: 0.85,
+                direction: ChangeDirection::Increase,
+            },
+            ChangePoint {
+                index: 4,
+                commit_sha: "sha000004".to_string(),
+                magnitude_pct: -30.0,
+                confidence: 0.90,
+                direction: ChangeDirection::Decrease,
+            },
+        ];
+
+        reporter.add_change_point_traces(&change_points, "metric", 0.0, 100.0);
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Should have both regression and improvement traces
+        assert!(html.contains("metric (Regressions)"));
+        assert!(html.contains("metric (Improvements)"));
+    }
+
+    #[test]
+    fn test_change_point_traces_empty() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 10;
+
+        let change_points: Vec<ChangePoint> = vec![];
+        reporter.add_change_point_traces(&change_points, "test", 0.0, 100.0);
+
+        // Should not crash and plot should still be valid
+        let bytes = reporter.as_bytes();
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_change_point_hover_text_format() {
+        use crate::change_point::{ChangeDirection, ChangePoint};
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "abc123def".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "xyz789abc".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let change_points = vec![ChangePoint {
+            index: 1,
+            commit_sha: "xyz789abc".to_string(),
+            magnitude_pct: 23.5,
+            confidence: 0.88,
+            direction: ChangeDirection::Increase,
+        }];
+
+        reporter.add_change_point_traces(&change_points, "test", 0.0, 100.0);
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Hover text should contain percentage and short SHA
+        assert!(html.contains("+23.5%"));
+        assert!(html.contains("xyz789"));
     }
 }
