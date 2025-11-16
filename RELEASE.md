@@ -15,6 +15,7 @@ sequenceDiagram
     participant Developer
     participant GH as GitHub
     participant RP as release-plz.yml
+    participant CR as crates.io
     participant R as release.yml
     participant CD as cargo-dist
     participant SLT as set-latest-tag.yml
@@ -38,7 +39,7 @@ sequenceDiagram
     activate RP
 
     RP->>GH: Create git tag (vX.Y.Z)
-    RP->>GH: Publish to crates.io (cargo publish)
+    RP->>CR: Publish to crates.io (cargo publish)
     RP->>GH: Create GitHub release (draft)
     deactivate RP
 
