@@ -36,9 +36,9 @@ jobs:
             // - Must start with valid type
             // - Optional scope in parentheses (alphanumeric, hyphens, underscores)
             // - Colon and space required
-            // - Description must start with lowercase letter
+            // - First word of description must be lowercase (subsequent words can have uppercase for abbreviations)
             // Note: Scope validation is disabled - any scope is accepted
-            const conventionalCommitRegex = /^(feat|fix|docs|refactor|chore|test|perf|build|ci|revert)(\([a-z0-9_-]+\))?: [a-z].+$/;
+            const conventionalCommitRegex = /^(feat|fix|docs|refactor|chore|test|perf|build|ci|revert)(\([a-z0-9_-]+\))?: [a-z][a-z0-9]*(?:[ ].+)?$/;
 
             if (!conventionalCommitRegex.test(prTitle)) {
               let errorMessage = `❌ PR title does not follow Conventional Commits format.\n\n`;
@@ -53,7 +53,7 @@ jobs:
               errorMessage += `✅ \`chore(deps): update clap to 4.5.0\`\n\n`;
               errorMessage += `**Common mistakes:**\n`;
               errorMessage += `❌ Missing type prefix\n`;
-              errorMessage += `❌ Capital letter after colon (must be lowercase)\n`;
+              errorMessage += `❌ First word after colon starts with capital letter (must be lowercase)\n`;
               errorMessage += `❌ Missing colon\n`;
               errorMessage += `❌ Invalid type\n\n`;
               errorMessage += `See CLAUDE.md for more details.`;
