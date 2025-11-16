@@ -582,8 +582,8 @@ pub fn report(
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
     combined_patterns: &[String],
-    _show_epochs: bool,
-    _detect_changes: bool,
+    show_epochs: bool,
+    detect_changes: bool,
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
@@ -597,10 +597,27 @@ pub fn report(
         );
     }
 
-    let mut plot =
-        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
+    // Check if we're creating an HTML report (for change point visualization)
+    let is_html_report = output
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("html"));
 
-    plot.add_commits(&commits);
+    // For HTML reports with change point features, use PlotlyReporter directly
+    // Otherwise use the factory
+    let (mut plot, mut plotly_reporter): (Box<dyn Reporter<'_>>, Option<PlotlyReporter>) =
+        if is_html_report && (show_epochs || detect_changes) {
+            let mut pr = PlotlyReporter::new();
+            pr.add_commits(&commits);
+            (Box::new(CsvReporter::new()), Some(pr)) // Dummy, we'll use plotly_reporter
+        } else {
+            let p = ReporterFactory::from_file_name(&output)
+                .ok_or(anyhow!("Could not infer output format"))?;
+            (p, None)
+        };
+
+    if plotly_reporter.is_none() {
+        plot.add_commits(&commits);
+    }
 
     let relevant = |m: &MeasurementData| {
         // Apply regex filters (handles both exact measurement matches and filter patterns)
@@ -699,25 +716,89 @@ pub fn report(
                             .map(move |m| (i, m))
                     })
                     .collect_vec();
-                plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
+
+                if let Some(ref mut pr) = plotly_reporter {
+                    pr.add_summarized_trace(
+                        trace_measurements.clone(),
+                        measurement_name,
+                        &group_value,
+                    );
+                } else {
+                    plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
+                }
             } else {
                 let trace_measurements: Vec<_> = group_measurements
                     .clone()
                     .enumerate()
                     .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
                     .collect();
-                plot.add_trace(trace_measurements, measurement_name, &group_value);
+
+                if let Some(ref mut pr) = plotly_reporter {
+                    pr.add_trace(trace_measurements.clone(), measurement_name, &group_value);
+                } else {
+                    plot.add_trace(trace_measurements, measurement_name, &group_value);
+                }
+            }
+
+            // Add change point detection for this measurement (HTML reports only)
+            if let Some(ref mut pr) = plotly_reporter {
+                // Collect measurement values and epochs for change point detection
+                let measurement_data: Vec<(f64, u32, String)> = group_measurements
+                    .clone()
+                    .enumerate()
+                    .flat_map(|(i, ms)| {
+                        let commit_sha = commits[i].commit.clone();
+                        ms.map(move |m| (m.val, m.epoch, commit_sha.clone()))
+                    })
+                    .collect();
+
+                if measurement_data.len() >= 2 {
+                    let values: Vec<f64> = measurement_data.iter().map(|(v, _, _)| *v).collect();
+                    let epochs: Vec<u32> = measurement_data.iter().map(|(_, e, _)| *e).collect();
+                    let commit_shas: Vec<String> =
+                        measurement_data.iter().map(|(_, _, s)| s.clone()).collect();
+
+                    // Calculate y-axis bounds for vertical lines
+                    let y_min = values.iter().cloned().fold(f64::INFINITY, f64::min) * 0.9;
+                    let y_max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max) * 1.1;
+
+                    // Add epoch boundary traces if requested
+                    if show_epochs {
+                        let transitions = crate::change_point::detect_epoch_transitions(&epochs);
+                        pr.add_epoch_boundary_traces(&transitions, measurement_name, y_min, y_max);
+                    }
+
+                    // Add change point traces if requested
+                    if detect_changes && values.len() >= 10 {
+                        let config = crate::change_point::ChangePointConfig::default();
+                        let raw_cps = crate::change_point::detect_change_points(&values, &config);
+                        let enriched_cps = crate::change_point::enrich_change_points(
+                            &raw_cps,
+                            &values,
+                            &commit_shas,
+                            &config,
+                        );
+                        pr.add_change_point_traces(&enriched_cps, measurement_name, y_min, y_max);
+                    }
+                }
             }
         }
     }
 
+    // Write output
+    let output_bytes = if let Some(pr) = plotly_reporter {
+        pr.as_bytes()
+    } else {
+        plot.as_bytes()
+    };
+
     if output == Path::new("-") {
-        match io::stdout().write_all(&plot.as_bytes()) {
+        match io::stdout().write_all(&output_bytes) {
             Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
             res => res,
         }?;
     } else {
-        File::create(&output)?.write_all(&plot.as_bytes())?;
+        File::create(&output)?.write_all(&output_bytes)?;
     }
 
     Ok(())
