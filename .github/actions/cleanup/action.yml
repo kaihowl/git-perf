@@ -8,9 +8,9 @@ branding:
 
 inputs:
   retention-days:
-    description: 'Number of days to retain measurements (e.g., 730 for 2 years)'
+    description: 'Number of days to retain measurements (e.g., 90)'
     required: false
-    default: '730'
+    default: '90'
   backup:
     description: 'Create backup of measurements before removal'
     required: false

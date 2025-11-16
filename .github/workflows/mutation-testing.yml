@@ -266,5 +266,5 @@ jobs:
           git_perf/mutation-report.json
           git_perf/mutation-report-outcomes.json
           git_perf/mutation-summary.md
-        retention-days: 730
+        retention-days: 90
 

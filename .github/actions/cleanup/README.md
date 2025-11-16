@@ -79,7 +79,7 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `retention-days` | Number of days to retain measurements | No | `730` |
+| `retention-days` | Number of days to retain measurements | No | `90` |
 | `backup` | Create backup of measurements before removal | No | `true` |
 | `cleanup-reports` | Also cleanup orphaned reports on gh-pages branch | No | `true` |
 | `git-perf-version` | Version of git-perf to use (latest or specific version) | No | `latest` |
@@ -141,7 +141,7 @@ jobs:
       - name: Cleanup old measurements and reports
         uses: kaihowl/git-perf/.github/actions/cleanup@master
         with:
-          retention-days: 730
+          retention-days: 90
           backup: true
           cleanup-reports: true
           git-perf-version: latest
