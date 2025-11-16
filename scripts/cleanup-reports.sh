@@ -108,11 +108,19 @@ fi
 
 git checkout gh-pages
 
+# Set up trap to return to original branch on any exit
+cleanup() {
+    if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "gh-pages" ]; then
+        git checkout "$CURRENT_BRANCH" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
 echo "Deleting orphaned reports..."
 DELETED_COUNT=0
 for commit in $ORPHANED_REPORTS; do
     if git rm "${commit}.html" 2>/dev/null; then
-        ((DELETED_COUNT++))
+        ((DELETED_COUNT++)) || true  # Prevent errexit on arithmetic
     else
         echo "Warning: Could not remove ${commit}.html"
     fi
@@ -143,7 +151,4 @@ else
     echo "No changes to commit"
 fi
 
-# Return to original branch
-if [ -n "$CURRENT_BRANCH" ]; then
-    git checkout "$CURRENT_BRANCH"
-fi
+# The trap cleanup will automatically return to the original branch on exit
