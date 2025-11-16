@@ -88,7 +88,7 @@ runs:
           echo "This may be due to missing git objects in the repository"
         fi
         mkdir -p reports/
-        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html ${{ inputs.additional-args }}
+        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html --show-epochs --detect-changes ${{ inputs.additional-args }}
 
     - name: Run audit
       id: audit
