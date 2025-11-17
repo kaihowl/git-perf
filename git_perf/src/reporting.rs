@@ -1000,7 +1000,12 @@ pub fn report(
 
                     // Add epoch boundary traces if requested
                     if show_epochs {
-                        let transitions = crate::change_point::detect_epoch_transitions(&epochs);
+                        // Reverse epochs and commit indices to match display order (newest on left, oldest on right)
+                        let reversed_epochs: Vec<u32> = epochs.iter().rev().cloned().collect();
+                        let reversed_commit_indices: Vec<usize> =
+                            commit_indices.iter().rev().cloned().collect();
+                        let transitions =
+                            crate::change_point::detect_epoch_transitions(&reversed_epochs);
                         log::debug!(
                             "Epoch transitions for {}: {:?}",
                             measurement_name,
@@ -1008,7 +1013,7 @@ pub fn report(
                         );
                         pr.add_epoch_boundary_traces_with_indices(
                             &transitions,
-                            &commit_indices,
+                            &reversed_commit_indices,
                             measurement_name,
                             y_min,
                             y_max,
@@ -1018,12 +1023,20 @@ pub fn report(
                     // Add change point traces if requested
                     if detect_changes && values.len() >= 10 {
                         let config = crate::change_point::ChangePointConfig::default();
-                        let raw_cps = crate::change_point::detect_change_points(&values, &config);
+                        // Reverse measurements to match display order (newest on left, oldest on right)
+                        // This ensures change point direction (regression/improvement) matches visual interpretation
+                        let reversed_values: Vec<f64> = values.iter().rev().cloned().collect();
+                        let reversed_commit_shas: Vec<String> =
+                            commit_shas.iter().rev().cloned().collect();
+                        let reversed_commit_indices: Vec<usize> =
+                            commit_indices.iter().rev().cloned().collect();
+                        let raw_cps =
+                            crate::change_point::detect_change_points(&reversed_values, &config);
                         log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
                         let enriched_cps = crate::change_point::enrich_change_points(
                             &raw_cps,
-                            &values,
-                            &commit_shas,
+                            &reversed_values,
+                            &reversed_commit_shas,
                             &config,
                         );
                         log::debug!(
@@ -1033,7 +1046,7 @@ pub fn report(
                         );
                         pr.add_change_point_traces_with_indices(
                             &enriched_cps,
-                            &commit_indices,
+                            &reversed_commit_indices,
                             measurement_name,
                             y_min,
                             y_max,
