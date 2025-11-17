@@ -80,9 +80,16 @@ pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) ->
         return vec![];
     }
 
+    // Use BIC-based penalty that scales with data size and variance
+    // This prevents over-segmentation in noisy data
+    let variance = calculate_variance(measurements);
+    // Penalty = base_penalty * log(n) * variance
+    // This is a modified BIC criterion that accounts for data variance
+    let scaled_penalty = config.penalty * (n as f64).ln() * variance.max(1.0);
+
     // F[t] = optimal cost for data[0..t]
     // Initialize with -penalty so first segment doesn't double-count
-    let mut f = vec![-config.penalty; n + 1];
+    let mut f = vec![-scaled_penalty; n + 1];
     // cp[t] = last change point before t
     let mut cp = vec![0usize; n + 1];
     // R = candidate set for pruning
@@ -92,7 +99,7 @@ pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) ->
         let (min_cost, best_tau) = r
             .iter()
             .map(|&tau| {
-                let cost = f[tau] + segment_cost(measurements, tau, t) + config.penalty;
+                let cost = f[tau] + segment_cost(measurements, tau, t) + scaled_penalty;
                 (cost, tau)
             })
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
@@ -131,6 +138,17 @@ fn segment_cost(measurements: &[f64], start: usize, end: usize) -> f64 {
     let mean = sum / n;
 
     segment.iter().map(|x| (x - mean).powi(2)).sum()
+}
+
+/// Calculate variance of a dataset.
+fn calculate_variance(measurements: &[f64]) -> f64 {
+    if measurements.is_empty() {
+        return 0.0;
+    }
+    let n = measurements.len() as f64;
+    let mean = measurements.iter().sum::<f64>() / n;
+    let variance = measurements.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
+    variance
 }
 
 /// Convert raw change point indices to enriched ChangePoint structures.
@@ -301,6 +319,7 @@ mod tests {
         ];
         let config = ChangePointConfig {
             min_data_points: 5,
+            penalty: 0.5, // Lower penalty to detect both change points in test data
             ..Default::default()
         };
         let cps = detect_change_points(&data, &config);
