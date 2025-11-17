@@ -934,14 +934,47 @@ pub fn report(
             if let Some(ref mut pr) = plotly_reporter {
                 // Collect measurement values, epochs, commit indices and SHAs for change point detection
                 // Note: We need the original commit index (i) to map back to the correct x-coordinate
-                let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| {
-                        let commit_sha = commits[i].commit.clone();
-                        ms.map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
-                    })
-                    .collect();
+                // IMPORTANT: We must aggregate multiple measurements per commit to get one value per commit
+                // Otherwise, change point detection will see incorrect patterns
+                let measurement_data: Vec<(usize, f64, u32, String)> = if aggregate_by.is_some() {
+                    // Already aggregated, use the same reduction function
+                    group_measurements
+                        .clone()
+                        .enumerate()
+                        .flat_map(|(i, ms)| {
+                            let commit_sha = commits[i].commit.clone();
+                            ms.reduce_by(aggregate_by.unwrap())
+                                .into_iter()
+                                .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
+                        })
+                        .collect()
+                } else {
+                    // No aggregation specified, use median to get one value per commit
+                    group_measurements
+                        .clone()
+                        .enumerate()
+                        .filter_map(|(i, ms)| {
+                            let measurements: Vec<_> = ms.collect();
+                            if measurements.is_empty() {
+                                None
+                            } else {
+                                let commit_sha = commits[i].commit.clone();
+                                // Use median for change point detection when multiple measurements exist
+                                let mut vals: Vec<f64> =
+                                    measurements.iter().map(|m| m.val).collect();
+                                vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                let median_val = if vals.len().is_multiple_of(2) {
+                                    (vals[vals.len() / 2 - 1] + vals[vals.len() / 2]) / 2.0
+                                } else {
+                                    vals[vals.len() / 2]
+                                };
+                                // Use the first measurement's epoch (they should all be the same)
+                                let epoch = measurements[0].epoch;
+                                Some((i, median_val, epoch, commit_sha))
+                            }
+                        })
+                        .collect()
+                };
 
                 if measurement_data.len() >= 2 {
                     let commit_indices: Vec<usize> =

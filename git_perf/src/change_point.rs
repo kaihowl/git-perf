@@ -216,18 +216,28 @@ pub fn enrich_change_points(
 /// Calculate confidence score for a change point.
 ///
 /// Based on:
-/// - How balanced the segments are (more balanced = higher confidence)
+/// - Minimum segment size (at least a few points on each side)
 /// - Magnitude of the change (larger = higher confidence)
 fn calculate_confidence(index: usize, total_len: usize, magnitude_pct: f64) -> f64 {
-    // Segment balance factor: penalize very unbalanced splits
-    let before_ratio = index as f64 / total_len as f64;
-    let balance_factor = 4.0 * before_ratio * (1.0 - before_ratio); // Max at 0.5, 0 at extremes
+    // Minimum segment size factor: ensure at least a few points on each side
+    // This is more lenient than balance factor - we just need enough data to be meaningful
+    let min_segment = index.min(total_len - index);
+    let size_factor = if min_segment < 3 {
+        0.3 // Very low confidence if less than 3 points on one side
+    } else if min_segment < 5 {
+        0.6 // Low confidence with 3-4 points
+    } else if min_segment < 10 {
+        0.8 // Moderate confidence with 5-9 points
+    } else {
+        1.0 // High confidence with 10+ points
+    };
 
     // Magnitude factor: higher magnitude = higher confidence
-    let magnitude_factor = (magnitude_pct / 100.0).min(1.0);
+    // Scale more aggressively: 10% change = 0.5 confidence, 20% = 0.8, 50% = 1.0
+    let magnitude_factor = (magnitude_pct / 50.0).min(1.0);
 
-    // Combine factors (weighted average)
-    let confidence = 0.7 * balance_factor + 0.3 * magnitude_factor;
+    // Combine factors: magnitude is more important than segment size
+    let confidence = 0.4 * size_factor + 0.6 * magnitude_factor;
 
     confidence.clamp(0.0, 1.0)
 }
@@ -401,17 +411,31 @@ mod tests {
 
     #[test]
     fn test_calculate_confidence() {
-        // Balanced split with moderate magnitude
+        // Large change with good segment size should have high confidence
         let conf1 = calculate_confidence(50, 100, 50.0);
-        assert!(conf1 > 0.8);
+        assert!(conf1 > 0.9, "conf1 = {}", conf1); // 50% change with 50 points each side
 
-        // Unbalanced split (early index)
+        // Even with fewer points on one side, high magnitude should still be confident
         let conf2 = calculate_confidence(10, 100, 50.0);
-        assert!(conf2 < conf1);
+        assert!(conf2 > 0.8, "conf2 = {}", conf2); // 10+ points on smaller side
 
-        // Very unbalanced split
-        let conf3 = calculate_confidence(1, 100, 50.0);
-        assert!(conf3 < 0.3);
+        // Very small segment should have lower confidence
+        let conf3 = calculate_confidence(2, 100, 50.0);
+        assert!(
+            conf3 < conf2,
+            "conf3 = {} should be less than conf2 = {}",
+            conf3,
+            conf2
+        );
+
+        // Small magnitude should have lower confidence regardless of balance
+        let conf4 = calculate_confidence(50, 100, 5.0);
+        assert!(
+            conf4 < conf1,
+            "conf4 = {} should be less than conf1 = {}",
+            conf4,
+            conf1
+        );
     }
 
     #[test]
