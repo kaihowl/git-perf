@@ -309,7 +309,7 @@ impl PlotlyReporter {
     /// Add change point traces to the plot.
     ///
     /// These are vertical solid lines at detected regime shifts.
-    /// Red for regressions, green for improvements.
+    /// Red for increases, green for decreases.
     /// Hidden by default (legendonly), user clicks legend to toggle visibility.
     #[allow(dead_code)] // Will be integrated in Phase 2
     pub fn add_change_point_traces(
@@ -323,7 +323,7 @@ impl PlotlyReporter {
             return;
         }
 
-        // Separate into increases (regressions) and decreases (improvements)
+        // Separate into increases and decreases
         let increases: Vec<_> = change_points
             .iter()
             .filter(|cp| cp.direction == ChangeDirection::Increase)
@@ -345,7 +345,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Regression {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -353,7 +353,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Regression {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -364,8 +364,11 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Regressions)", measurement_name))
-                .legend_group(format!("{}_changes", measurement_name))
+                .name(format!("{} (Change Points - Increase)", measurement_name))
+                .legend_group(format!("{}_change_points", measurement_name))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - Change Points", measurement_name).as_str(),
+                ))
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color("rgba(220, 53, 69, 0.8)").width(3.0))
@@ -375,7 +378,7 @@ impl PlotlyReporter {
             self.plot.add_trace(trace);
         }
 
-        // Add improvement trace (green)
+        // Add decrease trace (green)
         if !decreases.is_empty() {
             let mut x_coords: Vec<Option<usize>> = vec![];
             let mut y_coords: Vec<Option<f64>> = vec![];
@@ -387,7 +390,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Improvement {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -395,7 +398,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Improvement {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -406,8 +409,11 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Improvements)", measurement_name))
-                .legend_group(format!("{}_changes", measurement_name))
+                .name(format!("{} (Change Points - Decrease)", measurement_name))
+                .legend_group(format!("{}_change_points", measurement_name))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - Change Points", measurement_name).as_str(),
+                ))
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color("rgba(40, 167, 69, 0.8)").width(3.0))
@@ -463,7 +469,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Regression {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -471,7 +477,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Regression {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -482,8 +488,11 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Regressions)", measurement_name))
-                .legend_group(format!("{}_changes", measurement_name))
+                .name(format!("{} (Change Points - Increase)", measurement_name))
+                .legend_group(format!("{}_change_points", measurement_name))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - Change Points", measurement_name).as_str(),
+                ))
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color("rgba(220, 53, 69, 0.8)").width(3.0))
@@ -513,7 +522,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Improvement {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -521,7 +530,7 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Improvement {:+.1}% at {}",
+                    "Change Point {:+.1}% at {}",
                     cp.magnitude_pct,
                     &cp.commit_sha[..6.min(cp.commit_sha.len())]
                 ));
@@ -532,8 +541,11 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Improvements)", measurement_name))
-                .legend_group(format!("{}_changes", measurement_name))
+                .name(format!("{} (Change Points - Decrease)", measurement_name))
+                .legend_group(format!("{}_change_points", measurement_name))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - Change Points", measurement_name).as_str(),
+                ))
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color("rgba(40, 167, 69, 0.8)").width(3.0))
@@ -949,7 +961,7 @@ pub fn report(
                         })
                         .collect()
                 } else {
-                    // No aggregation specified, use median to get one value per commit
+                    // No aggregation specified, use min (default) to get one value per commit
                     group_measurements
                         .clone()
                         .enumerate()
@@ -959,18 +971,15 @@ pub fn report(
                                 None
                             } else {
                                 let commit_sha = commits[i].commit.clone();
-                                // Use median for change point detection when multiple measurements exist
-                                let mut vals: Vec<f64> =
-                                    measurements.iter().map(|m| m.val).collect();
-                                vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                let median_val = if vals.len().is_multiple_of(2) {
-                                    (vals[vals.len() / 2 - 1] + vals[vals.len() / 2]) / 2.0
-                                } else {
-                                    vals[vals.len() / 2]
-                                };
+                                // Use min for change point detection when multiple measurements exist
+                                let min_val = measurements
+                                    .iter()
+                                    .map(|m| m.val)
+                                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                                    .unwrap();
                                 // Use the first measurement's epoch (they should all be the same)
                                 let epoch = measurements[0].epoch;
-                                Some((i, median_val, epoch, commit_sha))
+                                Some((i, min_val, epoch, commit_sha))
                             }
                         })
                         .collect()
@@ -1586,8 +1595,8 @@ mod tests {
         let html = String::from_utf8_lossy(&bytes);
         // Check that trace is set to legendonly
         assert!(html.contains("legendonly"));
-        // Check for regression trace
-        assert!(html.contains("build_time (Regressions)"));
+        // Check for change point trace
+        assert!(html.contains("build_time (Change Points - Increase)"));
     }
 
     #[test]
@@ -1626,9 +1635,9 @@ mod tests {
 
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
-        // Should have both regression and improvement traces
-        assert!(html.contains("metric (Regressions)"));
-        assert!(html.contains("metric (Improvements)"));
+        // Should have both increase and decrease traces
+        assert!(html.contains("metric (Change Points - Increase)"));
+        assert!(html.contains("metric (Change Points - Decrease)"));
     }
 
     #[test]
