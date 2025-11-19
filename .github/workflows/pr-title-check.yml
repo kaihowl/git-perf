@@ -36,9 +36,10 @@ jobs:
             // - Must start with valid type
             // - Optional scope in parentheses (alphanumeric, hyphens, underscores)
             // - Colon and space required
-            // - First word of description must be lowercase (subsequent words can have uppercase for abbreviations)
+            // - First word of description must be lowercase (can contain hyphens, underscores, digits)
+            // - Subsequent words can have uppercase for abbreviations
             // Note: Scope validation is disabled - any scope is accepted
-            const conventionalCommitRegex = /^(feat|fix|docs|refactor|chore|test|perf|build|ci|revert)(\([a-z0-9_-]+\))?: [a-z][a-z0-9]*(?:[ ].+)?$/;
+            const conventionalCommitRegex = /^(feat|fix|docs|refactor|chore|test|perf|build|ci|revert)(\([a-z0-9_-]+\))?: [a-z][a-z0-9_-]*(?:[ ].+)?$/;
 
             if (!conventionalCommitRegex.test(prTitle)) {
               let errorMessage = `❌ PR title does not follow Conventional Commits format.\n\n`;
