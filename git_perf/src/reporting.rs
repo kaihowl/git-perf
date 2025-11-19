@@ -364,7 +364,7 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Change Points - Increase)", measurement_name))
+                .name(format!("{} (Change Points)", measurement_name))
                 .legend_group(format!("{}_change_points", measurement_name))
                 .legend_group_title(LegendGroupTitle::from(
                     format!("{} - Change Points", measurement_name).as_str(),
@@ -409,7 +409,7 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Change Points - Decrease)", measurement_name))
+                .name(format!("{} (Change Points)", measurement_name))
                 .legend_group(format!("{}_change_points", measurement_name))
                 .legend_group_title(LegendGroupTitle::from(
                     format!("{} - Change Points", measurement_name).as_str(),
@@ -488,7 +488,7 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Change Points - Increase)", measurement_name))
+                .name(format!("{} (Change Points)", measurement_name))
                 .legend_group(format!("{}_change_points", measurement_name))
                 .legend_group_title(LegendGroupTitle::from(
                     format!("{} - Change Points", measurement_name).as_str(),
@@ -541,7 +541,7 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Change Points - Decrease)", measurement_name))
+                .name(format!("{} (Change Points)", measurement_name))
                 .legend_group(format!("{}_change_points", measurement_name))
                 .legend_group_title(LegendGroupTitle::from(
                     format!("{} - Change Points", measurement_name).as_str(),
@@ -1596,7 +1596,7 @@ mod tests {
         // Check that trace is set to legendonly
         assert!(html.contains("legendonly"));
         // Check for change point trace
-        assert!(html.contains("build_time (Change Points - Increase)"));
+        assert!(html.contains("build_time (Change Points)"));
     }
 
     #[test]
@@ -1635,9 +1635,8 @@ mod tests {
 
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
-        // Should have both increase and decrease traces
-        assert!(html.contains("metric (Change Points - Increase)"));
-        assert!(html.contains("metric (Change Points - Decrease)"));
+        // Should have change points trace (both directions use same name)
+        assert!(html.contains("metric (Change Points)"));
     }
 
     #[test]
