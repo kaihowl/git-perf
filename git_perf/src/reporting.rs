@@ -610,6 +610,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .name(&group_label)
                 .legend_group(measurement_name)
                 .legend_group_title(LegendGroupTitle::from(measurement_display))
+                .show_legend(true)
         } else {
             trace.name(&measurement_display)
         };
@@ -645,6 +646,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .name(&group_label)
                 .legend_group(measurement_name)
                 .legend_group_title(LegendGroupTitle::from(measurement_display))
+                .show_legend(true)
         } else {
             trace.name(&measurement_display)
         };
