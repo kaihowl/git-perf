@@ -251,6 +251,7 @@ impl PlotlyReporter {
         transitions: &[EpochTransition],
         commit_indices: &[usize],
         measurement_name: &str,
+        group_values: &[String],
         y_min: f64,
         y_max: f64,
     ) {
@@ -294,14 +295,29 @@ impl PlotlyReporter {
             hover_texts.push(String::new());
         }
 
+        let measurement_display = format_measurement_with_unit(measurement_name);
+
         let trace = Scatter::new(x_coords, y_coords)
-            .name(format!("{} (Epochs)", measurement_name))
-            .legend_group(format!("{}_epochs", measurement_name))
             .visible(Visible::LegendOnly)
             .mode(Mode::Lines)
             .line(Line::new().color("gray").dash(DashType::Dash).width(2.0))
             .show_legend(true)
             .hover_text_array(hover_texts);
+
+        let trace = if !group_values.is_empty() {
+            // Join group values with "/" for display (only at display time)
+            let group_label = group_values.join("/");
+            trace
+                .name(format!("{} (Epochs)", group_label))
+                .legend_group(format!("{}_epochs", measurement_name))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - Epochs", measurement_display).as_str(),
+                ))
+        } else {
+            trace
+                .name(format!("{} (Epochs)", measurement_display))
+                .legend_group(format!("{}_epochs", measurement_name))
+        };
 
         self.plot.add_trace(trace);
     }
@@ -433,12 +449,15 @@ impl PlotlyReporter {
         change_points: &[ChangePoint],
         commit_indices: &[usize],
         measurement_name: &str,
+        group_values: &[String],
         y_min: f64,
         y_max: f64,
     ) {
         if change_points.is_empty() {
             return;
         }
+
+        let measurement_display = format_measurement_with_unit(measurement_name);
 
         let increases: Vec<_> = change_points
             .iter()
@@ -488,16 +507,26 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Change Points)", measurement_name))
-                .legend_group(format!("{}_change_points", measurement_name))
-                .legend_group_title(LegendGroupTitle::from(
-                    format!("{} - Change Points", measurement_name).as_str(),
-                ))
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color("rgba(220, 53, 69, 0.8)").width(3.0))
                 .show_legend(true)
                 .hover_text_array(hover_texts);
+
+            let trace = if !group_values.is_empty() {
+                // Join group values with "/" for display (only at display time)
+                let group_label = group_values.join("/");
+                trace
+                    .name(format!("{} (Increases)", group_label))
+                    .legend_group(format!("{}_change_points", measurement_name))
+                    .legend_group_title(LegendGroupTitle::from(
+                        format!("{} - Change Points", measurement_display).as_str(),
+                    ))
+            } else {
+                trace
+                    .name(format!("{} (Increases)", measurement_display))
+                    .legend_group(format!("{}_change_points", measurement_name))
+            };
 
             self.plot.add_trace(trace);
         }
@@ -541,16 +570,26 @@ impl PlotlyReporter {
             }
 
             let trace = Scatter::new(x_coords, y_coords)
-                .name(format!("{} (Change Points)", measurement_name))
-                .legend_group(format!("{}_change_points", measurement_name))
-                .legend_group_title(LegendGroupTitle::from(
-                    format!("{} - Change Points", measurement_name).as_str(),
-                ))
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color("rgba(40, 167, 69, 0.8)").width(3.0))
                 .show_legend(true)
                 .hover_text_array(hover_texts);
+
+            let trace = if !group_values.is_empty() {
+                // Join group values with "/" for display (only at display time)
+                let group_label = group_values.join("/");
+                trace
+                    .name(format!("{} (Decreases)", group_label))
+                    .legend_group(format!("{}_change_points", measurement_name))
+                    .legend_group_title(LegendGroupTitle::from(
+                        format!("{} - Change Points", measurement_display).as_str(),
+                    ))
+            } else {
+                trace
+                    .name(format!("{} (Decreases)", measurement_display))
+                    .legend_group(format!("{}_change_points", measurement_name))
+            };
 
             self.plot.add_trace(trace);
         }
@@ -1026,6 +1065,7 @@ pub fn report(
                             &transitions,
                             &reversed_commit_indices,
                             measurement_name,
+                            &group_value,
                             y_min,
                             y_max,
                         );
@@ -1059,6 +1099,7 @@ pub fn report(
                             &enriched_cps,
                             &reversed_commit_indices,
                             measurement_name,
+                            &group_value,
                             y_min,
                             y_max,
                         );
