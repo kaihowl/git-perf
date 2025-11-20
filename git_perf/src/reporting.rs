@@ -361,17 +361,19 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "⚠ Regression: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "⚠ Regression: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(None);
@@ -406,17 +408,19 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "✓ Improvement: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "✓ Improvement: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(None);
@@ -488,17 +492,19 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "⚠ Regression: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "⚠ Regression: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(None);
@@ -551,17 +557,19 @@ impl PlotlyReporter {
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_min));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "✓ Improvement: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(Some(x_pos));
                 y_coords.push(Some(y_max));
                 hover_texts.push(format!(
-                    "Change Point {:+.1}% at {}",
+                    "✓ Improvement: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
                     cp.magnitude_pct,
-                    &cp.commit_sha[..6.min(cp.commit_sha.len())]
+                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                    cp.confidence * 100.0
                 ));
 
                 x_coords.push(None);
@@ -1073,7 +1081,7 @@ pub fn report(
 
                     // Add change point traces if requested
                     if detect_changes && values.len() >= 10 {
-                        let config = crate::change_point::ChangePointConfig::default();
+                        let config = crate::config::change_point_config(measurement_name);
                         // Reverse measurements to match display order (newest on left, oldest on right)
                         // This ensures change point direction (regression/improvement) matches visual interpretation
                         let reversed_values: Vec<f64> = values.iter().rev().cloned().collect();
