@@ -258,6 +258,14 @@ pub enum Commands {
         /// What to aggregate the measurements in each group with
         #[arg(short, long)]
         aggregate_by: Option<ReductionFunc>,
+
+        /// Show epoch boundary markers in the report (hidden by default, toggleable via legend)
+        #[arg(long)]
+        show_epochs: bool,
+
+        /// Detect and show change points in the report (hidden by default, toggleable via legend)
+        #[arg(long)]
+        detect_changes: bool,
     },
 
     /// For given measurements, check perfomance deviations of the HEAD commit
@@ -379,6 +387,12 @@ pub enum Commands {
         /// to stddev.
         #[arg(short = 'D', long, value_enum)]
         dispersion_method: Option<DispersionMethod>,
+
+        /// Suppress warning when change points are detected in the current epoch.
+        /// By default, audit will warn if a change point (regime shift) is detected
+        /// within the current measurement epoch, as this may affect z-score reliability.
+        #[arg(long)]
+        no_change_point_warning: bool,
     },
 
     /// Accept HEAD commit's measurement for audit, even if outside of range.
