@@ -60,6 +60,33 @@ min_relative_deviation = 8.0
 dispersion_method = "mad"
 unit = "ms"  # Display network latency in milliseconds
 
+# Change point detection settings (default configuration for all measurements)
+[change_point]
+# Enable or disable change point detection globally (default: true)
+enabled = true
+
+# Minimum number of data points required for detection (default: 10)
+min_data_points = 10
+
+# Minimum percentage change to consider significant (default: 5.0)
+min_magnitude_pct = 5.0
+
+# Penalty factor for PELT algorithm (default: 3.0)
+# Higher values result in fewer change points detected (less sensitive)
+# Lower values result in more change points detected (more sensitive)
+penalty = 3.0
+
+# Measurement-specific change point settings (override defaults)
+[change_point."build_time"]
+# More sensitive for build time measurements
+penalty = 2.0
+min_magnitude_pct = 3.0
+
+[change_point."memory_usage"]
+# Less sensitive for memory measurements (avoid noise)
+penalty = 4.0
+min_magnitude_pct = 10.0
+
 # Backoff settings for retry logic
 [backoff]
 # Maximum elapsed seconds for backoff
