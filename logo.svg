@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="gitBranchGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F05133;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DE4C36;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0288D1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="clockGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#66BB6A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#43A047;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="#1E1E1E" stroke="#424242" stroke-width="2"/>
+
+  <!-- Git branch nodes (left side) -->
+  <g id="git-branch">
+    <!-- Main branch line -->
+    <line x1="30" y1="50" x2="30" y2="150" stroke="url(#gitBranchGradient)" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Branch commits (circles) -->
+    <circle cx="30" cy="50" r="6" fill="url(#gitBranchGradient)" stroke="#1E1E1E" stroke-width="2"/>
+    <circle cx="30" cy="85" r="6" fill="url(#gitBranchGradient)" stroke="#1E1E1E" stroke-width="2"/>
+    <circle cx="30" cy="120" r="6" fill="url(#gitBranchGradient)" stroke="#1E1E1E" stroke-width="2"/>
+    <circle cx="30" cy="150" r="6" fill="url(#gitBranchGradient)" stroke="#1E1E1E" stroke-width="2"/>
+
+    <!-- Feature branch -->
+    <path d="M 30 85 Q 40 85, 50 95 L 50 120 Q 50 125, 40 125 L 30 125"
+          stroke="url(#gitBranchGradient)" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="50" cy="107" r="5" fill="url(#gitBranchGradient)" stroke="#1E1E1E" stroke-width="2"/>
+  </g>
+
+  <!-- Performance chart (center-right) -->
+  <g id="perf-chart" transform="translate(80, 60)">
+    <!-- Chart bars representing performance metrics -->
+    <rect x="0" y="60" width="12" height="20" fill="url(#chartGradient)" rx="2"/>
+    <rect x="18" y="50" width="12" height="30" fill="url(#chartGradient)" rx="2"/>
+    <rect x="36" y="45" width="12" height="35" fill="url(#chartGradient)" rx="2"/>
+    <rect x="54" y="55" width="12" height="25" fill="url(#chartGradient)" rx="2"/>
+    <rect x="72" y="40" width="12" height="40" fill="url(#chartGradient)" rx="2"/>
+
+    <!-- Trend line showing improvement -->
+    <path d="M 6 65 L 24 55 L 42 50 L 60 58 L 78 45"
+          stroke="#FFC107" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"
+          opacity="0.9"/>
+    <circle cx="78" cy="45" r="3" fill="#FFC107"/>
+
+    <!-- Baseline -->
+    <line x1="-5" y1="80" x2="90" y2="80" stroke="#666" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>
+  </g>
+
+  <!-- Stopwatch/Timer element (bottom right) -->
+  <g id="stopwatch" transform="translate(140, 125)">
+    <!-- Clock face -->
+    <circle cx="0" cy="0" r="22" fill="url(#clockGradient)" stroke="#2E7D32" stroke-width="2"/>
+    <circle cx="0" cy="0" r="18" fill="#1E1E1E" stroke="#43A047" stroke-width="1"/>
+
+    <!-- Clock hands pointing to performance -->
+    <line x1="0" y1="0" x2="0" y2="-10" stroke="#66BB6A" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="7" y2="4" stroke="#66BB6A" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Center dot -->
+    <circle cx="0" cy="0" r="2" fill="#A5D6A7"/>
+
+    <!-- Crown/button -->
+    <rect x="-2" y="-25" width="4" height="4" fill="#66BB6A" rx="1"/>
+  </g>
+
+  <!-- Speed/Performance indicator arcs -->
+  <g id="speed-arcs" opacity="0.3">
+    <path d="M 160 95 Q 175 95, 175 80" stroke="#4FC3F7" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M 165 98 Q 180 98, 180 83" stroke="#4FC3F7" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Text: "git-perf" -->
+  <g id="logo-text">
+    <text x="100" y="185" font-family="'Courier New', monospace" font-size="16" font-weight="bold"
+          fill="#EEEEEE" text-anchor="middle" letter-spacing="1">git-perf</text>
+
+    <!-- Subtitle -->
+    <text x="100" y="197" font-family="'Courier New', monospace" font-size="8"
+          fill="#999999" text-anchor="middle" letter-spacing="0.5">PERFORMANCE TRACKING</text>
+  </g>
+
+  <!-- Small git note indicator -->
+  <g id="note-tag" transform="translate(60, 130)">
+    <rect x="0" y="0" width="14" height="10" fill="#FFA726" rx="1"/>
+    <path d="M 14 3 L 17 5 L 14 7 Z" fill="#FFA726"/>
+    <rect x="1" y="1" width="12" height="3" fill="#FFF" opacity="0.3" rx="0.5"/>
+    <rect x="1" y="5" width="8" height="2" fill="#FFF" opacity="0.3" rx="0.5"/>
+  </g>
+</svg>
