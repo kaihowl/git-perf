@@ -762,9 +762,15 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             let commit_hash = info
                 .get(1)
                 .expect("No commit header found before measurement line in git log output");
-            // Check for git's grafted marker (appears as "(grafted)" in decorations)
-            // We check for the opening paren to avoid false matches with refs containing "grafted"
-            detected_shallow |= info[2..].iter().any(|s| s.contains("(grafted"));
+            // Check for git's grafted marker in decorations
+            // Git outputs "grafted" as a decoration (without leading space when first)
+            // We check for exact match to avoid false positives from refs containing "grafted"
+            // Note: "grafted" appears as a standalone decoration, while ref names appear as
+            // "HEAD -> refs/heads/...", "tag: refs/tags/...", etc.
+            detected_shallow |= info[2..].iter().any(|s| {
+                let trimmed = s.trim();
+                trimmed == "grafted"
+            });
             current_commit = Some(commit_hash.to_string());
             commits.push((commit_hash.to_string(), Vec::new()));
         } else if let Some(commit_hash) = current_commit.as_ref() {
@@ -1156,13 +1162,14 @@ mod test {
     }
 
     /// Test walk_commits correctly identifies normal (non-shallow) repos
+    /// and does not error when requesting more commits than available
     #[test]
     fn test_walk_commits_normal_repo_not_shallow() {
         let tempdir = dir_with_repo();
         set_current_dir(tempdir.path()).unwrap();
         hermetic_git_env();
 
-        // Create a few commits
+        // Create a few commits (total will be 3 including initial commit)
         for i in 2..=3 {
             run_git_command(
                 &["commit", "--allow-empty", "-m", &format!("Commit {}", i)],
@@ -1173,12 +1180,64 @@ mod test {
         // Add a note to enable walk_commits
         add_note_line_to_head("test: 100").expect("Should add note");
 
+        // Request MORE commits than exist (10 requested, only 3 exist)
+        // This should succeed in a non-shallow repo
         let result = walk_commits(10);
-        assert!(result.is_ok(), "walk_commits should succeed");
+        assert!(
+            result.is_ok(),
+            "walk_commits should succeed when requesting more commits than available in non-shallow repo: {:?}",
+            result
+        );
 
         let commits = result.unwrap();
 
-        // Should have commits
+        // Should have exactly 3 commits (all available)
         assert!(!commits.is_empty(), "Should have found commits");
+        assert_eq!(
+            commits.len(),
+            3,
+            "Should have gotten all 3 commits even though we requested 10"
+        );
+    }
+
+    /// Test that refs containing "grafted" in their name don't cause false positives
+    /// for shallow clone detection
+    #[test]
+    fn test_walk_commits_with_grafted_ref_name() {
+        let tempdir = dir_with_repo();
+        set_current_dir(tempdir.path()).unwrap();
+        hermetic_git_env();
+
+        // Create a few commits
+        for i in 2..=5 {
+            run_git_command(
+                &["commit", "--allow-empty", "-m", &format!("Commit {}", i)],
+                tempdir.path(),
+            );
+        }
+
+        // Create a tag with "grafted" in the name
+        run_git_command(&["tag", "grafted-feature"], tempdir.path());
+
+        // Add a note to enable walk_commits
+        add_note_line_to_head("test: 100").expect("Should add note");
+
+        // Request more commits than exist (20 requested, only 5 exist)
+        // This should NOT error even though we have a "grafted" ref name
+        let result = walk_commits(20);
+        assert!(
+            result.is_ok(),
+            "walk_commits should not error on 'grafted' ref name in non-shallow repo: {:?}",
+            result
+        );
+
+        let commits = result.unwrap();
+
+        // Should have exactly 5 commits
+        assert_eq!(
+            commits.len(),
+            5,
+            "Should have gotten all 5 commits without shallow clone error"
+        );
     }
 }
