@@ -5,3 +5,6 @@
 # Mutation testing artifacts
 mutants.out/
 mutants.out.old/
+
+# Generated HTML reports
+*.html
