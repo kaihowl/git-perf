@@ -382,11 +382,11 @@ fn audit_with_data(
     if tail_summary.len < min_count.into() {
         let number_measurements = tail_summary.len;
         // MUTATION POINT: > vs < (Line 122)
-        let plural_s = if number_measurements > 1 { "s" } else { "" };
-        error!("Only {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
+        let plural_s = if number_measurements == 1 { "" } else { "s" };
+        error!("Only {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
 
         let mut skip_message = format!(
-            "⏭️ '{measurement}'\nOnly {number_measurements} measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
+            "⏭️ '{measurement}'\nOnly {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
         );
 
         // Add summary using the same logic as passing/failing cases
@@ -602,8 +602,8 @@ mod test {
 
     #[test]
     fn test_pluralization_logic() {
-        // COVERS MUTATION: number_measurements > 1 vs <
-        // Test with 0 measurements (no 's')
+        // COVERS MUTATION: number_measurements > 1 vs ==
+        // Test with 0 measurements (should have 's' - grammatically correct)
         let result = audit_with_data(
             "test_measurement",
             15.0,
@@ -615,8 +615,8 @@ mod test {
 
         assert!(result.is_ok());
         let message = result.unwrap().message;
-        assert!(message.contains("0 measurement found")); // No 's'
-        assert!(!message.contains("0 measurements found")); // Should not have 's'
+        assert!(message.contains("0 historical measurements found")); // Has 's'
+        assert!(!message.contains("0 historical measurement found")); // Should not be singular
 
         // Test with 1 measurement (no 's')
         let result = audit_with_data(
@@ -630,7 +630,7 @@ mod test {
 
         assert!(result.is_ok());
         let message = result.unwrap().message;
-        assert!(message.contains("1 measurement found")); // No 's'
+        assert!(message.contains("1 historical measurement found")); // No 's'
 
         // Test with 2+ measurements (should have 's')
         let result = audit_with_data(
@@ -644,7 +644,7 @@ mod test {
 
         assert!(result.is_ok());
         let message = result.unwrap().message;
-        assert!(message.contains("2 measurements found")); // Has 's'
+        assert!(message.contains("2 historical measurements found")); // Has 's'
     }
 
     #[test]
