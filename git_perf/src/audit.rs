@@ -130,7 +130,7 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
-    _no_change_point_warning: bool,
+    _no_change_point_warning: bool, // TODO: Implement change point warning in Phase 2
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {

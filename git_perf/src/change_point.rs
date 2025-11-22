@@ -193,20 +193,31 @@ pub fn enrich_change_points(
 ) -> Vec<ChangePoint> {
     let mut result = vec![];
 
-    for &idx in indices {
+    for (i, &idx) in indices.iter().enumerate() {
         if idx == 0 || idx >= measurements.len() {
             continue;
         }
 
-        // Calculate mean before and after the change point
-        let before_mean = if idx > 0 {
-            measurements[..idx].iter().sum::<f64>() / idx as f64
+        // Calculate mean of the regime before this change point
+        // (from previous change point or start to this change point)
+        let before_start = if i > 0 { indices[i - 1] } else { 0 };
+        let before_segment = &measurements[before_start..idx];
+        let before_mean = if !before_segment.is_empty() {
+            before_segment.iter().sum::<f64>() / before_segment.len() as f64
         } else {
             measurements[0]
         };
 
-        let after_mean = if idx < measurements.len() {
-            measurements[idx..].iter().sum::<f64>() / (measurements.len() - idx) as f64
+        // Calculate mean of the regime after this change point
+        // (from this change point to next change point or end)
+        let after_end = if i + 1 < indices.len() {
+            indices[i + 1]
+        } else {
+            measurements.len()
+        };
+        let after_segment = &measurements[idx..after_end];
+        let after_mean = if !after_segment.is_empty() {
+            after_segment.iter().sum::<f64>() / after_segment.len() as f64
         } else {
             measurements[measurements.len() - 1]
         };

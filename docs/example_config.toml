@@ -71,21 +71,19 @@ min_data_points = 10
 # Minimum percentage change to consider significant (default: 5.0)
 min_magnitude_pct = 5.0
 
-# Penalty factor for PELT algorithm (default: 3.0)
+# Penalty factor for PELT algorithm (default: 0.5)
 # Higher values result in fewer change points detected (less sensitive)
 # Lower values result in more change points detected (more sensitive)
-penalty = 3.0
+penalty = 0.5
 
 # Measurement-specific change point settings (override defaults)
 [change_point."build_time"]
-# More sensitive for build time measurements
-penalty = 2.0
-min_magnitude_pct = 3.0
+# Less sensitive for this measurement (avoid detecting minor fluctuations)
+penalty = 1.0
 
 [change_point."memory_usage"]
-# Less sensitive for memory measurements (avoid noise)
-penalty = 4.0
-min_magnitude_pct = 10.0
+# More sensitive for detecting subtle memory changes
+penalty = 0.3
 
 # Backoff settings for retry logic
 [backoff]
