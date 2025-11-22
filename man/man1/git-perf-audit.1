@@ -52,7 +52,7 @@ Key\-value pair separated by "=" with no whitespaces to subselect measurements
 Filter measurements by regex pattern (can be specified multiple times). At least one of \-\-measurement or \-\-filter must be provided. If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Examples: \-f "bench_.*" (prefix), \-f ".*_x64$" (suffix), \-f "^perf_" (anchored prefix)
 .TP
 \fB\-\-min\-measurements\fR \fI<MIN_MEASUREMENTS>\fR
-Minimum number of measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per\-measurement config or defaults to 2
+Minimum number of historic measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per\-measurement config or defaults to 2
 .TP
 \fB\-a\fR, \fB\-\-aggregate\-by\fR \fI<AGGREGATE_BY>\fR
 What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min

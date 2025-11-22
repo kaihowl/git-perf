@@ -34,7 +34,7 @@ assert_output_contains "$output" "⏭️ 'test-metric'" "Header with measurement
 echo "✅ Header with measurement name found"
 
 # Verify the output contains the skip message (should be 2 tail measurements + 1 head = 3 total, but only 2 in tail)
-assert_output_contains "$output" "Only 2 measurement" "Skip message NOT found"
+assert_output_contains "$output" "Only 2 historical measurements" "Skip message NOT found"
 echo "✅ Skip message found"
 
 # Verify the output contains the threshold information

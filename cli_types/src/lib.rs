@@ -346,7 +346,7 @@ pub enum Commands {
         #[arg(short = 'f', long = "filter", required_unless_present = "measurement")]
         filter: Vec<String>,
 
-        /// Minimum number of measurements needed. If less, pass test and assume
+        /// Minimum number of historic measurements needed. If less, pass test and assume
         /// more measurements are needed.
         /// A minimum of two historic measurements are needed for proper evaluation of standard
         /// deviation.
