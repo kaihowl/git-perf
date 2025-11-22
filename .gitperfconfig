@@ -15,3 +15,13 @@ unit = "ns"
 [measurement."release-binary-size"]
 epoch = "c692cdd"
 unit = "bytes"
+
+[measurement."report-benchmark"]
+unit = "ns"
+
+[measurement."add-benchmark"]
+unit = "ns"
+
+[measurement."report-size-benchmark"]
+unit = "bytes"
+min_relative_deviation = 10.0
