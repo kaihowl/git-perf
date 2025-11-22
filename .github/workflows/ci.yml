@@ -107,15 +107,61 @@ jobs:
       run: |
           set -x
           cargo install --path git_perf
-          # Run report on repo with known (n=10) number of measurements
+
+          # Run test-measure2 in main repo
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 1
-          git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
-          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
+
+          # Create a temporary repo with fixed measurements to benchmark report and add performance
+          # This ensures measurements don't depend on the growing main repo
+          TEMP_REPO=$(mktemp -d)
+          cd "$TEMP_REPO"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Create 10 commits with 10 measurements each = 100 total measurements
+          # This pre-populated dataset tests performance at realistic scale
+          for i in {1..10}; do
+            echo "commit $i" > file$i.txt
+            git add file$i.txt
+            git commit -m "Commit $i"
+            # Add 10 measurements per commit
+            for j in {1..10}; do
+              git perf add -m benchmark-a -k iteration="$i-$j" $((100 + RANDOM % 50))
+            done
+          done
+
+          # Return to main repo for measurements
+          cd "$GITHUB_WORKSPACE"
+
+          # Measure add performance: 10 sequential adds on pre-populated repo
+          git perf measure -n 10 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- bash -c "cd '$TEMP_REPO' && for i in {1..10}; do git perf add -m test-metric-\$i 123; done"
+
+          # Measure report generation performance on fixed dataset
+          git perf measure -n 10 -m report-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf report -n 10 -o "$TEMP_REPO/report.html"
+          git perf add -m report-size-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < "$TEMP_REPO/report.html")
+
+          # Also run old measurements for historical continuity (informational only)
+          git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf report -n 10 -o "$TEMP_REPO/report-old.html"
+          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < "$TEMP_REPO/report-old.html")
+
+          # Copy report to workspace for artifact upload
+          cp "$TEMP_REPO/report.html" report.html
+
+          # Cleanup temp repo
+          rm -rf "$TEMP_REPO"
+
           git perf push
 
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "test-measure2 audit failed (expected on first runs or due to CI variability)"
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report audit failed (expected on first runs or due to CI variability)"
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report-size audit failed (expected on first runs or due to CI variability)"
+          # Blocking audits: these must pass or CI fails
+          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
+          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
+          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
+          git perf audit -n 40 -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
+
+          # Informational audits: failures don't block CI
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report audit failed (informational only)"
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report-size audit failed (informational only)"
 
     - name: Archive report
       uses: actions/upload-artifact@v5
@@ -212,7 +258,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
           git-perf-version: 'branch'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
