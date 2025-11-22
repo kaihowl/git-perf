@@ -273,7 +273,7 @@ pub fn measurement_unit(measurement: &str) -> Option<String> {
 /// - `enabled`: Enable/disable change point detection (default: true)
 /// - `min_data_points`: Minimum data points required (default: 10)
 /// - `min_magnitude_pct`: Minimum percentage change to consider significant (default: 5.0)
-/// - `penalty`: Penalty factor for PELT algorithm (default: 3.0)
+/// - `penalty`: Penalty factor for PELT algorithm (default: 0.5, lower = more sensitive)
 pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePointConfig {
     let mut config = crate::change_point::ChangePointConfig::default();
 
