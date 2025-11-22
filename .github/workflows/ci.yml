@@ -107,10 +107,39 @@ jobs:
       run: |
           set -x
           cargo install --path git_perf
-          # Run report on repo with known (n=10) number of measurements
+
+          # Run test-measure2 in main repo
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 1
-          git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git perf report -n 1 -o report.html
-          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < report.html)
+
+          # Create a temporary repo with fixed measurements to benchmark report performance
+          # This ensures report measurement doesn't depend on the growing main repo
+          TEMP_REPO=$(mktemp -d)
+          cd "$TEMP_REPO"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Create multiple commits with measurements to simulate realistic data
+          for i in {1..10}; do
+            echo "commit $i" > file$i.txt
+            git add file$i.txt
+            git commit -m "Commit $i"
+            # Add measurements to this commit
+            git perf add -m benchmark-a -k iteration="$i" $((100 + RANDOM % 50))
+            git perf add -m benchmark-b -k iteration="$i" $((200 + RANDOM % 100))
+          done
+
+          # Now measure report performance on this fixed dataset and push to main repo
+          cd "$GITHUB_WORKSPACE"
+          git perf measure -n 10 -m report -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf report -n 10 -o "$TEMP_REPO/report.html"
+          git perf add -m report-size -k os=${{matrix.os}} -k rust=${{matrix.rust}} $(wc -c < "$TEMP_REPO/report.html")
+
+          # Copy report to workspace for artifact upload
+          cp "$TEMP_REPO/report.html" report.html
+
+          # Cleanup temp repo
+          rm -rf "$TEMP_REPO"
+
           git perf push
 
           git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "test-measure2 audit failed (expected on first runs or due to CI variability)"
