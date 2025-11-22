@@ -762,7 +762,9 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             let commit_hash = info
                 .get(1)
                 .expect("No commit header found before measurement line in git log output");
-            detected_shallow |= info[2..].contains(&"grafted");
+            // Check for git's grafted marker (appears as "(grafted)" in decorations)
+            // We check for the opening paren to avoid false matches with refs containing "grafted"
+            detected_shallow |= info[2..].iter().any(|s| s.contains("(grafted"));
             current_commit = Some(commit_hash.to_string());
             commits.push((commit_hash.to_string(), Vec::new()));
         } else if let Some(commit_hash) = current_commit.as_ref() {
@@ -775,6 +777,10 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
         }
     }
 
+    // Only error if we detected a shallow boundary (grafted marker) AND got fewer commits
+    // than requested. The grafted marker indicates incomplete history due to shallow clone.
+    // However, requesting more commits than available in the branch is OK if we're not
+    // actually in a shallow repository (the grafted marker could appear due to git-replace).
     if detected_shallow && commits.len() < num_commits {
         bail!("Refusing to continue as commit log depth was limited by shallow clone");
     }
