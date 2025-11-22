@@ -1,10 +1,10 @@
 [measurement."report-size"]
-epoch = "cef149b0"
+epoch = "fedee674"
 min_relative_deviation = 10.0
 unit = "bytes"
 
 [measurement."report"]
-epoch = "cef149b0"
+epoch = "fedee674"
 unit = "ns"
 
 [measurement."test-measure2"]
