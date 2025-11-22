@@ -2,6 +2,30 @@
 //!
 //! This module provides functionality to detect regime shifts in time series data,
 //! helping identify when performance characteristics changed significantly.
+//!
+//! ## Algorithm Details
+//!
+//! PELT uses a penalty parameter to control sensitivity to change points. The algorithm
+//! minimizes: `cost + penalty * number_of_change_points`, where cost measures how well
+//! segments fit the data.
+//!
+//! ## Tuning the Penalty Parameter
+//!
+//! - **Lower penalty** (e.g., 0.5): More sensitive, detects multiple change points
+//! - **Higher penalty** (e.g., 3.0+): Conservative, only detects major changes
+//! - **Default**: 0.5 - balanced for detecting multiple significant changes
+//!
+//! Configure via `.gitperfconfig`:
+//! ```toml
+//! [change_point]
+//! penalty = 0.5  # Global default
+//!
+//! [change_point."specific_measurement"]
+//! penalty = 1.0  # Per-measurement override
+//! ```
+//!
+//! The scaled penalty used internally is: `penalty * log(n) * variance`
+//! This adapts to data size and variability automatically.
 
 use std::cmp::Ordering;
 
@@ -59,7 +83,7 @@ impl Default for ChangePointConfig {
             min_data_points: 10,
             min_magnitude_pct: 5.0,
             confidence_threshold: 0.8,
-            penalty: 3.0,
+            penalty: 0.5,
         }
     }
 }
@@ -555,5 +579,93 @@ mod tests {
         // Should handle empty SHA list gracefully
         assert_eq!(enriched.len(), 1);
         assert_eq!(enriched[0].commit_sha, "");
+    }
+
+    #[test]
+    fn test_two_distinct_performance_regressions() {
+        // Simulates the scenario from the user's chart:
+        // ~12ns baseline -> ~17ns (40% regression) -> ~38ns (120% regression from second level)
+        let mut measurements = Vec::new();
+
+        // First regime: ~12ns (80 measurements)
+        for _ in 0..80 {
+            measurements.push(12.0 + rand::random::<f64>() * 0.5 - 0.25);
+        }
+
+        // Second regime: ~17ns (80 measurements) - first regression (~40% increase)
+        for _ in 0..80 {
+            measurements.push(17.0 + rand::random::<f64>() * 0.8 - 0.4);
+        }
+
+        // Third regime: ~38ns (80 measurements) - second regression (~120% increase from second)
+        for _ in 0..80 {
+            measurements.push(38.0 + rand::random::<f64>() * 1.5 - 0.75);
+        }
+
+        let config = ChangePointConfig {
+            min_data_points: 10,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.7,
+            penalty: 0.5, // Default penalty should detect both change points
+        };
+
+        let cps = detect_change_points(&measurements, &config);
+
+        // Should detect both change points
+        assert!(
+            cps.len() >= 2,
+            "Expected at least 2 change points, found {}. Change points: {:?}",
+            cps.len(),
+            cps
+        );
+
+        // First change point should be around index 80
+        assert!(
+            cps[0] > 70 && cps[0] < 90,
+            "First change point at {} should be around 80",
+            cps[0]
+        );
+
+        // Second change point should be around index 160
+        assert!(
+            cps[1] > 150 && cps[1] < 170,
+            "Second change point at {} should be around 160",
+            cps[1]
+        );
+    }
+
+    #[test]
+    fn test_penalty_sensitivity_for_multiple_changes() {
+        // Test that lower penalty detects more change points
+        let data = vec![
+            10.0, 10.0, 10.0, 10.0, 10.0, // Regime 1
+            15.0, 15.0, 15.0, 15.0, 15.0, // Regime 2 (50% increase)
+            20.0, 20.0, 20.0, 20.0, 20.0, // Regime 3 (33% increase)
+        ];
+
+        // With default penalty (0.5), should detect both
+        let config_low = ChangePointConfig {
+            min_data_points: 3,
+            penalty: 0.5,
+            ..Default::default()
+        };
+        let cps_low = detect_change_points(&data, &config_low);
+        assert_eq!(
+            cps_low.len(),
+            2,
+            "Low penalty should detect 2 change points"
+        );
+
+        // With high penalty, might miss the second one
+        let config_high = ChangePointConfig {
+            min_data_points: 3,
+            penalty: 5.0,
+            ..Default::default()
+        };
+        let cps_high = detect_change_points(&data, &config_high);
+        assert!(
+            cps_high.len() < cps_low.len(),
+            "High penalty should detect fewer change points than low penalty"
+        );
     }
 }
