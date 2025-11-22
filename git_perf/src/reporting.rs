@@ -188,65 +188,9 @@ impl PlotlyReporter {
     ///
     /// These are vertical dashed gray lines where measurement epochs change.
     /// Hidden by default (legendonly), user clicks legend to toggle visibility.
-    #[allow(dead_code)] // Will be integrated in Phase 2
+    /// Uses actual commit indices to properly map epoch transitions when measurements
+    /// don't exist for all commits.
     pub fn add_epoch_boundary_traces(
-        &mut self,
-        transitions: &[EpochTransition],
-        measurement_name: &str,
-        y_min: f64,
-        y_max: f64,
-    ) {
-        if transitions.is_empty() {
-            return;
-        }
-
-        // Create a single trace for all epoch boundaries of this measurement
-        // Using multiple (x,y) pairs with None separators to create multiple vertical lines
-        let mut x_coords: Vec<Option<usize>> = vec![];
-        let mut y_coords: Vec<Option<f64>> = vec![];
-        let mut hover_texts: Vec<String> = vec![];
-
-        for transition in transitions {
-            let x_pos = self.size - transition.index - 1;
-
-            // Add line segment (two points for vertical line)
-            x_coords.push(Some(x_pos));
-            y_coords.push(Some(y_min));
-            hover_texts.push(format!(
-                "Epoch {}→{}",
-                transition.from_epoch, transition.to_epoch
-            ));
-
-            x_coords.push(Some(x_pos));
-            y_coords.push(Some(y_max));
-            hover_texts.push(format!(
-                "Epoch {}→{}",
-                transition.from_epoch, transition.to_epoch
-            ));
-
-            // Add None to create a break between lines
-            x_coords.push(None);
-            y_coords.push(None);
-            hover_texts.push(String::new());
-        }
-
-        let trace = Scatter::new(x_coords, y_coords)
-            .name(format!("{} (Epochs)", measurement_name))
-            .legend_group(format!("{}_epochs", measurement_name))
-            .visible(Visible::LegendOnly)
-            .mode(Mode::Lines)
-            .line(Line::new().color("gray").dash(DashType::Dash).width(2.0))
-            .show_legend(true)
-            .hover_text_array(hover_texts);
-
-        self.plot.add_trace(trace);
-    }
-
-    /// Add epoch boundary traces with explicit commit index mapping.
-    ///
-    /// This version uses the actual commit indices to properly map epoch transitions
-    /// when measurements don't exist for all commits.
-    pub fn add_epoch_boundary_traces_with_indices(
         &mut self,
         transitions: &[EpochTransition],
         commit_indices: &[usize],
@@ -1069,7 +1013,7 @@ pub fn report(
                             measurement_name,
                             transitions
                         );
-                        pr.add_epoch_boundary_traces_with_indices(
+                        pr.add_epoch_boundary_traces(
                             &transitions,
                             &reversed_commit_indices,
                             measurement_name,
@@ -1590,7 +1534,16 @@ mod tests {
             to_epoch: 2,
         }];
 
-        reporter.add_epoch_boundary_traces(&transitions, "test_metric", 0.0, 100.0);
+        let commit_indices = vec![0, 1, 2];
+        let group_values: Vec<String> = vec![];
+        reporter.add_epoch_boundary_traces(
+            &transitions,
+            &commit_indices,
+            "test_metric",
+            &group_values,
+            0.0,
+            100.0,
+        );
 
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
@@ -1602,11 +1555,22 @@ mod tests {
 
     #[test]
     fn test_epoch_boundary_traces_empty() {
+        use crate::change_point::EpochTransition;
+
         let mut reporter = PlotlyReporter::new();
         reporter.size = 10;
 
         let transitions: Vec<EpochTransition> = vec![];
-        reporter.add_epoch_boundary_traces(&transitions, "test", 0.0, 100.0);
+        let commit_indices: Vec<usize> = vec![];
+        let group_values: Vec<String> = vec![];
+        reporter.add_epoch_boundary_traces(
+            &transitions,
+            &commit_indices,
+            "test",
+            &group_values,
+            0.0,
+            100.0,
+        );
 
         // Should not crash and plot should still be valid
         let bytes = reporter.as_bytes();
