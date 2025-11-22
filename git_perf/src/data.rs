@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct MeasurementSummary {
     pub epoch: u32,
     pub val: f64,

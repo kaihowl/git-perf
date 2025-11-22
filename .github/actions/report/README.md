@@ -77,6 +77,10 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `audit-args` | Additional arguments to git-perf audit (e.g., `-m <measurement> -d <threshold>`) | No | `` |
 | `git-perf-version` | Version of git-perf to use (latest, or specific version) | No | `latest` |
 | `comment-on-pr` | Whether to comment on the PR with the report URL (only for pull_request events) | No | `true` |
+| `show-size` | Whether to show measurement storage size in output | No | `false` |
+| `size-use-disk-size` | Whether to use disk-size (compressed) instead of logical size | No | `true` |
+| `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
+| `detect-changes` | Whether to detect and display change points in the report | No | `false` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
 
 ### Common Audit Arguments
@@ -174,6 +178,16 @@ jobs:
 - uses: kaihowl/git-perf/.github/actions/report@master
   with:
     comment-on-pr: 'false'
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Enable Epoch and Change Point Detection
+
+```yaml
+- uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    show-epochs: 'true'
+    detect-changes: 'true'
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 

@@ -117,9 +117,26 @@ sigma = 3.5
 
 [measurement."specific_test"]       # Per-measurement overrides
 min_relative_deviation = 10.0
+
+[change_point]
+penalty = 0.5                       # PELT sensitivity (0.3=high, 0.5=default, 1.0+=low)
+min_data_points = 10
+min_magnitude_pct = 5.0
+
+[change_point."specific_test"]      # Per-measurement overrides
+penalty = 0.3                       # More sensitive for this measurement
 ```
 
 **Precedence**: CLI flags > Per-measurement config > Default config > Built-in defaults
+
+### Change Point Detection Tuning
+
+The `penalty` parameter controls how many change points PELT detects:
+- **0.3-0.5**: High sensitivity - detects multiple change points
+- **0.5-1.0**: Balanced (default 0.5)
+- **1.0+**: Conservative - only major shifts
+
+Lower penalty values are better for detecting multiple regime changes in performance data.
 
 ## Requirements
 

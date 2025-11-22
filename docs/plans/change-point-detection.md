@@ -100,7 +100,7 @@ pub struct ChangePointConfig {
     pub min_data_points: usize,      // Default: 10
     pub min_magnitude_pct: f64,      // Default: 5.0
     pub confidence_threshold: f64,   // Default: 0.8
-    pub penalty: f64,                // Default: 3.0 (BIC-based)
+    pub penalty: f64,                // Default: 0.5 (lower = more sensitive)
 }
 ```
 
@@ -251,11 +251,26 @@ git perf audit -m build_time --no-change-point-warning
 enabled = true
 min_data_points = 10
 min_magnitude_pct = 5.0
-penalty = 3.0
+penalty = 0.5  # Default: balanced sensitivity (lower = more sensitive)
 
 [change_point."build_time"]
-penalty = 2.0  # More sensitive for this measurement
+penalty = 1.0  # Less sensitive for this measurement (if needed)
+
+[change_point."memory_usage"]
+penalty = 0.3  # More sensitive for detecting subtle memory changes
 ```
+
+### Penalty Parameter Tuning Guide
+
+The `penalty` parameter controls PELT's sensitivity to change points:
+
+- **0.3-0.5**: High sensitivity - detects multiple change points, may catch smaller shifts
+- **0.5-1.0**: Balanced (default 0.5) - good for most use cases
+- **1.0-3.0**: Conservative - only detects major regime shifts
+- **3.0+**: Very conservative - minimal change point detection
+
+The algorithm scales this by `log(n) * variance` internally, so the same penalty value
+adapts automatically to different data sizes and variability levels.
 
 ---
 
