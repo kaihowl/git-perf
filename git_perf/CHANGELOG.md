@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.1...git-perf-v0.18.2) - 2025-11-22
+
+### Other
+
+- clarify minimum measurement requirement ([#489](https://github.com/kaihowl/git-perf/pull/489))
+
 ## [0.18.1](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.0...git-perf-v0.18.1) - 2025-11-15
 
 ### Added
