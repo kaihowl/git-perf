@@ -301,21 +301,13 @@ impl PlotlyReporter {
             return;
         }
 
-        // Separate change points by direction to create two separate traces
-        let increases: Vec<_> = change_points
-            .iter()
-            .filter(|cp| cp.direction == ChangeDirection::Increase)
-            .collect();
-        let decreases: Vec<_> = change_points
-            .iter()
-            .filter(|cp| cp.direction == ChangeDirection::Decrease)
-            .collect();
-
         // Add traces for each direction
-        for (points, direction) in [
-            (increases, ChangeDirection::Increase),
-            (decreases, ChangeDirection::Decrease),
-        ] {
+        for direction in [ChangeDirection::Increase, ChangeDirection::Decrease] {
+            let points: Vec<_> = change_points
+                .iter()
+                .filter(|cp| cp.direction == direction)
+                .collect();
+
             if points.is_empty() {
                 continue;
             }
