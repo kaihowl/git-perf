@@ -537,7 +537,17 @@ mod tests {
             write_gitperfconfig(temp_dir.path(), "[measurement]\n");
 
             let result = get_local_config_path();
-            assert_eq!(result, Some(temp_dir.path().join(".gitperfconfig")));
+            // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
+            assert_eq!(
+                result.map(|p| p.canonicalize().unwrap()),
+                Some(
+                    temp_dir
+                        .path()
+                        .join(".gitperfconfig")
+                        .canonicalize()
+                        .unwrap()
+                )
+            );
         });
     }
 
@@ -572,9 +582,16 @@ mod tests {
 
             let sources = gather_config_sources().unwrap();
             assert_eq!(sources.system_config, Some(system_config_path));
+            // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
             assert_eq!(
-                sources.local_config,
-                Some(temp_dir.path().join(".gitperfconfig"))
+                sources.local_config.map(|p| p.canonicalize().unwrap()),
+                Some(
+                    temp_dir
+                        .path()
+                        .join(".gitperfconfig")
+                        .canonicalize()
+                        .unwrap()
+                )
             );
         });
     }
