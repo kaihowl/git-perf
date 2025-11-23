@@ -599,7 +599,11 @@ mod tests {
     #[test]
     fn test_gather_global_settings() {
         hermetic_git_env();
-        with_isolated_home(|_home_path| {
+        with_isolated_home(|home_path| {
+            let temp_dir = dir_with_repo();
+            let _guard = DirGuard::new(temp_dir.path());
+            env::set_var("HOME", home_path);
+
             let settings = gather_global_settings();
             // Default value is 60 seconds
             assert_eq!(settings.backoff_max_elapsed_seconds, 60);
