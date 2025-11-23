@@ -601,7 +601,11 @@ epoch = "oldvalue"
             // Test that find_config_path finds it
             let found_path = find_config_path();
             assert!(found_path.is_some());
-            assert_eq!(found_path.unwrap(), config_path);
+            // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
+            assert_eq!(
+                found_path.unwrap().canonicalize().unwrap(),
+                config_path.canonicalize().unwrap()
+            );
         });
     }
 
