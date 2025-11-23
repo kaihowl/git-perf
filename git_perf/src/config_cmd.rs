@@ -584,8 +584,8 @@ mod tests {
         hermetic_git_env();
         with_isolated_home(|_home_path| {
             let settings = gather_global_settings();
-            // Default value is 60 seconds
-            assert_eq!(settings.backoff_max_elapsed_seconds, 60);
+            // Value is 180 seconds (configured in .gitperfconfig for CI concurrency tests)
+            assert_eq!(settings.backoff_max_elapsed_seconds, 180);
         });
     }
 
