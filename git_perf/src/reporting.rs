@@ -297,74 +297,46 @@ impl PlotlyReporter {
         y_min: f64,
         y_max: f64,
     ) {
-        if change_points.is_empty() {
-            return;
-        }
+        let measurement_display = format_measurement_with_unit(measurement_name);
 
-        // Add traces for each direction
-        for direction in [ChangeDirection::Increase, ChangeDirection::Decrease] {
-            let points: Vec<_> = change_points
-                .iter()
-                .filter(|cp| cp.direction == direction)
-                .collect();
-
-            if points.is_empty() {
+        for cp in change_points {
+            if cp.index >= commit_indices.len() {
+                log::warn!(
+                    "Change point index {} out of bounds for commit_indices len {}",
+                    cp.index,
+                    commit_indices.len()
+                );
                 continue;
             }
 
-            let (color, label_prefix, symbol) = match direction {
-                ChangeDirection::Increase => {
-                    ("rgba(220, 53, 69, 0.8)", "Increases", "⚠ Regression")
-                }
+            let (color, label_prefix, symbol) = match cp.direction {
+                ChangeDirection::Increase => ("rgba(220, 53, 69, 0.8)", "Increase", "⚠ Regression"),
                 ChangeDirection::Decrease => {
-                    ("rgba(40, 167, 69, 0.8)", "Decreases", "✓ Improvement")
+                    ("rgba(40, 167, 69, 0.8)", "Decrease", "✓ Improvement")
                 }
             };
 
-            let mut x_coords: Vec<Option<usize>> = vec![];
-            let mut y_coords: Vec<Option<f64>> = vec![];
-            let mut hover_texts: Vec<String> = vec![];
+            let commit_idx = commit_indices[cp.index];
+            let x_pos = self.size - commit_idx - 1;
 
-            for cp in points {
-                if cp.index >= commit_indices.len() {
-                    log::warn!(
-                        "Change point index {} out of bounds for commit_indices len {}",
-                        cp.index,
-                        commit_indices.len()
-                    );
-                    continue;
-                }
-                let commit_idx = commit_indices[cp.index];
-                let x_pos = self.size - commit_idx - 1;
+            let hover_text = format!(
+                "{}: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
+                symbol,
+                cp.magnitude_pct,
+                &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                cp.confidence * 100.0
+            );
 
-                let hover_text = format!(
-                    "{}: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
-                    symbol,
-                    cp.magnitude_pct,
-                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
-                    cp.confidence * 100.0
-                );
-
-                x_coords.push(Some(x_pos));
-                y_coords.push(Some(y_min));
-                hover_texts.push(hover_text.clone());
-
-                x_coords.push(Some(x_pos));
-                y_coords.push(Some(y_max));
-                hover_texts.push(hover_text);
-
-                x_coords.push(None);
-                y_coords.push(None);
-                hover_texts.push(String::new());
-            }
-
-            let measurement_display = format_measurement_with_unit(measurement_name);
+            // Create vertical line from y_min to y_max
+            let x_coords = vec![Some(x_pos), Some(x_pos)];
+            let y_coords = vec![Some(y_min), Some(y_max)];
+            let hover_texts = vec![hover_text.clone(), hover_text];
 
             let trace = Scatter::new(x_coords, y_coords)
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
                 .line(Line::new().color(color).width(3.0))
-                .show_legend(true)
+                .show_legend(false)
                 .hover_text_array(hover_texts);
 
             let trace = if !group_values.is_empty() {
@@ -1483,8 +1455,8 @@ mod tests {
         let html = String::from_utf8_lossy(&bytes);
         // Check that trace is set to legendonly
         assert!(html.contains("legendonly"));
-        // Check for change point trace (increases)
-        assert!(html.contains("build_time (Increases)"));
+        // Check for change point trace (increase)
+        assert!(html.contains("build_time (Increase)"));
     }
 
     #[test]
@@ -1532,8 +1504,8 @@ mod tests {
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
         // Should have both increase and decrease traces
-        assert!(html.contains("metric (Increases)"));
-        assert!(html.contains("metric (Decreases)"));
+        assert!(html.contains("metric (Increase)"));
+        assert!(html.contains("metric (Decrease)"));
     }
 
     #[test]
