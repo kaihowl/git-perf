@@ -202,6 +202,78 @@ where
     result
 }
 
+/// Sets up an isolated git repository environment in a temporary directory.
+///
+/// This helper:
+/// 1. Sets up hermetic git environment variables
+/// 2. Creates a temporary directory with an initialized git repository
+/// 3. Changes the current directory to the git repository (with automatic restoration)
+///
+/// The closure runs with the current directory set to the git repository.
+///
+/// # Arguments
+/// * `f` - Closure that takes the git directory path and returns a result
+///
+/// # Returns
+/// The result from the closure
+///
+/// # Example
+/// ```
+/// with_isolated_cwd_git(|git_dir| {
+///     // Your test code here - already in git repo directory
+///     // with hermetic git environment
+/// });
+/// ```
+pub fn with_isolated_cwd_git<F, R>(f: F) -> R
+where
+    F: FnOnce(&Path) -> R,
+{
+    hermetic_git_env();
+    let temp_dir = dir_with_repo();
+    let _guard = DirGuard::new(temp_dir.path());
+
+    f(temp_dir.path())
+}
+
+/// Sets up a complete isolated test environment combining HOME isolation and git repository setup.
+///
+/// This is a composition of `with_isolated_home` and `with_isolated_cwd_git` that provides
+/// maximum isolation for tests. Use this when you need both HOME isolation and a git repository.
+///
+/// This helper:
+/// 1. Creates an isolated HOME directory
+/// 2. Sets up hermetic git environment variables
+/// 3. Creates a temporary directory with an initialized git repository
+/// 4. Changes the current directory to the git repository (with automatic restoration)
+/// 5. Ensures HOME points to the isolated directory
+///
+/// For more flexibility, you can compose `with_isolated_home` and `with_isolated_cwd_git`
+/// directly in different orders or use them individually.
+///
+/// # Arguments
+/// * `f` - Closure that takes `(git_dir, home_path)` and returns a result
+///
+/// # Returns
+/// The result from the closure
+///
+/// # Example
+/// ```
+/// with_isolated_test_setup(|git_dir, home_path| {
+///     // Your test code here - in git repo with isolated HOME
+/// });
+/// ```
+pub fn with_isolated_test_setup<F, R>(f: F) -> R
+where
+    F: FnOnce(&Path, &Path) -> R,
+{
+    with_isolated_home(|home_path| {
+        with_isolated_cwd_git(|git_dir| {
+            env::set_var("HOME", home_path);
+            f(git_dir, home_path)
+        })
+    })
+}
+
 /// Writes a .gitperfconfig file in the specified directory.
 ///
 /// # Arguments
