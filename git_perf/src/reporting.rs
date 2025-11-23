@@ -284,6 +284,90 @@ impl PlotlyReporter {
         self.plot.add_trace(trace);
     }
 
+    /// Helper function to add a trace for a specific direction of change points
+    #[allow(clippy::too_many_arguments)]
+    fn add_change_point_trace_for_direction(
+        &mut self,
+        change_points: &[&ChangePoint],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+        direction: ChangeDirection,
+    ) {
+        if change_points.is_empty() {
+            return;
+        }
+
+        let (color, label_prefix, symbol) = match direction {
+            ChangeDirection::Increase => ("rgba(220, 53, 69, 0.8)", "Increases", "⚠ Regression"),
+            ChangeDirection::Decrease => ("rgba(40, 167, 69, 0.8)", "Decreases", "✓ Improvement"),
+        };
+
+        let mut x_coords: Vec<Option<usize>> = vec![];
+        let mut y_coords: Vec<Option<f64>> = vec![];
+        let mut hover_texts: Vec<String> = vec![];
+
+        for cp in change_points {
+            if cp.index >= commit_indices.len() {
+                log::warn!(
+                    "Change point index {} out of bounds for commit_indices len {}",
+                    cp.index,
+                    commit_indices.len()
+                );
+                continue;
+            }
+            let commit_idx = commit_indices[cp.index];
+            let x_pos = self.size - commit_idx - 1;
+
+            let hover_text = format!(
+                "{}: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
+                symbol,
+                cp.magnitude_pct,
+                &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                cp.confidence * 100.0
+            );
+
+            x_coords.push(Some(x_pos));
+            y_coords.push(Some(y_min));
+            hover_texts.push(hover_text.clone());
+
+            x_coords.push(Some(x_pos));
+            y_coords.push(Some(y_max));
+            hover_texts.push(hover_text);
+
+            x_coords.push(None);
+            y_coords.push(None);
+            hover_texts.push(String::new());
+        }
+
+        let measurement_display = format_measurement_with_unit(measurement_name);
+
+        let trace = Scatter::new(x_coords, y_coords)
+            .visible(Visible::LegendOnly)
+            .mode(Mode::Lines)
+            .line(Line::new().color(color).width(3.0))
+            .show_legend(true)
+            .hover_text_array(hover_texts);
+
+        let trace = if !group_values.is_empty() {
+            let group_label = group_values.join("/");
+            trace
+                .name(format!("{} ({})", group_label, label_prefix))
+                .legend_group(format!("{}_change_points", measurement_name))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - Change Points", measurement_display).as_str(),
+                ))
+        } else {
+            trace
+                .name(format!("{} ({})", measurement_display, label_prefix))
+                .legend_group(format!("{}_change_points", measurement_name))
+        };
+
+        self.plot.add_trace(trace);
+    }
+
     /// Add change point traces with explicit commit index mapping.
     ///
     /// This version uses the actual commit indices to properly map change points
@@ -301,8 +385,6 @@ impl PlotlyReporter {
             return;
         }
 
-        let measurement_display = format_measurement_with_unit(measurement_name);
-
         let increases: Vec<_> = change_points
             .iter()
             .filter(|cp| cp.direction == ChangeDirection::Increase)
@@ -312,135 +394,25 @@ impl PlotlyReporter {
             .filter(|cp| cp.direction == ChangeDirection::Decrease)
             .collect();
 
-        if !increases.is_empty() {
-            let mut x_coords: Vec<Option<usize>> = vec![];
-            let mut y_coords: Vec<Option<f64>> = vec![];
-            let mut hover_texts: Vec<String> = vec![];
+        self.add_change_point_trace_for_direction(
+            &increases,
+            commit_indices,
+            measurement_name,
+            group_values,
+            y_min,
+            y_max,
+            ChangeDirection::Increase,
+        );
 
-            for cp in &increases {
-                if cp.index >= commit_indices.len() {
-                    log::warn!(
-                        "Change point index {} out of bounds for commit_indices len {}",
-                        cp.index,
-                        commit_indices.len()
-                    );
-                    continue;
-                }
-                let commit_idx = commit_indices[cp.index];
-                let x_pos = self.size - commit_idx - 1;
-
-                x_coords.push(Some(x_pos));
-                y_coords.push(Some(y_min));
-                hover_texts.push(format!(
-                    "⚠ Regression: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
-                    cp.magnitude_pct,
-                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
-                    cp.confidence * 100.0
-                ));
-
-                x_coords.push(Some(x_pos));
-                y_coords.push(Some(y_max));
-                hover_texts.push(format!(
-                    "⚠ Regression: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
-                    cp.magnitude_pct,
-                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
-                    cp.confidence * 100.0
-                ));
-
-                x_coords.push(None);
-                y_coords.push(None);
-                hover_texts.push(String::new());
-            }
-
-            let trace = Scatter::new(x_coords, y_coords)
-                .visible(Visible::LegendOnly)
-                .mode(Mode::Lines)
-                .line(Line::new().color("rgba(220, 53, 69, 0.8)").width(3.0))
-                .show_legend(true)
-                .hover_text_array(hover_texts);
-
-            let trace = if !group_values.is_empty() {
-                // Join group values with "/" for display (only at display time)
-                let group_label = group_values.join("/");
-                trace
-                    .name(format!("{} (Increases)", group_label))
-                    .legend_group(format!("{}_change_points", measurement_name))
-                    .legend_group_title(LegendGroupTitle::from(
-                        format!("{} - Change Points", measurement_display).as_str(),
-                    ))
-            } else {
-                trace
-                    .name(format!("{} (Increases)", measurement_display))
-                    .legend_group(format!("{}_change_points", measurement_name))
-            };
-
-            self.plot.add_trace(trace);
-        }
-
-        if !decreases.is_empty() {
-            let mut x_coords: Vec<Option<usize>> = vec![];
-            let mut y_coords: Vec<Option<f64>> = vec![];
-            let mut hover_texts: Vec<String> = vec![];
-
-            for cp in &decreases {
-                if cp.index >= commit_indices.len() {
-                    log::warn!(
-                        "Change point index {} out of bounds for commit_indices len {}",
-                        cp.index,
-                        commit_indices.len()
-                    );
-                    continue;
-                }
-                let commit_idx = commit_indices[cp.index];
-                let x_pos = self.size - commit_idx - 1;
-
-                x_coords.push(Some(x_pos));
-                y_coords.push(Some(y_min));
-                hover_texts.push(format!(
-                    "✓ Improvement: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
-                    cp.magnitude_pct,
-                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
-                    cp.confidence * 100.0
-                ));
-
-                x_coords.push(Some(x_pos));
-                y_coords.push(Some(y_max));
-                hover_texts.push(format!(
-                    "✓ Improvement: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
-                    cp.magnitude_pct,
-                    &cp.commit_sha[..8.min(cp.commit_sha.len())],
-                    cp.confidence * 100.0
-                ));
-
-                x_coords.push(None);
-                y_coords.push(None);
-                hover_texts.push(String::new());
-            }
-
-            let trace = Scatter::new(x_coords, y_coords)
-                .visible(Visible::LegendOnly)
-                .mode(Mode::Lines)
-                .line(Line::new().color("rgba(40, 167, 69, 0.8)").width(3.0))
-                .show_legend(true)
-                .hover_text_array(hover_texts);
-
-            let trace = if !group_values.is_empty() {
-                // Join group values with "/" for display (only at display time)
-                let group_label = group_values.join("/");
-                trace
-                    .name(format!("{} (Decreases)", group_label))
-                    .legend_group(format!("{}_change_points", measurement_name))
-                    .legend_group_title(LegendGroupTitle::from(
-                        format!("{} - Change Points", measurement_display).as_str(),
-                    ))
-            } else {
-                trace
-                    .name(format!("{} (Decreases)", measurement_display))
-                    .legend_group(format!("{}_change_points", measurement_name))
-            };
-
-            self.plot.add_trace(trace);
-        }
+        self.add_change_point_trace_for_direction(
+            &decreases,
+            commit_indices,
+            measurement_name,
+            group_values,
+            y_min,
+            y_max,
+            ChangeDirection::Decrease,
+        );
     }
 }
 
@@ -952,7 +924,7 @@ pub fn report(
                 }
 
                 // Add change point traces if requested
-                if detect_changes && values.len() >= 10 {
+                if detect_changes {
                     let config = crate::config::change_point_config(measurement_name);
                     // Reverse measurements to match display order (newest on left, oldest on right)
                     // This ensures change point direction (regression/improvement) matches visual interpretation
