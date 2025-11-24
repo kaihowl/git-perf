@@ -463,7 +463,7 @@ fn display_json(info: &ConfigInfo) -> Result<()> {
 mod tests {
     use super::*;
     use crate::test_helpers::{
-        dir_with_repo, hermetic_git_env, with_isolated_home, write_gitperfconfig, DirGuard,
+        hermetic_git_env, with_isolated_home, with_isolated_test_setup, write_gitperfconfig,
     };
     use std::env;
     use std::fs;
@@ -471,12 +471,7 @@ mod tests {
 
     #[test]
     fn test_gather_git_context() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|_git_dir, _home_path| {
             let context = gather_git_context().unwrap();
             assert_eq!(context.branch, "master");
             assert!(context.repository_root.exists());
@@ -528,37 +523,21 @@ mod tests {
 
     #[test]
     fn test_get_local_config_path_exists() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
-            write_gitperfconfig(temp_dir.path(), "[measurement]\n");
+        with_isolated_test_setup(|git_dir, _home_path| {
+            write_gitperfconfig(git_dir, "[measurement]\n");
 
             let result = get_local_config_path();
             // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
             assert_eq!(
                 result.map(|p| p.canonicalize().unwrap()),
-                Some(
-                    temp_dir
-                        .path()
-                        .join(".gitperfconfig")
-                        .canonicalize()
-                        .unwrap()
-                )
+                Some(git_dir.join(".gitperfconfig").canonicalize().unwrap())
             );
         });
     }
 
     #[test]
     fn test_get_local_config_path_none() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|_git_dir, _home_path| {
             let result = get_local_config_path();
             assert_eq!(result, None);
         });
@@ -566,40 +545,28 @@ mod tests {
 
     #[test]
     fn test_gather_config_sources() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|git_dir, home_path| {
             // Create system config in HOME/.config
             let system_config_dir = Path::new(home_path).join(".config").join("git-perf");
             fs::create_dir_all(&system_config_dir).unwrap();
             let system_config_path = system_config_dir.join("config.toml");
             fs::write(&system_config_path, "# system config\n").unwrap();
 
-            write_gitperfconfig(temp_dir.path(), "[measurement]\n");
+            write_gitperfconfig(git_dir, "[measurement]\n");
 
             let sources = gather_config_sources().unwrap();
             assert_eq!(sources.system_config, Some(system_config_path));
             // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
             assert_eq!(
                 sources.local_config.map(|p| p.canonicalize().unwrap()),
-                Some(
-                    temp_dir
-                        .path()
-                        .join(".gitperfconfig")
-                        .canonicalize()
-                        .unwrap()
-                )
+                Some(git_dir.join(".gitperfconfig").canonicalize().unwrap())
             );
         });
     }
 
     #[test]
     fn test_gather_global_settings() {
-        hermetic_git_env();
-        with_isolated_home(|_home_path| {
+        with_isolated_test_setup(|_git_dir, _home_path| {
             let settings = gather_global_settings();
             // Value is 180 seconds (configured in .gitperfconfig for CI concurrency tests)
             assert_eq!(settings.backoff_max_elapsed_seconds, 180);
@@ -608,12 +575,7 @@ mod tests {
 
     #[test]
     fn test_extract_measurement_names_empty() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|_git_dir, _home_path| {
             let config = Config::builder().build().unwrap();
             let names = extract_measurement_names(&config).unwrap();
             assert!(names.is_empty());
@@ -622,14 +584,9 @@ mod tests {
 
     #[test]
     fn test_extract_measurement_names_with_measurements() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|git_dir, _home_path| {
             write_gitperfconfig(
-                temp_dir.path(),
+                git_dir,
                 r#"
 [measurement.build_time]
 epoch = 0x12345678
@@ -649,14 +606,9 @@ epoch = 0x87654321
 
     #[test]
     fn test_gather_single_measurement_config() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|git_dir, _home_path| {
             write_gitperfconfig(
-                temp_dir.path(),
+                git_dir,
                 r#"
 [measurement.build_time]
 epoch = "12345678"
@@ -686,14 +638,9 @@ unit = "ms"
 
     #[test]
     fn test_gather_single_measurement_config_parent_fallback() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|git_dir, _home_path| {
             write_gitperfconfig(
-                temp_dir.path(),
+                git_dir,
                 r#"
 [measurement]
 dispersion_method = "stddev"
@@ -847,12 +794,7 @@ dispersion_method = "stddev"
 
     #[test]
     fn test_gather_measurement_configs_empty() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|_git_dir, _home_path| {
             // No config file
             let measurements = gather_measurement_configs(None).unwrap();
             assert!(measurements.is_empty());
@@ -861,14 +803,9 @@ dispersion_method = "stddev"
 
     #[test]
     fn test_gather_measurement_configs_with_filter() {
-        hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_test_setup(|git_dir, _home_path| {
             write_gitperfconfig(
-                temp_dir.path(),
+                git_dir,
                 r#"
 [measurement.build_time]
 epoch = 0x12345678
