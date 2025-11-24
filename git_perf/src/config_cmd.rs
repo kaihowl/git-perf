@@ -599,14 +599,10 @@ mod tests {
     #[test]
     fn test_gather_global_settings() {
         hermetic_git_env();
-        with_isolated_home(|home_path| {
-            let temp_dir = dir_with_repo();
-            let _guard = DirGuard::new(temp_dir.path());
-            env::set_var("HOME", home_path);
-
+        with_isolated_home(|_home_path| {
             let settings = gather_global_settings();
-            // Default value is 60 seconds when no config exists
-            assert_eq!(settings.backoff_max_elapsed_seconds, 60);
+            // Value is 180 seconds (configured in .gitperfconfig for CI concurrency tests)
+            assert_eq!(settings.backoff_max_elapsed_seconds, 180);
         });
     }
 
