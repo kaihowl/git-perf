@@ -202,6 +202,65 @@ impl PlotlyReporter {
         None
     }
 
+    /// Helper function to add a vertical line segment to coordinate vectors.
+    ///
+    /// Adds two points (bottom and top of the line) plus a separator (None).
+    fn add_vertical_line_segment(
+        x_coords: &mut Vec<Option<usize>>,
+        y_coords: &mut Vec<Option<f64>>,
+        hover_texts: &mut Vec<String>,
+        x_pos: usize,
+        y_min: f64,
+        y_max: f64,
+        hover_text: String,
+    ) {
+        // Bottom point
+        x_coords.push(Some(x_pos));
+        y_coords.push(Some(y_min));
+        hover_texts.push(hover_text.clone());
+
+        // Top point
+        x_coords.push(Some(x_pos));
+        y_coords.push(Some(y_max));
+        hover_texts.push(hover_text);
+
+        // Separator (breaks the line for next segment)
+        x_coords.push(None);
+        y_coords.push(None);
+        hover_texts.push(String::new());
+    }
+
+    /// Helper function to configure trace legend based on group values.
+    ///
+    /// If group_values is non-empty, uses group label with legend grouping.
+    /// Otherwise, uses measurement display name directly.
+    fn configure_trace_legend<X, Y>(
+        trace: Box<Scatter<X, Y>>,
+        group_values: &[String],
+        measurement_name: &str,
+        measurement_display: &str,
+        label_suffix: &str,
+        legend_group_suffix: &str,
+    ) -> Box<Scatter<X, Y>>
+    where
+        X: serde::Serialize + Clone,
+        Y: serde::Serialize + Clone,
+    {
+        if !group_values.is_empty() {
+            let group_label = group_values.join("/");
+            trace
+                .name(format!("{} ({})", group_label, label_suffix))
+                .legend_group(format!("{}_{}", measurement_name, legend_group_suffix))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - {}", measurement_display, label_suffix).as_str(),
+                ))
+        } else {
+            trace
+                .name(format!("{} ({})", measurement_display, label_suffix))
+                .legend_group(format!("{}_{}", measurement_name, legend_group_suffix))
+        }
+    }
+
     /// Add epoch boundary traces to the plot.
     ///
     /// These are vertical dashed gray lines where measurement epochs change.
@@ -238,23 +297,17 @@ impl PlotlyReporter {
             let commit_idx = commit_indices[transition.index];
             let x_pos = self.size - commit_idx - 1;
 
-            x_coords.push(Some(x_pos));
-            y_coords.push(Some(y_min));
-            hover_texts.push(format!(
-                "Epoch {}→{}",
-                transition.from_epoch, transition.to_epoch
-            ));
+            let hover_text = format!("Epoch {}→{}", transition.from_epoch, transition.to_epoch);
 
-            x_coords.push(Some(x_pos));
-            y_coords.push(Some(y_max));
-            hover_texts.push(format!(
-                "Epoch {}→{}",
-                transition.from_epoch, transition.to_epoch
-            ));
-
-            x_coords.push(None);
-            y_coords.push(None);
-            hover_texts.push(String::new());
+            Self::add_vertical_line_segment(
+                &mut x_coords,
+                &mut y_coords,
+                &mut hover_texts,
+                x_pos,
+                y_min,
+                y_max,
+                hover_text,
+            );
         }
 
         let measurement_display = format_measurement_with_unit(measurement_name);
@@ -266,20 +319,14 @@ impl PlotlyReporter {
             .show_legend(true)
             .hover_text_array(hover_texts);
 
-        let trace = if !group_values.is_empty() {
-            // Join group values with "/" for display (only at display time)
-            let group_label = group_values.join("/");
-            trace
-                .name(format!("{} (Epochs)", group_label))
-                .legend_group(format!("{}_epochs", measurement_name))
-                .legend_group_title(LegendGroupTitle::from(
-                    format!("{} - Epochs", measurement_display).as_str(),
-                ))
-        } else {
-            trace
-                .name(format!("{} (Epochs)", measurement_display))
-                .legend_group(format!("{}_epochs", measurement_name))
-        };
+        let trace = Self::configure_trace_legend(
+            trace,
+            group_values,
+            measurement_name,
+            &measurement_display,
+            "Epochs",
+            "epochs",
+        );
 
         self.plot.add_trace(trace);
     }
@@ -328,9 +375,24 @@ impl PlotlyReporter {
             );
 
             // Create vertical line from y_min to y_max
-            let x_coords = vec![Some(x_pos), Some(x_pos)];
-            let y_coords = vec![Some(y_min), Some(y_max)];
-            let hover_texts = vec![hover_text.clone(), hover_text];
+            let mut x_coords = vec![];
+            let mut y_coords = vec![];
+            let mut hover_texts = vec![];
+
+            Self::add_vertical_line_segment(
+                &mut x_coords,
+                &mut y_coords,
+                &mut hover_texts,
+                x_pos,
+                y_min,
+                y_max,
+                hover_text,
+            );
+
+            // Remove the trailing separator (None values) since we're creating one trace per change point
+            x_coords.truncate(2);
+            y_coords.truncate(2);
+            hover_texts.truncate(2);
 
             let trace = Scatter::new(x_coords, y_coords)
                 .visible(Visible::LegendOnly)
@@ -339,19 +401,14 @@ impl PlotlyReporter {
                 .show_legend(false)
                 .hover_text_array(hover_texts);
 
-            let trace = if !group_values.is_empty() {
-                let group_label = group_values.join("/");
-                trace
-                    .name(format!("{} ({})", group_label, label_prefix))
-                    .legend_group(format!("{}_change_points", measurement_name))
-                    .legend_group_title(LegendGroupTitle::from(
-                        format!("{} - Change Points", measurement_display).as_str(),
-                    ))
-            } else {
-                trace
-                    .name(format!("{} ({})", measurement_display, label_prefix))
-                    .legend_group(format!("{}_change_points", measurement_name))
-            };
+            let trace = Self::configure_trace_legend(
+                trace,
+                group_values,
+                measurement_name,
+                &measurement_display,
+                label_prefix,
+                "change_points",
+            );
 
             self.plot.add_trace(trace);
         }
