@@ -27,6 +27,10 @@ inputs:
     description: 'Perform dry-run without making actual changes'
     required: false
     default: 'false'
+  reports-subdirectory:
+    description: 'Subdirectory within gh-pages containing reports (must match report action)'
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -82,15 +86,24 @@ runs:
     - name: Cleanup orphaned reports
       if: inputs.cleanup-reports == 'true'
       shell: bash
+      env:
+        REPORTS_SUBDIR: ${{ inputs.reports-subdirectory }}
       run: |
         # Run cleanup script to remove reports without measurements
         # Use -y flag for non-interactive execution in CI
+        # Pass subdirectory via environment variable
         if [ -f ./scripts/cleanup-reports.sh ]; then
           chmod +x ./scripts/cleanup-reports.sh
           if [ "${{ inputs.dry-run }}" = "true" ]; then
             echo "[DRY-RUN] Would cleanup orphaned reports"
+            if [ -n "$REPORTS_SUBDIR" ]; then
+              echo "  in subdirectory: $REPORTS_SUBDIR"
+            fi
             ./scripts/cleanup-reports.sh --dry-run || echo "Cleanup script failed but continuing"
           else
+            if [ -n "$REPORTS_SUBDIR" ]; then
+              echo "Cleaning up reports in subdirectory: $REPORTS_SUBDIR"
+            fi
             ./scripts/cleanup-reports.sh -y || echo "Cleanup script failed but continuing"
           fi
         else

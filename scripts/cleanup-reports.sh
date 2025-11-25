@@ -44,10 +44,22 @@ echo "Found $MEASUREMENT_COUNT commits with measurements"
 
 # Get list of commit-based reports on gh-pages
 echo "Fetching reports from gh-pages branch..."
-git ls-tree --name-only gh-pages | \
-    grep -E '^[0-9a-f]{40}\.html$' | \
-    sed 's/\.html$//' | \
-    sort > /tmp/commits_with_reports.txt
+if [ -n "${REPORTS_SUBDIR:-}" ]; then
+    echo "Looking in subdirectory: $REPORTS_SUBDIR"
+    # List files in subdirectory, extract SHA-based reports
+    git ls-tree --name-only gh-pages "$REPORTS_SUBDIR" 2>/dev/null | \
+        sed "s|^$REPORTS_SUBDIR/||" | \
+        grep -E '^[0-9a-f]{40}\.html$' | \
+        sed 's/\.html$//' | \
+        sort > /tmp/commits_with_reports.txt || touch /tmp/commits_with_reports.txt
+else
+    echo "Looking in root directory"
+    # List files in root, extract SHA-based reports
+    git ls-tree --name-only gh-pages | \
+        grep -E '^[0-9a-f]{40}\.html$' | \
+        sed 's/\.html$//' | \
+        sort > /tmp/commits_with_reports.txt
+fi
 
 REPORT_COUNT=$(wc -l < /tmp/commits_with_reports.txt)
 echo "Found $REPORT_COUNT commit-based reports"
@@ -119,10 +131,16 @@ trap cleanup EXIT
 echo "Deleting orphaned reports..."
 DELETED_COUNT=0
 for commit in $ORPHANED_REPORTS; do
-    if git rm "${commit}.html" 2>/dev/null; then
+    if [ -n "${REPORTS_SUBDIR:-}" ]; then
+        REPORT_PATH="$REPORTS_SUBDIR/${commit}.html"
+    else
+        REPORT_PATH="${commit}.html"
+    fi
+
+    if git rm "$REPORT_PATH" 2>/dev/null; then
         ((DELETED_COUNT++)) || true  # Prevent errexit on arithmetic
     else
-        echo "Warning: Could not remove ${commit}.html"
+        echo "Warning: Could not remove $REPORT_PATH"
     fi
 done
 
