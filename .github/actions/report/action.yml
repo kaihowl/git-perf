@@ -42,6 +42,14 @@ inputs:
     description: 'Whether to use disk-size (compressed) instead of logical size'
     required: false
     default: 'true'
+  show-epochs:
+    description: 'Whether to show epoch boundaries in the report'
+    required: false
+    default: 'false'
+  detect-changes:
+    description: 'Whether to detect and display change points in the report'
+    required: false
+    default: 'false'
 
 outputs:
   report-url:
@@ -88,7 +96,19 @@ runs:
           echo "This may be due to missing git objects in the repository"
         fi
         mkdir -p reports/
-        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html ${{ inputs.additional-args }}
+
+        # Build optional flags
+        EPOCH_FLAG=""
+        if [ "${{ inputs.show-epochs }}" = "true" ]; then
+          EPOCH_FLAG="--show-epochs"
+        fi
+
+        CHANGES_FLAG=""
+        if [ "${{ inputs.detect-changes }}" = "true" ]; then
+          CHANGES_FLAG="--detect-changes"
+        fi
+
+        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG ${{ inputs.additional-args }}
 
     - name: Run audit
       id: audit

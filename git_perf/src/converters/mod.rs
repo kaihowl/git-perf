@@ -307,8 +307,10 @@ mod tests {
 
     #[test]
     fn test_format_measurement_name_with_prefix() {
-        let mut options = ConversionOptions::default();
-        options.prefix = Some("custom".to_string());
+        let options = ConversionOptions {
+            prefix: Some("custom".to_string()),
+            ..Default::default()
+        };
         let name = format_measurement_name("test", "my_test", None, &options);
         assert_eq!(name, "custom::test::my_test");
     }
@@ -322,8 +324,10 @@ mod tests {
 
     #[test]
     fn test_format_measurement_name_with_prefix_and_suffix() {
-        let mut options = ConversionOptions::default();
-        options.prefix = Some("perf".to_string());
+        let options = ConversionOptions {
+            prefix: Some("perf".to_string()),
+            ..Default::default()
+        };
         let name = format_measurement_name("bench", "my_bench", Some("median"), &options);
         assert_eq!(name, "perf::bench::my_bench::median");
     }
@@ -646,8 +650,10 @@ mod tests {
             metadata: HashMap::new(),
         })];
 
-        let mut options = ConversionOptions::default();
-        options.prefix = Some("ci".to_string());
+        let options = ConversionOptions {
+            prefix: Some("ci".to_string()),
+            ..Default::default()
+        };
 
         let result = convert_to_measurements(parsed, &options);
         assert_eq!(result[0].name, "ci::test::my_test");
