@@ -568,7 +568,7 @@ mod tests {
     fn test_gather_global_settings() {
         with_isolated_test_setup(|_git_dir, _home_path| {
             let settings = gather_global_settings();
-            // Default value is 60 seconds (test runs in isolated directory)
+            // Default value is 60 seconds
             assert_eq!(settings.backoff_max_elapsed_seconds, 60);
         });
     }
