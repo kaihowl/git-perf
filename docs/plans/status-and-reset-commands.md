@@ -13,7 +13,7 @@ Add two new commands to git-perf to manage locally pending measurements (measure
 Currently, git-perf users who create test measurements locally have no convenient way to:
 - See which measurements are pending (not yet pushed to remote)
 - Identify which commits have pending measurements
-- Selectively or completely discard local measurements before pushing
+- Completely discard local measurements before pushing
 - Clean up experimental measurements without affecting remote data
 
 This leads to:
@@ -29,8 +29,7 @@ A `status` command would provide:
 - Clear distinction between local and remote state
 
 A `reset` command would provide:
-- Safe way to discard local pending measurements
-- Options to reset all or specific measurements
+- Safe way to discard all local pending measurements
 - Prevention of data loss by only affecting unpushed data
 - Workflow similar to `git reset` for familiarity
 
@@ -42,10 +41,8 @@ A `reset` command would provide:
    - Show summary similar to `git status` output
    - Optional detailed view showing per-commit breakdown
 
-2. **Reset command** - Drop locally pending measurements
-   - Remove all pending measurements (default behavior)
-   - Optionally filter by measurement name
-   - Optionally filter by commit/commit range
+2. **Reset command** - Drop all locally pending measurements
+   - Remove all pending measurements
    - Preserve remote measurements (only affect local pending)
    - Provide confirmation/dry-run options for safety
 
@@ -57,6 +54,7 @@ A `reset` command would provide:
 
 ## Non-Goals (Future Work)
 
+- Selective reset (filtering by measurement name or commit range)
 - Interactive mode for selective reset (pick which measurements to drop)
 - Reset by date/time range
 - Undo/recovery of reset measurements
@@ -134,15 +132,10 @@ Add to `Commands` enum (after `Prune`, around line 417):
 /// Examples:
 ///   git perf status                    # Show summary of pending measurements
 ///   git perf status --detailed         # Show per-commit breakdown
-///   git perf status --measurement M    # Only show specific measurement
 Status {
     /// Show detailed per-commit breakdown
     #[arg(short, long)]
     detailed: bool,
-
-    /// Filter by specific measurement name (can be specified multiple times)
-    #[arg(short, long)]
-    measurement: Vec<String>,
 },
 
 /// Drop locally pending measurements that haven't been pushed
@@ -155,26 +148,16 @@ Status {
 /// have been pushed to the remote are not affected. Use `remove` or `prune`
 /// for managing published measurements.
 ///
-/// By default, removes ALL pending measurements. Use filters to be selective.
+/// Removes ALL pending measurements.
 ///
 /// Examples:
 ///   git perf reset                        # Remove all pending measurements
 ///   git perf reset --dry-run              # Preview what would be reset
-///   git perf reset --measurement M        # Only reset specific measurement
-///   git perf reset --commit HEAD~3..HEAD  # Reset for specific commit range
+///   git perf reset --force                # Skip confirmation prompt
 Reset {
     /// Preview what would be reset without actually resetting
     #[arg(long)]
     dry_run: bool,
-
-    /// Only reset measurements with these names (can be specified multiple times)
-    #[arg(short, long)]
-    measurement: Vec<String>,
-
-    /// Only reset measurements for specific commit(s) or range
-    /// Format: commit-ish (e.g., HEAD, abc123, main~5..main)
-    #[arg(short, long)]
-    commit: Option<String>,
 
     /// Skip confirmation prompt (dangerous)
     #[arg(short, long)]
@@ -227,12 +210,9 @@ pub struct CommitMeasurements {
 
 ```rust
 /// Display pending measurement status
-pub fn show_status(
-    detailed: bool,
-    measurement_filter: &[String],
-) -> Result<()> {
+pub fn show_status(detailed: bool) -> Result<()> {
     // 1. Check if there are any pending measurements
-    let status = gather_pending_status(detailed, measurement_filter)?;
+    let status = gather_pending_status(detailed)?;
 
     // 2. Display results
     display_status(&status, detailed)?;
@@ -241,10 +221,7 @@ pub fn show_status(
 }
 
 /// Gather information about pending measurements
-fn gather_pending_status(
-    detailed: bool,
-    measurement_filter: &[String],
-) -> Result<PendingStatus> {
+fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     // Create a consolidated read branch that includes pending writes
     // but not the remote branch
     let pending_guard = create_consolidated_pending_read_branch()?;
@@ -272,24 +249,10 @@ fn gather_pending_status(
             continue;
         }
 
-        // Filter by measurement name if requested
-        let filtered_measurements: Vec<_> = if measurement_filter.is_empty() {
-            measurements
-        } else {
-            measurements
-                .into_iter()
-                .filter(|m| measurement_filter.contains(&m.name))
-                .collect()
-        };
-
-        if filtered_measurements.is_empty() {
-            continue;
-        }
-
         commit_count += 1;
 
         // Collect unique measurement names
-        let commit_measurement_names: Vec<String> = filtered_measurements
+        let commit_measurement_names: Vec<String> = measurements
             .iter()
             .map(|m| m.name.clone())
             .collect();
@@ -303,7 +266,7 @@ fn gather_pending_status(
             per_commit_vec.push(CommitMeasurements {
                 commit: commit_sha.clone(),
                 measurement_names: commit_measurement_names,
-                count: filtered_measurements.len(),
+                count: measurements.len(),
             });
         }
     }
@@ -422,14 +385,9 @@ pub struct ResetPlan {
 
 ```rust
 /// Reset (discard) pending measurements
-pub fn reset_measurements(
-    dry_run: bool,
-    measurement_filter: &[String],
-    commit_filter: Option<&str>,
-    force: bool,
-) -> Result<()> {
+pub fn reset_measurements(dry_run: bool, force: bool) -> Result<()> {
     // 1. Determine what would be reset
-    let plan = plan_reset(measurement_filter, commit_filter)?;
+    let plan = plan_reset()?;
 
     // 2. Check if there's anything to reset
     if plan.refs_to_delete.is_empty() {
@@ -462,10 +420,7 @@ pub fn reset_measurements(
 }
 
 /// Plan what will be reset
-fn plan_reset(
-    measurement_filter: &[String],
-    commit_filter: Option<&str>,
-) -> Result<ResetPlan> {
+fn plan_reset() -> Result<ResetPlan> {
     // Get all write refs
     let refs = get_refs(vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")])?;
 
@@ -477,21 +432,14 @@ fn plan_reset(
         });
     }
 
-    // If no filters, delete all write refs
-    if measurement_filter.is_empty() && commit_filter.is_none() {
-        // Count measurements for display
-        let (measurement_count, commit_count) = count_all_pending_measurements()?;
+    // Count measurements for display
+    let (measurement_count, commit_count) = count_all_pending_measurements()?;
 
-        return Ok(ResetPlan {
-            refs_to_delete: refs.into_iter().map(|r| r.refname).collect(),
-            measurement_count,
-            commit_count,
-        });
-    }
-
-    // With filters, we need selective reset
-    // This is more complex - we need to rewrite write refs
-    plan_selective_reset(measurement_filter, commit_filter, &refs)
+    Ok(ResetPlan {
+        refs_to_delete: refs.into_iter().map(|r| r.refname).collect(),
+        measurement_count,
+        commit_count,
+    })
 }
 
 /// Count all pending measurements
@@ -515,34 +463,6 @@ fn count_all_pending_measurements() -> Result<(usize, usize)> {
     }
 
     Ok((total_measurements, commit_count))
-}
-
-/// Plan selective reset (with filters)
-fn plan_selective_reset(
-    measurement_filter: &[String],
-    commit_filter: Option<&str>,
-    refs: &[Reference],
-) -> Result<ResetPlan> {
-    // For selective reset, we need to:
-    // 1. Read all measurements from write refs
-    // 2. Filter out unwanted measurements
-    // 3. Rewrite refs with remaining measurements
-    // 4. Delete refs that become empty
-
-    // This is complex and error-prone. For v1, we can:
-    // - Only support full reset (no filters)
-    // - Or: delete all write refs and prompt user to re-add what they want to keep
-
-    // For safety, let's not support selective reset in v1
-    if !measurement_filter.is_empty() || commit_filter.is_some() {
-        bail!(
-            "Selective reset (by measurement or commit) is not yet supported.\n\
-             To reset specific measurements, use 'git perf reset' to discard all pending,\n\
-             then re-add the measurements you want to keep."
-        );
-    }
-
-    unreachable!("This code path should not be reached with current filters")
 }
 ```
 
@@ -589,22 +509,9 @@ fn confirm_reset() -> Result<bool> {
 Add to match statement (after `Prune`, around line 127):
 
 ```rust
-Commands::Status {
-    detailed,
-    measurement,
-} => status::show_status(*detailed, measurement),
+Commands::Status { detailed } => status::show_status(*detailed),
 
-Commands::Reset {
-    dry_run,
-    measurement,
-    commit,
-    force,
-} => reset::reset_measurements(
-    *dry_run,
-    measurement,
-    commit.as_deref(),
-    *force,
-),
+Commands::Reset { dry_run, force } => reset::reset_measurements(*dry_run, *force),
 ```
 
 Add module declarations at top of file:
@@ -637,28 +544,22 @@ Ensure the `status` and `reset` modules are declared.
 1. Add `--detailed` flag support
    - Show per-commit breakdown
    - Include measurement counts
-2. Add measurement filtering
-3. Improve output formatting
-4. Add helpful hints in output
+2. Improve output formatting
+3. Add helpful hints in output
 
-### Phase 3: Reset Command (Basic)
+### Phase 3: Reset Command
 
 1. Add CLI definition for `Reset` command
-2. Create `git_perf/src/reset.rs` with basic implementation
-   - Support full reset only (no filters)
+2. Create `git_perf/src/reset.rs` with implementation
+   - Support full reset only (no filtering)
    - Add confirmation prompt
    - Add dry-run support
+   - Add `--force` flag to skip confirmation
 3. Wire up command handler
 4. Test carefully with test data
+5. Improve error messages and safety checks
 
-### Phase 4: Reset Command (Enhanced)
-
-1. Add `--force` flag to skip confirmation
-2. Improve error messages and safety checks
-3. Add better dry-run output
-4. Consider selective reset (stretch goal)
-
-### Phase 5: Documentation
+### Phase 4: Documentation
 
 1. Add comprehensive doc comments to CLI definitions
 2. Run `./scripts/generate-manpages.sh`
@@ -666,7 +567,7 @@ Ensure the `status` and `reset` modules are declared.
 4. Update README if needed
 5. Add examples to documentation
 
-### Phase 6: Testing
+### Phase 5: Testing
 
 1. Create `test/test_status.sh` integration test
 2. Create `test/test_reset.sh` integration test
@@ -674,7 +575,7 @@ Ensure the `status` and `reset` modules are declared.
 4. Run full test suite
 5. Manual testing with various scenarios
 
-### Phase 7: Code Quality
+### Phase 6: Code Quality
 
 1. Run `cargo fmt` to format code
 2. Run `cargo clippy` and address warnings
@@ -828,20 +729,6 @@ Per-commit breakdown:
 (use "git perf push" to publish measurements)
 ```
 
-```bash
-# Filter by measurement name
-$ git perf status --measurement benchmark_render
-Pending measurements:
-  2 commit(s) with measurements
-  1 unique measurement(s)
-
-Measurement names:
-  - benchmark_render
-
-(use "git perf reset" to discard pending measurements)
-(use "git perf push" to publish measurements)
-```
-
 ### Reset Examples
 
 ```bash
@@ -894,9 +781,9 @@ Reset complete. 3 write ref(s) deleted.
    - Safe because only affects unpushed data
    - Uses existing `remove_reference()` function
 
-3. **Selective reset complexity**:
-   - V1: Only support full reset (all pending)
-   - Future: Selective reset requires rewriting git notes
+3. **No selective reset**:
+   - Only support full reset (all pending)
+   - Selective reset would require rewriting git notes
    - Rewriting is complex and error-prone
    - Better UX: reset all, then re-add what you want
 
@@ -994,7 +881,6 @@ Reset complete. 3 write ref(s) deleted.
 - [ ] `status` command shows pending measurements correctly
 - [ ] `status` command handles empty state gracefully
 - [ ] `status --detailed` shows per-commit breakdown
-- [ ] `status --measurement` filters correctly
 - [ ] `reset` command deletes write refs correctly
 - [ ] `reset` command prompts for confirmation
 - [ ] `reset --dry-run` previews without changes
@@ -1013,7 +899,7 @@ Reset complete. 3 write ref(s) deleted.
 | Accidental data loss | User loses measurements | Require confirmation, add --dry-run, clear warnings |
 | Confusion about pending vs published | User expectations violated | Clear documentation, helpful output messages |
 | Performance with many commits | Slow status command | Document limitation, optimize if needed |
-| Complexity of selective reset | Bugs, data corruption | Defer to future version, only support full reset in v1 |
+| Complexity of selective reset | Bugs, data corruption | Not supported - only full reset implemented |
 | Concurrent modifications | Inconsistent state | Use atomic ref operations, document behavior |
 
 ## Related Work
@@ -1063,7 +949,7 @@ Reset complete. 3 write ref(s) deleted.
 
 **Pros**: More flexible, supports selective reset
 **Cons**: Complex, error-prone, risk of data corruption
-**Decision**: Deferred to future version, start with full reset only
+**Decision**: Rejected - too complex and risky, full reset only
 
 ### Approach 3: Reset with automatic backup
 
