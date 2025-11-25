@@ -25,11 +25,3 @@ unit = "ns"
 [measurement."report-size-benchmark"]
 unit = "bytes"
 min_relative_deviation = 10.0
-
-[backoff]
-# Increase max elapsed time to handle high concurrency in CI environments
-# The slow concurrency test (testslow_concurrency_push_add.sh) runs 2 concurrent
-# pruners that can experience significant contention, especially in CI where
-# resources are more limited. Default is 60s, we increase to 180s to provide
-# enough retry window for the worst-case scenarios.
-max_elapsed_seconds = 180
