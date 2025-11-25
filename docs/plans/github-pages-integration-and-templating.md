@@ -505,35 +505,25 @@ The CLI arguments (`--filter`, `--measurement`, `--aggregate-by`, etc.) are **ig
 
 For backward compatibility, if the template contains **no** `{{SECTION[...]}}` blocks, the existing behavior applies (single report with CLI-specified filters).
 
-**Configuration File Support:**
+**Using Multiple Dashboard Templates:**
 
-For commonly used dashboard configurations, allow template paths in `.gitperfconfig`:
-
-```toml
-[report]
-# Default single-view template
-template_path = ".git-perf/report-template.html"
-
-[report.dashboard]
-# Multi-section dashboard template
-template_path = ".git-perf/dashboard-template.html"
-enabled = true
-
-[report.dashboard.section."test-durations"]
-measurement_filter = "^test::"
-aggregate_by = "median"
-
-[report.dashboard.section."benchmarks"]
-measurement_filter = "^bench::"
-aggregate_by = "mean"
-separate_by = ["platform"]
-```
-
-Then invoke with:
+Simply keep different dashboard templates in your repository and reference them directly:
 
 ```bash
-git perf report --use-dashboard --output reports/dashboard.html
+# Generate test-focused dashboard
+git perf report --template .git-perf/test-dashboard.html \
+                --output reports/tests.html
+
+# Generate benchmark-focused dashboard
+git perf report --template .git-perf/bench-dashboard.html \
+                --output reports/benchmarks.html
+
+# Generate comprehensive overview
+git perf report --template .git-perf/overview-dashboard.html \
+                --output reports/overview.html
 ```
+
+The template files themselves contain all the configuration needed for each dashboard view.
 
 **Example: Complete Dashboard Template**
 
@@ -1022,13 +1012,11 @@ This index is preserved by `keep_files: true` when reports are deployed to `/per
 - [ ] Implement CLI argument override behavior (ignore CLI when sections present)
 - [ ] Add `key-value-filter` parameter parsing
 - [ ] Refactor reporting.rs to support reusable report generation for sections
-- [ ] Create dashboard template examples
-- [ ] Add configuration file support for dashboard templates
-- [ ] Add `--use-dashboard` CLI flag
 - [ ] Write unit tests for section parsing and configuration
 - [ ] Write integration tests for multi-section reports
 - [ ] Document dashboard template syntax and usage
-- [ ] Create example templates (test overview, benchmark comparison, memory analysis)
+- [ ] Create example dashboard templates (test overview, benchmark comparison, memory analysis)
+- [ ] Add examples showing multiple dashboard templates in one repository
 
 ### Phase 3: Index Generation (Weeks 5-6)
 - [ ] Implement `generate-index` subcommand
