@@ -83,6 +83,8 @@ jobs:
 | `backup` | Create backup of measurements before removal | No | `true` |
 | `cleanup-reports` | Also cleanup orphaned reports on gh-pages branch | No | `true` |
 | `git-perf-version` | Version of git-perf to use (latest or specific version) | No | `latest` |
+| `dry-run` | Perform dry-run without making actual changes | No | `false` |
+| `reports-subdirectory` | Subdirectory within gh-pages containing reports (must match report action) | No | `` |
 
 ## Permissions Required
 
@@ -189,8 +191,36 @@ If report cleanup fails:
 - Ensure the workflow has `pages: write` permission
 - Check that the gh-pages branch exists
 
+## Subdirectory Support
+
+If you're using the report action with `reports-subdirectory`, ensure the cleanup action uses the same subdirectory:
+
+```yaml
+- name: Cleanup measurements and reports
+  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  with:
+    retention-days: 90
+    cleanup-reports: true
+    reports-subdirectory: 'perf'  # Must match report action
+```
+
+This ensures the cleanup script only removes orphaned reports from the specified subdirectory, leaving other content on gh-pages untouched.
+
+### Dry Run Example
+
+Test the cleanup before running it:
+
+```yaml
+- name: Test cleanup (dry-run)
+  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  with:
+    dry-run: true
+    reports-subdirectory: 'perf'
+```
+
 ## See Also
 
 - [git-perf Install Action](../install/README.md)
+- [git-perf Report Action](../report/README.md)
 - [git-perf Documentation](https://github.com/kaihowl/git-perf)
 - [Integration Tutorial](../../../docs/INTEGRATION_TUTORIAL.md) *(coming soon)*
