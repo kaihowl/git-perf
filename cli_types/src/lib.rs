@@ -409,6 +409,10 @@ pub enum Commands {
         /// Skip automatic pruning of orphaned measurements after removal
         #[arg(long = "no-prune", default_value = "false")]
         no_prune: bool,
+
+        /// Preview what would be removed without actually removing
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Remove all performance measurements for non-existent/unreachable objects.

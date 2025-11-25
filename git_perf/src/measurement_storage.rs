@@ -69,6 +69,10 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
     Ok(())
 }
 
-pub fn remove_measurements_from_commits(older_than: DateTime<Utc>, prune: bool) -> Result<()> {
-    crate::git::git_interop::remove_measurements_from_commits(older_than, prune)
+pub fn remove_measurements_from_commits(
+    older_than: DateTime<Utc>,
+    prune: bool,
+    dry_run: bool,
+) -> Result<()> {
+    crate::git::git_interop::remove_measurements_from_commits(older_than, prune, dry_run)
 }

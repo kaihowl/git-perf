@@ -4,7 +4,7 @@
 .SH NAME
 remove \- Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=)
 .SH SYNOPSIS
-\fBremove\fR <\fB\-\-older\-than\fR> [\fB\-\-no\-prune\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBremove\fR <\fB\-\-older\-than\fR> [\fB\-\-no\-prune\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .SH DESCRIPTION
 Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=).
 .PP
@@ -18,6 +18,9 @@ Note: Only published measurements (i.e., those that have been pushed to the remo
 .TP
 \fB\-\-no\-prune\fR
 Skip automatic pruning of orphaned measurements after removal
+.TP
+\fB\-\-dry\-run\fR
+Preview what would be removed without actually removing
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help (see a summary with \*(Aq\-h\*(Aq)
