@@ -206,6 +206,14 @@ pub fn audit_multiple(
             params.dispersion_method,
         )?;
 
+        // TODO(Phase 2): Add change point detection warning here
+        // If !_no_change_point_warning, detect change points in current epoch
+        // and warn if any exist, as they make z-score comparisons unreliable:
+        //   ⚠️  WARNING: Change point detected in current epoch at commit a1b2c3d (+23.5%)
+        //       Historical z-score comparison may be unreliable due to regime shift.
+        //       Consider bumping epoch or investigating the change.
+        // See docs/plans/change-point-detection.md for implementation details.
+
         println!("{}", result.message);
 
         if !result.passed {
