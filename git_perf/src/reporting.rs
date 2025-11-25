@@ -840,61 +840,42 @@ pub fn report(
             // Note: We need the original commit index (i) to map back to the correct x-coordinate
             // IMPORTANT: We must aggregate multiple measurements per commit to get one value per commit
             // Otherwise, change point detection will see incorrect patterns
-            let measurement_data: Vec<(usize, f64, u32, String)> = if aggregate_by.is_some() {
-                // Already aggregated, use the same reduction function
-                group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| {
-                        let commit_sha = commits[i].commit.clone();
-                        ms.reduce_by(aggregate_by.unwrap())
-                            .into_iter()
-                            .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
-                    })
-                    .collect()
-            } else {
-                // No aggregation specified, use min (default) to get one value per commit
-                group_measurements
-                    .clone()
-                    .enumerate()
-                    .filter_map(|(i, ms)| {
-                        let measurements: Vec<_> = ms.collect();
-                        if measurements.is_empty() {
-                            None
-                        } else {
-                            let commit_sha = commits[i].commit.clone();
-                            // Use min for change point detection when multiple measurements exist
-                            let min_val = measurements
-                                .iter()
-                                .map(|m| m.val)
-                                .min_by(|a, b| a.partial_cmp(b).unwrap())
-                                .unwrap();
-                            // Use the first measurement's epoch (they should all be the same)
-                            let epoch = measurements[0].epoch;
-                            Some((i, min_val, epoch, commit_sha))
-                        }
-                    })
-                    .collect()
-            };
 
-            if measurement_data.len() >= 2 {
-                let commit_indices: Vec<usize> =
-                    measurement_data.iter().map(|(i, _, _, _)| *i).collect();
-                let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
-                let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
-                let commit_shas: Vec<String> = measurement_data
-                    .iter()
-                    .map(|(_, _, _, s)| s.clone())
-                    .collect();
+            // Default to min aggregation if no aggregation specified
+            let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
 
-                log::debug!(
-                    "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
-                    measurement_name,
-                    values.len(),
-                    commit_indices,
-                    epochs
-                );
+            let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
+                .clone()
+                .enumerate()
+                .flat_map(|(i, ms)| {
+                    let commit_sha = commits[i].commit.clone();
+                    ms.reduce_by(reduction_func)
+                        .into_iter()
+                        .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
+                })
+                .collect();
 
+            // No explicit minimum data point check needed here - change point detection
+            // already enforces min_data_points via ChangePointConfig (default: 10).
+            // Epoch transition detection gracefully handles any input size.
+            let commit_indices: Vec<usize> =
+                measurement_data.iter().map(|(i, _, _, _)| *i).collect();
+            let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
+            let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
+            let commit_shas: Vec<String> = measurement_data
+                .iter()
+                .map(|(_, _, _, s)| s.clone())
+                .collect();
+
+            log::debug!(
+                "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+                measurement_name,
+                values.len(),
+                commit_indices,
+                epochs
+            );
+
+            if !values.is_empty() {
                 // Calculate y-axis bounds for vertical lines
                 let y_min = values.iter().cloned().fold(f64::INFINITY, f64::min) * 0.9;
                 let y_max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max) * 1.1;

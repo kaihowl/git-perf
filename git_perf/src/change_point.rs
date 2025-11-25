@@ -198,8 +198,10 @@ pub fn enrich_change_points(
             continue;
         }
 
-        // Calculate mean of the regime before this change point
-        // (from previous change point or start to this change point)
+        // Calculate mean of the regimen immediately before this change point.
+        // This is the segment between the previous change point (or start) and this one.
+        // Example: if change points are at indices [10, 20, 30], and we're processing CP at 20:
+        //   before_segment = measurements[10..20] (the regimen from previous CP to this CP)
         let before_start = if i > 0 { indices[i - 1] } else { 0 };
         let before_segment = &measurements[before_start..idx];
         let before_mean = if !before_segment.is_empty() {
@@ -208,8 +210,10 @@ pub fn enrich_change_points(
             measurements[0]
         };
 
-        // Calculate mean of the regime after this change point
-        // (from this change point to next change point or end)
+        // Calculate mean of the regimen immediately after this change point.
+        // This is the segment between this change point and the next one (or end).
+        // Continuing example: if we're processing CP at 20:
+        //   after_segment = measurements[20..30] (the regimen from this CP to next CP)
         let after_end = if i + 1 < indices.len() {
             indices[i + 1]
         } else {
