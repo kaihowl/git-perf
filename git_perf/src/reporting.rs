@@ -92,7 +92,8 @@ struct SectionConfig {
     aggregate_by: Option<ReductionFunc>,
     /// Number of commits (overrides global depth)
     depth: Option<usize>,
-    /// Section-specific title for the chart
+    /// Section-specific title for the chart (parsed but not yet used in display)
+    #[allow(dead_code)]
     title: Option<String>,
 }
 
