@@ -272,6 +272,7 @@ Note: Only published measurements (i.e., those that have been pushed to the remo
 * `--no-prune` — Skip automatic pruning of orphaned measurements after removal
 
   Default value: `false`
+* `--dry-run` — Preview what would be removed without actually removing
 
 
 

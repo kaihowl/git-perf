@@ -128,7 +128,8 @@ pub fn handle_calls() -> Result<()> {
         Commands::Remove {
             older_than,
             no_prune,
-        } => remove_measurements_from_commits(older_than, !no_prune),
+            dry_run,
+        } => remove_measurements_from_commits(older_than, !no_prune, dry_run),
         Commands::ListCommits {} => {
             let commits = list_commits_with_measurements()?;
             for commit in commits {
