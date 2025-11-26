@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    {{PLOTLY_HEAD}}
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+        }
+        .section h2 {
+            margin-top: 0;
+        }
+        .metadata {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        {{CUSTOM_CSS}}
+    </style>
+</head>
+<body>
+    <h1>{{TITLE}}</h1>
+
+    <div class="metadata">
+        <strong>Generated:</strong> {{TIMESTAMP}} |
+        <strong>Commits:</strong> {{COMMIT_RANGE}} ({{DEPTH}} total)
+    </div>
+
+    <div class="section">
+        <h2>Test Performance (Aggregated)</h2>
+        {{SECTION[tests]
+            measurement-filter: ^test::
+            aggregate-by: median
+        }}
+    </div>
+
+    <div class="section">
+        <h2>Benchmark Performance (Aggregated)</h2>
+        {{SECTION[benchmarks]
+            measurement-filter: ^bench::
+            aggregate-by: median
+        }}
+    </div>
+
+    <div class="section">
+        <h2>Raw Test Data (Last 20 commits)</h2>
+        {{SECTION[tests-raw]
+            measurement-filter: ^test::
+            aggregate-by: none
+            depth: 20
+        }}
+    </div>
+</body>
+</html>
