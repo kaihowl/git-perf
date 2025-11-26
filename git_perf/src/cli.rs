@@ -62,10 +62,19 @@ pub fn handle_calls() -> Result<()> {
             key_value,
             aggregate_by,
             filter,
+            template,
+            custom_css,
+            title,
         } => {
             // Combine measurements (as exact matches) and filter patterns into unified regex patterns
             let combined_patterns =
                 crate::filter::combine_measurements_and_filters(&measurement, &filter);
+
+            let template_config = crate::reporting::ReportTemplateConfig {
+                template_path: template,
+                custom_css_path: custom_css,
+                title,
+            };
 
             report(
                 output,
@@ -74,6 +83,7 @@ pub fn handle_calls() -> Result<()> {
                 &key_value,
                 aggregate_by.map(ReductionFunc::from),
                 &combined_patterns,
+                template_config,
             )
         }
         Commands::Audit {

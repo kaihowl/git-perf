@@ -178,6 +178,9 @@ Create an HTML performance report
 
   Possible values: `min`, `max`, `median`, `mean`
 
+* `-t`, `--template <TEMPLATE>` — Path to custom HTML template file (overrides config)
+* `-c`, `--custom-css <CUSTOM_CSS>` — Path to custom CSS file to inject into the template
+* `--title <TITLE>` — Custom title for the report (overrides default)
 
 
 

@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{self, File},
     io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
 };
 
 use anyhow::anyhow;
 use anyhow::{bail, Result};
+use chrono::Utc;
 use itertools::Itertools;
 use plotly::{
     common::{Font, LegendGroupTitle, Title},
@@ -20,6 +21,154 @@ use crate::{
     measurement_retrieval::{self, MeasurementReducer},
     stats::ReductionFunc,
 };
+
+/// Configuration for report templates
+pub struct ReportTemplateConfig {
+    pub template_path: Option<PathBuf>,
+    pub custom_css_path: Option<PathBuf>,
+    pub title: Option<String>,
+}
+
+/// Metadata for rendering report templates
+struct ReportMetadata {
+    title: String,
+    custom_css: String,
+    timestamp: String,
+    commit_range: String,
+    depth: usize,
+}
+
+impl ReportMetadata {
+    fn new(
+        title: Option<String>,
+        custom_css_content: String,
+        commits: &[Commit],
+    ) -> ReportMetadata {
+        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+        let commit_range = if commits.is_empty() {
+            "No commits".to_string()
+        } else if commits.len() == 1 {
+            commits[0].commit[..7].to_string()
+        } else {
+            format!(
+                "{}..{}",
+                &commits.last().unwrap().commit[..7],
+                &commits[0].commit[..7]
+            )
+        };
+
+        let depth = commits.len();
+
+        let default_title = "Performance Measurements".to_string();
+        let title = title.unwrap_or(default_title);
+
+        ReportMetadata {
+            title,
+            custom_css: custom_css_content,
+            timestamp,
+            commit_range,
+            depth,
+        }
+    }
+}
+
+/// Extract Plotly JavaScript dependencies and plot content
+///
+/// Uses Plotly's native API to generate proper HTML components:
+/// - `plotly_head`: Script tags for Plotly.js library (from CDN by default)
+/// - `plotly_body`: Inline div + script for the actual plot content
+///
+/// This approach is more robust than HTML string parsing and leverages
+/// Plotly's to_inline_html() method which generates embeddable content
+/// assuming Plotly.js is already available on the page.
+fn extract_plotly_parts(plot: &Plot) -> (String, String) {
+    // Get the Plotly.js library script tags from CDN
+    // This returns script tags that load plotly.min.js from CDN
+    let plotly_head = Plot::online_cdn_js();
+
+    // Get the inline plot HTML (div + script) without full HTML document
+    // This assumes plotly.js is already loaded (which we handle via plotly_head)
+    // Pass None to auto-generate a unique div ID
+    let plotly_body = plot.to_inline_html(None);
+
+    (plotly_head, plotly_body)
+}
+
+/// Apply template with placeholder substitution
+fn apply_template(template: &str, plot: &Plot, metadata: &ReportMetadata) -> Vec<u8> {
+    let (plotly_head, plotly_body) = extract_plotly_parts(plot);
+
+    let output = template
+        .replace("{{TITLE}}", &metadata.title)
+        .replace("{{PLOTLY_HEAD}}", &plotly_head)
+        .replace("{{PLOTLY_BODY}}", &plotly_body)
+        .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+        .replace("{{TIMESTAMP}}", &metadata.timestamp)
+        .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+        .replace("{{DEPTH}}", &metadata.depth.to_string())
+        .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
+
+    output.as_bytes().to_vec()
+}
+
+/// Load template from file or return default
+fn load_template(template_path: Option<&PathBuf>) -> Result<Option<String>> {
+    let template_path = match template_path {
+        Some(path) => path.clone(),
+        None => {
+            // Try config
+            if let Some(config_path) = config::report_template_path() {
+                config_path
+            } else {
+                // No template specified
+                return Ok(None);
+            }
+        }
+    };
+
+    if !template_path.exists() {
+        bail!("Template file not found: {}", template_path.display());
+    }
+
+    let template_content = fs::read_to_string(&template_path).map_err(|e| {
+        anyhow!(
+            "Failed to read template file {}: {}",
+            template_path.display(),
+            e
+        )
+    })?;
+
+    Ok(Some(template_content))
+}
+
+/// Load custom CSS content from file
+fn load_custom_css(custom_css_path: Option<&PathBuf>) -> Result<String> {
+    let css_path = match custom_css_path {
+        Some(path) => path.clone(),
+        None => {
+            // Try config
+            if let Some(config_path) = config::report_custom_css_path() {
+                config_path
+            } else {
+                // No custom CSS
+                return Ok(String::new());
+            }
+        }
+    };
+
+    if !css_path.exists() {
+        bail!("Custom CSS file not found: {}", css_path.display());
+    }
+
+    fs::read_to_string(&css_path).map_err(|e| {
+        anyhow!(
+            "Failed to read custom CSS file {}: {}",
+            css_path.display(),
+            e
+        )
+    })
+}
 
 /// Formats a measurement name with its configured unit, if available.
 /// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
@@ -129,6 +278,7 @@ trait Reporter<'a> {
         group_values: &[String],
     );
     fn as_bytes(&self) -> Vec<u8>;
+    fn set_template_and_metadata(&mut self, template: Option<String>, metadata: ReportMetadata);
 }
 
 struct PlotlyReporter {
@@ -140,17 +290,22 @@ struct PlotlyReporter {
     size: usize,
     // Track units for all measurements to determine if we should add unit to Y-axis label
     measurement_units: Vec<Option<String>>,
+    // Template and metadata for customized output
+    template: Option<String>,
+    metadata: Option<ReportMetadata>,
 }
 
 impl PlotlyReporter {
     fn new() -> PlotlyReporter {
-        let config = Configuration::default().responsive(true).fill_frame(true);
+        let config = Configuration::default().responsive(true).fill_frame(false);
         let mut plot = Plot::new();
         plot.set_configuration(config);
         PlotlyReporter {
             plot,
             size: 0,
             measurement_units: Vec::new(),
+            template: None,
+            metadata: None,
         }
     }
 
@@ -280,16 +435,29 @@ impl<'a> Reporter<'a> for PlotlyReporter {
     }
 
     fn as_bytes(&self) -> Vec<u8> {
-        // If all measurements share the same unit, add it to Y-axis label
-        if let Some(y_axis) = self.compute_y_axis() {
+        // Get the final plot (with or without custom y-axis)
+        let final_plot = if let Some(y_axis) = self.compute_y_axis() {
             let mut plot_with_y_axis = self.plot.clone();
             let mut layout = plot_with_y_axis.layout().clone();
             layout = layout.y_axis(y_axis);
             plot_with_y_axis.set_layout(layout);
-            plot_with_y_axis.to_html().as_bytes().to_vec()
+            plot_with_y_axis
         } else {
-            self.plot.to_html().as_bytes().to_vec()
+            self.plot.clone()
+        };
+
+        // Apply template if available
+        if let (Some(template), Some(metadata)) = (&self.template, &self.metadata) {
+            apply_template(template, &final_plot, metadata)
+        } else {
+            // No template: generate standalone HTML file
+            final_plot.to_html().as_bytes().to_vec()
         }
+    }
+
+    fn set_template_and_metadata(&mut self, template: Option<String>, metadata: ReportMetadata) {
+        self.template = template;
+        self.metadata = Some(metadata);
     }
 }
 
@@ -381,6 +549,10 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
             ));
         }
     }
+
+    fn set_template_and_metadata(&mut self, _template: Option<String>, _metadata: ReportMetadata) {
+        // CSV reporter doesn't use templates
+    }
 }
 
 struct ReporterFactory {}
@@ -410,6 +582,7 @@ pub fn report(
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
     combined_patterns: &[String],
+    template_config: ReportTemplateConfig,
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
@@ -427,6 +600,19 @@ pub fn report(
         ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
 
     plot.add_commits(&commits);
+
+    // Load template and CSS for HTML reports
+    if output.extension().and_then(|s| s.to_str()) == Some("html") {
+        let template = load_template(template_config.template_path.as_ref())?;
+
+        // Resolve title: CLI > config > None
+        let resolved_title = template_config.title.or_else(config::report_title);
+
+        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+        let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
+
+        plot.set_template_and_metadata(template, metadata);
+    }
 
     let relevant = |m: &MeasurementData| {
         // Apply regex filters (handles both exact measurement matches and filter patterns)
@@ -645,6 +831,169 @@ mod tests {
         // Test measurement without unit configured
         let result = format_measurement_with_unit("unknown_measurement");
         assert_eq!(result, "unknown_measurement");
+    }
+
+    #[test]
+    fn test_extract_plotly_parts() {
+        // Create a simple plot
+        let mut plot = Plot::new();
+        let trace = plotly::Scatter::new(vec![1, 2, 3], vec![4, 5, 6]).name("test");
+        plot.add_trace(trace);
+
+        let (head, body) = extract_plotly_parts(&plot);
+
+        // Head should contain script tags for plotly.js from CDN
+        assert!(head.contains("<script"));
+        assert!(head.contains("plotly"));
+
+        // Body should contain the plot div and script
+        assert!(body.contains("<div"));
+        assert!(body.contains("<script"));
+        assert!(body.contains("Plotly.newPlot"));
+    }
+
+    #[test]
+    fn test_extract_plotly_parts_structure() {
+        // Verify the structure of extracted parts
+        let mut plot = Plot::new();
+        let trace = plotly::Scatter::new(vec![1], vec![1]).name("data");
+        plot.add_trace(trace);
+
+        let (head, body) = extract_plotly_parts(&plot);
+
+        // Head should be CDN script tags only (no full HTML structure)
+        assert!(!head.contains("<html>"));
+        assert!(!head.contains("<head>"));
+        assert!(!head.contains("<body>"));
+
+        // Body should be inline content (div + script), not full HTML
+        assert!(!body.contains("<html>"));
+        assert!(!body.contains("<head>"));
+        assert!(!body.contains("<body>"));
+    }
+
+    #[test]
+    fn test_apply_template_basic() {
+        let template = r#"<html><head>{{PLOTLY_HEAD}}</head><body><h1>{{TITLE}}</h1>{{PLOTLY_BODY}}</body></html>"#;
+
+        // Create a simple plot
+        let mut plot = Plot::new();
+        let trace = plotly::Scatter::new(vec![1, 2], vec![3, 4]).name("test");
+        plot.add_trace(trace);
+
+        let metadata = ReportMetadata {
+            title: "Test Report".to_string(),
+            custom_css: "".to_string(),
+            timestamp: "2024-01-01 00:00:00 UTC".to_string(),
+            commit_range: "abc123".to_string(),
+            depth: 1,
+        };
+
+        let result = apply_template(template, &plot, &metadata);
+        let result_str = String::from_utf8(result).unwrap();
+
+        assert!(result_str.contains("Test Report"));
+        // Should contain plotly script tags in head
+        assert!(result_str.contains("<script"));
+        assert!(result_str.contains("plotly"));
+        // Should contain plot div and script in body
+        assert!(result_str.contains("<div"));
+        assert!(result_str.contains("Plotly.newPlot"));
+    }
+
+    #[test]
+    fn test_apply_template_all_placeholders() {
+        let template = r#"
+            <html>
+            <head>
+                <title>{{TITLE}}</title>
+                {{PLOTLY_HEAD}}
+                <style>{{CUSTOM_CSS}}</style>
+            </head>
+            <body>
+                <h1>{{TITLE}}</h1>
+                <p>Generated: {{TIMESTAMP}}</p>
+                <p>Commits: {{COMMIT_RANGE}}</p>
+                <p>Depth: {{DEPTH}}</p>
+                {{PLOTLY_BODY}}
+                {{AUDIT_SECTION}}
+            </body>
+            </html>
+        "#;
+
+        // Create a simple plot
+        let mut plot = Plot::new();
+        let trace = plotly::Scatter::new(vec![1, 2, 3], vec![10, 20, 30]).name("chart");
+        plot.add_trace(trace);
+
+        let metadata = ReportMetadata {
+            title: "Performance Report".to_string(),
+            custom_css: "body { color: red; }".to_string(),
+            timestamp: "2024-01-15 12:00:00 UTC".to_string(),
+            commit_range: "abc123..def456".to_string(),
+            depth: 50,
+        };
+
+        let result = apply_template(template, &plot, &metadata);
+        let result_str = String::from_utf8(result).unwrap();
+
+        assert!(result_str.contains("Performance Report"));
+        assert!(result_str.contains("body { color: red; }"));
+        assert!(result_str.contains("2024-01-15 12:00:00 UTC"));
+        assert!(result_str.contains("abc123..def456"));
+        assert!(result_str.contains("50"));
+        // Should contain plotly script tags and plot content
+        assert!(result_str.contains("<script"));
+        assert!(result_str.contains("plotly"));
+        assert!(result_str.contains("<div"));
+    }
+
+    #[test]
+    fn test_report_metadata_new() {
+        use crate::data::Commit;
+
+        let commits = vec![
+            Commit {
+                commit: "abc1234567890".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "def0987654321".to_string(),
+                measurements: vec![],
+            },
+        ];
+
+        let metadata =
+            ReportMetadata::new(Some("Custom Title".to_string()), "".to_string(), &commits);
+
+        assert_eq!(metadata.title, "Custom Title");
+        assert_eq!(metadata.commit_range, "def0987..abc1234");
+        assert_eq!(metadata.depth, 2);
+    }
+
+    #[test]
+    fn test_report_metadata_new_default_title() {
+        use crate::data::Commit;
+
+        let commits = vec![Commit {
+            commit: "abc1234567890".to_string(),
+            measurements: vec![],
+        }];
+
+        let metadata = ReportMetadata::new(None, "".to_string(), &commits);
+
+        assert_eq!(metadata.title, "Performance Measurements");
+        assert_eq!(metadata.commit_range, "abc1234");
+        assert_eq!(metadata.depth, 1);
+    }
+
+    #[test]
+    fn test_report_metadata_new_empty_commits() {
+        let commits = vec![];
+        let metadata = ReportMetadata::new(None, "".to_string(), &commits);
+
+        assert_eq!(metadata.commit_range, "No commits");
+        assert_eq!(metadata.depth, 0);
     }
 
     #[test]

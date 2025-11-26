@@ -258,6 +258,18 @@ pub enum Commands {
         /// What to aggregate the measurements in each group with
         #[arg(short, long)]
         aggregate_by: Option<ReductionFunc>,
+
+        /// Path to custom HTML template file (overrides config)
+        #[arg(short = 't', long)]
+        template: Option<PathBuf>,
+
+        /// Path to custom CSS file to inject into the template
+        #[arg(short = 'c', long)]
+        custom_css: Option<PathBuf>,
+
+        /// Custom title for the report (overrides default)
+        #[arg(long)]
+        title: Option<String>,
     },
 
     /// For given measurements, check perfomance deviations of the HEAD commit

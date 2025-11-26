@@ -267,6 +267,26 @@ pub fn measurement_unit(measurement: &str) -> Option<String> {
     config.get_with_parent_fallback("measurement", measurement, "unit")
 }
 
+/// Returns the report template path from config, or None if not set.
+pub fn report_template_path() -> Option<PathBuf> {
+    let config = read_hierarchical_config().ok()?;
+    let path_str = config.get_string("report.template_path").ok()?;
+    Some(PathBuf::from(path_str))
+}
+
+/// Returns the report custom CSS path from config, or None if not set.
+pub fn report_custom_css_path() -> Option<PathBuf> {
+    let config = read_hierarchical_config().ok()?;
+    let path_str = config.get_string("report.custom_css_path").ok()?;
+    Some(PathBuf::from(path_str))
+}
+
+/// Returns the report title from config, or None if not set.
+pub fn report_title() -> Option<String> {
+    let config = read_hierarchical_config().ok()?;
+    config.get_string("report.title").ok()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
