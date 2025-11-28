@@ -3,6 +3,7 @@ use std::{
     fs::{self, File},
     io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use anyhow::anyhow;
@@ -23,6 +24,28 @@ use crate::{
 };
 
 use regex::Regex;
+
+/// Cached regex for parsing section placeholders (compiled once)
+static SECTION_PLACEHOLDER_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Cached regex for finding all section blocks in a template (compiled once)
+static SECTION_FINDER_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Get or compile the section placeholder parsing regex
+fn section_placeholder_regex() -> &'static Regex {
+    SECTION_PLACEHOLDER_REGEX.get_or_init(|| {
+        Regex::new(r"(?s)\{\{SECTION\[([^\]]+)\](.*?)\}\}")
+            .expect("Invalid section placeholder regex pattern")
+    })
+}
+
+/// Get or compile the section finder regex
+fn section_finder_regex() -> &'static Regex {
+    SECTION_FINDER_REGEX.get_or_init(|| {
+        Regex::new(r"(?s)\{\{SECTION\[[^\]]+\].*?\}\}")
+            .expect("Invalid section finder regex pattern")
+    })
+}
 
 /// Configuration for report templates
 pub struct ReportTemplateConfig {
@@ -101,17 +124,24 @@ impl SectionConfig {
     /// Parse a single section placeholder into a SectionConfig
     /// Format: {{SECTION[id] param: value, param2: value2 }}
     fn parse(placeholder: &str) -> Result<Self> {
-        // Regex to extract section ID and parameters
-        // Matches: {{SECTION[id] param: value, param2: value2 }}
-        // Use DOTALL flag (s) to allow . to match newlines
-        let section_regex = Regex::new(r"(?s)\{\{SECTION\[([^\]]+)\](.*?)\}\}")?;
+        // Use cached regex to extract section ID and parameters
+        let section_regex = section_placeholder_regex();
 
         let captures = section_regex
             .captures(placeholder)
             .ok_or_else(|| anyhow!("Invalid section placeholder format: {}", placeholder))?;
 
-        let id = captures.get(1).unwrap().as_str().trim().to_string();
-        let params_str = captures.get(2).unwrap().as_str().trim();
+        let id = captures
+            .get(1)
+            .expect("Regex capture group 1 (section ID) must exist")
+            .as_str()
+            .trim()
+            .to_string();
+        let params_str = captures
+            .get(2)
+            .expect("Regex capture group 2 (parameters) must exist")
+            .as_str()
+            .trim();
 
         // Parse parameters
         let mut measurement_filter = None;
@@ -143,8 +173,15 @@ impl SectionConfig {
                             for pair in value.split(',') {
                                 let pair = pair.trim();
                                 if let Some((k, v)) = pair.split_once('=') {
-                                    key_value_filter
-                                        .push((k.trim().to_string(), v.trim().to_string()));
+                                    let k = k.trim();
+                                    let v = v.trim();
+                                    if k.is_empty() {
+                                        bail!("Empty key in key-value-filter: '{}'", pair);
+                                    }
+                                    if v.is_empty() {
+                                        bail!("Empty value in key-value-filter: '{}'", pair);
+                                    }
+                                    key_value_filter.push((k.to_string(), v.to_string()));
                                 } else {
                                     bail!("Invalid key-value-filter format: {}", pair);
                                 }
@@ -202,9 +239,8 @@ impl SectionConfig {
 
 /// Parse all section placeholders from a template
 fn parse_template_sections(template: &str) -> Result<Vec<SectionConfig>> {
-    // Regex to find all {{SECTION[...] ...}} blocks
-    // Use DOTALL flag (s) to allow . to match newlines
-    let section_regex = Regex::new(r"(?s)\{\{SECTION\[[^\]]+\].*?\}\}")?;
+    // Use cached regex to find all {{SECTION[...] ...}} blocks
+    let section_regex = section_finder_regex();
 
     let mut sections = Vec::new();
     let mut seen_ids = std::collections::HashSet::new();
@@ -1830,6 +1866,58 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Invalid depth value"));
+    }
+
+    #[test]
+    fn test_section_config_parse_empty_key_in_key_value_filter() {
+        let placeholder =
+            "{{SECTION[empty-key]\n                key-value-filter: =value\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty key in key-value-filter"));
+    }
+
+    #[test]
+    fn test_section_config_parse_empty_value_in_key_value_filter() {
+        let placeholder =
+            "{{SECTION[empty-value]\n                key-value-filter: key=\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty value in key-value-filter"));
+    }
+
+    #[test]
+    fn test_section_config_parse_empty_key_and_value() {
+        let placeholder = "{{SECTION[empty-both]\n                key-value-filter: =\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty key in key-value-filter"));
+    }
+
+    #[test]
+    fn test_section_config_parse_whitespace_key_value() {
+        let placeholder =
+            "{{SECTION[whitespace]\n                key-value-filter:    =   \n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        // Should fail because trimmed key is empty
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty key in key-value-filter"));
     }
 
     #[test]
