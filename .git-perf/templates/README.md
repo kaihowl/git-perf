@@ -66,15 +66,17 @@ For complete documentation on the template syntax and available parameters, see:
 - `key-value-filter` - Filter by metadata (e.g., `os=linux,arch=x64`)
 - `separate-by` - Split by metadata keys (e.g., `os,arch`)
 - `aggregate-by` - `none`, `min`, `max`, `median`, `mean`
-- `depth` - Number of commits for this section (overrides the `-n` flag and `{{DEPTH}}` placeholder)
+- `depth` - Number of commits for this section (must be ≤ the `-n` flag value; cannot exceed it)
 - `title` - Section title (for future use)
 
 ### Understanding depth vs -n Flag
 
 When generating reports with multi-section templates:
 
-- **`-n` flag** (command line): Sets the default depth for all sections AND the `{{DEPTH}}` placeholder
-- **`depth:` parameter** (in section): Overrides the default for that specific section only
+- **`-n` flag** (command line): Sets the **maximum** number of commits retrieved from the repository AND the `{{DEPTH}}` placeholder value
+- **`depth:` parameter** (in section): Uses fewer commits for that specific section (must be ≤ the `-n` value)
+
+**Important:** The `-n` flag determines how many commits are loaded from the repository. Individual sections can only use a **subset** of those commits via their `depth` parameter. If a section requests `depth` larger than `-n`, it will use all available commits and log a warning.
 
 **Example:**
 ```bash
@@ -88,14 +90,19 @@ With this template:
 {{SECTION[recent]
     measurement-filter: ^test::
     depth: 20
-}}  <!-- Shows last 20 commits -->
+}}  <!-- Shows last 20 commits (subset of 100) -->
 
 {{SECTION[historical]
     measurement-filter: ^test::
-}}  <!-- Shows last 100 commits (uses -n default) -->
+}}  <!-- Shows all 100 commits (uses -n value) -->
+
+{{SECTION[deep]
+    measurement-filter: ^test::
+    depth: 200
+}}  <!-- Shows 100 commits + WARNING (can't exceed -n value) -->
 ```
 
-**Best Practice:** Use `-n` to set a reasonable default history, then use per-section `depth:` parameters to show shorter/longer histories where needed (e.g., raw data sections with `depth: 20` for faster loading).
+**Best Practice:** Set `-n` to the **maximum** history you need across all sections (e.g., `-n 200` if one section needs 200 commits), then use per-section `depth:` parameters to show shorter histories where needed (e.g., raw data sections with `depth: 20` for faster loading).
 
 ## Tips
 
