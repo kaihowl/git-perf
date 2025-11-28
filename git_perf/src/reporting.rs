@@ -772,6 +772,7 @@ fn process_measurements_into_traces<'a>(
     separate_by: &[String],
     aggregate_by: Option<ReductionFunc>,
     error_context: &str,
+    fail_on_empty: bool,
 ) -> Result<()> {
     let unique_measurement_names: Vec<_> = relevant_measurements
         .clone()
@@ -780,7 +781,9 @@ fn process_measurements_into_traces<'a>(
         .collect();
 
     if unique_measurement_names.is_empty() {
-        // No measurements found - this is handled differently by callers
+        if fail_on_empty {
+            bail!("{}: No performance measurements found.", error_context);
+        }
         return Ok(());
     }
 
@@ -925,6 +928,7 @@ fn generate_section_plot(commits: &[Commit], section: &SectionConfig) -> Result<
         &section.separate_by,
         section.aggregate_by,
         &error_context,
+        false, // fail_on_empty - allow empty sections
     )?;
 
     // Check if any traces were added
@@ -1072,12 +1076,8 @@ pub fn report(
         &separate_by,
         aggregate_by,
         "Report generation",
+        true, // fail_on_empty
     )?;
-
-    // Check if any measurements were found
-    if plot.as_bytes().is_empty() {
-        bail!("No performance measurements found.")
-    }
 
     if output == Path::new("-") {
         match io::stdout().write_all(&plot.as_bytes()) {
