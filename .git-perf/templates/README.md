@@ -62,58 +62,88 @@ For complete documentation on the template syntax and available parameters, see:
 
 ### Available Parameters
 
-- `measurement-filter` - Regex to match measurement names
+- `measurement-filter` - Regex to match measurement names (only matches measurements configured in `.gitperfconfig`)
 - `key-value-filter` - Filter by metadata (e.g., `os=linux,arch=x64`)
 - `separate-by` - Split by metadata keys (e.g., `os,arch`)
 - `aggregate-by` - `none`, `min`, `max`, `median`, `mean`
-- `depth` - Number of commits (overrides `-n` flag)
+- `depth` - Number of commits for this section (overrides the `-n` flag and `{{DEPTH}}` placeholder)
 - `title` - Section title (for future use)
+
+### Understanding depth vs -n Flag
+
+When generating reports with multi-section templates:
+
+- **`-n` flag** (command line): Sets the default depth for all sections AND the `{{DEPTH}}` placeholder
+- **`depth:` parameter** (in section): Overrides the default for that specific section only
+
+**Example:**
+```bash
+git perf report --template dashboard.html -n 100 --output report.html
+```
+
+With this template:
+```html
+{{DEPTH}}  <!-- Will show "100" -->
+
+{{SECTION[recent]
+    measurement-filter: ^test::
+    depth: 20
+}}  <!-- Shows last 20 commits -->
+
+{{SECTION[historical]
+    measurement-filter: ^test::
+}}  <!-- Shows last 100 commits (uses -n default) -->
+```
+
+**Best Practice:** Use `-n` to set a reasonable default history, then use per-section `depth:` parameters to show shorter/longer histories where needed (e.g., raw data sections with `depth: 20` for faster loading).
 
 ## Tips
 
-1. **Start simple** - Begin with 2-3 sections and add more as needed
-2. **Use meaningful IDs** - Name sections like `test-median` or `bench-by-platform`
-3. **Combine aggregations** - Mix raw and aggregated views for different insights
-4. **Control depth** - Use shorter histories (depth: 20-50) for faster loading
+1. **Use configured measurements** - Only measurements defined in `.gitperfconfig` will appear in reports. Check your config file to see available measurements.
+2. **Start simple** - Begin with 2-3 sections and add more as needed
+3. **Use meaningful IDs** - Name sections like `test-median` or `bench-by-platform`
+4. **Combine aggregations** - Mix raw and aggregated views for different insights
+5. **Control depth** - Use shorter histories (depth: 20-50) for faster loading
 
 ## Examples
+
+**Note:** These examples use measurements from the repository's `.gitperfconfig`. Adjust the `measurement-filter` patterns to match your own configured measurements.
 
 ### Basic Test Dashboard
 
 ```html
 <h2>Test Performance</h2>
 {{SECTION[tests]
-    measurement-filter: ^test::
+    measurement-filter: ^(test-measure2)$
     aggregate-by: median
 }}
 ```
 
-### Platform Comparison
+### Benchmark Comparison
 
 ```html
-<h2>Build Times by OS</h2>
-{{SECTION[builds]
-    measurement-filter: ^build_time$
-    separate-by: os,arch
+<h2>Benchmark Performance</h2>
+{{SECTION[benchmarks]
+    measurement-filter: ^(report-benchmark|add-benchmark)$
     aggregate-by: median
 }}
 ```
 
-### Memory Analysis
+### Size Analysis
 
 ```html
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
     <div>
-        <h3>Peak Memory</h3>
-        {{SECTION[mem-max]
-            measurement-filter: memory_peak
+        <h3>Binary Size</h3>
+        {{SECTION[binary-size]
+            measurement-filter: ^(release-binary-size)$
             aggregate-by: max
         }}
     </div>
     <div>
-        <h3>Average Memory</h3>
-        {{SECTION[mem-avg]
-            measurement-filter: memory_peak
+        <h3>Report Size</h3>
+        {{SECTION[report-size]
+            measurement-filter: ^(report-size|report-size-benchmark)$
             aggregate-by: mean
         }}
     </div>

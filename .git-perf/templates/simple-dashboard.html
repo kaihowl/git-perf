@@ -47,7 +47,7 @@
     <div class="section">
         <h2>Test Performance (Aggregated)</h2>
         {{SECTION[tests]
-            measurement-filter: ^test::
+            measurement-filter: ^(test-measure2)$
             aggregate-by: median
         }}
     </div>
@@ -55,15 +55,15 @@
     <div class="section">
         <h2>Benchmark Performance (Aggregated)</h2>
         {{SECTION[benchmarks]
-            measurement-filter: ^bench::
+            measurement-filter: ^(report-benchmark|add-benchmark)$
             aggregate-by: median
         }}
     </div>
 
     <div class="section">
-        <h2>Raw Test Data (Last 20 commits)</h2>
-        {{SECTION[tests-raw]
-            measurement-filter: ^test::
+        <h2>Report Size (Last 20 commits)</h2>
+        {{SECTION[report-size]
+            measurement-filter: ^(report-size|report-size-benchmark)$
             aggregate-by: none
             depth: 20
         }}

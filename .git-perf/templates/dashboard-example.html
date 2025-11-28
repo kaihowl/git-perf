@@ -86,12 +86,12 @@
     </header>
 
     <main>
-        <!-- Section 1: Test Suite Performance Overview -->
+        <!-- Section 1: Test Performance Overview -->
         <section class="report-section">
-            <h2>📊 Test Suite Performance (Last 50 Commits)</h2>
-            <p>Median test execution times across all test suites.</p>
+            <h2>📊 Test Performance (Last 50 Commits)</h2>
+            <p>Median test execution times for configured test measurements.</p>
             {{SECTION[test-overview]
-                measurement-filter: ^test::
+                measurement-filter: ^(test-measure2)$
                 aggregate-by: median
                 depth: 50
             }}
@@ -100,39 +100,38 @@
         <!-- Section 2: Benchmark Trends -->
         <section class="report-section">
             <h2>🚀 Benchmark Results</h2>
-            <p>Median benchmark performance showing mean execution times.</p>
+            <p>Median benchmark performance for time-based benchmarks.</p>
             {{SECTION[benchmark-median]
-                measurement-filter: ^bench::.*::mean$
+                measurement-filter: ^(report-benchmark|add-benchmark)$
                 aggregate-by: median
             }}
         </section>
 
-        <!-- Section 3: Build Time Analysis -->
+        <!-- Section 3: Report Generation Performance -->
         <section class="report-section">
-            <h2>⚙️ Build Times by Platform</h2>
-            <p>Build duration split by operating system and architecture.</p>
-            {{SECTION[build-by-platform]
-                measurement-filter: ^build_time$
-                separate-by: os,arch
+            <h2>⚙️ Report Generation Time</h2>
+            <p>Report generation performance showing execution duration.</p>
+            {{SECTION[report-time]
+                measurement-filter: ^(report)$
                 aggregate-by: median
             }}
         </section>
 
-        <!-- Section 4: Memory Comparison -->
+        <!-- Section 4: Size Comparison -->
         <section class="report-section">
-            <h2>💾 Memory Usage Trends</h2>
+            <h2>💾 Binary and Report Sizes</h2>
             <div class="side-by-side">
                 <div>
-                    <h3>Peak Memory (Max)</h3>
-                    {{SECTION[memory-max]
-                        measurement-filter: memory_peak
+                    <h3>Release Binary Size</h3>
+                    {{SECTION[binary-size]
+                        measurement-filter: ^(release-binary-size)$
                         aggregate-by: max
                     }}
                 </div>
                 <div>
-                    <h3>Average Memory</h3>
-                    {{SECTION[memory-avg]
-                        measurement-filter: memory_peak
+                    <h3>Report Size</h3>
+                    {{SECTION[report-size]
+                        measurement-filter: ^(report-size|report-size-benchmark)$
                         aggregate-by: mean
                     }}
                 </div>
@@ -141,12 +140,11 @@
 
         <!-- Section 5: Raw Data Detail View -->
         <section class="report-section">
-            <h2>📈 Detailed Raw Measurements (Integration Tests)</h2>
+            <h2>📈 Detailed Raw Measurements (All Tests)</h2>
             <p>Individual test runs without aggregation - shows variability.</p>
-            {{SECTION[integration-raw]
-                measurement-filter: ^test::integration::
+            {{SECTION[tests-raw]
+                measurement-filter: ^(test-measure2)$
                 aggregate-by: none
-                key-value-filter: test_type=integration
             }}
         </section>
 
