@@ -762,6 +762,117 @@ impl ReporterFactory {
     }
 }
 
+/// Process measurements and add traces to a reporter based on grouping and aggregation settings
+///
+/// This helper function contains the shared logic for iterating over measurements,
+/// grouping them by metadata keys, and adding them as traces to a reporter.
+fn process_measurements_into_traces<'a>(
+    reporter: &mut dyn Reporter<'a>,
+    relevant_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    separate_by: &[String],
+    aggregate_by: Option<ReductionFunc>,
+    error_context: &str,
+) -> Result<()> {
+    let unique_measurement_names: Vec<_> = relevant_measurements
+        .clone()
+        .flat_map(|m| m.map(|m| &m.name))
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        // No measurements found - this is handled differently by callers
+        return Ok(());
+    }
+
+    for measurement_name in unique_measurement_names {
+        let filtered_measurements = relevant_measurements
+            .clone()
+            .map(|ms| ms.filter(|m| m.name == *measurement_name));
+
+        let group_values: Vec<Vec<String>> = if !separate_by.is_empty() {
+            // Find all unique combinations of the split keys
+            filtered_measurements
+                .clone()
+                .flatten()
+                .filter_map(|m| {
+                    // Extract values for all split keys
+                    let values: Vec<String> = separate_by
+                        .iter()
+                        .filter_map(|key| m.key_values.get(key).cloned())
+                        .collect();
+
+                    // Only include if all split keys are present
+                    if values.len() == separate_by.len() {
+                        Some(values)
+                    } else {
+                        None
+                    }
+                })
+                .unique()
+                .collect_vec()
+        } else {
+            vec![]
+        };
+
+        // When no splits specified, create a single group with all measurements
+        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
+            if !separate_by.is_empty() {
+                bail!(
+                    "{}: Invalid separator supplied, no measurements have all required keys: {:?}",
+                    error_context,
+                    separate_by
+                );
+            }
+            vec![vec![]]
+        } else {
+            group_values
+        };
+
+        for group_value in group_values_to_process {
+            let group_measurements = filtered_measurements.clone().map(|ms| {
+                ms.filter(|m| {
+                    if !group_value.is_empty() {
+                        // Check if measurement has ALL the expected key-value pairs
+                        separate_by
+                            .iter()
+                            .zip(group_value.iter())
+                            .all(|(key, expected_val)| {
+                                m.key_values
+                                    .get(key)
+                                    .map(|v| v == expected_val)
+                                    .unwrap_or(false)
+                            })
+                    } else {
+                        true
+                    }
+                })
+            });
+
+            if let Some(reduction_func) = aggregate_by {
+                let trace_measurements = group_measurements
+                    .clone()
+                    .enumerate()
+                    .flat_map(move |(i, ms)| {
+                        ms.reduce_by(reduction_func)
+                            .into_iter()
+                            .map(move |m| (i, m))
+                    })
+                    .collect_vec();
+                reporter.add_summarized_trace(trace_measurements, measurement_name, &group_value);
+            } else {
+                let trace_measurements: Vec<_> = group_measurements
+                    .clone()
+                    .enumerate()
+                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
+                    .collect();
+                reporter.add_trace(trace_measurements, measurement_name, &group_value);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Generate a plot for a single section with specific configuration
 fn generate_section_plot(commits: &[Commit], section: &SectionConfig) -> Result<Plot> {
     let mut reporter = PlotlyReporter::new();
@@ -806,102 +917,19 @@ fn generate_section_plot(commits: &[Commit], section: &SectionConfig) -> Result<
         .iter()
         .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
 
-    let unique_measurement_names: Vec<_> = relevant_measurements
-        .clone()
-        .flat_map(|m| m.map(|m| &m.name))
-        .unique()
-        .collect();
+    // Use helper function to process measurements and add traces
+    let error_context = format!("Section '{}'", section.id);
+    process_measurements_into_traces(
+        &mut reporter,
+        relevant_measurements,
+        &section.separate_by,
+        section.aggregate_by,
+        &error_context,
+    )?;
 
-    if unique_measurement_names.is_empty() {
+    // Check if any traces were added
+    if reporter.plot.data().is_empty() {
         log::warn!("Section '{}' has no matching measurements", section.id);
-        // Return an empty plot
-        return Ok(reporter.plot);
-    }
-
-    for measurement_name in unique_measurement_names {
-        let filtered_measurements = relevant_measurements
-            .clone()
-            .map(|ms| ms.filter(|m| m.name == *measurement_name));
-
-        let group_values: Vec<Vec<String>> = if !section.separate_by.is_empty() {
-            // Find all unique combinations of the split keys
-            filtered_measurements
-                .clone()
-                .flatten()
-                .filter_map(|m| {
-                    // Extract values for all split keys
-                    let values: Vec<String> = section
-                        .separate_by
-                        .iter()
-                        .filter_map(|key| m.key_values.get(key).cloned())
-                        .collect();
-
-                    // Only include if all split keys are present
-                    if values.len() == section.separate_by.len() {
-                        Some(values)
-                    } else {
-                        None
-                    }
-                })
-                .unique()
-                .collect_vec()
-        } else {
-            vec![]
-        };
-
-        // When no splits specified, create a single group with all measurements
-        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
-            if !section.separate_by.is_empty() {
-                bail!(
-                    "Section '{}': Invalid separator supplied, no measurements have all required keys: {:?}",
-                    section.id,
-                    section.separate_by
-                );
-            }
-            vec![vec![]]
-        } else {
-            group_values
-        };
-
-        for group_value in group_values_to_process {
-            let group_measurements = filtered_measurements.clone().map(|ms| {
-                ms.filter(|m| {
-                    if !group_value.is_empty() {
-                        // Check if measurement has ALL the expected key-value pairs
-                        section.separate_by.iter().zip(group_value.iter()).all(
-                            |(key, expected_val)| {
-                                m.key_values
-                                    .get(key)
-                                    .map(|v| v == expected_val)
-                                    .unwrap_or(false)
-                            },
-                        )
-                    } else {
-                        true
-                    }
-                })
-            });
-
-            if let Some(reduction_func) = section.aggregate_by {
-                let trace_measurements = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(move |(i, ms)| {
-                        ms.reduce_by(reduction_func)
-                            .into_iter()
-                            .map(move |m| (i, m))
-                    })
-                    .collect_vec();
-                reporter.add_summarized_trace(trace_measurements, measurement_name, &group_value);
-            } else {
-                let trace_measurements: Vec<_> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
-                    .collect();
-                reporter.add_trace(trace_measurements, measurement_name, &group_value);
-            }
-        }
     }
 
     Ok(reporter.plot)
@@ -1037,99 +1065,18 @@ pub fn report(
         .iter()
         .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
 
-    let unique_measurement_names: Vec<_> = relevant_measurements
-        .clone()
-        .flat_map(|m| m.map(|m| &m.name))
-        .unique()
-        .collect();
+    // Use helper function to process measurements and add traces
+    process_measurements_into_traces(
+        plot.as_mut(),
+        relevant_measurements,
+        &separate_by,
+        aggregate_by,
+        "Report generation",
+    )?;
 
-    if unique_measurement_names.is_empty() {
+    // Check if any measurements were found
+    if plot.as_bytes().is_empty() {
         bail!("No performance measurements found.")
-    }
-
-    for measurement_name in unique_measurement_names {
-        let filtered_measurements = relevant_measurements
-            .clone()
-            .map(|ms| ms.filter(|m| m.name == *measurement_name));
-
-        let group_values: Vec<Vec<String>> = if !separate_by.is_empty() {
-            // Find all unique combinations of the split keys
-            filtered_measurements
-                .clone()
-                .flatten()
-                .filter_map(|m| {
-                    // Extract values for all split keys
-                    let values: Vec<String> = separate_by
-                        .iter()
-                        .filter_map(|key| m.key_values.get(key).cloned())
-                        .collect();
-
-                    // Only include if all split keys are present
-                    if values.len() == separate_by.len() {
-                        Some(values)
-                    } else {
-                        None
-                    }
-                })
-                .unique()
-                .collect_vec()
-        } else {
-            vec![]
-        };
-
-        // When no splits specified, create a single group with all measurements
-        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
-            if !separate_by.is_empty() {
-                bail!(
-                    "Invalid separator supplied, no measurements have all required keys: {:?}",
-                    separate_by
-                );
-            }
-            vec![vec![]]
-        } else {
-            group_values
-        };
-
-        for group_value in group_values_to_process {
-            let group_measurements = filtered_measurements.clone().map(|ms| {
-                ms.filter(|m| {
-                    if !group_value.is_empty() {
-                        // Check if measurement has ALL the expected key-value pairs
-                        separate_by
-                            .iter()
-                            .zip(group_value.iter())
-                            .all(|(key, expected_val)| {
-                                m.key_values
-                                    .get(key)
-                                    .map(|v| v == expected_val)
-                                    .unwrap_or(false)
-                            })
-                    } else {
-                        true
-                    }
-                })
-            });
-
-            if let Some(reduction_func) = aggregate_by {
-                let trace_measurements = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(move |(i, ms)| {
-                        ms.reduce_by(reduction_func)
-                            .into_iter()
-                            .map(move |m| (i, m))
-                    })
-                    .collect_vec();
-                plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
-            } else {
-                let trace_measurements: Vec<_> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
-                    .collect();
-                plot.add_trace(trace_measurements, measurement_name, &group_value);
-            }
-        }
     }
 
     if output == Path::new("-") {
@@ -1896,7 +1843,8 @@ mod tests {
 
     #[test]
     fn test_section_config_parse_empty_key_and_value() {
-        let placeholder = "{{SECTION[empty-both]\n                key-value-filter: =\n            }}";
+        let placeholder =
+            "{{SECTION[empty-both]\n                key-value-filter: =\n            }}";
         let result = SectionConfig::parse(placeholder);
 
         assert!(result.is_err());
