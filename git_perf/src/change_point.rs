@@ -29,6 +29,10 @@
 
 use std::cmp::Ordering;
 
+use average::Mean;
+
+use crate::stats::aggregate_measurements;
+
 /// Direction of a detected change
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChangeDirection {
@@ -151,28 +155,28 @@ pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) ->
 /// Calculate the cost of a segment assuming Gaussian distribution.
 ///
 /// Uses sum of squared deviations from the segment mean.
+/// Leverages the `average` crate for numerically stable mean calculation.
 fn segment_cost(measurements: &[f64], start: usize, end: usize) -> f64 {
     if start >= end {
         return 0.0;
     }
 
     let segment = &measurements[start..end];
-    let n = segment.len() as f64;
-    let sum: f64 = segment.iter().sum();
-    let mean = sum / n;
+    let mean_calc: Mean = segment.iter().collect();
+    let mean = mean_calc.mean();
 
     segment.iter().map(|x| (x - mean).powi(2)).sum()
 }
 
 /// Calculate variance of a dataset.
+///
+/// Uses the `average` crate's Variance implementation for numerical stability.
 fn calculate_variance(measurements: &[f64]) -> f64 {
     if measurements.is_empty() {
         return 0.0;
     }
-    let n = measurements.len() as f64;
-    let mean = measurements.iter().sum::<f64>() / n;
-    let variance = measurements.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
-    variance
+    let stats = aggregate_measurements(measurements.iter());
+    stats.stddev.powi(2) // variance = stddev²
 }
 
 /// Convert raw change point indices to enriched ChangePoint structures.
@@ -205,7 +209,8 @@ pub fn enrich_change_points(
         let before_start = if i > 0 { indices[i - 1] } else { 0 };
         let before_segment = &measurements[before_start..idx];
         let before_mean = if !before_segment.is_empty() {
-            before_segment.iter().sum::<f64>() / before_segment.len() as f64
+            let mean_calc: Mean = before_segment.iter().collect();
+            mean_calc.mean()
         } else {
             measurements[0]
         };
@@ -221,7 +226,8 @@ pub fn enrich_change_points(
         };
         let after_segment = &measurements[idx..after_end];
         let after_mean = if !after_segment.is_empty() {
-            after_segment.iter().sum::<f64>() / after_segment.len() as f64
+            let mean_calc: Mean = after_segment.iter().collect();
+            mean_calc.mean()
         } else {
             measurements[measurements.len() - 1]
         };
