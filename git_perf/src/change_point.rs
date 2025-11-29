@@ -179,6 +179,18 @@ fn calculate_variance(measurements: &[f64]) -> f64 {
     stats.stddev.powi(2) // variance = stddev²
 }
 
+/// Calculate mean of a segment, returning a fallback value if empty.
+///
+/// Uses the `average` crate for numerically stable mean calculation.
+fn segment_mean_or_fallback(segment: &[f64], fallback: f64) -> f64 {
+    if segment.is_empty() {
+        fallback
+    } else {
+        let mean_calc: Mean = segment.iter().collect();
+        mean_calc.mean()
+    }
+}
+
 /// Convert raw change point indices to enriched ChangePoint structures.
 ///
 /// # Arguments
@@ -208,12 +220,10 @@ pub fn enrich_change_points(
         //   before_segment = measurements[10..20] (the regimen from previous CP to this CP)
         let before_start = if i > 0 { indices[i - 1] } else { 0 };
         let before_segment = &measurements[before_start..idx];
-        let before_mean = if !before_segment.is_empty() {
-            let mean_calc: Mean = before_segment.iter().collect();
-            mean_calc.mean()
-        } else {
-            measurements[0]
-        };
+        let before_mean = segment_mean_or_fallback(
+            before_segment,
+            measurements.first().copied().unwrap_or(0.0),
+        );
 
         // Calculate mean of the regimen immediately after this change point.
         // This is the segment between this change point and the next one (or end).
@@ -225,12 +235,10 @@ pub fn enrich_change_points(
             measurements.len()
         };
         let after_segment = &measurements[idx..after_end];
-        let after_mean = if !after_segment.is_empty() {
-            let mean_calc: Mean = after_segment.iter().collect();
-            mean_calc.mean()
-        } else {
-            measurements[measurements.len() - 1]
-        };
+        let after_mean = segment_mean_or_fallback(
+            after_segment,
+            measurements.last().copied().unwrap_or(0.0),
+        );
 
         // Calculate percentage change
         let magnitude_pct = if before_mean.abs() > f64::EPSILON {
