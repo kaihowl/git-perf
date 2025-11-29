@@ -261,6 +261,31 @@ impl PlotlyReporter {
         }
     }
 
+    /// Helper to process a vertical marker (epoch or change point) and add its coordinates.
+    ///
+    /// Returns Ok(x_pos) if successful, Err if index out of bounds.
+    fn process_vertical_marker(
+        &self,
+        index: usize,
+        commit_indices: &[usize],
+        measurement_name: &str,
+        marker_type: &str,
+    ) -> Result<usize, ()> {
+        if index >= commit_indices.len() {
+            log::warn!(
+                "[{}] {} index {} out of bounds (max: {})",
+                measurement_name,
+                marker_type,
+                index,
+                commit_indices.len()
+            );
+            return Err(());
+        }
+        let commit_idx = commit_indices[index];
+        let x_pos = self.size - commit_idx - 1;
+        Ok(x_pos)
+    }
+
     /// Add epoch boundary traces to the plot.
     ///
     /// These are vertical dashed gray lines where measurement epochs change.
@@ -285,17 +310,15 @@ impl PlotlyReporter {
         let mut hover_texts: Vec<String> = vec![];
 
         for transition in transitions {
-            // Map the transition index (within measurement data) to the actual commit index
-            if transition.index >= commit_indices.len() {
-                log::warn!(
-                    "Epoch transition index {} out of bounds for commit_indices len {}",
-                    transition.index,
-                    commit_indices.len()
-                );
-                continue;
-            }
-            let commit_idx = commit_indices[transition.index];
-            let x_pos = self.size - commit_idx - 1;
+            let x_pos = match self.process_vertical_marker(
+                transition.index,
+                commit_indices,
+                measurement_name,
+                "Epoch transition",
+            ) {
+                Ok(pos) => pos,
+                Err(()) => continue,
+            };
 
             let hover_text = format!("Epoch {}→{}", transition.from_epoch, transition.to_epoch);
 
@@ -347,14 +370,15 @@ impl PlotlyReporter {
         let measurement_display = format_measurement_with_unit(measurement_name);
 
         for cp in change_points {
-            if cp.index >= commit_indices.len() {
-                log::warn!(
-                    "Change point index {} out of bounds for commit_indices len {}",
-                    cp.index,
-                    commit_indices.len()
-                );
-                continue;
-            }
+            let x_pos = match self.process_vertical_marker(
+                cp.index,
+                commit_indices,
+                measurement_name,
+                "Change point",
+            ) {
+                Ok(pos) => pos,
+                Err(()) => continue,
+            };
 
             let (color, label_prefix, symbol) = match cp.direction {
                 ChangeDirection::Increase => ("rgba(220, 53, 69, 0.8)", "Increase", "⚠ Regression"),
@@ -362,9 +386,6 @@ impl PlotlyReporter {
                     ("rgba(40, 167, 69, 0.8)", "Decrease", "✓ Improvement")
                 }
             };
-
-            let commit_idx = commit_indices[cp.index];
-            let x_pos = self.size - commit_idx - 1;
 
             let hover_text = format!(
                 "{}: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",

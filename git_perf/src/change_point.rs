@@ -276,6 +276,31 @@ pub fn enrich_change_points(
     result
 }
 
+// Confidence calculation constants
+/// Minimum segment size threshold for very low confidence (less than this = 0.3 confidence)
+const CONFIDENCE_MIN_SEGMENT_VERY_LOW: usize = 3;
+/// Minimum segment size threshold for low confidence (less than this = 0.6 confidence)
+const CONFIDENCE_MIN_SEGMENT_LOW: usize = 5;
+/// Minimum segment size threshold for moderate confidence (less than this = 0.8 confidence)
+const CONFIDENCE_MIN_SEGMENT_MODERATE: usize = 10;
+
+/// Confidence value for very small segments (< 3 points on one side)
+const CONFIDENCE_FACTOR_VERY_LOW: f64 = 0.3;
+/// Confidence value for small segments (3-4 points on one side)
+const CONFIDENCE_FACTOR_LOW: f64 = 0.6;
+/// Confidence value for moderate segments (5-9 points on one side)
+const CONFIDENCE_FACTOR_MODERATE: f64 = 0.8;
+/// Confidence value for large segments (10+ points on one side)
+const CONFIDENCE_FACTOR_HIGH: f64 = 1.0;
+
+/// Magnitude percentage scale for confidence calculation (50% = max confidence)
+const CONFIDENCE_MAGNITUDE_SCALE: f64 = 50.0;
+
+/// Weight for segment size factor in confidence calculation
+const CONFIDENCE_WEIGHT_SIZE: f64 = 0.4;
+/// Weight for magnitude factor in confidence calculation (more important than size)
+const CONFIDENCE_WEIGHT_MAGNITUDE: f64 = 0.6;
+
 /// Calculate confidence score for a change point.
 ///
 /// Based on:
@@ -285,22 +310,23 @@ fn calculate_confidence(index: usize, total_len: usize, magnitude_pct: f64) -> f
     // Minimum segment size factor: ensure at least a few points on each side
     // This is more lenient than balance factor - we just need enough data to be meaningful
     let min_segment = index.min(total_len - index);
-    let size_factor = if min_segment < 3 {
-        0.3 // Very low confidence if less than 3 points on one side
-    } else if min_segment < 5 {
-        0.6 // Low confidence with 3-4 points
-    } else if min_segment < 10 {
-        0.8 // Moderate confidence with 5-9 points
+    let size_factor = if min_segment < CONFIDENCE_MIN_SEGMENT_VERY_LOW {
+        CONFIDENCE_FACTOR_VERY_LOW
+    } else if min_segment < CONFIDENCE_MIN_SEGMENT_LOW {
+        CONFIDENCE_FACTOR_LOW
+    } else if min_segment < CONFIDENCE_MIN_SEGMENT_MODERATE {
+        CONFIDENCE_FACTOR_MODERATE
     } else {
-        1.0 // High confidence with 10+ points
+        CONFIDENCE_FACTOR_HIGH
     };
 
     // Magnitude factor: higher magnitude = higher confidence
-    // Scale more aggressively: 10% change = 0.5 confidence, 20% = 0.8, 50% = 1.0
-    let magnitude_factor = (magnitude_pct / 50.0).min(1.0);
+    // Scale: 10% change = 0.2 confidence, 25% = 0.5, 50% = 1.0
+    let magnitude_factor = (magnitude_pct / CONFIDENCE_MAGNITUDE_SCALE).min(1.0);
 
     // Combine factors: magnitude is more important than segment size
-    let confidence = 0.4 * size_factor + 0.6 * magnitude_factor;
+    let confidence =
+        CONFIDENCE_WEIGHT_SIZE * size_factor + CONFIDENCE_WEIGHT_MAGNITUDE * magnitude_factor;
 
     confidence.clamp(0.0, 1.0)
 }
