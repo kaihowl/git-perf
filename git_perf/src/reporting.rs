@@ -3,6 +3,7 @@ use std::{
     fs::{self, File},
     io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use anyhow::anyhow;
@@ -21,6 +22,30 @@ use crate::{
     measurement_retrieval::{self, MeasurementReducer},
     stats::ReductionFunc,
 };
+
+use regex::Regex;
+
+/// Cached regex for parsing section placeholders (compiled once)
+static SECTION_PLACEHOLDER_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Cached regex for finding all section blocks in a template (compiled once)
+static SECTION_FINDER_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Get or compile the section placeholder parsing regex
+fn section_placeholder_regex() -> &'static Regex {
+    SECTION_PLACEHOLDER_REGEX.get_or_init(|| {
+        Regex::new(r"(?s)\{\{SECTION\[([^\]]+)\](.*?)\}\}")
+            .expect("Invalid section placeholder regex pattern")
+    })
+}
+
+/// Get or compile the section finder regex
+fn section_finder_regex() -> &'static Regex {
+    SECTION_FINDER_REGEX.get_or_init(|| {
+        Regex::new(r"(?s)\{\{SECTION\[[^\]]+\].*?\}\}")
+            .expect("Invalid section finder regex pattern")
+    })
+}
 
 /// Configuration for report templates
 pub struct ReportTemplateConfig {
@@ -71,6 +96,168 @@ impl ReportMetadata {
             depth,
         }
     }
+}
+
+/// Configuration for a single report section in a multi-section template
+#[derive(Debug, Clone)]
+struct SectionConfig {
+    /// Section identifier (e.g., "test-overview", "bench-median")
+    id: String,
+    /// Original placeholder text to replace (e.g., "{{SECTION[id] param: value }}")
+    placeholder: String,
+    /// Regex pattern for selecting measurements
+    measurement_filter: Option<String>,
+    /// Key-value pairs to match (e.g., os=linux,arch=x64)
+    key_value_filter: Vec<(String, String)>,
+    /// Metadata keys to split traces by (e.g., ["os", "arch"])
+    separate_by: Vec<String>,
+    /// Aggregation function (none means raw data)
+    aggregate_by: Option<ReductionFunc>,
+    /// Number of commits (overrides global depth)
+    depth: Option<usize>,
+    /// Section-specific title for the chart (parsed but not yet used in display)
+    #[allow(dead_code)]
+    title: Option<String>,
+}
+
+impl SectionConfig {
+    /// Parse a single section placeholder into a SectionConfig
+    /// Format: {{SECTION[id] param: value, param2: value2 }}
+    fn parse(placeholder: &str) -> Result<Self> {
+        // Use cached regex to extract section ID and parameters
+        let section_regex = section_placeholder_regex();
+
+        let captures = section_regex
+            .captures(placeholder)
+            .ok_or_else(|| anyhow!("Invalid section placeholder format: {}", placeholder))?;
+
+        let id = captures
+            .get(1)
+            .expect("Regex capture group 1 (section ID) must exist")
+            .as_str()
+            .trim()
+            .to_string();
+        let params_str = captures
+            .get(2)
+            .expect("Regex capture group 2 (parameters) must exist")
+            .as_str()
+            .trim();
+
+        // Parse parameters
+        let mut measurement_filter = None;
+        let mut key_value_filter = Vec::new();
+        let mut separate_by = Vec::new();
+        let mut aggregate_by = None;
+        let mut depth = None;
+        let mut title = None;
+
+        if !params_str.is_empty() {
+            // Split by newlines and trim each line
+            for line in params_str.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                // Parse "param: value" format
+                if let Some((key, value)) = line.split_once(':') {
+                    let key = key.trim();
+                    let value = value.trim();
+
+                    match key {
+                        "measurement-filter" => {
+                            measurement_filter = Some(value.to_string());
+                        }
+                        "key-value-filter" => {
+                            // Parse comma-separated key=value pairs
+                            for pair in value.split(',') {
+                                let pair = pair.trim();
+                                if let Some((k, v)) = pair.split_once('=') {
+                                    let k = k.trim();
+                                    let v = v.trim();
+                                    if k.is_empty() {
+                                        bail!("Empty key in key-value-filter: '{}'", pair);
+                                    }
+                                    if v.is_empty() {
+                                        bail!("Empty value in key-value-filter: '{}'", pair);
+                                    }
+                                    key_value_filter.push((k.to_string(), v.to_string()));
+                                } else {
+                                    bail!("Invalid key-value-filter format: {}", pair);
+                                }
+                            }
+                        }
+                        "separate-by" => {
+                            // Parse comma-separated list
+                            separate_by = value
+                                .split(',')
+                                .map(|s| s.trim().to_string())
+                                .filter(|s| !s.is_empty())
+                                .collect();
+                        }
+                        "aggregate-by" => {
+                            aggregate_by = match value {
+                                "none" => None,
+                                "min" => Some(ReductionFunc::Min),
+                                "max" => Some(ReductionFunc::Max),
+                                "median" => Some(ReductionFunc::Median),
+                                "mean" => Some(ReductionFunc::Mean),
+                                _ => bail!("Invalid aggregate-by value: {}", value),
+                            };
+                        }
+                        "depth" => {
+                            depth = Some(
+                                value
+                                    .parse::<usize>()
+                                    .map_err(|_| anyhow!("Invalid depth value: {}", value))?,
+                            );
+                        }
+                        "title" => {
+                            title = Some(value.to_string());
+                        }
+                        _ => {
+                            // Unknown parameter - ignore or warn
+                            log::warn!("Unknown section parameter: {}", key);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(SectionConfig {
+            id,
+            placeholder: placeholder.to_string(),
+            measurement_filter,
+            key_value_filter,
+            separate_by,
+            aggregate_by,
+            depth,
+            title,
+        })
+    }
+}
+
+/// Parse all section placeholders from a template
+fn parse_template_sections(template: &str) -> Result<Vec<SectionConfig>> {
+    // Use cached regex to find all {{SECTION[...] ...}} blocks
+    let section_regex = section_finder_regex();
+
+    let mut sections = Vec::new();
+    let mut seen_ids = std::collections::HashSet::new();
+
+    for captures in section_regex.find_iter(template) {
+        let placeholder = captures.as_str();
+        let section = SectionConfig::parse(placeholder)?;
+
+        // Check for duplicate section IDs
+        if !seen_ids.insert(section.id.clone()) {
+            bail!("Duplicate section ID found: {}", section.id);
+        }
+
+        sections.push(section);
+    }
+
+    Ok(sections)
 }
 
 /// Extract Plotly JavaScript dependencies and plot content
@@ -575,59 +762,18 @@ impl ReporterFactory {
     }
 }
 
-pub fn report(
-    output: PathBuf,
-    separate_by: Vec<String>,
-    num_commits: usize,
-    key_values: &[(String, String)],
+/// Process measurements and add traces to a reporter based on grouping and aggregation settings
+///
+/// This helper function contains the shared logic for iterating over measurements,
+/// grouping them by metadata keys, and adding them as traces to a reporter.
+fn process_measurements_into_traces<'a>(
+    reporter: &mut dyn Reporter<'a>,
+    relevant_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    separate_by: &[String],
     aggregate_by: Option<ReductionFunc>,
-    combined_patterns: &[String],
-    template_config: ReportTemplateConfig,
+    error_context: &str,
+    fail_on_empty: bool,
 ) -> Result<()> {
-    // Compile combined regex patterns (measurements as exact matches + filter patterns)
-    // early to fail fast on invalid patterns
-    let filters = crate::filter::compile_filters(combined_patterns)?;
-
-    let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
-
-    if commits.is_empty() {
-        bail!(
-            "No commits found in repository. Ensure commits exist and were pushed to the remote."
-        );
-    }
-
-    let mut plot =
-        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
-
-    plot.add_commits(&commits);
-
-    // Load template and CSS for HTML reports
-    if output.extension().and_then(|s| s.to_str()) == Some("html") {
-        let template = load_template(template_config.template_path.as_ref())?;
-
-        // Resolve title: CLI > config > None
-        let resolved_title = template_config.title.or_else(config::report_title);
-
-        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-        let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
-
-        plot.set_template_and_metadata(template, metadata);
-    }
-
-    let relevant = |m: &MeasurementData| {
-        // Apply regex filters (handles both exact measurement matches and filter patterns)
-        if !crate::filter::matches_any_filter(&m.name, &filters) {
-            return false;
-        }
-
-        // Filter using subset relation: key_values ⊆ measurement.key_values
-        m.key_values_is_superset_of(key_values)
-    };
-
-    let relevant_measurements = commits
-        .iter()
-        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
-
     let unique_measurement_names: Vec<_> = relevant_measurements
         .clone()
         .flat_map(|m| m.map(|m| &m.name))
@@ -635,7 +781,10 @@ pub fn report(
         .collect();
 
     if unique_measurement_names.is_empty() {
-        bail!("No performance measurements found.")
+        if fail_on_empty {
+            bail!("{}: No performance measurements found.", error_context);
+        }
+        return Ok(());
     }
 
     for measurement_name in unique_measurement_names {
@@ -672,7 +821,8 @@ pub fn report(
         let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
             if !separate_by.is_empty() {
                 bail!(
-                    "Invalid separator supplied, no measurements have all required keys: {:?}",
+                    "{}: Invalid separator supplied, no measurements have all required keys: {:?}",
+                    error_context,
                     separate_by
                 );
             }
@@ -711,17 +861,223 @@ pub fn report(
                             .map(move |m| (i, m))
                     })
                     .collect_vec();
-                plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
+                reporter.add_summarized_trace(trace_measurements, measurement_name, &group_value);
             } else {
                 let trace_measurements: Vec<_> = group_measurements
                     .clone()
                     .enumerate()
                     .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
                     .collect();
-                plot.add_trace(trace_measurements, measurement_name, &group_value);
+                reporter.add_trace(trace_measurements, measurement_name, &group_value);
             }
         }
     }
+
+    Ok(())
+}
+
+/// Generate a plot for a single section with specific configuration
+fn generate_section_plot(commits: &[Commit], section: &SectionConfig) -> Result<Plot> {
+    let mut reporter = PlotlyReporter::new();
+    reporter.add_commits(commits);
+
+    // Determine the number of commits to use for this section
+    let section_commits = if let Some(depth) = section.depth {
+        if depth > commits.len() {
+            log::warn!(
+                "Section '{}' requested depth {} but only {} commits available",
+                section.id,
+                depth,
+                commits.len()
+            );
+            commits
+        } else {
+            &commits[..depth]
+        }
+    } else {
+        commits
+    };
+
+    // Compile filter pattern if specified
+    let filters = if let Some(ref pattern) = section.measurement_filter {
+        crate::filter::compile_filters(std::slice::from_ref(pattern))?
+    } else {
+        vec![]
+    };
+
+    // Filter function for this section
+    let relevant = |m: &MeasurementData| {
+        // Apply regex filter if specified
+        if !filters.is_empty() && !crate::filter::matches_any_filter(&m.name, &filters) {
+            return false;
+        }
+
+        // Apply key-value filters
+        m.key_values_is_superset_of(&section.key_value_filter)
+    };
+
+    let relevant_measurements = section_commits
+        .iter()
+        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+
+    // Use helper function to process measurements and add traces
+    let error_context = format!("Section '{}'", section.id);
+    process_measurements_into_traces(
+        &mut reporter,
+        relevant_measurements,
+        &section.separate_by,
+        section.aggregate_by,
+        &error_context,
+        false, // fail_on_empty - allow empty sections
+    )?;
+
+    // Check if any traces were added
+    if reporter.plot.data().is_empty() {
+        log::warn!("Section '{}' has no matching measurements", section.id);
+    }
+
+    Ok(reporter.plot)
+}
+
+/// Generate a multi-section report from a template with section placeholders
+fn generate_multi_section_report(
+    template: &str,
+    commits: &[Commit],
+    metadata: &ReportMetadata,
+) -> Result<Vec<u8>> {
+    let sections = parse_template_sections(template)?;
+
+    if sections.is_empty() {
+        // No sections found - this shouldn't happen if called correctly
+        bail!("Template contains no section placeholders");
+    }
+
+    log::info!(
+        "Generating multi-section report with {} sections",
+        sections.len()
+    );
+
+    let mut output = template.to_string();
+
+    // Generate each section
+    for section in sections {
+        log::info!("Generating section: {}", section.id);
+
+        // Generate the plot for this section
+        let plot = generate_section_plot(commits, &section)?;
+
+        // Extract plotly parts
+        let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
+
+        // For sections, we only want the body (the actual plot div + script)
+        // The head (plotly.js library) will be included once in the global template
+        // Replace the section placeholder with just the plotly body
+        output = output.replace(&section.placeholder, &plotly_body);
+    }
+
+    // Now apply global placeholders
+    let (plotly_head, _) = extract_plotly_parts(&Plot::new()); // Get just the plotly.js script tags
+
+    output = output
+        .replace("{{TITLE}}", &metadata.title)
+        .replace("{{PLOTLY_HEAD}}", &plotly_head)
+        .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+        .replace("{{TIMESTAMP}}", &metadata.timestamp)
+        .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+        .replace("{{DEPTH}}", &metadata.depth.to_string())
+        .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
+
+    Ok(output.as_bytes().to_vec())
+}
+
+pub fn report(
+    output: PathBuf,
+    separate_by: Vec<String>,
+    num_commits: usize,
+    key_values: &[(String, String)],
+    aggregate_by: Option<ReductionFunc>,
+    combined_patterns: &[String],
+    template_config: ReportTemplateConfig,
+) -> Result<()> {
+    // Compile combined regex patterns (measurements as exact matches + filter patterns)
+    // early to fail fast on invalid patterns
+    let filters = crate::filter::compile_filters(combined_patterns)?;
+
+    let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
+
+    if commits.is_empty() {
+        bail!(
+            "No commits found in repository. Ensure commits exist and were pushed to the remote."
+        );
+    }
+
+    let mut plot =
+        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
+
+    plot.add_commits(&commits);
+
+    // Load template and CSS for HTML reports
+    if output.extension().and_then(|s| s.to_str()) == Some("html") {
+        let template = load_template(template_config.template_path.as_ref())?;
+
+        // Resolve title: CLI > config > None
+        let resolved_title = template_config.title.or_else(config::report_title);
+
+        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+        let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
+
+        // Check if template contains section placeholders
+        if let Some(ref template_str) = template {
+            let sections = parse_template_sections(template_str)?;
+            if !sections.is_empty() {
+                // Multi-section template detected - generate and return early
+                log::info!(
+                    "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
+                    sections.len()
+                );
+
+                let report_bytes =
+                    generate_multi_section_report(template_str, &commits, &metadata)?;
+
+                if output == Path::new("-") {
+                    match io::stdout().write_all(&report_bytes) {
+                        Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+                        res => res,
+                    }?;
+                } else {
+                    File::create(&output)?.write_all(&report_bytes)?;
+                }
+
+                return Ok(());
+            }
+        }
+
+        plot.set_template_and_metadata(template, metadata);
+    }
+
+    let relevant = |m: &MeasurementData| {
+        // Apply regex filters (handles both exact measurement matches and filter patterns)
+        if !crate::filter::matches_any_filter(&m.name, &filters) {
+            return false;
+        }
+
+        // Filter using subset relation: key_values ⊆ measurement.key_values
+        m.key_values_is_superset_of(key_values)
+    };
+
+    let relevant_measurements = commits
+        .iter()
+        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+
+    // Use helper function to process measurements and add traces
+    process_measurements_into_traces(
+        plot.as_mut(),
+        relevant_measurements,
+        &separate_by,
+        aggregate_by,
+        "Report generation",
+        true, // fail_on_empty
+    )?;
 
     if output == Path::new("-") {
         match io::stdout().write_all(&plot.as_bytes()) {
@@ -1321,5 +1677,256 @@ mod tests {
         let expected =
             "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\nabc\t0\tavg_time\t0.0\t5.5\t\n";
         assert_eq!(csv, expected);
+    }
+
+    #[test]
+    fn test_section_config_parse_basic() {
+        let placeholder = "{{SECTION[test-section]}}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "test-section");
+        assert_eq!(section.placeholder, placeholder);
+        assert!(section.measurement_filter.is_none());
+        assert!(section.key_value_filter.is_empty());
+        assert!(section.separate_by.is_empty());
+        assert!(section.aggregate_by.is_none());
+        assert!(section.depth.is_none());
+        assert!(section.title.is_none());
+    }
+
+    #[test]
+    fn test_section_config_parse_with_measurement_filter() {
+        let placeholder = "{{SECTION[bench-section]\n                measurement-filter: ^bench::\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "bench-section");
+        assert_eq!(section.measurement_filter, Some("^bench::".to_string()));
+    }
+
+    #[test]
+    fn test_section_config_parse_with_aggregate_by() {
+        let placeholder =
+            "{{SECTION[median-section]\n                aggregate-by: median\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "median-section");
+        assert_eq!(section.aggregate_by, Some(ReductionFunc::Median));
+    }
+
+    #[test]
+    fn test_section_config_parse_with_separate_by() {
+        let placeholder =
+            "{{SECTION[split-section]\n                separate-by: os,arch\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "split-section");
+        assert_eq!(section.separate_by, vec!["os", "arch"]);
+    }
+
+    #[test]
+    fn test_section_config_parse_with_key_value_filter() {
+        let placeholder =
+            "{{SECTION[kv-section]\n                key-value-filter: os=linux,arch=x64\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "kv-section");
+        assert_eq!(section.key_value_filter.len(), 2);
+        assert!(section
+            .key_value_filter
+            .contains(&("os".to_string(), "linux".to_string())));
+        assert!(section
+            .key_value_filter
+            .contains(&("arch".to_string(), "x64".to_string())));
+    }
+
+    #[test]
+    fn test_section_config_parse_with_depth() {
+        let placeholder = "{{SECTION[depth-section]\n                depth: 50\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "depth-section");
+        assert_eq!(section.depth, Some(50));
+    }
+
+    #[test]
+    fn test_section_config_parse_with_title() {
+        let placeholder =
+            "{{SECTION[title-section]\n                title: My Custom Title\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "title-section");
+        assert_eq!(section.title, Some("My Custom Title".to_string()));
+    }
+
+    #[test]
+    fn test_section_config_parse_all_parameters() {
+        let placeholder = r#"{{SECTION[full-section]
+                measurement-filter: ^test::
+                key-value-filter: os=linux,env=ci
+                separate-by: os,arch
+                aggregate-by: mean
+                depth: 100
+                title: Full Test Section
+            }}"#;
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "full-section");
+        assert_eq!(section.measurement_filter, Some("^test::".to_string()));
+        assert_eq!(section.key_value_filter.len(), 2);
+        assert_eq!(section.separate_by, vec!["os", "arch"]);
+        assert_eq!(section.aggregate_by, Some(ReductionFunc::Mean));
+        assert_eq!(section.depth, Some(100));
+        assert_eq!(section.title, Some("Full Test Section".to_string()));
+    }
+
+    #[test]
+    fn test_section_config_parse_aggregate_by_none() {
+        let placeholder =
+            "{{SECTION[raw-section]\n                aggregate-by: none\n            }}";
+        let section = SectionConfig::parse(placeholder).unwrap();
+
+        assert_eq!(section.id, "raw-section");
+        assert_eq!(section.aggregate_by, None);
+    }
+
+    #[test]
+    fn test_section_config_parse_invalid_aggregate_by() {
+        let placeholder =
+            "{{SECTION[invalid-section]\n                aggregate-by: invalid\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid aggregate-by value"));
+    }
+
+    #[test]
+    fn test_section_config_parse_invalid_depth() {
+        let placeholder =
+            "{{SECTION[bad-depth]\n                depth: not-a-number\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid depth value"));
+    }
+
+    #[test]
+    fn test_section_config_parse_empty_key_in_key_value_filter() {
+        let placeholder =
+            "{{SECTION[empty-key]\n                key-value-filter: =value\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty key in key-value-filter"));
+    }
+
+    #[test]
+    fn test_section_config_parse_empty_value_in_key_value_filter() {
+        let placeholder =
+            "{{SECTION[empty-value]\n                key-value-filter: key=\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty value in key-value-filter"));
+    }
+
+    #[test]
+    fn test_section_config_parse_empty_key_and_value() {
+        let placeholder =
+            "{{SECTION[empty-both]\n                key-value-filter: =\n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty key in key-value-filter"));
+    }
+
+    #[test]
+    fn test_section_config_parse_whitespace_key_value() {
+        let placeholder =
+            "{{SECTION[whitespace]\n                key-value-filter:    =   \n            }}";
+        let result = SectionConfig::parse(placeholder);
+
+        assert!(result.is_err());
+        // Should fail because trimmed key is empty
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty key in key-value-filter"));
+    }
+
+    #[test]
+    fn test_parse_template_sections_empty() {
+        let template = "<html><body>No sections here</body></html>";
+        let sections = parse_template_sections(template).unwrap();
+
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn test_parse_template_sections_single() {
+        let template = r#"<html><body>
+            {{SECTION[test-section]
+                measurement-filter: ^test::
+            }}
+        </body></html>"#;
+        let sections = parse_template_sections(template).unwrap();
+
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].id, "test-section");
+    }
+
+    #[test]
+    fn test_parse_template_sections_multiple() {
+        let template = r#"<html><body>
+            {{SECTION[section1]
+                measurement-filter: ^test::
+            }}
+            {{SECTION[section2]
+                measurement-filter: ^bench::
+                aggregate-by: median
+            }}
+            {{SECTION[section3]
+                separate-by: os
+            }}
+        </body></html>"#;
+        let sections = parse_template_sections(template).unwrap();
+
+        assert_eq!(sections.len(), 3);
+        assert_eq!(sections[0].id, "section1");
+        assert_eq!(sections[1].id, "section2");
+        assert_eq!(sections[2].id, "section3");
+    }
+
+    #[test]
+    fn test_parse_template_sections_duplicate_ids() {
+        let template = r#"<html><body>
+            {{SECTION[same-id]
+                measurement-filter: ^test::
+            }}
+            {{SECTION[same-id]
+                measurement-filter: ^bench::
+            }}
+        </body></html>"#;
+        let result = parse_template_sections(template);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate section ID"));
     }
 }
