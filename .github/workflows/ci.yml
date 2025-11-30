@@ -154,10 +154,7 @@ jobs:
           git perf push
 
           # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
-          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
-          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
-          git perf audit -n 40 -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
+          git perf audit -n 40 -m test-measure2 -m report-benchmark -m add-benchmark -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
 
           # Informational audits: failures don't block CI
           git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report audit failed (informational only)"

@@ -18,10 +18,13 @@ unit = "bytes"
 
 [measurement."report-benchmark"]
 unit = "ns"
+sigma = 3
 
 [measurement."add-benchmark"]
 unit = "ns"
+sigma = 3.5
 
 [measurement."report-size-benchmark"]
 unit = "bytes"
 min_relative_deviation = 10.0
+sigma = 3.5
