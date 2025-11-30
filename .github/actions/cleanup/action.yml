@@ -116,6 +116,10 @@ runs:
       shell: bash
       run: |
         if git rev-parse --verify gh-pages >/dev/null 2>&1; then
+          # Save current branch and set up trap to restore it on exit
+          ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          trap "git checkout '$ORIGINAL_BRANCH'" EXIT
+
           git checkout gh-pages
           if [ -n "$(git status --porcelain)" ]; then
             git push origin gh-pages
