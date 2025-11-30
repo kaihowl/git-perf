@@ -18,18 +18,18 @@
         # Sigma threshold for statistical outlier detection
         # Number of standard deviations (or MADs) from the median
         # Higher values are more lenient, lower values are more strict
-        # Default: 3.0 (if not specified)
+        # Default: 4.0 (if not specified)
         sigma = 3.5
 
         # Minimum number of measurements required for statistical analysis
         # If fewer measurements exist, audits may skip statistical checks
-        # Default: 3 (if not specified)
+        # Default: 2 (if not specified)
         min_measurements = 3
 
         # Aggregation method for reducing multiple measurements
         # Options: "min", "max", "median", "mean"
         # Used when multiple measurements exist for the same commit
-        # Default: "median" (if not specified)
+        # Default: "min" (if not specified)
         aggregate_by = "median"
 
         # Default epoch for accepting performance changes (hex format)
