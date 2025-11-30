@@ -1,5 +1,5 @@
 test_tool = "nextest"
-exclude_globs = ["examples/**", "benches/**", "git_perf/tests/**", "git_perf/src/main.rs", "git_perf/src/cli.rs", "git_perf/src/measurement_retrieval.rs"]
+exclude_globs = ["examples/**", "benches/**", "git_perf/tests/**", "git_perf/src/main.rs", "git_perf/src/cli.rs", "git_perf/src/measurement_retrieval.rs", "git_perf/src/test_helpers.rs"]
 additional_cargo_test_args = ["--", "--skip", "slow"]
 timeout_multiplier = 2.0
 minimum_test_timeout = 60

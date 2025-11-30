@@ -450,7 +450,10 @@ mod tests {
             .envs(hermetic_git_env_vars())
             .output()
             .expect("Failed to run git command");
-        assert!(before.status.success(), "Failed to get initial commit count");
+        assert!(
+            before.status.success(),
+            "Failed to get initial commit count"
+        );
         let count_before = String::from_utf8_lossy(&before.stdout)
             .trim()
             .parse::<i32>()
