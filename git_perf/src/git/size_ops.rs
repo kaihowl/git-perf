@@ -365,82 +365,119 @@ mod tests {
     }
 
     #[test]
-    fn test_accumulate_measurement_sizes_division() {
-        // Test the division operator used in accumulate_measurement_sizes
-        // size_per_measurement = note_size / measurements.len()
-
-        // Mock a note size and measurement counts
-        let note_size = 1000u64;
-
-        // Test division with 2 measurements
-        let measurement_count_2 = 2;
-        let size_per_measurement = note_size / measurement_count_2;
-        assert_eq!(
-            size_per_measurement, 500,
-            "Division should split note size evenly: 1000/2 = 500"
-        );
-
-        // Verify that changing the divisor changes the result correctly
-        let size_with_one = note_size / 1;
-        let size_with_two = note_size / 2;
-        let size_with_four = note_size / 4;
-
-        assert_ne!(
-            size_with_one, size_with_two,
-            "Division result should differ with different divisors"
-        );
-        assert_eq!(size_with_one, 1000, "1000/1 = 1000");
-        assert_eq!(size_with_two, 500, "1000/2 = 500");
-        assert_eq!(size_with_four, 250, "1000/4 = 250");
-
-        // Verify the operator is division, not another operation
-        assert!(
-            size_with_one > size_with_two,
-            "Division should decrease result"
-        );
-        assert!(
-            size_with_two > size_with_four,
-            "Larger divisor = smaller result"
-        );
-    }
-
-    #[test]
-    fn test_accumulate_measurement_sizes_addition() {
+    fn test_accumulate_measurement_sizes() {
+        use crate::data::MeasurementData;
+        use crate::serialization::serialize_multiple;
+        use crate::test_helpers::{hermetic_git_env, run_git_command};
         use std::collections::HashMap;
 
-        // Test that += operator is correctly used for accumulation
+        // Create a hermetic git repo
+        let temp_dir = dir_with_repo();
+        let repo_path = temp_dir.path();
+        hermetic_git_env();
+
+        // Create test measurements
+        let measurements = vec![
+            MeasurementData {
+                epoch: 1,
+                name: "test_metric_a".to_string(),
+                timestamp: 1234567890.0,
+                val: 100.0,
+                key_values: HashMap::new(),
+            },
+            MeasurementData {
+                epoch: 1,
+                name: "test_metric_b".to_string(),
+                timestamp: 1234567891.0,
+                val: 200.0,
+                key_values: HashMap::new(),
+            },
+            MeasurementData {
+                epoch: 1,
+                name: "test_metric_a".to_string(),
+                timestamp: 1234567892.0,
+                val: 150.0,
+                key_values: HashMap::new(),
+            },
+        ];
+
+        // Serialize measurements
+        let serialized = serialize_multiple(&measurements);
+
+        // Get HEAD commit hash
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .expect("Failed to get HEAD hash");
+        let head_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        // Add measurements as a note to HEAD
+        std::fs::write(repo_path.join("note_content.txt"), &serialized)
+            .expect("Failed to write note content");
+        run_git_command(
+            &[
+                "notes",
+                "--ref",
+                "refs/notes/perf-v3",
+                "add",
+                "-F",
+                "note_content.txt",
+                &head_hash,
+            ],
+            repo_path,
+        );
+
+        // Get the note OID
+        let output = std::process::Command::new("git")
+            .args(["notes", "--ref", "refs/notes/perf-v3", "list"])
+            .current_dir(repo_path)
+            .output()
+            .expect("Failed to list notes");
+        let notes_list = String::from_utf8_lossy(&output.stdout);
+        let note_oid = notes_list
+            .split_whitespace()
+            .next()
+            .expect("No note OID found");
+
+        // Get the note size using git cat-file
+        let output = std::process::Command::new("git")
+            .args(["cat-file", "-s", note_oid])
+            .current_dir(repo_path)
+            .output()
+            .expect("Failed to get note size");
+        let note_size: u64 = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse()
+            .expect("Failed to parse note size");
+
+        // Call accumulate_measurement_sizes
         let mut by_name = HashMap::new();
+        accumulate_measurement_sizes(repo_path, note_oid, note_size, &mut by_name)
+            .expect("Failed to accumulate measurement sizes");
 
-        // Simulate multiple additions to the same measurement
-        let entry = by_name
-            .entry("test".to_string())
-            .or_insert(MeasurementSizeInfo {
-                total_bytes: 0,
-                count: 0,
-            });
+        // Verify results
+        assert_eq!(by_name.len(), 2, "Should have 2 unique measurement names");
 
-        let initial = entry.total_bytes;
-        entry.total_bytes += 100;
+        let metric_a = by_name
+            .get("test_metric_a")
+            .expect("test_metric_a should exist");
+        assert_eq!(metric_a.count, 2, "test_metric_a should appear 2 times");
+        // Each measurement gets note_size / 3 (3 total measurements)
+        let expected_size_per_measurement = note_size / 3;
         assert_eq!(
-            entry.total_bytes,
-            initial + 100,
-            "Addition should increase total_bytes by 100"
+            metric_a.total_bytes,
+            expected_size_per_measurement * 2,
+            "test_metric_a should have size for 2 measurements"
         );
 
-        entry.total_bytes += 50;
+        let metric_b = by_name
+            .get("test_metric_b")
+            .expect("test_metric_b should exist");
+        assert_eq!(metric_b.count, 1, "test_metric_b should appear 1 time");
         assert_eq!(
-            entry.total_bytes,
-            initial + 150,
-            "Second addition should accumulate to 150"
-        );
-
-        // Verify that += is cumulative, not replacement
-        let before = entry.total_bytes;
-        entry.total_bytes += 25;
-        assert_eq!(
-            entry.total_bytes,
-            before + 25,
-            "Operator should add, not replace"
+            metric_b.total_bytes, expected_size_per_measurement,
+            "test_metric_b should have size for 1 measurement"
         );
     }
 }
