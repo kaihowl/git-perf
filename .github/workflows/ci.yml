@@ -1,8 +1,6 @@
 name: ci
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: false
+# Concurrency disabled for variability testing - need multiple concurrent runs
 
 permissions:
   contents: write
