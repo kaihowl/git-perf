@@ -59,17 +59,6 @@ pub const DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS: u64 = 60;
 pub const DEFAULT_EPOCH: u32 = 0;
 
 // ============================================================================
-// Calculation Defaults
-// ============================================================================
-
-/// Default value for median when no measurements are available.
-///
-/// This is used in calculations where a median is required but the dataset
-/// is empty. Using 0.0 allows calculations to proceed without errors while
-/// making it clear that no data is available.
-pub const DEFAULT_MEDIAN_EMPTY: f64 = 0.0;
-
-// ============================================================================
 // Git Configuration Defaults
 // ============================================================================
 
@@ -106,12 +95,6 @@ pub const fn default_epoch() -> u32 {
     DEFAULT_EPOCH
 }
 
-/// Returns the default median value for empty datasets.
-#[inline]
-pub const fn default_median_empty() -> f64 {
-    DEFAULT_MEDIAN_EMPTY
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,11 +121,5 @@ mod tests {
     fn test_default_epoch() {
         assert_eq!(DEFAULT_EPOCH, 0);
         assert_eq!(default_epoch(), 0);
-    }
-
-    #[test]
-    fn test_default_median_empty() {
-        assert_eq!(DEFAULT_MEDIAN_EMPTY, 0.0);
-        assert_eq!(default_median_empty(), 0.0);
     }
 }

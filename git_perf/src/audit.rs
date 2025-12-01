@@ -291,9 +291,7 @@ fn audit_with_data(
 
     let mut tail_measurements = all_measurements.clone();
     tail_measurements.pop(); // Remove head to get just tail for median calculation
-    let tail_median = tail_measurements
-        .median()
-        .unwrap_or(defaults::DEFAULT_MEDIAN_EMPTY);
+    let tail_median = tail_measurements.median().unwrap_or_default();
 
     // Calculate min and max once for use in both branches
     let min_val = all_measurements
