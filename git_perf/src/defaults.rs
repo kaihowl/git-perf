@@ -73,11 +73,10 @@ pub const DEFAULT_MEDIAN_EMPTY: f64 = 0.0;
 // Git Configuration Defaults
 // ============================================================================
 
-/// Default remote name for git-perf notes.
-///
-/// This is defined in git/git_interop.rs as GIT_PERF_REMOTE constant.
-/// Documenting it here for completeness.
-pub const DEFAULT_GIT_REMOTE: &str = "origin";
+// Default remote name for git-perf notes:
+// This is already defined as GIT_PERF_REMOTE in git/git_definitions.rs
+// and should not be duplicated. The actual value is "git-perf-origin".
+// See git/git_definitions.rs:28 for the implementation.
 
 // ============================================================================
 // Helper Functions
