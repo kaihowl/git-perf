@@ -28,3 +28,5 @@
 1133737162test-measure21764619995.51391171001121084.0os=ubuntu-22.04rust=stable
 
 0add-benchmark1764619997.528395218278330.0rust=stableos=ubuntu-22.04
+
+0add-benchmark1764619997.561858218221886.0os=ubuntu-22.04rust=stable
