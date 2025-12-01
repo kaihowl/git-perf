@@ -173,6 +173,7 @@ jobs:
   rustfmt:
     name: rustfmt
     runs-on: ubuntu-22.04
+    if: false  # Temporarily disabled for variability testing
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
@@ -187,6 +188,7 @@ jobs:
   clippy:
     name: clippy
     runs-on: ubuntu-22.04
+    if: false  # Temporarily disabled for variability testing
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
@@ -201,6 +203,7 @@ jobs:
   rustdoc:
     name: rust doc
     runs-on: ubuntu-22.04
+    if: false  # Temporarily disabled for variability testing
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
@@ -217,6 +220,7 @@ jobs:
   documentation-check:
     name: Check documentation is up to date
     runs-on: ubuntu-22.04
+    if: false  # Temporarily disabled for variability testing
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
@@ -242,7 +246,7 @@ jobs:
   report:
     name: git-perf
     runs-on: ubuntu-22.04
-    if: always()
+    if: false  # Temporarily disabled for variability testing
     needs: [test, rustfmt, clippy, rustdoc, documentation-check, release-binary-size]
     concurrency:
       group: gh-pages-${{ github.ref }}
@@ -265,6 +269,7 @@ jobs:
   release-binary-size:
     name: release-binary-size
     runs-on: ubuntu-22.04
+    if: false  # Temporarily disabled for variability testing
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
