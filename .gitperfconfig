@@ -17,11 +17,20 @@ epoch = "c692cdd"
 unit = "bytes"
 
 [measurement."report-benchmark"]
+epoch = "e1b4d14"
 unit = "ns"
+sigma = 3
+aggregate_by = "median"
 
 [measurement."add-benchmark"]
+epoch = "e1b4d14"
 unit = "ns"
+sigma = 3.5
+aggregate_by = "median"
 
 [measurement."report-size-benchmark"]
+epoch = "e1b4d14"
 unit = "bytes"
 min_relative_deviation = 10.0
+sigma = 3.5
+aggregate_by = "median"
