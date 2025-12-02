@@ -2,10 +2,12 @@
 epoch = "fedee674"
 min_relative_deviation = 10.0
 unit = "bytes"
+min_measurements = 10
 
 [measurement."report"]
 epoch = "fedee674"
 unit = "ns"
+min_measurements = 10
 
 [measurement."test-measure2"]
 epoch = "439374ca"
@@ -15,12 +17,14 @@ unit = "ns"
 [measurement."release-binary-size"]
 epoch = "c692cdd"
 unit = "bytes"
+min_measurements = 10
 
 [measurement."report-benchmark"]
 epoch = "e1b4d14"
 unit = "ns"
 sigma = 3
 aggregate_by = "median"
+min_measurements = 10
 
 [measurement."add-benchmark"]
 epoch = "e1b4d14"
@@ -35,3 +39,4 @@ unit = "bytes"
 min_relative_deviation = 10.0
 sigma = 3.5
 aggregate_by = "median"
+min_measurements = 10
