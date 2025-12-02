@@ -22,6 +22,12 @@ use crate::{
     stats::ReductionFunc,
 };
 
+/// Default number of characters to display from commit SHA in report x-axis.
+///
+/// This value is used when displaying commit hashes on the x-axis of plots,
+/// optimized for display space and readability in interactive visualizations.
+const DEFAULT_COMMIT_HASH_DISPLAY_LENGTH: usize = 6;
+
 /// Formats a measurement name with its configured unit, if available.
 /// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
 fn format_measurement_with_unit(measurement_name: &str) -> String {
@@ -442,7 +448,12 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         self.size = commits.len();
 
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
-            .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
+            .map(|(n, c)| {
+                (
+                    n as f64,
+                    c.commit[..DEFAULT_COMMIT_HASH_DISPLAY_LENGTH].to_owned(),
+                )
+            })
             .unzip();
         let x_axis = Axis::new()
             .tick_values(commit_nrs)
