@@ -8,6 +8,7 @@ use std::{
 };
 use toml_edit::{value, Document, Item, Table};
 
+use crate::defaults;
 use crate::git::git_interop::{get_head_revision, get_repository_root};
 
 // Import the CLI types for dispersion method
@@ -171,17 +172,17 @@ pub fn bump_epoch(measurement: &str) -> Result<()> {
     Ok(())
 }
 
-/// Returns the backoff max elapsed seconds from config, or 60 if not set.
+/// Returns the backoff max elapsed seconds from config, or the default if not set.
 pub fn backoff_max_elapsed_seconds() -> u64 {
     match read_hierarchical_config() {
         Ok(config) => {
             if let Ok(seconds) = config.get_int("backoff.max_elapsed_seconds") {
                 seconds as u64
             } else {
-                60 // Default value
+                defaults::DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS
             }
         }
-        Err(_) => 60, // Default value when no config exists
+        Err(_) => defaults::DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS,
     }
 }
 
@@ -214,7 +215,6 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         }
     }
 
-    // Default to StandardDeviation
     DispersionMethod::StandardDeviation
 }
 

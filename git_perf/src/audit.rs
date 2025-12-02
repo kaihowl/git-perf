@@ -1,6 +1,7 @@
 use crate::{
     config,
     data::{Commit, MeasurementData},
+    defaults,
     measurement_retrieval::{self, summarize_measurements},
     stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
@@ -63,7 +64,7 @@ pub(crate) fn resolve_audit_params(
 ) -> ResolvedAuditParams {
     let min_count = cli_min_count
         .or_else(|| config::audit_min_measurements(measurement))
-        .unwrap_or(2);
+        .unwrap_or(defaults::DEFAULT_MIN_MEASUREMENTS);
 
     let summarize_by = cli_summarize_by
         .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
@@ -71,7 +72,7 @@ pub(crate) fn resolve_audit_params(
 
     let sigma = cli_sigma
         .or_else(|| config::audit_sigma(measurement))
-        .unwrap_or(4.0);
+        .unwrap_or(defaults::DEFAULT_SIGMA);
 
     let dispersion_method = cli_dispersion_method
         .or_else(|| {
@@ -290,7 +291,7 @@ fn audit_with_data(
 
     let mut tail_measurements = all_measurements.clone();
     tail_measurements.pop(); // Remove head to get just tail for median calculation
-    let tail_median = tail_measurements.median().unwrap_or(0.0);
+    let tail_median = tail_measurements.median().unwrap_or_default();
 
     // Calculate min and max once for use in both branches
     let min_val = all_measurements
