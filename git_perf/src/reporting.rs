@@ -28,6 +28,25 @@ use crate::{
 /// optimized for display space and readability in interactive visualizations.
 const DEFAULT_COMMIT_HASH_DISPLAY_LENGTH: usize = 6;
 
+// Color constants for change point visualization
+/// RGBA color for performance regressions (increases in metrics like execution time).
+/// Red color with 80% opacity.
+const REGRESSION_COLOR: &str = "rgba(220, 53, 69, 0.8)";
+
+/// RGBA color for performance improvements (decreases in metrics like execution time).
+/// Green color with 80% opacity.
+const IMPROVEMENT_COLOR: &str = "rgba(40, 167, 69, 0.8)";
+
+/// Color for epoch markers in the plot.
+const EPOCH_MARKER_COLOR: &str = "gray";
+
+// Line width constants for plot styling
+/// Line width for change point markers (vertical lines indicating performance changes).
+const CHANGE_POINT_LINE_WIDTH: f64 = 3.0;
+
+/// Line width for epoch markers (vertical dashed lines).
+const EPOCH_MARKER_LINE_WIDTH: f64 = 2.0;
+
 /// Formats a measurement name with its configured unit, if available.
 /// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
 fn format_measurement_with_unit(measurement_name: &str) -> String {
@@ -344,7 +363,12 @@ impl PlotlyReporter {
         let trace = Scatter::new(x_coords, y_coords)
             .visible(Visible::LegendOnly)
             .mode(Mode::Lines)
-            .line(Line::new().color("gray").dash(DashType::Dash).width(2.0))
+            .line(
+                Line::new()
+                    .color(EPOCH_MARKER_COLOR)
+                    .dash(DashType::Dash)
+                    .width(EPOCH_MARKER_LINE_WIDTH),
+            )
             .show_legend(true)
             .hover_text_array(hover_texts);
 
@@ -387,10 +411,8 @@ impl PlotlyReporter {
             };
 
             let (color, label_prefix, symbol) = match cp.direction {
-                ChangeDirection::Increase => ("rgba(220, 53, 69, 0.8)", "Increase", "⚠ Regression"),
-                ChangeDirection::Decrease => {
-                    ("rgba(40, 167, 69, 0.8)", "Decrease", "✓ Improvement")
-                }
+                ChangeDirection::Increase => (REGRESSION_COLOR, "Increase", "⚠ Regression"),
+                ChangeDirection::Decrease => (IMPROVEMENT_COLOR, "Decrease", "✓ Improvement"),
             };
 
             let hover_text = format!(
@@ -424,7 +446,7 @@ impl PlotlyReporter {
             let trace = Scatter::new(x_coords, y_coords)
                 .visible(Visible::LegendOnly)
                 .mode(Mode::Lines)
-                .line(Line::new().color(color).width(3.0))
+                .line(Line::new().color(color).width(CHANGE_POINT_LINE_WIDTH))
                 .show_legend(false)
                 .hover_text_array(hover_texts);
 
