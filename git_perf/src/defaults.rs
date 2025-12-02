@@ -68,6 +68,22 @@ pub const DEFAULT_EPOCH: u32 = 0;
 // See git/git_definitions.rs:28 for the implementation.
 
 // ============================================================================
+// Reporting Configuration Defaults
+// ============================================================================
+
+/// Default number of characters to display from commit SHA in report metadata.
+///
+/// This value is used when displaying commit ranges in report headers,
+/// providing a balance between readability and uniqueness.
+pub const DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA: usize = 7;
+
+/// Default number of characters to display from commit SHA in report x-axis.
+///
+/// This value is used when displaying commit hashes on the x-axis of plots,
+/// optimized for display space and readability in interactive visualizations.
+pub const DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_AXIS: usize = 6;
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -93,6 +109,18 @@ pub const fn default_backoff_max_elapsed_seconds() -> u64 {
 #[inline]
 pub const fn default_epoch() -> u32 {
     DEFAULT_EPOCH
+}
+
+/// Returns the default commit hash display length for metadata.
+#[inline]
+pub const fn default_commit_hash_display_length_metadata() -> usize {
+    DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA
+}
+
+/// Returns the default commit hash display length for axis.
+#[inline]
+pub const fn default_commit_hash_display_length_axis() -> usize {
+    DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_AXIS
 }
 
 #[cfg(test)]
@@ -121,5 +149,17 @@ mod tests {
     fn test_default_epoch() {
         assert_eq!(DEFAULT_EPOCH, 0);
         assert_eq!(default_epoch(), 0);
+    }
+
+    #[test]
+    fn test_default_commit_hash_display_length_metadata() {
+        assert_eq!(DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA, 7);
+        assert_eq!(default_commit_hash_display_length_metadata(), 7);
+    }
+
+    #[test]
+    fn test_default_commit_hash_display_length_axis() {
+        assert_eq!(DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_AXIS, 6);
+        assert_eq!(default_commit_hash_display_length_axis(), 6);
     }
 }
