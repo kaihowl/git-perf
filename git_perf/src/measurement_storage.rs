@@ -10,6 +10,7 @@ use chrono::prelude::*;
 use crate::{
     config,
     data::MeasurementData,
+    defaults,
     git::git_interop::add_note_line_to_head,
     serialization::{serialize_multiple, serialize_single, DELIMITER},
 };
@@ -25,7 +26,7 @@ pub fn add_multiple(
 
     let timestamp = timestamp.as_secs_f64();
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
-    let epoch = config::determine_epoch_from_config(measurement).unwrap_or(0);
+    let epoch = config::determine_epoch_from_config(measurement).unwrap_or(defaults::DEFAULT_EPOCH);
     let name = measurement.to_owned();
 
     let mds = values
@@ -55,7 +56,7 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
     let key_values: HashMap<_, _> = key_values.iter().cloned().collect();
 
     let md = MeasurementData {
-        epoch: config::determine_epoch_from_config(measurement).unwrap_or(0),
+        epoch: config::determine_epoch_from_config(measurement).unwrap_or(defaults::DEFAULT_EPOCH),
         name: measurement.to_owned(),
         timestamp,
         val: value,
