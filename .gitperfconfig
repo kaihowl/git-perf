@@ -27,6 +27,7 @@ epoch = "e1b4d14"
 unit = "ns"
 sigma = 3.5
 aggregate_by = "median"
+min_measurements = 10
 
 [measurement."report-size-benchmark"]
 epoch = "e1b4d14"
