@@ -369,10 +369,12 @@ mod tests {
     #[test]
     fn test_get_notes_size_with_measurements() {
         use crate::measurement_storage;
+        use crate::test_helpers::hermetic_git_env;
 
         // Test the full flow: add measurements -> get size with detailed breakdown
         let temp_dir = dir_with_repo();
         std::env::set_current_dir(temp_dir.path()).unwrap();
+        hermetic_git_env();
 
         // Add measurements using the public API
         measurement_storage::add("test_metric_1", 42.0, &[]).unwrap();
