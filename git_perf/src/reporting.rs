@@ -18,6 +18,9 @@ use plotly::{
 use crate::{
     config,
     data::{Commit, MeasurementData, MeasurementSummary},
+    defaults::{
+        DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_AXIS, DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA,
+    },
     measurement_retrieval::{self, MeasurementReducer},
     stats::ReductionFunc,
 };
@@ -49,12 +52,12 @@ impl ReportMetadata {
         let commit_range = if commits.is_empty() {
             "No commits".to_string()
         } else if commits.len() == 1 {
-            commits[0].commit[..7].to_string()
+            commits[0].commit[..DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA].to_string()
         } else {
             format!(
                 "{}..{}",
-                &commits.last().unwrap().commit[..7],
-                &commits[0].commit[..7]
+                &commits.last().unwrap().commit[..DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA],
+                &commits[0].commit[..DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_METADATA]
             )
         };
 
@@ -345,7 +348,12 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         self.size = commits.len();
 
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
-            .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
+            .map(|(n, c)| {
+                (
+                    n as f64,
+                    c.commit[..DEFAULT_COMMIT_HASH_DISPLAY_LENGTH_AXIS].to_owned(),
+                )
+            })
             .unzip();
         let x_axis = Axis::new()
             .tick_values(commit_nrs)
