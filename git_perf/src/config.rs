@@ -287,6 +287,61 @@ pub fn report_title() -> Option<String> {
     config.get_string("report.title").ok()
 }
 
+/// Returns the change point configuration for a measurement, applying fallback rules.
+///
+/// Configuration keys under `[change_point]` or `[change_point."measurement_name"]`:
+/// - `enabled`: Enable/disable change point detection (default: true)
+/// - `min_data_points`: Minimum data points required (default: 10)
+/// - `min_magnitude_pct`: Minimum percentage change to consider significant (default: 5.0)
+/// - `penalty`: Penalty factor for PELT algorithm (default: 0.5, lower = more sensitive)
+pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePointConfig {
+    let mut config = crate::change_point::ChangePointConfig::default();
+
+    let Ok(file_config) = read_hierarchical_config() else {
+        return config;
+    };
+
+    // Check if change point detection is disabled globally or per-measurement
+    if let Some(enabled_str) =
+        file_config.get_with_parent_fallback("change_point", measurement, "enabled")
+    {
+        if let Ok(enabled) = enabled_str.parse::<bool>() {
+            if !enabled {
+                // If disabled, return a config that will skip detection
+                config.min_data_points = usize::MAX;
+                return config;
+            }
+        }
+    }
+
+    // min_data_points
+    if let Some(s) =
+        file_config.get_with_parent_fallback("change_point", measurement, "min_data_points")
+    {
+        if let Ok(v) = s.parse::<usize>() {
+            config.min_data_points = v;
+        }
+    }
+
+    // min_magnitude_pct
+    if let Some(s) =
+        file_config.get_with_parent_fallback("change_point", measurement, "min_magnitude_pct")
+    {
+        if let Ok(v) = s.parse::<f64>() {
+            config.min_magnitude_pct = v;
+        }
+    }
+
+    // penalty
+    if let Some(s) = file_config.get_with_parent_fallback("change_point", measurement, "penalty") {
+        if let Ok(v) = s.parse::<f64>() {
+            config.penalty = v;
+        }
+    }
+
+    config
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
