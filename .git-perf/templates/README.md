@@ -68,6 +68,8 @@ For complete documentation on the template syntax and available parameters, see:
 - `aggregate-by` - `none`, `min`, `max`, `median`, `mean`
 - `depth` - Number of commits for this section (must be ≤ the `-n` flag value; cannot exceed it)
 - `title` - Section title (for future use)
+- `show-epochs` - Show epoch boundary markers (`true`/`false`, default: false, OR'ed with `--show-epochs` flag)
+- `detect-changes` - Detect and show change points (`true`/`false`, default: false, OR'ed with `--detect-changes` flag)
 
 ### Understanding depth vs -n Flag
 

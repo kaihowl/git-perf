@@ -89,21 +89,24 @@
         <!-- Section 1: Test Performance Overview -->
         <section class="report-section">
             <h2>📊 Test Performance (Last 50 Commits)</h2>
-            <p>Median test execution times for configured test measurements.</p>
+            <p>Median test execution times for configured test measurements with change point detection.</p>
             {{SECTION[test-overview]
                 measurement-filter: ^(test-measure2)$
                 aggregate-by: median
                 depth: 50
+                detect-changes: true
             }}
         </section>
 
         <!-- Section 2: Benchmark Trends -->
         <section class="report-section">
             <h2>🚀 Benchmark Results</h2>
-            <p>Median benchmark performance for time-based benchmarks.</p>
+            <p>Median benchmark performance for time-based benchmarks with epoch boundaries shown.</p>
             {{SECTION[benchmark-median]
                 measurement-filter: ^(report-benchmark|add-benchmark)$
                 aggregate-by: median
+                show-epochs: true
+                detect-changes: true
             }}
         </section>
 
