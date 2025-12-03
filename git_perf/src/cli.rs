@@ -62,12 +62,21 @@ pub fn handle_calls() -> Result<()> {
             key_value,
             aggregate_by,
             filter,
+            template,
+            custom_css,
+            title,
             show_epochs,
             detect_changes,
         } => {
             // Combine measurements (as exact matches) and filter patterns into unified regex patterns
             let combined_patterns =
                 crate::filter::combine_measurements_and_filters(&measurement, &filter);
+
+            let template_config = crate::reporting::ReportTemplateConfig {
+                template_path: template,
+                custom_css_path: custom_css,
+                title,
+            };
 
             report(
                 output,
@@ -76,6 +85,7 @@ pub fn handle_calls() -> Result<()> {
                 &key_value,
                 aggregate_by.map(ReductionFunc::from),
                 &combined_patterns,
+                template_config,
                 show_epochs,
                 detect_changes,
             )
@@ -134,7 +144,8 @@ pub fn handle_calls() -> Result<()> {
         Commands::Remove {
             older_than,
             no_prune,
-        } => remove_measurements_from_commits(older_than, !no_prune),
+            dry_run,
+        } => remove_measurements_from_commits(older_than, !no_prune, dry_run),
         Commands::ListCommits {} => {
             let commits = list_commits_with_measurements()?;
             for commit in commits {

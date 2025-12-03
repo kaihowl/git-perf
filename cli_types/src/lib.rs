@@ -259,6 +259,18 @@ pub enum Commands {
         #[arg(short, long)]
         aggregate_by: Option<ReductionFunc>,
 
+        /// Path to custom HTML template file (overrides config)
+        #[arg(short = 't', long)]
+        template: Option<PathBuf>,
+
+        /// Path to custom CSS file to inject into the template
+        #[arg(short = 'c', long)]
+        custom_css: Option<PathBuf>,
+
+        /// Custom title for the report (overrides default)
+        #[arg(long)]
+        title: Option<String>,
+
         /// Show epoch boundary markers in the report (hidden by default, toggleable via legend)
         #[arg(long)]
         show_epochs: bool,
@@ -423,6 +435,10 @@ pub enum Commands {
         /// Skip automatic pruning of orphaned measurements after removal
         #[arg(long = "no-prune", default_value = "false")]
         no_prune: bool,
+
+        /// Preview what would be removed without actually removing
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Remove all performance measurements for non-existent/unreachable objects.

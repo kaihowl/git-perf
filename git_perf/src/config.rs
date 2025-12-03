@@ -8,6 +8,7 @@ use std::{
 };
 use toml_edit::{value, Document, Item, Table};
 
+use crate::defaults;
 use crate::git::git_interop::{get_head_revision, get_repository_root};
 
 // Import the CLI types for dispersion method
@@ -171,17 +172,17 @@ pub fn bump_epoch(measurement: &str) -> Result<()> {
     Ok(())
 }
 
-/// Returns the backoff max elapsed seconds from config, or 60 if not set.
+/// Returns the backoff max elapsed seconds from config, or the default if not set.
 pub fn backoff_max_elapsed_seconds() -> u64 {
     match read_hierarchical_config() {
         Ok(config) => {
             if let Ok(seconds) = config.get_int("backoff.max_elapsed_seconds") {
                 seconds as u64
             } else {
-                60 // Default value
+                defaults::DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS
             }
         }
-        Err(_) => 60, // Default value when no config exists
+        Err(_) => defaults::DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS,
     }
 }
 
@@ -214,7 +215,6 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         }
     }
 
-    // Default to StandardDeviation
     DispersionMethod::StandardDeviation
 }
 
@@ -265,6 +265,26 @@ pub fn audit_sigma(measurement: &str) -> Option<f64> {
 pub fn measurement_unit(measurement: &str) -> Option<String> {
     let config = read_hierarchical_config().ok()?;
     config.get_with_parent_fallback("measurement", measurement, "unit")
+}
+
+/// Returns the report template path from config, or None if not set.
+pub fn report_template_path() -> Option<PathBuf> {
+    let config = read_hierarchical_config().ok()?;
+    let path_str = config.get_string("report.template_path").ok()?;
+    Some(PathBuf::from(path_str))
+}
+
+/// Returns the report custom CSS path from config, or None if not set.
+pub fn report_custom_css_path() -> Option<PathBuf> {
+    let config = read_hierarchical_config().ok()?;
+    let path_str = config.get_string("report.custom_css_path").ok()?;
+    Some(PathBuf::from(path_str))
+}
+
+/// Returns the report title from config, or None if not set.
+pub fn report_title() -> Option<String> {
+    let config = read_hierarchical_config().ok()?;
+    config.get_string("report.title").ok()
 }
 
 /// Returns the change point configuration for a measurement, applying fallback rules.

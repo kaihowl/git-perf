@@ -5,6 +5,9 @@ updates:
     # Check for updates every Monday
     schedule:
       interval: "weekly"
+    # Apply 2-week (14-day) cooldown period before updating dependencies
+    cooldown:
+      default-days: 14
     groups:
       github-actions:
         patterns:

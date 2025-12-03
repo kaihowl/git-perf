@@ -279,9 +279,20 @@ fn retry_notify(err: GitError, dur: Duration) {
     warn!("Retrying...");
 }
 
-pub fn remove_measurements_from_commits(older_than: DateTime<Utc>, prune: bool) -> Result<()> {
+pub fn remove_measurements_from_commits(
+    older_than: DateTime<Utc>,
+    prune: bool,
+    dry_run: bool,
+) -> Result<()> {
+    if dry_run {
+        // In dry-run mode, don't use backoff retry since we're not modifying anything
+        return raw_remove_measurements_from_commits(older_than, prune, dry_run)
+            .map_err(|e| anyhow!(e));
+    }
+
     let op = || -> Result<(), ::backoff::Error<GitError>> {
-        raw_remove_measurements_from_commits(older_than, prune).map_err(map_git_error_for_backoff)
+        raw_remove_measurements_from_commits(older_than, prune, dry_run)
+            .map_err(map_git_error_for_backoff)
     };
 
     let backoff = default_backoff();
@@ -332,15 +343,25 @@ where
 fn raw_remove_measurements_from_commits(
     older_than: DateTime<Utc>,
     prune: bool,
+    dry_run: bool,
 ) -> Result<(), GitError> {
     // Check for shallow repo once at the beginning (needed for prune)
     if prune && is_shallow_repo()? {
         return Err(GitError::ShallowRepository);
     }
 
+    if dry_run {
+        // In dry-run mode, skip the execute_notes_operation wrapper since we don't modify anything
+        remove_measurements_from_reference(REFS_NOTES_BRANCH, older_than, dry_run)?;
+        if prune {
+            println!("[DRY-RUN] Would prune orphaned measurements after removal");
+        }
+        return Ok(());
+    }
+
     execute_notes_operation(|target| {
         // Remove measurements older than the specified date
-        remove_measurements_from_reference(target, older_than)?;
+        remove_measurements_from_reference(target, older_than, dry_run)?;
 
         // Prune orphaned measurements if requested
         if prune {
@@ -355,6 +376,7 @@ fn raw_remove_measurements_from_commits(
 fn remove_measurements_from_reference(
     reference: &str,
     older_than: DateTime<Utc>,
+    dry_run: bool,
 ) -> Result<(), GitError> {
     let oldest_timestamp = older_than.timestamp();
     // Outputs line-by-line <note_oid> <annotated_oid>
@@ -375,6 +397,61 @@ fn remove_measurements_from_reference(
     let dates_in = get_commit_dates.stdin.take().unwrap();
     let dates_out = get_commit_dates.stdout.take().unwrap();
 
+    if dry_run {
+        // In dry-run mode, collect and display what would be removed without actually removing
+        let date_collection_handler = thread::spawn(move || {
+            let reader = BufReader::new(dates_out);
+            let mut results = Vec::new();
+            for line in reader.lines().map_while(Result::ok) {
+                if let Some((commit, timestamp)) = line.split_whitespace().take(2).collect_tuple() {
+                    if let Ok(timestamp) = timestamp.parse::<i64>() {
+                        if timestamp <= oldest_timestamp {
+                            results.push(commit.to_string());
+                        }
+                    }
+                }
+            }
+            results
+        });
+
+        {
+            let reader = BufReader::new(notes_out);
+            let mut writer = BufWriter::new(dates_in);
+
+            reader.lines().map_while(Result::ok).for_each(|line| {
+                if let Some(line) = line.split_whitespace().nth(1) {
+                    writeln!(writer, "{line}").expect("Failed to write to pipe");
+                }
+            });
+        }
+
+        let commits_to_remove = date_collection_handler
+            .join()
+            .expect("Failed to join date collection thread");
+        let count = commits_to_remove.len();
+
+        list_notes.wait()?;
+        get_commit_dates.wait()?;
+
+        if count == 0 {
+            println!(
+                "[DRY-RUN] No measurements older than {} would be removed",
+                older_than
+            );
+        } else {
+            println!(
+                "[DRY-RUN] Would remove measurements from {} commits older than {}",
+                count, older_than
+            );
+            for commit in &commits_to_remove {
+                println!("  {}", commit);
+            }
+        }
+
+        return Ok(());
+    }
+
+    // Normal mode: actually remove measurements
     let mut remove_measurements = spawn_git_command(
         &[
             "notes",

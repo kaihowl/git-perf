@@ -178,6 +178,9 @@ Create an HTML performance report
 
   Possible values: `min`, `max`, `median`, `mean`
 
+* `-t`, `--template <TEMPLATE>` — Path to custom HTML template file (overrides config)
+* `-c`, `--custom-css <CUSTOM_CSS>` — Path to custom CSS file to inject into the template
+* `--title <TITLE>` — Custom title for the report (overrides default)
 * `--show-epochs` — Show epoch boundary markers in the report (hidden by default, toggleable via legend)
 * `--detect-changes` — Detect and show change points in the report (hidden by default, toggleable via legend)
 
@@ -275,6 +278,7 @@ Note: Only published measurements (i.e., those that have been pushed to the remo
 * `--no-prune` — Skip automatic pruning of orphaned measurements after removal
 
   Default value: `false`
+* `--dry-run` — Preview what would be removed without actually removing
 
 
 

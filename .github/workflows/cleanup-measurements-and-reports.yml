@@ -9,6 +9,8 @@ on:
     paths:
       - '.github/actions/cleanup/**'
       - '.github/workflows/cleanup-measurements-and-reports.yml'
+      - 'cli_types/src/lib.rs'
+      - 'git_perf/src/git/git_interop.rs'
 
 permissions:
   contents: write
@@ -22,11 +24,18 @@ jobs:
         with:
           fetch-depth: 0  # Full checkout required for git perf remove/prune operations
 
+      # Build from source when running on PR to test the changes
+      - name: Build git-perf from source (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          cargo build --release
+          echo "$PWD/target/release" >> $GITHUB_PATH
+
       - name: Cleanup old measurements and reports
         uses: ./.github/actions/cleanup
         with:
           retention-days: 730
           backup: true
           cleanup-reports: true
-          git-perf-version: latest
+          git-perf-version: ${{ github.event_name == 'pull_request' && 'skip' || 'latest' }}
           dry-run: ${{ github.event_name == 'pull_request' }}

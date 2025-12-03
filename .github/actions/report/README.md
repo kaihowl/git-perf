@@ -7,6 +7,7 @@ A GitHub Action to generate and publish git-perf performance reports to GitHub P
 - Generates HTML performance reports using `git-perf report`
 - Optionally runs `git-perf audit` for performance analysis
 - Publishes reports to GitHub Pages
+- **Supports subdirectory organization** for coexistence with existing documentation
 - Automatically comments on pull requests with report URL and audit results
 - Supports custom report naming and depth configuration
 - Returns report URL and audit output for use in subsequent steps
@@ -79,6 +80,8 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `comment-on-pr` | Whether to comment on the PR with the report URL (only for pull_request events) | No | `true` |
 | `show-size` | Whether to show measurement storage size in output | No | `false` |
 | `size-use-disk-size` | Whether to use disk-size (compressed) instead of logical size | No | `true` |
+| `reports-subdirectory` | Subdirectory within gh-pages for reports (e.g., "perf", "reports"). Empty for root. | No | `` |
+| `preserve-existing` | Preserve existing gh-pages content outside reports subdirectory | No | `true` |
 | `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
 | `detect-changes` | Whether to detect and display change points in the report | No | `false` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
@@ -181,6 +184,22 @@ jobs:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+## Subdirectory Organization
+
+The action supports deploying reports to a subdirectory within GitHub Pages, allowing coexistence with existing documentation sites.
+
+### Deploy to Subdirectory
+
+```yaml
+- uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    reports-subdirectory: 'perf'
+    preserve-existing: 'true'
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
+
 ### Enable Epoch and Change Point Detection
 
 ```yaml
@@ -191,11 +210,102 @@ jobs:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### Multi-Workflow Coordination
+
+When combining performance reports with existing documentation (MkDocs, Jekyll, etc.), use proper concurrency control:
+
+```yaml
+name: Performance Reports
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  pull-requests: write
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false  # Queue deployments, don't cancel
+
+jobs:
+  report:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 100
+
+      - uses: kaihowl/git-perf/.github/actions/report@master
+        with:
+          reports-subdirectory: 'perf'
+          preserve-existing: 'true'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Documentation Workflow Example:**
+
+```yaml
+name: Deploy Documentation
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**']
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false  # Same group as performance workflow
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+      - run: pip install mkdocs-material
+      - run: mkdocs build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true  # Preserve perf/ reports
+```
+
+### Subdirectory Best Practices
+
+1. **Use the same concurrency group** across all workflows deploying to gh-pages
+2. **Set `cancel-in-progress: false`** to queue deployments instead of canceling
+3. **Set `keep_files: true`** in all deployment actions to preserve existing content
+4. **Use descriptive subdirectory names**: `perf`, `reports`, `benchmarks`, etc.
+5. **Match subdirectory in cleanup action**: Ensure cleanup uses the same subdirectory
+
+### Repository Structure Result
+
+```
+gh-pages branch:
+├── index.html           # Documentation root (MkDocs/Jekyll)
+├── docs/               # Documentation pages
+│   └── ...
+└── perf/               # Performance reports
+    ├── main.html       # Branch reports
+    ├── develop.html
+    └── abc123....html  # Commit reports
+```
+
 ## Notes
 
 - **Concurrency Control**: The action does NOT enforce concurrency control internally. You MUST add concurrency control at the job/workflow level to prevent concurrent pushes to the gh-pages branch, which could cause conflicts.
 - **Automatic PR Comments**: By default, the action automatically comments on pull requests with the report URL and audit results. Set `comment-on-pr: 'false'` to disable.
 - **PR Comment Updates**: If a performance comment already exists, the action updates it instead of creating a new one.
 - **GitHub Pages**: The action uses `peaceiris/actions-gh-pages@v4` to publish to GitHub Pages with `keep_files: true`, preserving previous reports.
+- **Subdirectory Security**: The action validates subdirectory paths to prevent path traversal attacks (rejects `..`, absolute paths, and special characters).
 - **Error Handling**: If `git perf pull` fails, the action continues with a warning (useful for missing git objects).
 - **Audit Failures**: Audit results are captured even if the audit command fails, ensuring workflow continues.

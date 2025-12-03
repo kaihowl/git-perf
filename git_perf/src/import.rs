@@ -14,6 +14,7 @@ use git_perf_cli_types::ImportFormat;
 use crate::config;
 use crate::converters::{convert_to_measurements, ConversionOptions};
 use crate::data::MeasurementData;
+use crate::defaults;
 use crate::parsers::{CriterionJsonParser, JunitXmlParser, Parser};
 use crate::serialization::serialize_multiple;
 
@@ -108,7 +109,8 @@ pub fn handle_import(
     let measurements: Vec<MeasurementData> = measurements
         .into_iter()
         .map(|mut m| {
-            m.epoch = config::determine_epoch_from_config(&m.name).unwrap_or(0);
+            m.epoch =
+                config::determine_epoch_from_config(&m.name).unwrap_or(defaults::DEFAULT_EPOCH);
             m
         })
         .collect();

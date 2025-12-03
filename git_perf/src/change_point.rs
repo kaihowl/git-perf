@@ -220,10 +220,8 @@ pub fn enrich_change_points(
         //   before_segment = measurements[10..20] (the regimen from previous CP to this CP)
         let before_start = if i > 0 { indices[i - 1] } else { 0 };
         let before_segment = &measurements[before_start..idx];
-        let before_mean = segment_mean_or_fallback(
-            before_segment,
-            measurements.first().copied().unwrap_or(0.0),
-        );
+        let before_mean =
+            segment_mean_or_fallback(before_segment, measurements.first().copied().unwrap_or(0.0));
 
         // Calculate mean of the regimen immediately after this change point.
         // This is the segment between this change point and the next one (or end).
@@ -235,10 +233,8 @@ pub fn enrich_change_points(
             measurements.len()
         };
         let after_segment = &measurements[idx..after_end];
-        let after_mean = segment_mean_or_fallback(
-            after_segment,
-            measurements.last().copied().unwrap_or(0.0),
-        );
+        let after_mean =
+            segment_mean_or_fallback(after_segment, measurements.last().copied().unwrap_or(0.0));
 
         // Calculate percentage change
         let magnitude_pct = if before_mean.abs() > f64::EPSILON {

@@ -42,6 +42,14 @@ inputs:
     description: 'Whether to use disk-size (compressed) instead of logical size'
     required: false
     default: 'true'
+  reports-subdirectory:
+    description: 'Subdirectory within gh-pages for reports (e.g., "perf", "reports"). Empty for root.'
+    required: false
+    default: ''
+  preserve-existing:
+    description: 'Preserve existing gh-pages content outside reports subdirectory'
+    required: false
+    default: 'true'
   show-epochs:
     description: 'Whether to show epoch boundaries in the report'
     required: false
@@ -54,7 +62,7 @@ inputs:
 outputs:
   report-url:
     description: 'URL of the published report'
-    value: ${{ steps.get-pages-url.outputs.pages-url }}/${{ steps.set-report-name.outputs.report-name }}.html
+    value: ${{ steps.get-pages-url.outputs.full-report-url }}
   audit-output:
     description: 'Output from git-perf audit command'
     value: ${{ steps.audit.outputs.audit-output }}
@@ -65,6 +73,25 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Validate subdirectory input
+      shell: bash
+      run: |
+        SUBDIR="${{ inputs.reports-subdirectory }}"
+        if [ -n "$SUBDIR" ]; then
+          # Security: Reject paths containing .., absolute paths, or invalid characters
+          if [[ "$SUBDIR" =~ \.\. ]] || [[ "$SUBDIR" == /* ]] || [[ ! "$SUBDIR" =~ ^[a-zA-Z0-9_/-]+$ ]]; then
+            echo "Error: Invalid subdirectory path '$SUBDIR'"
+            echo "Subdirectory must:"
+            echo "  - Not contain '..' (parent directory references)"
+            echo "  - Not be an absolute path (starting with /)"
+            echo "  - Only contain alphanumeric characters, underscores, hyphens, and forward slashes"
+            exit 1
+          fi
+          echo "✓ Subdirectory validation passed: $SUBDIR"
+        else
+          echo "✓ Using root directory (no subdirectory specified)"
+        fi
+
     - name: Install git-perf
       uses: kaihowl/git-perf/.github/actions/install@master
       with:
@@ -157,7 +184,8 @@ runs:
       with:
         github_token: ${{ inputs.github-token }}
         publish_dir: ./reports
-        keep_files: true
+        destination_dir: ${{ inputs.reports-subdirectory }}
+        keep_files: ${{ inputs.preserve-existing == 'true' }}
 
     - name: Get Pages URL
       id: get-pages-url
@@ -169,15 +197,26 @@ runs:
         echo "pages-url=$pages_url" >> $GITHUB_OUTPUT
         echo "Pages URL: $pages_url"
 
+        # Construct full report URL including subdirectory
+        SUBDIR="${{ inputs.reports-subdirectory }}"
+        REPORT_NAME="${{ steps.set-report-name.outputs.report-name }}"
+        if [ -n "$SUBDIR" ]; then
+          # Remove trailing slash from pages_url if present
+          pages_url="${pages_url%/}"
+          full_report_url="${pages_url}/${SUBDIR}/${REPORT_NAME}.html"
+        else
+          full_report_url="${pages_url}/${REPORT_NAME}.html"
+        fi
+        echo "full-report-url=$full_report_url" >> $GITHUB_OUTPUT
+        echo "Full report URL: $full_report_url"
+
     - name: Comment on PR
       if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
       uses: actions/github-script@v8
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const reportName = '${{ steps.set-report-name.outputs.report-name }}'
-          const pagesUrl = '${{ steps.get-pages-url.outputs.pages-url }}'
-          const reportUrl = `${pagesUrl}/${reportName}.html`
+          const reportUrl = '${{ steps.get-pages-url.outputs.full-report-url }}'
 
           const auditOutput = `${{ steps.audit.outputs.audit-output }}`.trim()
           const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
