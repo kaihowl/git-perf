@@ -4,6 +4,29 @@ This directory contains example report templates for git-perf's multi-section da
 
 ## Available Templates
 
+### performance-overview.html ⭐ RECOMMENDED
+
+A professional, production-ready multi-section dashboard with modern styling:
+- Fibonacci benchmarks (statistical metrics)
+- Timing benchmarks (execution time measurements)
+- Size measurements (binary and output sizes)
+- Trend analysis (performance slopes)
+- Complete overview (all metrics)
+
+**Features:**
+- Beautiful gradient design with professional styling
+- Change point detection enabled on all sections
+- Epoch boundary visualization
+- Responsive layout with descriptive headers and icons
+- Organized by measurement type for easy navigation
+
+**Usage:**
+```bash
+git perf report --template .git-perf/templates/performance-overview.html --output dashboard.html
+```
+
+See [USAGE-performance-overview.md](./USAGE-performance-overview.md) for detailed documentation.
+
 ### simple-dashboard.html
 
 A basic multi-section template showing:
