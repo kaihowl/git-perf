@@ -48,6 +48,11 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
 
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ matrix.rust }}
+
     - name: Install libfaketime
       run: |
         if [[ $(uname -s) = Darwin ]]; then
@@ -58,6 +63,11 @@ jobs:
 
     - name: Install nextest
       uses: taiki-e/install-action@nextest
+
+    - name: Install cargo-criterion
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-criterion
 
     - name: Build git-perf
       run: cargo build --verbose
@@ -73,9 +83,6 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          # Install cargo-criterion for JSON output support
-          cargo install cargo-criterion --version 1.1.0 --locked
-
           # Run fibonacci benchmark with JSON output
           cargo criterion --bench sample_ci_bench --message-format json > bench-results.json || true
 
@@ -106,7 +113,8 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          cargo install --path git_perf
+          # Use the debug binary built earlier (avoid rebuilding)
+          export PATH="$PWD/target/debug:$PATH"
 
           # Run test-measure2 in main repo
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 1
