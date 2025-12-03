@@ -1,10 +1,12 @@
 pub mod audit;
 pub mod basic_measure;
+pub mod change_point;
 pub mod cli;
 pub mod config;
 pub mod config_cmd;
 pub mod converters;
 pub mod data;
+pub mod defaults;
 pub mod filter;
 pub mod git;
 pub mod import;

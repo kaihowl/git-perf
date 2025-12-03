@@ -8,6 +8,7 @@ use std::{
 };
 use toml_edit::{value, Document, Item, Table};
 
+use crate::defaults;
 use crate::git::git_interop::{get_head_revision, get_repository_root};
 
 // Import the CLI types for dispersion method
@@ -171,17 +172,17 @@ pub fn bump_epoch(measurement: &str) -> Result<()> {
     Ok(())
 }
 
-/// Returns the backoff max elapsed seconds from config, or 60 if not set.
+/// Returns the backoff max elapsed seconds from config, or the default if not set.
 pub fn backoff_max_elapsed_seconds() -> u64 {
     match read_hierarchical_config() {
         Ok(config) => {
             if let Ok(seconds) = config.get_int("backoff.max_elapsed_seconds") {
                 seconds as u64
             } else {
-                60 // Default value
+                defaults::DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS
             }
         }
-        Err(_) => 60, // Default value when no config exists
+        Err(_) => defaults::DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS,
     }
 }
 
@@ -214,7 +215,6 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
         }
     }
 
-    // Default to StandardDeviation
     DispersionMethod::StandardDeviation
 }
 
@@ -285,6 +285,61 @@ pub fn report_custom_css_path() -> Option<PathBuf> {
 pub fn report_title() -> Option<String> {
     let config = read_hierarchical_config().ok()?;
     config.get_string("report.title").ok()
+}
+
+/// Returns the change point configuration for a measurement, applying fallback rules.
+///
+/// Configuration keys under `[change_point]` or `[change_point."measurement_name"]`:
+/// - `enabled`: Enable/disable change point detection (default: true)
+/// - `min_data_points`: Minimum data points required (default: 10)
+/// - `min_magnitude_pct`: Minimum percentage change to consider significant (default: 5.0)
+/// - `penalty`: Penalty factor for PELT algorithm (default: 0.5, lower = more sensitive)
+pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePointConfig {
+    let mut config = crate::change_point::ChangePointConfig::default();
+
+    let Ok(file_config) = read_hierarchical_config() else {
+        return config;
+    };
+
+    // Check if change point detection is disabled globally or per-measurement
+    if let Some(enabled_str) =
+        file_config.get_with_parent_fallback("change_point", measurement, "enabled")
+    {
+        if let Ok(enabled) = enabled_str.parse::<bool>() {
+            if !enabled {
+                // If disabled, return a config that will skip detection
+                config.min_data_points = usize::MAX;
+                return config;
+            }
+        }
+    }
+
+    // min_data_points
+    if let Some(s) =
+        file_config.get_with_parent_fallback("change_point", measurement, "min_data_points")
+    {
+        if let Ok(v) = s.parse::<usize>() {
+            config.min_data_points = v;
+        }
+    }
+
+    // min_magnitude_pct
+    if let Some(s) =
+        file_config.get_with_parent_fallback("change_point", measurement, "min_magnitude_pct")
+    {
+        if let Ok(v) = s.parse::<f64>() {
+            config.min_magnitude_pct = v;
+        }
+    }
+
+    // penalty
+    if let Some(s) = file_config.get_with_parent_fallback("change_point", measurement, "penalty") {
+        if let Ok(v) = s.parse::<f64>() {
+            config.penalty = v;
+        }
+    }
+
+    config
 }
 
 #[cfg(test)]

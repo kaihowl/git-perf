@@ -1,6 +1,7 @@
 use crate::{
     config,
     data::{Commit, MeasurementData},
+    defaults,
     measurement_retrieval::{self, summarize_measurements},
     stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
@@ -63,7 +64,7 @@ pub(crate) fn resolve_audit_params(
 ) -> ResolvedAuditParams {
     let min_count = cli_min_count
         .or_else(|| config::audit_min_measurements(measurement))
-        .unwrap_or(2);
+        .unwrap_or(defaults::DEFAULT_MIN_MEASUREMENTS);
 
     let summarize_by = cli_summarize_by
         .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
@@ -71,7 +72,7 @@ pub(crate) fn resolve_audit_params(
 
     let sigma = cli_sigma
         .or_else(|| config::audit_sigma(measurement))
-        .unwrap_or(4.0);
+        .unwrap_or(defaults::DEFAULT_SIGMA);
 
     let dispersion_method = cli_dispersion_method
         .or_else(|| {
@@ -121,6 +122,7 @@ fn discover_matching_measurements(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     max_count: usize,
     min_count: Option<u16>,
@@ -129,6 +131,7 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
+    _no_change_point_warning: bool, // TODO: Implement change point warning in Phase 2
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {
@@ -203,6 +206,14 @@ pub fn audit_multiple(
             params.sigma,
             params.dispersion_method,
         )?;
+
+        // TODO(Phase 2): Add change point detection warning here
+        // If !_no_change_point_warning, detect change points in current epoch
+        // and warn if any exist, as they make z-score comparisons unreliable:
+        //   ⚠️  WARNING: Change point detected in current epoch at commit a1b2c3d (+23.5%)
+        //       Historical z-score comparison may be unreliable due to regime shift.
+        //       Consider bumping epoch or investigating the change.
+        // See docs/plans/change-point-detection.md for implementation details.
 
         println!("{}", result.message);
 
@@ -290,7 +301,7 @@ fn audit_with_data(
 
     let mut tail_measurements = all_measurements.clone();
     tail_measurements.pop(); // Remove head to get just tail for median calculation
-    let tail_median = tail_measurements.median().unwrap_or(0.0);
+    let tail_median = tail_measurements.median().unwrap_or_default();
 
     // Calculate min and max once for use in both branches
     let min_val = all_measurements
@@ -552,6 +563,7 @@ mod test {
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
             &[], // Empty combined_patterns
+            false,
         );
 
         // Should succeed when no measurements need to be audited

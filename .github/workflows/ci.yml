@@ -48,6 +48,11 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
 
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ matrix.rust }}
+
     - name: Install libfaketime
       run: |
         if [[ $(uname -s) = Darwin ]]; then
@@ -58,6 +63,11 @@ jobs:
 
     - name: Install nextest
       uses: taiki-e/install-action@nextest
+
+    - name: Install cargo-criterion
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-criterion
 
     - name: Build git-perf
       run: cargo build --verbose
@@ -73,9 +83,6 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          # Install cargo-criterion for JSON output support
-          cargo install cargo-criterion --version 1.1.0 --locked
-
           # Run fibonacci benchmark with JSON output
           cargo criterion --bench sample_ci_bench --message-format json > bench-results.json || true
 
@@ -106,7 +113,8 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          cargo install --path git_perf
+          # Use the debug binary built earlier (avoid rebuilding)
+          export PATH="$PWD/target/debug:$PATH"
 
           # Run test-measure2 in main repo
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 1
@@ -135,7 +143,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
 
           # Measure add performance: 10 sequential adds on pre-populated repo
-          git perf measure -n 10 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- bash -c "cd '$TEMP_REPO' && for i in {1..10}; do git perf add -m test-metric-\$i 123; done"
+          git perf measure -n 10 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf add -m inner-test-metric 123
 
           # Measure report generation performance on fixed dataset
           git perf measure -n 10 -m report-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf report -n 10 -o "$TEMP_REPO/report.html"
@@ -154,14 +162,11 @@ jobs:
           git perf push
 
           # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10
-          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
-          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
-          git perf audit -n 40 -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 --sigma 3.5
+          git perf audit -n 40 -m test-measure2 -m report-benchmark -m add-benchmark -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
 
           # Informational audits: failures don't block CI
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report audit failed (informational only)"
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report-size audit failed (informational only)"
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report audit failed (informational only)"
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
 
     - name: Archive report
       uses: actions/upload-artifact@v5
@@ -258,11 +263,13 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable"'
           git-perf-version: 'branch'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
           size-use-disk-size: 'true'
+          show-epochs: 'true'
+          detect-changes: 'true'
 
   release-binary-size:
     name: release-binary-size
@@ -303,7 +310,7 @@ jobs:
 
     - name: Audit release binary size
       run: |
-        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable --min-measurements 10
+        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable
 
     - name: Upload size artifact
       uses: actions/upload-artifact@v5

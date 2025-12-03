@@ -1187,7 +1187,7 @@ mod test {
         // Create a shallow clone (depth 2) which will have grafted commits
         let shallow_dir = tempdir.path().join("shallow");
         let output = Command::new("git")
-            .args(&[
+            .args([
                 "clone",
                 "--depth",
                 "2",

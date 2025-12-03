@@ -15,6 +15,23 @@
         # MAD is more robust to outliers, stddev is more sensitive
         dispersion_method = "mad"
 
+        # Sigma threshold for statistical outlier detection
+        # Number of standard deviations (or MADs) from the median
+        # Higher values are more lenient, lower values are more strict
+        # Default: 4.0 (if not specified)
+        sigma = 3.5
+
+        # Minimum number of measurements required for statistical analysis
+        # If fewer measurements exist, audits may skip statistical checks
+        # Default: 2 (if not specified)
+        min_measurements = 3
+
+        # Aggregation method for reducing multiple measurements
+        # Options: "min", "max", "median", "mean"
+        # Used when multiple measurements exist for the same commit
+        # Default: "min" (if not specified)
+        aggregate_by = "median"
+
         # Default epoch for accepting performance changes (hex format)
         epoch = "00000000"
 
@@ -59,6 +76,31 @@ unit = "%"  # Display CPU usage as percentage
 min_relative_deviation = 8.0
 dispersion_method = "mad"
 unit = "ms"  # Display network latency in milliseconds
+
+# Change point detection settings (default configuration for all measurements)
+[change_point]
+# Enable or disable change point detection globally (default: true)
+enabled = true
+
+# Minimum number of data points required for detection (default: 10)
+min_data_points = 10
+
+# Minimum percentage change to consider significant (default: 5.0)
+min_magnitude_pct = 5.0
+
+# Penalty factor for PELT algorithm (default: 0.5)
+# Higher values result in fewer change points detected (less sensitive)
+# Lower values result in more change points detected (more sensitive)
+penalty = 0.5
+
+# Measurement-specific change point settings (override defaults)
+[change_point."build_time"]
+# Less sensitive for this measurement (avoid detecting minor fluctuations)
+penalty = 1.0
+
+[change_point."memory_usage"]
+# More sensitive for detecting subtle memory changes
+penalty = 0.3
 
 # Backoff settings for retry logic
 [backoff]
