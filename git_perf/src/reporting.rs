@@ -10,12 +10,13 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use itertools::Itertools;
 use plotly::{
-    common::{Font, LegendGroupTitle, Title},
+    common::{DashType, Font, LegendGroupTitle, Line, Mode, Title, Visible},
     layout::{Axis, Legend},
-    Configuration, Layout, Plot,
+    Configuration, Layout, Plot, Scatter,
 };
 
 use crate::{
+    change_point::{ChangeDirection, ChangePoint, EpochTransition},
     config,
     data::{Commit, MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, MeasurementReducer},
@@ -170,6 +171,31 @@ fn load_custom_css(custom_css_path: Option<&PathBuf>) -> Result<String> {
     })
 }
 
+/// Default number of characters to display from commit SHA in report x-axis.
+///
+/// This value is used when displaying commit hashes on the x-axis of plots,
+/// optimized for display space and readability in interactive visualizations.
+const DEFAULT_COMMIT_HASH_DISPLAY_LENGTH: usize = 6;
+
+// Color constants for change point visualization
+/// RGBA color for performance regressions (increases in metrics like execution time).
+/// Red color with 80% opacity.
+const REGRESSION_COLOR: &str = "rgba(220, 53, 69, 0.8)";
+
+/// RGBA color for performance improvements (decreases in metrics like execution time).
+/// Green color with 80% opacity.
+const IMPROVEMENT_COLOR: &str = "rgba(40, 167, 69, 0.8)";
+
+/// Color for epoch markers in the plot.
+const EPOCH_MARKER_COLOR: &str = "gray";
+
+// Line width constants for plot styling
+/// Line width for change point markers (vertical lines indicating performance changes).
+const CHANGE_POINT_LINE_WIDTH: f64 = 3.0;
+
+/// Line width for epoch markers (vertical dashed lines).
+const EPOCH_MARKER_LINE_WIDTH: f64 = 2.0;
+
 /// Formats a measurement name with its configured unit, if available.
 /// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
 fn format_measurement_with_unit(measurement_name: &str) -> String {
@@ -277,6 +303,24 @@ trait Reporter<'a> {
         measurement_name: &str,
         group_values: &[String],
     );
+    fn add_epoch_boundaries(
+        &mut self,
+        transitions: &[EpochTransition],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+    );
+    fn add_change_points(
+        &mut self,
+        change_points: &[ChangePoint],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+    );
     fn as_bytes(&self) -> Vec<u8>;
     fn set_template_and_metadata(&mut self, template: Option<String>, metadata: ReportMetadata);
 }
@@ -337,6 +381,242 @@ impl PlotlyReporter {
         }
         None
     }
+
+    /// Helper function to add a vertical line segment to coordinate vectors.
+    ///
+    /// Adds two points (bottom and top of the line) plus a separator (None).
+    fn add_vertical_line_segment(
+        x_coords: &mut Vec<Option<usize>>,
+        y_coords: &mut Vec<Option<f64>>,
+        hover_texts: &mut Vec<String>,
+        x_pos: usize,
+        y_min: f64,
+        y_max: f64,
+        hover_text: String,
+    ) {
+        // Bottom point
+        x_coords.push(Some(x_pos));
+        y_coords.push(Some(y_min));
+        hover_texts.push(hover_text.clone());
+
+        // Top point
+        x_coords.push(Some(x_pos));
+        y_coords.push(Some(y_max));
+        hover_texts.push(hover_text);
+
+        // Separator (breaks the line for next segment)
+        x_coords.push(None);
+        y_coords.push(None);
+        hover_texts.push(String::new());
+    }
+
+    /// Helper function to configure trace legend based on group values.
+    ///
+    /// If group_values is non-empty, uses group label with legend grouping.
+    /// Otherwise, uses measurement display name directly.
+    fn configure_trace_legend<X, Y>(
+        trace: Box<Scatter<X, Y>>,
+        group_values: &[String],
+        measurement_name: &str,
+        measurement_display: &str,
+        label_suffix: &str,
+        legend_group_suffix: &str,
+    ) -> Box<Scatter<X, Y>>
+    where
+        X: serde::Serialize + Clone,
+        Y: serde::Serialize + Clone,
+    {
+        if !group_values.is_empty() {
+            let group_label = group_values.join("/");
+            trace
+                .name(format!("{} ({})", group_label, label_suffix))
+                .legend_group(format!("{}_{}", measurement_name, legend_group_suffix))
+                .legend_group_title(LegendGroupTitle::from(
+                    format!("{} - {}", measurement_display, label_suffix).as_str(),
+                ))
+        } else {
+            trace
+                .name(format!("{} ({})", measurement_display, label_suffix))
+                .legend_group(format!("{}_{}", measurement_name, legend_group_suffix))
+        }
+    }
+
+    /// Helper to process a vertical marker (epoch or change point) and add its coordinates.
+    ///
+    /// Returns Ok(x_pos) if successful, Err if index out of bounds.
+    fn process_vertical_marker(
+        &self,
+        index: usize,
+        commit_indices: &[usize],
+        measurement_name: &str,
+        marker_type: &str,
+    ) -> Result<usize, ()> {
+        if index >= commit_indices.len() {
+            log::warn!(
+                "[{}] {} index {} out of bounds (max: {})",
+                measurement_name,
+                marker_type,
+                index,
+                commit_indices.len()
+            );
+            return Err(());
+        }
+        let commit_idx = commit_indices[index];
+        let x_pos = self.size - commit_idx - 1;
+        Ok(x_pos)
+    }
+
+    /// Add epoch boundary traces to the plot.
+    ///
+    /// These are vertical dashed gray lines where measurement epochs change.
+    /// Hidden by default (legendonly), user clicks legend to toggle visibility.
+    /// Uses actual commit indices to properly map epoch transitions when measurements
+    /// don't exist for all commits.
+    pub fn add_epoch_boundary_traces(
+        &mut self,
+        transitions: &[EpochTransition],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+    ) {
+        if transitions.is_empty() {
+            return;
+        }
+
+        let mut x_coords: Vec<Option<usize>> = vec![];
+        let mut y_coords: Vec<Option<f64>> = vec![];
+        let mut hover_texts: Vec<String> = vec![];
+
+        for transition in transitions {
+            let x_pos = match self.process_vertical_marker(
+                transition.index,
+                commit_indices,
+                measurement_name,
+                "Epoch transition",
+            ) {
+                Ok(pos) => pos,
+                Err(()) => continue,
+            };
+
+            let hover_text = format!("Epoch {}→{}", transition.from_epoch, transition.to_epoch);
+
+            Self::add_vertical_line_segment(
+                &mut x_coords,
+                &mut y_coords,
+                &mut hover_texts,
+                x_pos,
+                y_min,
+                y_max,
+                hover_text,
+            );
+        }
+
+        let measurement_display = format_measurement_with_unit(measurement_name);
+
+        let trace = Scatter::new(x_coords, y_coords)
+            .visible(Visible::LegendOnly)
+            .mode(Mode::Lines)
+            .line(
+                Line::new()
+                    .color(EPOCH_MARKER_COLOR)
+                    .dash(DashType::Dash)
+                    .width(EPOCH_MARKER_LINE_WIDTH),
+            )
+            .show_legend(true)
+            .hover_text_array(hover_texts);
+
+        let trace = Self::configure_trace_legend(
+            trace,
+            group_values,
+            measurement_name,
+            &measurement_display,
+            "Epochs",
+            "epochs",
+        );
+
+        self.plot.add_trace(trace);
+    }
+
+    /// Add change point traces with explicit commit index mapping.
+    ///
+    /// This version uses the actual commit indices to properly map change points
+    /// when measurements don't exist for all commits.
+    pub fn add_change_point_traces_with_indices(
+        &mut self,
+        change_points: &[ChangePoint],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+    ) {
+        let measurement_display = format_measurement_with_unit(measurement_name);
+
+        for cp in change_points {
+            let x_pos = match self.process_vertical_marker(
+                cp.index,
+                commit_indices,
+                measurement_name,
+                "Change point",
+            ) {
+                Ok(pos) => pos,
+                Err(()) => continue,
+            };
+
+            let (color, label_prefix, symbol) = match cp.direction {
+                ChangeDirection::Increase => (REGRESSION_COLOR, "Increase", "⚠ Regression"),
+                ChangeDirection::Decrease => (IMPROVEMENT_COLOR, "Decrease", "✓ Improvement"),
+            };
+
+            let hover_text = format!(
+                "{}: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
+                symbol,
+                cp.magnitude_pct,
+                &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                cp.confidence * 100.0
+            );
+
+            // Create vertical line from y_min to y_max
+            let mut x_coords = vec![];
+            let mut y_coords = vec![];
+            let mut hover_texts = vec![];
+
+            Self::add_vertical_line_segment(
+                &mut x_coords,
+                &mut y_coords,
+                &mut hover_texts,
+                x_pos,
+                y_min,
+                y_max,
+                hover_text,
+            );
+
+            // Remove the trailing separator (None values) since we're creating one trace per change point
+            x_coords.truncate(2);
+            y_coords.truncate(2);
+            hover_texts.truncate(2);
+
+            let trace = Scatter::new(x_coords, y_coords)
+                .visible(Visible::LegendOnly)
+                .mode(Mode::Lines)
+                .line(Line::new().color(color).width(CHANGE_POINT_LINE_WIDTH))
+                .show_legend(false)
+                .hover_text_array(hover_texts);
+
+            let trace = Self::configure_trace_legend(
+                trace,
+                group_values,
+                measurement_name,
+                &measurement_display,
+                label_prefix,
+                "change_points",
+            );
+
+            self.plot.add_trace(trace);
+        }
+    }
 }
 
 impl<'a> Reporter<'a> for PlotlyReporter {
@@ -345,7 +625,12 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         self.size = commits.len();
 
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
-            .map(|(n, c)| (n as f64, c.commit[..6].to_owned()))
+            .map(|(n, c)| {
+                (
+                    n as f64,
+                    c.commit[..DEFAULT_COMMIT_HASH_DISPLAY_LENGTH].to_owned(),
+                )
+            })
             .unzip();
         let x_axis = Axis::new()
             .tick_values(commit_nrs)
@@ -392,6 +677,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .name(&group_label)
                 .legend_group(measurement_name)
                 .legend_group_title(LegendGroupTitle::from(measurement_display))
+                .show_legend(true)
         } else {
             trace.name(&measurement_display)
         };
@@ -427,11 +713,50 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .name(&group_label)
                 .legend_group(measurement_name)
                 .legend_group_title(LegendGroupTitle::from(measurement_display))
+                .show_legend(true)
         } else {
             trace.name(&measurement_display)
         };
 
         self.plot.add_trace(trace);
+    }
+
+    fn add_epoch_boundaries(
+        &mut self,
+        transitions: &[EpochTransition],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+    ) {
+        self.add_epoch_boundary_traces(
+            transitions,
+            commit_indices,
+            measurement_name,
+            group_values,
+            y_min,
+            y_max,
+        );
+    }
+
+    fn add_change_points(
+        &mut self,
+        change_points: &[ChangePoint],
+        commit_indices: &[usize],
+        measurement_name: &str,
+        group_values: &[String],
+        y_min: f64,
+        y_max: f64,
+    ) {
+        self.add_change_point_traces_with_indices(
+            change_points,
+            commit_indices,
+            measurement_name,
+            group_values,
+            y_min,
+            y_max,
+        );
     }
 
     fn as_bytes(&self) -> Vec<u8> {
@@ -553,6 +878,30 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     fn set_template_and_metadata(&mut self, _template: Option<String>, _metadata: ReportMetadata) {
         // CSV reporter doesn't use templates
     }
+
+    fn add_epoch_boundaries(
+        &mut self,
+        _transitions: &[EpochTransition],
+        _commit_indices: &[usize],
+        _measurement_name: &str,
+        _group_values: &[String],
+        _y_min: f64,
+        _y_max: f64,
+    ) {
+        // CSV reporter does not support epoch boundary visualization
+    }
+
+    fn add_change_points(
+        &mut self,
+        _change_points: &[ChangePoint],
+        _commit_indices: &[usize],
+        _measurement_name: &str,
+        _group_values: &[String],
+        _y_min: f64,
+        _y_max: f64,
+    ) {
+        // CSV reporter does not support change point visualization
+    }
 }
 
 struct ReporterFactory {}
@@ -575,6 +924,7 @@ impl ReporterFactory {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn report(
     output: PathBuf,
     separate_by: Vec<String>,
@@ -583,6 +933,8 @@ pub fn report(
     aggregate_by: Option<ReductionFunc>,
     combined_patterns: &[String],
     template_config: ReportTemplateConfig,
+    show_epochs: bool,
+    detect_changes: bool,
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
@@ -711,6 +1063,7 @@ pub fn report(
                             .map(move |m| (i, m))
                     })
                     .collect_vec();
+
                 plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
             } else {
                 let trace_measurements: Vec<_> = group_measurements
@@ -718,18 +1071,125 @@ pub fn report(
                     .enumerate()
                     .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
                     .collect();
+
                 plot.add_trace(trace_measurements, measurement_name, &group_value);
+            }
+
+            // Add change point detection for this measurement
+            // Collect measurement values, epochs, commit indices and SHAs for change point detection
+            // Note: We need the original commit index (i) to map back to the correct x-coordinate
+            // IMPORTANT: We must aggregate multiple measurements per commit to get one value per commit
+            // Otherwise, change point detection will see incorrect patterns
+
+            // Default to min aggregation if no aggregation specified
+            let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+
+            let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
+                .clone()
+                .enumerate()
+                .flat_map(|(i, ms)| {
+                    let commit_sha = commits[i].commit.clone();
+                    ms.reduce_by(reduction_func)
+                        .into_iter()
+                        .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
+                })
+                .collect();
+
+            // No explicit minimum data point check needed here - change point detection
+            // already enforces min_data_points via ChangePointConfig (default: 10).
+            // Epoch transition detection gracefully handles any input size.
+            let commit_indices: Vec<usize> =
+                measurement_data.iter().map(|(i, _, _, _)| *i).collect();
+            let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
+            let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
+            let commit_shas: Vec<String> = measurement_data
+                .iter()
+                .map(|(_, _, _, s)| s.clone())
+                .collect();
+
+            log::debug!(
+                "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+                measurement_name,
+                values.len(),
+                commit_indices,
+                epochs
+            );
+
+            if !values.is_empty() {
+                // Calculate y-axis bounds for vertical lines
+                let y_min = values.iter().cloned().fold(f64::INFINITY, f64::min) * 0.9;
+                let y_max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max) * 1.1;
+
+                // Add epoch boundary traces if requested
+                if show_epochs {
+                    // Reverse epochs and commit indices to match display order (newest on left, oldest on right)
+                    let reversed_epochs: Vec<u32> = epochs.iter().rev().cloned().collect();
+                    let reversed_commit_indices: Vec<usize> =
+                        commit_indices.iter().rev().cloned().collect();
+                    let transitions =
+                        crate::change_point::detect_epoch_transitions(&reversed_epochs);
+                    log::debug!(
+                        "Epoch transitions for {}: {:?}",
+                        measurement_name,
+                        transitions
+                    );
+                    plot.add_epoch_boundaries(
+                        &transitions,
+                        &reversed_commit_indices,
+                        measurement_name,
+                        &group_value,
+                        y_min,
+                        y_max,
+                    );
+                }
+
+                // Add change point traces if requested
+                if detect_changes {
+                    let config = crate::config::change_point_config(measurement_name);
+                    // Reverse measurements to match display order (newest on left, oldest on right)
+                    // This ensures change point direction (regression/improvement) matches visual interpretation
+                    let reversed_values: Vec<f64> = values.iter().rev().cloned().collect();
+                    let reversed_commit_shas: Vec<String> =
+                        commit_shas.iter().rev().cloned().collect();
+                    let reversed_commit_indices: Vec<usize> =
+                        commit_indices.iter().rev().cloned().collect();
+                    let raw_cps =
+                        crate::change_point::detect_change_points(&reversed_values, &config);
+                    log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
+                    let enriched_cps = crate::change_point::enrich_change_points(
+                        &raw_cps,
+                        &reversed_values,
+                        &reversed_commit_shas,
+                        &config,
+                    );
+                    log::debug!(
+                        "Enriched change points for {}: {:?}",
+                        measurement_name,
+                        enriched_cps
+                    );
+                    plot.add_change_points(
+                        &enriched_cps,
+                        &reversed_commit_indices,
+                        measurement_name,
+                        &group_value,
+                        y_min,
+                        y_max,
+                    );
+                }
             }
         }
     }
 
+    // Write output
+    let output_bytes = plot.as_bytes();
+
     if output == Path::new("-") {
-        match io::stdout().write_all(&plot.as_bytes()) {
+        match io::stdout().write_all(&output_bytes) {
             Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
             res => res,
         }?;
     } else {
-        File::create(&output)?.write_all(&plot.as_bytes())?;
+        File::create(&output)?.write_all(&output_bytes)?;
     }
 
     Ok(())
@@ -1321,5 +1781,236 @@ mod tests {
         let expected =
             "commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit\nabc\t0\tavg_time\t0.0\t5.5\t\n";
         assert_eq!(csv, expected);
+    }
+
+    #[test]
+    fn test_epoch_boundary_traces_hidden_by_default() {
+        use crate::change_point::EpochTransition;
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "def456".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "ghi789".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let transitions = vec![EpochTransition {
+            index: 1,
+            from_epoch: 1,
+            to_epoch: 2,
+        }];
+
+        let commit_indices = vec![0, 1, 2];
+        let group_values: Vec<String> = vec![];
+        reporter.add_epoch_boundary_traces(
+            &transitions,
+            &commit_indices,
+            "test_metric",
+            &group_values,
+            0.0,
+            100.0,
+        );
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Check that trace is set to legendonly (hidden by default)
+        assert!(html.contains("legendonly"));
+        // Check that the trace name includes "Epochs"
+        assert!(html.contains("test_metric (Epochs)"));
+    }
+
+    #[test]
+    fn test_epoch_boundary_traces_empty() {
+        use crate::change_point::EpochTransition;
+
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 10;
+
+        let transitions: Vec<EpochTransition> = vec![];
+        let commit_indices: Vec<usize> = vec![];
+        let group_values: Vec<String> = vec![];
+        reporter.add_epoch_boundary_traces(
+            &transitions,
+            &commit_indices,
+            "test",
+            &group_values,
+            0.0,
+            100.0,
+        );
+
+        // Should not crash and plot should still be valid
+        let bytes = reporter.as_bytes();
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_change_point_traces_hidden_by_default() {
+        use crate::change_point::{ChangeDirection, ChangePoint};
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "abc123".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "def456".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let change_points = vec![ChangePoint {
+            index: 1,
+            commit_sha: "def456".to_string(),
+            magnitude_pct: 50.0,
+            confidence: 0.9,
+            direction: ChangeDirection::Increase,
+        }];
+
+        let commit_indices: Vec<usize> = (0..reporter.size).collect();
+        reporter.add_change_point_traces_with_indices(
+            &change_points,
+            &commit_indices,
+            "build_time",
+            &[],
+            0.0,
+            100.0,
+        );
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Check that trace is set to legendonly
+        assert!(html.contains("legendonly"));
+        // Check for change point trace (increase)
+        assert!(html.contains("build_time (Increase)"));
+    }
+
+    #[test]
+    fn test_change_point_traces_both_directions() {
+        use crate::change_point::{ChangeDirection, ChangePoint};
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits: Vec<Commit> = (0..5)
+            .map(|i| Commit {
+                commit: format!("sha{:06}", i),
+                measurements: vec![],
+            })
+            .collect();
+        reporter.add_commits(&commits);
+
+        let change_points = vec![
+            ChangePoint {
+                index: 2,
+                commit_sha: "sha000002".to_string(),
+                magnitude_pct: 25.0,
+                confidence: 0.85,
+                direction: ChangeDirection::Increase,
+            },
+            ChangePoint {
+                index: 4,
+                commit_sha: "sha000004".to_string(),
+                magnitude_pct: -30.0,
+                confidence: 0.90,
+                direction: ChangeDirection::Decrease,
+            },
+        ];
+
+        let commit_indices: Vec<usize> = (0..reporter.size).collect();
+        reporter.add_change_point_traces_with_indices(
+            &change_points,
+            &commit_indices,
+            "metric",
+            &[],
+            0.0,
+            100.0,
+        );
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Should have both increase and decrease traces
+        assert!(html.contains("metric (Increase)"));
+        assert!(html.contains("metric (Decrease)"));
+    }
+
+    #[test]
+    fn test_change_point_traces_empty() {
+        let mut reporter = PlotlyReporter::new();
+        reporter.size = 10;
+
+        let change_points: Vec<ChangePoint> = vec![];
+        let commit_indices: Vec<usize> = (0..reporter.size).collect();
+        reporter.add_change_point_traces_with_indices(
+            &change_points,
+            &commit_indices,
+            "test",
+            &[],
+            0.0,
+            100.0,
+        );
+
+        // Should not crash and plot should still be valid
+        let bytes = reporter.as_bytes();
+        assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_change_point_hover_text_format() {
+        use crate::change_point::{ChangeDirection, ChangePoint};
+        use crate::data::Commit;
+
+        let mut reporter = PlotlyReporter::new();
+
+        let commits = vec![
+            Commit {
+                commit: "abc123def".to_string(),
+                measurements: vec![],
+            },
+            Commit {
+                commit: "xyz789abc".to_string(),
+                measurements: vec![],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        let change_points = vec![ChangePoint {
+            index: 1,
+            commit_sha: "xyz789abc".to_string(),
+            magnitude_pct: 23.5,
+            confidence: 0.88,
+            direction: ChangeDirection::Increase,
+        }];
+
+        let commit_indices: Vec<usize> = (0..reporter.size).collect();
+        reporter.add_change_point_traces_with_indices(
+            &change_points,
+            &commit_indices,
+            "test",
+            &[],
+            0.0,
+            100.0,
+        );
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+        // Hover text should contain percentage and short SHA
+        assert!(html.contains("+23.5%"));
+        assert!(html.contains("xyz789"));
     }
 }

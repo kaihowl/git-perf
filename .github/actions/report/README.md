@@ -82,6 +82,8 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `size-use-disk-size` | Whether to use disk-size (compressed) instead of logical size | No | `true` |
 | `reports-subdirectory` | Subdirectory within gh-pages for reports (e.g., "perf", "reports"). Empty for root. | No | `` |
 | `preserve-existing` | Preserve existing gh-pages content outside reports subdirectory | No | `true` |
+| `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
+| `detect-changes` | Whether to detect and display change points in the report | No | `false` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
 
 ### Common Audit Arguments
@@ -197,6 +199,16 @@ The action supports deploying reports to a subdirectory within GitHub Pages, all
 ```
 
 This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
+
+### Enable Epoch and Change Point Detection
+
+```yaml
+- uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    show-epochs: 'true'
+    detect-changes: 'true'
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
 
 ### Multi-Workflow Coordination
 

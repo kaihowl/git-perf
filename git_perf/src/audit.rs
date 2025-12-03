@@ -122,6 +122,7 @@ fn discover_matching_measurements(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     max_count: usize,
     min_count: Option<u16>,
@@ -130,6 +131,7 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
+    _no_change_point_warning: bool, // TODO: Implement change point warning in Phase 2
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {
@@ -204,6 +206,14 @@ pub fn audit_multiple(
             params.sigma,
             params.dispersion_method,
         )?;
+
+        // TODO(Phase 2): Add change point detection warning here
+        // If !_no_change_point_warning, detect change points in current epoch
+        // and warn if any exist, as they make z-score comparisons unreliable:
+        //   ⚠️  WARNING: Change point detected in current epoch at commit a1b2c3d (+23.5%)
+        //       Historical z-score comparison may be unreliable due to regime shift.
+        //       Consider bumping epoch or investigating the change.
+        // See docs/plans/change-point-detection.md for implementation details.
 
         println!("{}", result.message);
 
@@ -553,6 +563,7 @@ mod test {
             Some(2.0),
             Some(DispersionMethod::StandardDeviation),
             &[], // Empty combined_patterns
+            false,
         );
 
         // Should succeed when no measurements need to be audited

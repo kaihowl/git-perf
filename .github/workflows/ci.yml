@@ -268,6 +268,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
           size-use-disk-size: 'true'
+          show-epochs: 'true'
+          detect-changes: 'true'
 
   release-binary-size:
     name: release-binary-size
