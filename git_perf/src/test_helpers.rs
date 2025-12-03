@@ -381,4 +381,151 @@ mod tests {
             .unwrap();
         assert_eq!(count, 1);
     }
+
+    #[test]
+    fn test_hermetic_git_env_vars() {
+        let env_vars = hermetic_git_env_vars();
+
+        // Verify all required variables are present and have correct values
+        assert_eq!(env_vars.len(), 6);
+
+        // Check each variable
+        assert_eq!(env_vars[0], ("GIT_CONFIG_NOSYSTEM", "true"));
+        assert_eq!(env_vars[1], ("GIT_CONFIG_GLOBAL", "/dev/null"));
+        assert_eq!(env_vars[2], ("GIT_AUTHOR_NAME", "testuser"));
+        assert_eq!(env_vars[3], ("GIT_AUTHOR_EMAIL", "testuser@example.com"));
+        assert_eq!(env_vars[4], ("GIT_COMMITTER_NAME", "testuser"));
+        assert_eq!(env_vars[5], ("GIT_COMMITTER_EMAIL", "testuser@example.com"));
+
+        // Verify values are not empty
+        for (key, value) in &env_vars {
+            assert!(
+                !key.is_empty(),
+                "Environment variable key should not be empty"
+            );
+            assert!(
+                !value.is_empty(),
+                "Environment variable value for {} should not be empty",
+                key
+            );
+        }
+    }
+
+    #[test]
+    fn test_init_repo_simple() {
+        let tempdir = tempdir().unwrap();
+        let original_dir = env::current_dir().unwrap();
+
+        set_current_dir(tempdir.path()).expect("Failed to change to temp dir");
+
+        hermetic_git_env();
+        init_repo_simple();
+
+        // Verify the repository was initialized
+        let output = Command::new("git")
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .envs(hermetic_git_env_vars())
+            .output()
+            .expect("Failed to run git command");
+
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "true");
+
+        // Restore original directory
+        set_current_dir(original_dir).expect("Failed to restore directory");
+    }
+
+    #[test]
+    fn test_empty_commit() {
+        let tempdir = tempdir().unwrap();
+        let original_dir = env::current_dir().unwrap();
+
+        hermetic_git_env();
+        init_repo(tempdir.path());
+        set_current_dir(tempdir.path()).expect("Failed to change to temp dir");
+
+        // Get initial commit count
+        let before = Command::new("git")
+            .args(["rev-list", "--count", "HEAD"])
+            .envs(hermetic_git_env_vars())
+            .output()
+            .expect("Failed to run git command");
+        assert!(
+            before.status.success(),
+            "Failed to get initial commit count"
+        );
+        let count_before = String::from_utf8_lossy(&before.stdout)
+            .trim()
+            .parse::<i32>()
+            .expect("Failed to parse initial commit count");
+
+        hermetic_git_env();
+        empty_commit();
+
+        // Verify a new commit was created
+        let after = Command::new("git")
+            .args(["rev-list", "--count", "HEAD"])
+            .envs(hermetic_git_env_vars())
+            .output()
+            .expect("Failed to run git command");
+        assert!(after.status.success(), "Failed to get final commit count");
+        let count_after = String::from_utf8_lossy(&after.stdout)
+            .trim()
+            .parse::<i32>()
+            .expect("Failed to parse final commit count");
+
+        assert_eq!(
+            count_after,
+            count_before + 1,
+            "Should have created exactly one new commit"
+        );
+
+        // Restore original directory
+        set_current_dir(original_dir).expect("Failed to restore directory");
+    }
+
+    #[test]
+    fn test_dir_guard_restores_directory() {
+        let original_dir = env::current_dir().unwrap();
+        let tempdir = tempdir().unwrap();
+
+        {
+            let _guard = DirGuard::new(tempdir.path());
+            // Verify we're in the new directory
+            assert_eq!(
+                env::current_dir().unwrap(),
+                tempdir.path().canonicalize().unwrap()
+            );
+        }
+
+        // Verify the guard restored the original directory
+        assert_eq!(env::current_dir().unwrap(), original_dir);
+    }
+
+    #[test]
+    fn test_hermetic_git_env_sets_all_vars() {
+        // Clear the environment variables first to ensure they're actually being set
+        env::remove_var("GIT_CONFIG_NOSYSTEM");
+        env::remove_var("GIT_CONFIG_GLOBAL");
+        env::remove_var("GIT_AUTHOR_NAME");
+        env::remove_var("GIT_AUTHOR_EMAIL");
+        env::remove_var("GIT_COMMITTER_NAME");
+        env::remove_var("GIT_COMMITTER_EMAIL");
+
+        hermetic_git_env();
+
+        // Verify all variables are set
+        assert_eq!(env::var("GIT_CONFIG_NOSYSTEM").unwrap(), "true");
+        assert_eq!(env::var("GIT_CONFIG_GLOBAL").unwrap(), "/dev/null");
+        assert_eq!(env::var("GIT_AUTHOR_NAME").unwrap(), "testuser");
+        assert_eq!(
+            env::var("GIT_AUTHOR_EMAIL").unwrap(),
+            "testuser@example.com"
+        );
+        assert_eq!(env::var("GIT_COMMITTER_NAME").unwrap(), "testuser");
+        assert_eq!(
+            env::var("GIT_COMMITTER_EMAIL").unwrap(),
+            "testuser@example.com"
+        );
+    }
 }
