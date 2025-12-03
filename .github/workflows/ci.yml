@@ -157,8 +157,8 @@ jobs:
           git perf audit -n 40 -m test-measure2 -m report-benchmark -m add-benchmark -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
 
           # Informational audits: failures don't block CI
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report audit failed (informational only)"
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 10 || echo "report-size audit failed (informational only)"
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report audit failed (informational only)"
+          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
 
     - name: Archive report
       uses: actions/upload-artifact@v5
@@ -255,7 +255,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable" --min-measurements 10'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable"'
           git-perf-version: 'branch'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
@@ -300,7 +300,7 @@ jobs:
 
     - name: Audit release binary size
       run: |
-        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable --min-measurements 10
+        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable
 
     - name: Upload size artifact
       uses: actions/upload-artifact@v5
