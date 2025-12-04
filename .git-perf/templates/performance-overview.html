@@ -112,7 +112,13 @@
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION:fibonacci-stats|filter=bench::fibonacci_*::mean,bench::fibonacci_*::median,bench::fibonacci_*::mad|aggregate=median|depth=40|title=Fibonacci Performance Statistics|enable_epochs=true|enable_change_detection=true}}
+                    {{SECTION[fibonacci-stats]
+                        measurement-filter: ^(bench::fibonacci_.*::(mean|median|mad))$
+                        aggregate-by: median
+                        depth: 40
+                        show-epochs: true
+                        detect-changes: true
+                    }}
                 </div>
             </div>
 
@@ -126,7 +132,13 @@
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION:timing|filter=*-benchmark,report,test-measure2|exclude=*-size*|aggregate=median|depth=40|title=Execution Time Trends|enable_epochs=true|enable_change_detection=true}}
+                    {{SECTION[timing]
+                        measurement-filter: ^(.*-benchmark|report|test-measure2)$
+                        aggregate-by: median
+                        depth: 40
+                        show-epochs: true
+                        detect-changes: true
+                    }}
                 </div>
             </div>
 
@@ -140,7 +152,13 @@
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION:sizes|filter=*-size*|aggregate=median|depth=40|title=Binary & Report Sizes|enable_epochs=true|enable_change_detection=true}}
+                    {{SECTION[sizes]
+                        measurement-filter: ^.*-size.*$
+                        aggregate-by: median
+                        depth: 40
+                        show-epochs: true
+                        detect-changes: true
+                    }}
                 </div>
             </div>
 
@@ -154,7 +172,13 @@
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION:slopes|filter=*::slope|aggregate=median|depth=40|title=Performance Trend Slopes|enable_epochs=true|enable_change_detection=true}}
+                    {{SECTION[slopes]
+                        measurement-filter: ^.*::slope$
+                        aggregate-by: median
+                        depth: 40
+                        show-epochs: true
+                        detect-changes: true
+                    }}
                 </div>
             </div>
 
@@ -168,7 +192,13 @@
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION:all|filter=*|aggregate=median|depth=40|title=All Measurements (Last 40 Commits)|enable_epochs=true|enable_change_detection=true}}
+                    {{SECTION[all]
+                        measurement-filter: ^.*$
+                        aggregate-by: median
+                        depth: 40
+                        show-epochs: true
+                        detect-changes: true
+                    }}
                 </div>
             </div>
         </div>
