@@ -3,6 +3,7 @@ use std::{
     fs::{self, File},
     io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use anyhow::anyhow;
@@ -22,6 +23,30 @@ use crate::{
     measurement_retrieval::{self, MeasurementReducer},
     stats::ReductionFunc,
 };
+
+use regex::Regex;
+
+/// Cached regex for parsing section placeholders (compiled once)
+static SECTION_PLACEHOLDER_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Cached regex for finding all section blocks in a template (compiled once)
+static SECTION_FINDER_REGEX: OnceLock<Regex> = OnceLock::new();
+
+/// Get or compile the section placeholder parsing regex
+fn section_placeholder_regex() -> &'static Regex {
+    SECTION_PLACEHOLDER_REGEX.get_or_init(|| {
+        Regex::new(r"(?s)\{\{SECTION\[([^\]]+)\](.*?)\}\}")
+            .expect("Invalid section placeholder regex pattern")
+    })
+}
+
+/// Get or compile the section finder regex
+fn section_finder_regex() -> &'static Regex {
+    SECTION_FINDER_REGEX.get_or_init(|| {
+        Regex::new(r"(?s)\{\{SECTION\[[^\]]+\].*?\}\}")
+            .expect("Invalid section finder regex pattern")
+    })
+}
 
 /// Configuration for report templates
 pub struct ReportTemplateConfig {
@@ -72,6 +97,193 @@ impl ReportMetadata {
             depth,
         }
     }
+}
+
+/// Configuration for a single report section in a multi-section template
+#[derive(Debug, Clone)]
+struct SectionConfig {
+    /// Section identifier (e.g., "test-overview", "bench-median")
+    id: String,
+    /// Original placeholder text to replace (e.g., "{{SECTION[id] param: value }}")
+    placeholder: String,
+    /// Regex pattern for selecting measurements
+    measurement_filter: Option<String>,
+    /// Key-value pairs to match (e.g., os=linux,arch=x64)
+    key_value_filter: Vec<(String, String)>,
+    /// Metadata keys to split traces by (e.g., ["os", "arch"])
+    separate_by: Vec<String>,
+    /// Aggregation function (none means raw data)
+    aggregate_by: Option<ReductionFunc>,
+    /// Number of commits (overrides global depth)
+    depth: Option<usize>,
+    /// Section-specific title for the chart (parsed but not yet used in display)
+    #[allow(dead_code)]
+    title: Option<String>,
+    /// Show epoch boundaries for this section
+    show_epochs: bool,
+    /// Detect and show change points for this section
+    detect_changes: bool,
+}
+
+impl SectionConfig {
+    /// Parse a single section placeholder into a SectionConfig
+    /// Format: {{SECTION[id] param: value, param2: value2 }}
+    fn parse(placeholder: &str) -> Result<Self> {
+        // Use cached regex to extract section ID and parameters
+        let section_regex = section_placeholder_regex();
+
+        let captures = section_regex
+            .captures(placeholder)
+            .ok_or_else(|| anyhow!("Invalid section placeholder format: {}", placeholder))?;
+
+        let id = captures
+            .get(1)
+            .expect("Regex capture group 1 (section ID) must exist")
+            .as_str()
+            .trim()
+            .to_string();
+        let params_str = captures
+            .get(2)
+            .expect("Regex capture group 2 (parameters) must exist")
+            .as_str()
+            .trim();
+
+        // Parse parameters
+        let mut measurement_filter = None;
+        let mut key_value_filter = Vec::new();
+        let mut separate_by = Vec::new();
+        let mut aggregate_by = None;
+        let mut depth = None;
+        let mut title = None;
+        let mut show_epochs = false;
+        let mut detect_changes = false;
+
+        if !params_str.is_empty() {
+            // Split by newlines and trim each line
+            for line in params_str.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                // Parse "param: value" format
+                if let Some((key, value)) = line.split_once(':') {
+                    let key = key.trim();
+                    let value = value.trim();
+
+                    match key {
+                        "measurement-filter" => {
+                            measurement_filter = Some(value.to_string());
+                        }
+                        "key-value-filter" => {
+                            // Parse comma-separated key=value pairs
+                            for pair in value.split(',') {
+                                let pair = pair.trim();
+                                if let Some((k, v)) = pair.split_once('=') {
+                                    let k = k.trim();
+                                    let v = v.trim();
+                                    if k.is_empty() {
+                                        bail!("Empty key in key-value-filter: '{}'", pair);
+                                    }
+                                    if v.is_empty() {
+                                        bail!("Empty value in key-value-filter: '{}'", pair);
+                                    }
+                                    key_value_filter.push((k.to_string(), v.to_string()));
+                                } else {
+                                    bail!("Invalid key-value-filter format: {}", pair);
+                                }
+                            }
+                        }
+                        "separate-by" => {
+                            // Parse comma-separated list
+                            separate_by = value
+                                .split(',')
+                                .map(|s| s.trim().to_string())
+                                .filter(|s| !s.is_empty())
+                                .collect();
+                        }
+                        "aggregate-by" => {
+                            aggregate_by = match value {
+                                "none" => None,
+                                "min" => Some(ReductionFunc::Min),
+                                "max" => Some(ReductionFunc::Max),
+                                "median" => Some(ReductionFunc::Median),
+                                "mean" => Some(ReductionFunc::Mean),
+                                _ => bail!("Invalid aggregate-by value: {}", value),
+                            };
+                        }
+                        "depth" => {
+                            depth = Some(
+                                value
+                                    .parse::<usize>()
+                                    .map_err(|_| anyhow!("Invalid depth value: {}", value))?,
+                            );
+                        }
+                        "title" => {
+                            title = Some(value.to_string());
+                        }
+                        "show-epochs" => {
+                            show_epochs = match value.to_lowercase().as_str() {
+                                "true" | "yes" | "1" => true,
+                                "false" | "no" | "0" => false,
+                                _ => bail!("Invalid show-epochs value: {} (use true/false)", value),
+                            };
+                        }
+                        "detect-changes" => {
+                            detect_changes = match value.to_lowercase().as_str() {
+                                "true" | "yes" | "1" => true,
+                                "false" | "no" | "0" => false,
+                                _ => bail!(
+                                    "Invalid detect-changes value: {} (use true/false)",
+                                    value
+                                ),
+                            };
+                        }
+                        _ => {
+                            // Unknown parameter - ignore or warn
+                            log::warn!("Unknown section parameter: {}", key);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(SectionConfig {
+            id,
+            placeholder: placeholder.to_string(),
+            measurement_filter,
+            key_value_filter,
+            separate_by,
+            aggregate_by,
+            depth,
+            title,
+            show_epochs,
+            detect_changes,
+        })
+    }
+}
+
+/// Parse all section placeholders from a template
+fn parse_template_sections(template: &str) -> Result<Vec<SectionConfig>> {
+    // Use cached regex to find all {{SECTION[...] ...}} blocks
+    let section_regex = section_finder_regex();
+
+    let mut sections = Vec::new();
+    let mut seen_ids = std::collections::HashSet::new();
+
+    for captures in section_regex.find_iter(template) {
+        let placeholder = captures.as_str();
+        let section = SectionConfig::parse(placeholder)?;
+
+        // Check for duplicate section IDs
+        if !seen_ids.insert(section.id.clone()) {
+            bail!("Duplicate section ID found: {}", section.id);
+        }
+
+        sections.push(section);
+    }
+
+    Ok(sections)
 }
 
 /// Extract Plotly JavaScript dependencies and plot content
@@ -927,6 +1139,480 @@ impl ReporterFactory {
     }
 }
 
+/// Compute group value combinations for splitting measurements by metadata keys.
+///
+/// Returns a vector of group values where each inner vector contains the values
+/// for the split keys. If no splits are specified, returns a single empty group.
+///
+/// # Errors
+/// Returns error if separate_by is non-empty but no measurements have all required keys
+fn compute_group_values_to_process<'a>(
+    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    separate_by: &[String],
+    context_id: &str, // For error messages (e.g., "Section 'test-overview'" or "measurement X")
+) -> Result<Vec<Vec<String>>> {
+    if separate_by.is_empty() {
+        return Ok(vec![vec![]]);
+    }
+
+    let group_values: Vec<Vec<String>> = filtered_measurements
+        .flatten()
+        .filter_map(|m| {
+            let values: Vec<String> = separate_by
+                .iter()
+                .filter_map(|key| m.key_values.get(key).cloned())
+                .collect();
+
+            if values.len() == separate_by.len() {
+                Some(values)
+            } else {
+                None
+            }
+        })
+        .unique()
+        .collect();
+
+    if group_values.is_empty() {
+        bail!(
+            "{}: Invalid separator supplied, no measurements have all required keys: {:?}",
+            context_id,
+            separate_by
+        );
+    }
+
+    Ok(group_values)
+}
+
+/// Filter measurements that match all key-value pairs in the group.
+///
+/// If group_value is empty, returns all measurements (no filtering).
+fn filter_group_measurements<'a>(
+    measurements: impl Iterator<Item = &'a MeasurementData> + 'a,
+    separate_by: Vec<String>,
+    group_value: Vec<String>,
+) -> Box<dyn Iterator<Item = &'a MeasurementData> + 'a> {
+    Box::new(measurements.filter(move |m| {
+        if group_value.is_empty() {
+            return true;
+        }
+
+        separate_by
+            .iter()
+            .zip(group_value.iter())
+            .all(|(key, expected_val)| {
+                m.key_values
+                    .get(key)
+                    .map(|v| v == expected_val)
+                    .unwrap_or(false)
+            })
+    }))
+}
+
+/// Collect and aggregate measurement data for change point detection.
+///
+/// Returns tuple of (commit_indices, values, epochs, commit_shas).
+/// Each vector has one entry per commit with measurements.
+fn collect_measurement_data_for_change_detection<'a>(
+    group_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    commits: &[Commit],
+    reduction_func: ReductionFunc,
+) -> (Vec<usize>, Vec<f64>, Vec<u32>, Vec<String>) {
+    let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
+        .enumerate()
+        .flat_map(|(i, ms)| {
+            let commit_sha = commits[i].commit.clone();
+            ms.reduce_by(reduction_func)
+                .into_iter()
+                .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
+        })
+        .collect();
+
+    let commit_indices: Vec<usize> = measurement_data.iter().map(|(i, _, _, _)| *i).collect();
+    let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
+    let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
+    let commit_shas: Vec<String> = measurement_data
+        .iter()
+        .map(|(_, _, _, s)| s.clone())
+        .collect();
+
+    (commit_indices, values, epochs, commit_shas)
+}
+
+/// Add a trace (line) to the plot for a measurement group.
+///
+/// If aggregate_by is Some, adds a summarized trace with aggregated values.
+/// If aggregate_by is None, adds a raw trace with all individual measurements.
+fn add_trace_for_measurement_group<'a>(
+    reporter: &mut dyn Reporter<'a>,
+    group_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    measurement_name: &str,
+    group_value: &[String],
+    aggregate_by: Option<ReductionFunc>,
+) {
+    if let Some(reduction_func) = aggregate_by {
+        let trace_measurements = group_measurements
+            .enumerate()
+            .flat_map(move |(i, ms)| {
+                ms.reduce_by(reduction_func)
+                    .into_iter()
+                    .map(move |m| (i, m))
+            })
+            .collect_vec();
+
+        reporter.add_summarized_trace(trace_measurements, measurement_name, group_value);
+    } else {
+        let trace_measurements: Vec<_> = group_measurements
+            .enumerate()
+            .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
+            .collect();
+
+        reporter.add_trace(trace_measurements, measurement_name, group_value);
+    }
+}
+
+/// Add change point and epoch boundary annotations to a reporter.
+///
+/// This function handles:
+/// - Data reversal for plotly's reversed axis display (when reverse_for_display=true)
+/// - Epoch transition detection and visualization
+/// - Change point detection with configurable config
+/// - Adding visualization traces via the Reporter trait
+///
+/// # Arguments
+/// * `reporter` - Mutable reference to any Reporter implementation
+/// * `commit_indices` - Indices of commits with measurements
+/// * `values` - Measurement values (one per commit)
+/// * `epochs` - Epoch numbers (one per commit)
+/// * `commit_shas` - Commit SHAs (one per commit)
+/// * `measurement_name` - Name of the measurement for config lookup
+/// * `group_values` - Grouping metadata for legend display
+/// * `show_epochs` - Whether to detect and display epoch boundaries
+/// * `detect_changes` - Whether to detect and display change points
+/// * `reverse_for_display` - Whether to reverse data before detection (needed for correct results)
+/// * `change_point_config_fn` - Function to retrieve change point config
+#[allow(clippy::too_many_arguments)]
+fn add_change_point_and_epoch_traces<F>(
+    reporter: &mut dyn Reporter,
+    commit_indices: &[usize],
+    values: &[f64],
+    epochs: &[u32],
+    commit_shas: &[String],
+    measurement_name: &str,
+    group_values: &[String],
+    show_epochs: bool,
+    detect_changes: bool,
+    reverse_for_display: bool,
+    change_point_config_fn: F,
+) where
+    F: Fn(&str) -> crate::change_point::ChangePointConfig,
+{
+    if values.is_empty() {
+        return;
+    }
+
+    log::debug!(
+        "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+        measurement_name,
+        values.len(),
+        commit_indices,
+        epochs
+    );
+
+    // Calculate y-axis bounds for vertical lines (10% padding)
+    let y_min = values.iter().copied().fold(f64::INFINITY, f64::min) * 0.9;
+    let y_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max) * 1.1;
+
+    // Conditionally reverse data based on display requirements
+    // Reversal is needed because plotly doesn't support reversed axes natively,
+    // so we manually reverse the data to display newest commits on the right.
+    // This ensures change point direction matches visual interpretation.
+    let (indices, vals, eps, shas) = if reverse_for_display {
+        (
+            commit_indices.iter().rev().cloned().collect::<Vec<_>>(),
+            values.iter().rev().cloned().collect::<Vec<_>>(),
+            epochs.iter().rev().cloned().collect::<Vec<_>>(),
+            commit_shas.iter().rev().cloned().collect::<Vec<_>>(),
+        )
+    } else {
+        (
+            commit_indices.to_vec(),
+            values.to_vec(),
+            epochs.to_vec(),
+            commit_shas.to_vec(),
+        )
+    };
+
+    // Add epoch boundary traces if requested
+    if show_epochs {
+        let transitions = crate::change_point::detect_epoch_transitions(&eps);
+        log::debug!(
+            "Epoch transitions for {}: {:?}",
+            measurement_name,
+            transitions
+        );
+        reporter.add_epoch_boundaries(
+            &transitions,
+            &indices,
+            measurement_name,
+            group_values,
+            y_min,
+            y_max,
+        );
+    }
+
+    // Add change point traces if requested
+    if detect_changes {
+        let config = change_point_config_fn(measurement_name);
+        let raw_cps = crate::change_point::detect_change_points(&vals, &config);
+        log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
+
+        let enriched_cps =
+            crate::change_point::enrich_change_points(&raw_cps, &vals, &shas, &config);
+        log::debug!(
+            "Enriched change points for {}: {:?}",
+            measurement_name,
+            enriched_cps
+        );
+
+        reporter.add_change_points(
+            &enriched_cps,
+            &vals,
+            &indices,
+            measurement_name,
+            group_values,
+        );
+    }
+}
+
+/// Process a single measurement group: add trace and optionally detect changes/epochs.
+///
+/// This is a high-level orchestration function that combines multiple steps:
+/// 1. Filter measurements for the specific group
+/// 2. Add trace visualization
+/// 3. Collect data for change detection
+/// 4. Add change point and epoch annotations
+///
+/// # Arguments
+/// * `reporter` - Mutable reference to any Reporter implementation
+/// * `filtered_measurements` - Iterator over measurements for this measurement name
+/// * `commits` - All commits (needed for change detection data collection)
+/// * `measurement_name` - Name of the measurement being processed
+/// * `group_value` - Values for the split keys (empty if no splitting)
+/// * `separate_by` - Keys to split measurements by
+/// * `aggregate_by` - Optional aggregation function
+/// * `show_epochs` - Whether to show epoch boundaries
+/// * `detect_changes` - Whether to detect change points
+/// * `reverse_for_display` - Whether to reverse data for display (needed for correct change detection)
+/// * `change_point_config_fn` - Function to retrieve change point config
+#[allow(clippy::too_many_arguments)]
+fn process_measurement_group<'a, F>(
+    reporter: &mut dyn Reporter<'a>,
+    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData> + 'a> + Clone + 'a,
+    commits: &[Commit],
+    measurement_name: &str,
+    group_value: Vec<String>,
+    separate_by: Vec<String>,
+    aggregate_by: Option<ReductionFunc>,
+    show_epochs: bool,
+    detect_changes: bool,
+    reverse_for_display: bool,
+    change_point_config_fn: F,
+) where
+    F: Fn(&str) -> crate::change_point::ChangePointConfig,
+{
+    // Step 1: Filter measurements for this specific group
+    let sep_by = separate_by.clone();
+    let grp_val = group_value.clone();
+    let group_measurements = filtered_measurements
+        .map(move |ms| filter_group_measurements(ms, sep_by.clone(), grp_val.clone()));
+
+    // Step 2: Add trace visualization
+    add_trace_for_measurement_group(
+        reporter,
+        group_measurements.clone(),
+        measurement_name,
+        &group_value,
+        aggregate_by,
+    );
+
+    // Step 3: Add change points and epochs if requested
+    if show_epochs || detect_changes {
+        let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+
+        let (commit_indices, values, epochs, commit_shas) =
+            collect_measurement_data_for_change_detection(
+                group_measurements,
+                commits,
+                reduction_func,
+            );
+
+        add_change_point_and_epoch_traces(
+            reporter,
+            &commit_indices,
+            &values,
+            &epochs,
+            &commit_shas,
+            measurement_name,
+            &group_value,
+            show_epochs,
+            detect_changes,
+            reverse_for_display,
+            change_point_config_fn,
+        );
+    }
+}
+
+/// Generate a plot for a single section with specific configuration
+#[allow(clippy::too_many_arguments)]
+fn generate_section_plot(
+    commits: &[Commit],
+    section: &SectionConfig,
+    global_show_epochs: bool,
+    global_detect_changes: bool,
+) -> Result<Plot> {
+    let mut reporter = PlotlyReporter::new();
+    reporter.add_commits(commits);
+
+    // Determine the number of commits to use for this section
+    let section_commits = if let Some(depth) = section.depth {
+        if depth > commits.len() {
+            log::warn!(
+                "Section '{}' requested depth {} but only {} commits available",
+                section.id,
+                depth,
+                commits.len()
+            );
+            commits
+        } else {
+            &commits[..depth]
+        }
+    } else {
+        commits
+    };
+
+    // Compile filter pattern if specified
+    let filters = if let Some(ref pattern) = section.measurement_filter {
+        crate::filter::compile_filters(std::slice::from_ref(pattern))?
+    } else {
+        vec![]
+    };
+
+    // Filter function for this section
+    let relevant = |m: &MeasurementData| {
+        // Apply regex filter if specified
+        if !filters.is_empty() && !crate::filter::matches_any_filter(&m.name, &filters) {
+            return false;
+        }
+
+        // Apply key-value filters
+        m.key_values_is_superset_of(&section.key_value_filter)
+    };
+
+    let relevant_measurements = section_commits
+        .iter()
+        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+
+    let unique_measurement_names: Vec<_> = relevant_measurements
+        .clone()
+        .flat_map(|m| m.map(|m| &m.name))
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        log::warn!("Section '{}' has no matching measurements", section.id);
+        // Return an empty plot
+        return Ok(reporter.plot);
+    }
+
+    // Determine epoch and change point settings for this section
+    let show_epochs = section.show_epochs || global_show_epochs;
+    let detect_changes = section.detect_changes || global_detect_changes;
+
+    for measurement_name in unique_measurement_names {
+        let filtered_measurements = relevant_measurements
+            .clone()
+            .map(|ms| ms.filter(|m| m.name == *measurement_name));
+
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_measurements.clone(),
+            &section.separate_by,
+            &format!("Section '{}'", section.id),
+        )?;
+
+        for group_value in group_values_to_process {
+            process_measurement_group(
+                &mut reporter as &mut dyn Reporter,
+                filtered_measurements.clone(),
+                section_commits,
+                measurement_name,
+                group_value,
+                section.separate_by.clone(),
+                section.aggregate_by,
+                show_epochs,
+                detect_changes,
+                true, // reverse_for_display=true FIXES THE REVERSAL BUG
+                |_| crate::change_point::ChangePointConfig::default(),
+            );
+        }
+    }
+
+    Ok(reporter.plot)
+}
+
+/// Generate a multi-section report from a template with section placeholders
+fn generate_multi_section_report(
+    template: &str,
+    commits: &[Commit],
+    metadata: &ReportMetadata,
+    global_show_epochs: bool,
+    global_detect_changes: bool,
+) -> Result<Vec<u8>> {
+    let sections = parse_template_sections(template)?;
+
+    if sections.is_empty() {
+        // No sections found - this shouldn't happen if called correctly
+        bail!("Template contains no section placeholders");
+    }
+
+    log::info!(
+        "Generating multi-section report with {} sections",
+        sections.len()
+    );
+
+    let mut output = template.to_string();
+
+    // Generate each section
+    for section in sections {
+        log::info!("Generating section: {}", section.id);
+
+        // Generate the plot for this section
+        let plot =
+            generate_section_plot(commits, &section, global_show_epochs, global_detect_changes)?;
+
+        // Extract plotly parts
+        let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
+
+        // For sections, we only want the body (the actual plot div + script)
+        // The head (plotly.js library) will be included once in the global template
+        // Replace the section placeholder with just the plotly body
+        output = output.replace(&section.placeholder, &plotly_body);
+    }
+
+    // Now apply global placeholders
+    let (plotly_head, _) = extract_plotly_parts(&Plot::new()); // Get just the plotly.js script tags
+
+    output = output
+        .replace("{{TITLE}}", &metadata.title)
+        .replace("{{PLOTLY_HEAD}}", &plotly_head)
+        .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+        .replace("{{TIMESTAMP}}", &metadata.timestamp)
+        .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+        .replace("{{DEPTH}}", &metadata.depth.to_string())
+        .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
+
+    Ok(output.as_bytes().to_vec())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn report(
     output: PathBuf,
@@ -966,26 +1652,62 @@ pub fn report(
         let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
         let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
 
+        // Check if template contains section placeholders
+        if let Some(ref template_str) = template {
+            let sections = parse_template_sections(template_str)?;
+            if !sections.is_empty() {
+                // Multi-section template detected - generate and return early
+                log::info!(
+                    "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
+                    sections.len()
+                );
+
+                let report_bytes = generate_multi_section_report(
+                    template_str,
+                    &commits,
+                    &metadata,
+                    show_epochs,
+                    detect_changes,
+                )?;
+
+                if output == Path::new("-") {
+                    match io::stdout().write_all(&report_bytes) {
+                        Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+                        res => res,
+                    }?;
+                } else {
+                    File::create(&output)?.write_all(&report_bytes)?;
+                }
+
+                return Ok(());
+            }
+        }
+
         plot.set_template_and_metadata(template, metadata);
     }
 
-    let relevant = |m: &MeasurementData| {
-        // Apply regex filters (handles both exact measurement matches and filter patterns)
-        if !crate::filter::matches_any_filter(&m.name, &filters) {
-            return false;
-        }
-
-        // Filter using subset relation: key_values ⊆ measurement.key_values
-        m.key_values_is_superset_of(key_values)
-    };
-
-    let relevant_measurements = commits
+    // Filter measurements and collect to avoid lifetime issues with the closure
+    let relevant_measurements: Vec<Vec<&MeasurementData>> = commits
         .iter()
-        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+        .map(|commit| {
+            commit
+                .measurements
+                .iter()
+                .filter(|m| {
+                    // Apply regex filters (handles both exact measurement matches and filter patterns)
+                    if !crate::filter::matches_any_filter(&m.name, &filters) {
+                        return false;
+                    }
+                    // Filter using subset relation: key_values ⊆ measurement.key_values
+                    m.key_values_is_superset_of(key_values)
+                })
+                .collect()
+        })
+        .collect();
 
     let unique_measurement_names: Vec<_> = relevant_measurements
-        .clone()
-        .flat_map(|m| m.map(|m| &m.name))
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
         .unique()
         .collect();
 
@@ -994,190 +1716,76 @@ pub fn report(
     }
 
     for measurement_name in unique_measurement_names {
-        let filtered_measurements = relevant_measurements
-            .clone()
-            .map(|ms| ms.filter(|m| m.name == *measurement_name));
+        // Get group values first
+        let filtered_for_grouping = relevant_measurements
+            .iter()
+            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
 
-        let group_values: Vec<Vec<String>> = if !separate_by.is_empty() {
-            // Find all unique combinations of the split keys
-            filtered_measurements
-                .clone()
-                .flatten()
-                .filter_map(|m| {
-                    // Extract values for all split keys
-                    let values: Vec<String> = separate_by
-                        .iter()
-                        .filter_map(|key| m.key_values.get(key).cloned())
-                        .collect();
-
-                    // Only include if all split keys are present
-                    if values.len() == separate_by.len() {
-                        Some(values)
-                    } else {
-                        None
-                    }
-                })
-                .unique()
-                .collect_vec()
-        } else {
-            vec![]
-        };
-
-        // When no splits specified, create a single group with all measurements
-        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
-            if !separate_by.is_empty() {
-                bail!(
-                    "Invalid separator supplied, no measurements have all required keys: {:?}",
-                    separate_by
-                );
-            }
-            vec![vec![]]
-        } else {
-            group_values
-        };
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_for_grouping,
+            &separate_by,
+            &format!("Measurement '{}'", measurement_name),
+        )?;
 
         for group_value in group_values_to_process {
-            let group_measurements = filtered_measurements.clone().map(|ms| {
-                ms.filter(|m| {
-                    if !group_value.is_empty() {
-                        // Check if measurement has ALL the expected key-value pairs
-                        separate_by
-                            .iter()
-                            .zip(group_value.iter())
-                            .all(|(key, expected_val)| {
-                                m.key_values
-                                    .get(key)
-                                    .map(|v| v == expected_val)
-                                    .unwrap_or(false)
-                            })
-                    } else {
-                        true
-                    }
-                })
-            });
-
-            if let Some(reduction_func) = aggregate_by {
-                let trace_measurements = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(move |(i, ms)| {
-                        ms.reduce_by(reduction_func)
-                            .into_iter()
-                            .map(move |m| (i, m))
-                    })
-                    .collect_vec();
-
-                plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
-            } else {
-                let trace_measurements: Vec<_> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
-                    .collect();
-
-                plot.add_trace(trace_measurements, measurement_name, &group_value);
-            }
-
-            // Add change point detection for this measurement
-            // Collect measurement values, epochs, commit indices and SHAs for change point detection
-            // Note: We need the original commit index (i) to map back to the correct x-coordinate
-            // IMPORTANT: We must aggregate multiple measurements per commit to get one value per commit
-            // Otherwise, change point detection will see incorrect patterns
-
-            // Default to min aggregation if no aggregation specified
-            let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
-
-            let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
-                .clone()
-                .enumerate()
-                .flat_map(|(i, ms)| {
-                    let commit_sha = commits[i].commit.clone();
-                    ms.reduce_by(reduction_func)
-                        .into_iter()
-                        .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
-                })
-                .collect();
-
-            // No explicit minimum data point check needed here - change point detection
-            // already enforces min_data_points via ChangePointConfig (default: 10).
-            // Epoch transition detection gracefully handles any input size.
-            let commit_indices: Vec<usize> =
-                measurement_data.iter().map(|(i, _, _, _)| *i).collect();
-            let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
-            let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
-            let commit_shas: Vec<String> = measurement_data
+            // Filter and collect measurements directly from relevant_measurements
+            let group_measurements: Vec<Vec<&MeasurementData>> = relevant_measurements
                 .iter()
-                .map(|(_, _, _, s)| s.clone())
+                .map(|ms| {
+                    ms.iter()
+                        .filter(|m| {
+                            // Filter by measurement name
+                            if m.name != *measurement_name {
+                                return false;
+                            }
+                            // Filter by group value
+                            if group_value.is_empty() {
+                                return true;
+                            }
+                            separate_by.iter().zip(group_value.iter()).all(
+                                |(key, expected_val)| {
+                                    m.key_values.get(key).map(|v| v == expected_val).unwrap_or(false)
+                                },
+                            )
+                        })
+                        .copied()
+                        .collect()
+                })
                 .collect();
 
-            log::debug!(
-                "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+            // Add trace visualization
+            add_trace_for_measurement_group(
+                &mut *plot,
+                group_measurements.iter().map(|v| v.iter().copied()),
                 measurement_name,
-                values.len(),
-                commit_indices,
-                epochs
+                &group_value,
+                aggregate_by,
             );
 
-            if !values.is_empty() {
-                // Calculate y-axis bounds for vertical lines
-                let y_min = values.iter().cloned().fold(f64::INFINITY, f64::min) * 0.9;
-                let y_max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max) * 1.1;
+            // Add change points and epochs if requested
+            if show_epochs || detect_changes {
+                let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
 
-                // Add epoch boundary traces if requested
-                if show_epochs {
-                    // Reverse epochs and commit indices to match display order (newest on left, oldest on right)
-                    let reversed_epochs: Vec<u32> = epochs.iter().rev().cloned().collect();
-                    let reversed_commit_indices: Vec<usize> =
-                        commit_indices.iter().rev().cloned().collect();
-                    let transitions =
-                        crate::change_point::detect_epoch_transitions(&reversed_epochs);
-                    log::debug!(
-                        "Epoch transitions for {}: {:?}",
-                        measurement_name,
-                        transitions
+                let (commit_indices, values, epochs, commit_shas) =
+                    collect_measurement_data_for_change_detection(
+                        group_measurements.iter().map(|v| v.iter().copied()),
+                        &commits,
+                        reduction_func,
                     );
-                    plot.add_epoch_boundaries(
-                        &transitions,
-                        &reversed_commit_indices,
-                        measurement_name,
-                        &group_value,
-                        y_min,
-                        y_max,
-                    );
-                }
 
-                // Add change point traces if requested
-                if detect_changes {
-                    let config = crate::config::change_point_config(measurement_name);
-                    // Reverse measurements to match display order (newest on left, oldest on right)
-                    // This ensures change point direction (regression/improvement) matches visual interpretation
-                    let reversed_values: Vec<f64> = values.iter().rev().cloned().collect();
-                    let reversed_commit_shas: Vec<String> =
-                        commit_shas.iter().rev().cloned().collect();
-                    let reversed_commit_indices: Vec<usize> =
-                        commit_indices.iter().rev().cloned().collect();
-                    let raw_cps =
-                        crate::change_point::detect_change_points(&reversed_values, &config);
-                    log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
-                    let enriched_cps = crate::change_point::enrich_change_points(
-                        &raw_cps,
-                        &reversed_values,
-                        &reversed_commit_shas,
-                        &config,
-                    );
-                    log::debug!(
-                        "Enriched change points for {}: {:?}",
-                        measurement_name,
-                        enriched_cps
-                    );
-                    plot.add_change_points(
-                        &enriched_cps,
-                        &reversed_values,
-                        &reversed_commit_indices,
-                        measurement_name,
-                        &group_value,
-                    );
-                }
+                add_change_point_and_epoch_traces(
+                    &mut *plot,
+                    &commit_indices,
+                    &values,
+                    &epochs,
+                    &commit_shas,
+                    measurement_name,
+                    &group_value,
+                    show_epochs,
+                    detect_changes,
+                    true, // reverse_for_display=true (existing behavior)
+                    crate::config::change_point_config, // Per-measurement config
+                );
             }
         }
     }

@@ -84,6 +84,7 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `preserve-existing` | Preserve existing gh-pages content outside reports subdirectory | No | `true` |
 | `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
 | `detect-changes` | Whether to detect and display change points in the report | No | `false` |
+| `template` | Path to custom report template (relative to repo root). Uses performance-overview.html by default | No | `.git-perf/templates/performance-overview.html` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
 
 ### Common Audit Arguments
@@ -209,6 +210,30 @@ This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
     detect-changes: 'true'
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+### Using Custom Templates
+
+By default, the action uses the professional `performance-overview.html` template. You can specify a different template:
+
+```yaml
+# Use a different template
+- uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    template: '.git-perf/templates/simple-dashboard.html'
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+
+# Disable template to use default single-plot report
+- uses: kaihowl/git-perf/.github/actions/report@master
+  with:
+    template: ''
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Available Templates:**
+- `performance-overview.html` (default) - Professional multi-section dashboard with styling
+- `simple-dashboard.html` - Basic multi-section template
+- `dashboard-example.html` - Comprehensive example template
+- Leave empty (`''`) to generate a single-plot report without templates
 
 ### Multi-Workflow Coordination
 
