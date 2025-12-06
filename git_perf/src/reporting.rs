@@ -1139,6 +1139,328 @@ impl ReporterFactory {
     }
 }
 
+/// Compute group value combinations for splitting measurements by metadata keys.
+///
+/// Returns a vector of group values where each inner vector contains the values
+/// for the split keys. If no splits are specified, returns a single empty group.
+///
+/// # Errors
+/// Returns error if separate_by is non-empty but no measurements have all required keys
+fn compute_group_values_to_process<'a>(
+    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    separate_by: &[String],
+    context_id: &str, // For error messages (e.g., "Section 'test-overview'" or "measurement X")
+) -> Result<Vec<Vec<String>>> {
+    if separate_by.is_empty() {
+        return Ok(vec![vec![]]);
+    }
+
+    let group_values: Vec<Vec<String>> = filtered_measurements
+        .flatten()
+        .filter_map(|m| {
+            let values: Vec<String> = separate_by
+                .iter()
+                .filter_map(|key| m.key_values.get(key).cloned())
+                .collect();
+
+            if values.len() == separate_by.len() {
+                Some(values)
+            } else {
+                None
+            }
+        })
+        .unique()
+        .collect();
+
+    if group_values.is_empty() {
+        bail!(
+            "{}: Invalid separator supplied, no measurements have all required keys: {:?}",
+            context_id,
+            separate_by
+        );
+    }
+
+    Ok(group_values)
+}
+
+/// Filter measurements that match all key-value pairs in the group.
+///
+/// If group_value is empty, returns all measurements (no filtering).
+fn filter_group_measurements<'a>(
+    measurements: impl Iterator<Item = &'a MeasurementData> + 'a,
+    separate_by: Vec<String>,
+    group_value: Vec<String>,
+) -> Box<dyn Iterator<Item = &'a MeasurementData> + 'a> {
+    Box::new(measurements.filter(move |m| {
+        if group_value.is_empty() {
+            return true;
+        }
+
+        separate_by
+            .iter()
+            .zip(group_value.iter())
+            .all(|(key, expected_val)| {
+                m.key_values
+                    .get(key)
+                    .map(|v| v == expected_val)
+                    .unwrap_or(false)
+            })
+    }))
+}
+
+/// Collect and aggregate measurement data for change point detection.
+///
+/// Returns tuple of (commit_indices, values, epochs, commit_shas).
+/// Each vector has one entry per commit with measurements.
+fn collect_measurement_data_for_change_detection<'a>(
+    group_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    commits: &[Commit],
+    reduction_func: ReductionFunc,
+) -> (Vec<usize>, Vec<f64>, Vec<u32>, Vec<String>) {
+    let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
+        .enumerate()
+        .flat_map(|(i, ms)| {
+            let commit_sha = commits[i].commit.clone();
+            ms.reduce_by(reduction_func)
+                .into_iter()
+                .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
+        })
+        .collect();
+
+    let commit_indices: Vec<usize> = measurement_data.iter().map(|(i, _, _, _)| *i).collect();
+    let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
+    let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
+    let commit_shas: Vec<String> = measurement_data
+        .iter()
+        .map(|(_, _, _, s)| s.clone())
+        .collect();
+
+    (commit_indices, values, epochs, commit_shas)
+}
+
+/// Add a trace (line) to the plot for a measurement group.
+///
+/// If aggregate_by is Some, adds a summarized trace with aggregated values.
+/// If aggregate_by is None, adds a raw trace with all individual measurements.
+fn add_trace_for_measurement_group<'a>(
+    reporter: &mut dyn Reporter<'a>,
+    group_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    measurement_name: &str,
+    group_value: &[String],
+    aggregate_by: Option<ReductionFunc>,
+) {
+    if let Some(reduction_func) = aggregate_by {
+        let trace_measurements = group_measurements
+            .enumerate()
+            .flat_map(move |(i, ms)| {
+                ms.reduce_by(reduction_func)
+                    .into_iter()
+                    .map(move |m| (i, m))
+            })
+            .collect_vec();
+
+        reporter.add_summarized_trace(trace_measurements, measurement_name, group_value);
+    } else {
+        let trace_measurements: Vec<_> = group_measurements
+            .enumerate()
+            .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
+            .collect();
+
+        reporter.add_trace(trace_measurements, measurement_name, group_value);
+    }
+}
+
+/// Add change point and epoch boundary annotations to a reporter.
+///
+/// This function handles:
+/// - Data reversal for plotly's reversed axis display (when reverse_for_display=true)
+/// - Epoch transition detection and visualization
+/// - Change point detection with configurable config
+/// - Adding visualization traces via the Reporter trait
+///
+/// # Arguments
+/// * `reporter` - Mutable reference to any Reporter implementation
+/// * `commit_indices` - Indices of commits with measurements
+/// * `values` - Measurement values (one per commit)
+/// * `epochs` - Epoch numbers (one per commit)
+/// * `commit_shas` - Commit SHAs (one per commit)
+/// * `measurement_name` - Name of the measurement for config lookup
+/// * `group_values` - Grouping metadata for legend display
+/// * `show_epochs` - Whether to detect and display epoch boundaries
+/// * `detect_changes` - Whether to detect and display change points
+/// * `reverse_for_display` - Whether to reverse data before detection (needed for correct results)
+/// * `change_point_config_fn` - Function to retrieve change point config
+fn add_change_point_and_epoch_traces<F>(
+    reporter: &mut dyn Reporter,
+    commit_indices: &[usize],
+    values: &[f64],
+    epochs: &[u32],
+    commit_shas: &[String],
+    measurement_name: &str,
+    group_values: &[String],
+    show_epochs: bool,
+    detect_changes: bool,
+    reverse_for_display: bool,
+    change_point_config_fn: F,
+) where
+    F: Fn(&str) -> crate::change_point::ChangePointConfig,
+{
+    if values.is_empty() {
+        return;
+    }
+
+    log::debug!(
+        "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+        measurement_name,
+        values.len(),
+        commit_indices,
+        epochs
+    );
+
+    // Calculate y-axis bounds for vertical lines (10% padding)
+    let y_min = values.iter().copied().fold(f64::INFINITY, f64::min) * 0.9;
+    let y_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max) * 1.1;
+
+    // Conditionally reverse data based on display requirements
+    // Reversal is needed because plotly doesn't support reversed axes natively,
+    // so we manually reverse the data to display newest commits on the right.
+    // This ensures change point direction matches visual interpretation.
+    let (indices, vals, eps, shas) = if reverse_for_display {
+        (
+            commit_indices.iter().rev().cloned().collect::<Vec<_>>(),
+            values.iter().rev().cloned().collect::<Vec<_>>(),
+            epochs.iter().rev().cloned().collect::<Vec<_>>(),
+            commit_shas.iter().rev().cloned().collect::<Vec<_>>(),
+        )
+    } else {
+        (
+            commit_indices.to_vec(),
+            values.to_vec(),
+            epochs.to_vec(),
+            commit_shas.to_vec(),
+        )
+    };
+
+    // Add epoch boundary traces if requested
+    if show_epochs {
+        let transitions = crate::change_point::detect_epoch_transitions(&eps);
+        log::debug!(
+            "Epoch transitions for {}: {:?}",
+            measurement_name,
+            transitions
+        );
+        reporter.add_epoch_boundaries(
+            &transitions,
+            &indices,
+            measurement_name,
+            group_values,
+            y_min,
+            y_max,
+        );
+    }
+
+    // Add change point traces if requested
+    if detect_changes {
+        let config = change_point_config_fn(measurement_name);
+        let raw_cps = crate::change_point::detect_change_points(&vals, &config);
+        log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
+
+        let enriched_cps =
+            crate::change_point::enrich_change_points(&raw_cps, &vals, &shas, &config);
+        log::debug!(
+            "Enriched change points for {}: {:?}",
+            measurement_name,
+            enriched_cps
+        );
+
+        reporter.add_change_points(
+            &enriched_cps,
+            &vals,
+            &indices,
+            measurement_name,
+            group_values,
+        );
+    }
+}
+
+/// Process a single measurement group: add trace and optionally detect changes/epochs.
+///
+/// This is a high-level orchestration function that combines multiple steps:
+/// 1. Filter measurements for the specific group
+/// 2. Add trace visualization
+/// 3. Collect data for change detection
+/// 4. Add change point and epoch annotations
+///
+/// # Arguments
+/// * `reporter` - Mutable reference to any Reporter implementation
+/// * `filtered_measurements` - Iterator over measurements for this measurement name
+/// * `commits` - All commits (needed for change detection data collection)
+/// * `measurement_name` - Name of the measurement being processed
+/// * `group_value` - Values for the split keys (empty if no splitting)
+/// * `separate_by` - Keys to split measurements by
+/// * `aggregate_by` - Optional aggregation function
+/// * `show_epochs` - Whether to show epoch boundaries
+/// * `detect_changes` - Whether to detect change points
+/// * `reverse_for_display` - Whether to reverse data for display (needed for correct change detection)
+/// * `change_point_config_fn` - Function to retrieve change point config
+#[allow(clippy::too_many_arguments)]
+fn process_measurement_group<'a, F>(
+    reporter: &mut dyn Reporter<'a>,
+    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData> + 'a> + Clone + 'a,
+    commits: &[Commit],
+    measurement_name: &str,
+    group_value: Vec<String>,
+    separate_by: Vec<String>,
+    aggregate_by: Option<ReductionFunc>,
+    show_epochs: bool,
+    detect_changes: bool,
+    reverse_for_display: bool,
+    change_point_config_fn: F,
+) where
+    F: Fn(&str) -> crate::change_point::ChangePointConfig,
+{
+    // Step 1: Filter measurements for this specific group
+    let sep_by = separate_by.clone();
+    let grp_val = group_value.clone();
+    let group_measurements = filtered_measurements
+        .map(move |ms| filter_group_measurements(ms, sep_by.clone(), grp_val.clone()));
+
+    // Step 2: Add trace visualization
+    add_trace_for_measurement_group(
+        reporter,
+        group_measurements.clone(),
+        measurement_name,
+        group_value,
+        aggregate_by,
+    );
+
+    // Step 3: Add change points and epochs if requested
+    if show_epochs || detect_changes {
+        let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+
+        let (commit_indices, values, epochs, commit_shas) =
+            collect_measurement_data_for_change_detection(
+                group_measurements,
+                commits,
+                reduction_func,
+            );
+
+        add_change_point_and_epoch_traces(
+            reporter,
+            &commit_indices,
+            &values,
+            &epochs,
+            &commit_shas,
+            measurement_name,
+            group_value,
+            show_epochs,
+            detect_changes,
+            reverse_for_display,
+            change_point_config_fn,
+        );
+    }
+}
+
 /// Generate a plot for a single section with specific configuration
 #[allow(clippy::too_many_arguments)]
 fn generate_section_plot(
@@ -1210,149 +1532,26 @@ fn generate_section_plot(
             .clone()
             .map(|ms| ms.filter(|m| m.name == *measurement_name));
 
-        let group_values: Vec<Vec<String>> = if !section.separate_by.is_empty() {
-            // Find all unique combinations of the split keys
-            filtered_measurements
-                .clone()
-                .flatten()
-                .filter_map(|m| {
-                    // Extract values for all split keys
-                    let values: Vec<String> = section
-                        .separate_by
-                        .iter()
-                        .filter_map(|key| m.key_values.get(key).cloned())
-                        .collect();
-
-                    // Only include if all split keys are present
-                    if values.len() == section.separate_by.len() {
-                        Some(values)
-                    } else {
-                        None
-                    }
-                })
-                .unique()
-                .collect_vec()
-        } else {
-            vec![]
-        };
-
-        // When no splits specified, create a single group with all measurements
-        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
-            if !section.separate_by.is_empty() {
-                bail!(
-                    "Section '{}': Invalid separator supplied, no measurements have all required keys: {:?}",
-                    section.id,
-                    section.separate_by
-                );
-            }
-            vec![vec![]]
-        } else {
-            group_values
-        };
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_measurements.clone(),
+            &section.separate_by,
+            &format!("Section '{}'", section.id),
+        )?;
 
         for group_value in group_values_to_process {
-            let group_measurements = filtered_measurements.clone().map(|ms| {
-                ms.filter(|m| {
-                    if !group_value.is_empty() {
-                        // Check if measurement has ALL the expected key-value pairs
-                        section.separate_by.iter().zip(group_value.iter()).all(
-                            |(key, expected_val)| {
-                                m.key_values
-                                    .get(key)
-                                    .map(|v| v == expected_val)
-                                    .unwrap_or(false)
-                            },
-                        )
-                    } else {
-                        true
-                    }
-                })
-            });
-
-            if let Some(reduction_func) = section.aggregate_by {
-                let trace_measurements = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(move |(i, ms)| {
-                        ms.reduce_by(reduction_func)
-                            .into_iter()
-                            .map(move |m| (i, m))
-                    })
-                    .collect_vec();
-
-                reporter.add_summarized_trace(trace_measurements, measurement_name, &group_value);
-            } else {
-                let trace_measurements: Vec<_> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
-                    .collect();
-
-                reporter.add_trace(trace_measurements, measurement_name, &group_value);
-            }
-
-            // Add change points and epoch boundaries if enabled
-            if show_epochs || detect_changes {
-                // Default to min aggregation if no aggregation specified
-                let reduction_func = section.aggregate_by.unwrap_or(ReductionFunc::Min);
-
-                let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| {
-                        ms.reduce_by(reduction_func)
-                            .into_iter()
-                            .map(move |m| (i, m.val, m.epoch, section_commits[i].commit.clone()))
-                    })
-                    .collect();
-
-                if !measurement_data.is_empty() {
-                    let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
-                    let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
-                    let commit_indices: Vec<usize> =
-                        measurement_data.iter().map(|(i, _, _, _)| *i).collect();
-                    let commit_shas: Vec<String> = measurement_data
-                        .iter()
-                        .map(|(_, _, _, sha)| sha.clone())
-                        .collect();
-
-                    let y_min = values.iter().copied().fold(f64::INFINITY, f64::min);
-                    let y_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-
-                    if show_epochs {
-                        let transitions = crate::change_point::detect_epoch_transitions(&epochs);
-                        reporter.add_epoch_boundaries(
-                            &transitions,
-                            &commit_indices,
-                            measurement_name,
-                            &group_value,
-                            y_min,
-                            y_max,
-                        );
-                    }
-
-                    if detect_changes {
-                        // Use default change point config
-                        let config = crate::change_point::ChangePointConfig::default();
-
-                        let change_point_indices =
-                            crate::change_point::detect_change_points(&values, &config);
-                        let change_points = crate::change_point::enrich_change_points(
-                            &change_point_indices,
-                            &values,
-                            &commit_shas,
-                            &config,
-                        );
-                        reporter.add_change_points(
-                            &change_points,
-                            &values,
-                            &commit_indices,
-                            measurement_name,
-                            &group_value,
-                        );
-                    }
-                }
-            }
+            process_measurement_group(
+                &mut reporter as &mut dyn Reporter,
+                filtered_measurements.clone(),
+                section_commits,
+                measurement_name,
+                group_value,
+                section.separate_by.clone(),
+                section.aggregate_by,
+                show_epochs,
+                detect_changes,
+                true, // reverse_for_display=true FIXES THE REVERSAL BUG
+                |_| crate::change_point::ChangePointConfig::default(),
+            );
         }
     }
 
@@ -1515,187 +1714,26 @@ pub fn report(
             .clone()
             .map(|ms| ms.filter(|m| m.name == *measurement_name));
 
-        let group_values: Vec<Vec<String>> = if !separate_by.is_empty() {
-            // Find all unique combinations of the split keys
-            filtered_measurements
-                .clone()
-                .flatten()
-                .filter_map(|m| {
-                    // Extract values for all split keys
-                    let values: Vec<String> = separate_by
-                        .iter()
-                        .filter_map(|key| m.key_values.get(key).cloned())
-                        .collect();
-
-                    // Only include if all split keys are present
-                    if values.len() == separate_by.len() {
-                        Some(values)
-                    } else {
-                        None
-                    }
-                })
-                .unique()
-                .collect_vec()
-        } else {
-            vec![]
-        };
-
-        // When no splits specified, create a single group with all measurements
-        let group_values_to_process: Vec<Vec<String>> = if group_values.is_empty() {
-            if !separate_by.is_empty() {
-                bail!(
-                    "Invalid separator supplied, no measurements have all required keys: {:?}",
-                    separate_by
-                );
-            }
-            vec![vec![]]
-        } else {
-            group_values
-        };
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_measurements.clone(),
+            &separate_by,
+            &format!("Measurement '{}'", measurement_name),
+        )?;
 
         for group_value in group_values_to_process {
-            let group_measurements = filtered_measurements.clone().map(|ms| {
-                ms.filter(|m| {
-                    if !group_value.is_empty() {
-                        // Check if measurement has ALL the expected key-value pairs
-                        separate_by
-                            .iter()
-                            .zip(group_value.iter())
-                            .all(|(key, expected_val)| {
-                                m.key_values
-                                    .get(key)
-                                    .map(|v| v == expected_val)
-                                    .unwrap_or(false)
-                            })
-                    } else {
-                        true
-                    }
-                })
-            });
-
-            if let Some(reduction_func) = aggregate_by {
-                let trace_measurements = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(move |(i, ms)| {
-                        ms.reduce_by(reduction_func)
-                            .into_iter()
-                            .map(move |m| (i, m))
-                    })
-                    .collect_vec();
-
-                plot.add_summarized_trace(trace_measurements, measurement_name, &group_value);
-            } else {
-                let trace_measurements: Vec<_> = group_measurements
-                    .clone()
-                    .enumerate()
-                    .flat_map(|(i, ms)| ms.map(move |m| (i, m)))
-                    .collect();
-
-                plot.add_trace(trace_measurements, measurement_name, &group_value);
-            }
-
-            // Add change point detection for this measurement
-            // Collect measurement values, epochs, commit indices and SHAs for change point detection
-            // Note: We need the original commit index (i) to map back to the correct x-coordinate
-            // IMPORTANT: We must aggregate multiple measurements per commit to get one value per commit
-            // Otherwise, change point detection will see incorrect patterns
-
-            // Default to min aggregation if no aggregation specified
-            let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
-
-            let measurement_data: Vec<(usize, f64, u32, String)> = group_measurements
-                .clone()
-                .enumerate()
-                .flat_map(|(i, ms)| {
-                    let commit_sha = commits[i].commit.clone();
-                    ms.reduce_by(reduction_func)
-                        .into_iter()
-                        .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))
-                })
-                .collect();
-
-            // No explicit minimum data point check needed here - change point detection
-            // already enforces min_data_points via ChangePointConfig (default: 10).
-            // Epoch transition detection gracefully handles any input size.
-            let commit_indices: Vec<usize> =
-                measurement_data.iter().map(|(i, _, _, _)| *i).collect();
-            let values: Vec<f64> = measurement_data.iter().map(|(_, v, _, _)| *v).collect();
-            let epochs: Vec<u32> = measurement_data.iter().map(|(_, _, e, _)| *e).collect();
-            let commit_shas: Vec<String> = measurement_data
-                .iter()
-                .map(|(_, _, _, s)| s.clone())
-                .collect();
-
-            log::debug!(
-                "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+            process_measurement_group(
+                &mut *plot,
+                filtered_measurements.clone(),
+                &commits,
                 measurement_name,
-                values.len(),
-                commit_indices,
-                epochs
+                &group_value,
+                &separate_by,
+                aggregate_by,
+                show_epochs,
+                detect_changes,
+                true, // reverse_for_display=true (existing behavior)
+                crate::config::change_point_config, // Per-measurement config
             );
-
-            if !values.is_empty() {
-                // Calculate y-axis bounds for vertical lines
-                let y_min = values.iter().cloned().fold(f64::INFINITY, f64::min) * 0.9;
-                let y_max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max) * 1.1;
-
-                // Add epoch boundary traces if requested
-                if show_epochs {
-                    // Reverse epochs and commit indices to match display order (newest on left, oldest on right)
-                    let reversed_epochs: Vec<u32> = epochs.iter().rev().cloned().collect();
-                    let reversed_commit_indices: Vec<usize> =
-                        commit_indices.iter().rev().cloned().collect();
-                    let transitions =
-                        crate::change_point::detect_epoch_transitions(&reversed_epochs);
-                    log::debug!(
-                        "Epoch transitions for {}: {:?}",
-                        measurement_name,
-                        transitions
-                    );
-                    plot.add_epoch_boundaries(
-                        &transitions,
-                        &reversed_commit_indices,
-                        measurement_name,
-                        &group_value,
-                        y_min,
-                        y_max,
-                    );
-                }
-
-                // Add change point traces if requested
-                if detect_changes {
-                    let config = crate::config::change_point_config(measurement_name);
-                    // Reverse measurements to match display order (newest on left, oldest on right)
-                    // This ensures change point direction (regression/improvement) matches visual interpretation
-                    let reversed_values: Vec<f64> = values.iter().rev().cloned().collect();
-                    let reversed_commit_shas: Vec<String> =
-                        commit_shas.iter().rev().cloned().collect();
-                    let reversed_commit_indices: Vec<usize> =
-                        commit_indices.iter().rev().cloned().collect();
-                    let raw_cps =
-                        crate::change_point::detect_change_points(&reversed_values, &config);
-                    log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
-                    let enriched_cps = crate::change_point::enrich_change_points(
-                        &raw_cps,
-                        &reversed_values,
-                        &reversed_commit_shas,
-                        &config,
-                    );
-                    log::debug!(
-                        "Enriched change points for {}: {:?}",
-                        measurement_name,
-                        enriched_cps
-                    );
-                    plot.add_change_points(
-                        &enriched_cps,
-                        &reversed_values,
-                        &reversed_commit_indices,
-                        measurement_name,
-                        &group_value,
-                    );
-                }
-            }
         }
     }
 
