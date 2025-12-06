@@ -8,22 +8,21 @@
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 0;
+            padding: 10px;
             background: #f5f5f5;
         }
         header {
             background: white;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 15px;
+            margin-bottom: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .report-section {
             background: white;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 15px;
+            margin-bottom: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
@@ -32,26 +31,24 @@
             color: #333;
             border-bottom: 2px solid #007bff;
             padding-bottom: 10px;
-        }
-        .side-by-side {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            font-size: 1.3em;
         }
         .metadata {
             background: #f8f9fa;
-            padding: 15px;
+            padding: 12px;
             border-radius: 4px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         .metadata p {
             margin: 5px 0;
             color: #666;
+            font-size: 0.9em;
         }
         nav {
             display: flex;
-            gap: 20px;
+            gap: 15px;
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
         nav a {
             text-decoration: none;
@@ -65,7 +62,30 @@
             text-align: center;
             padding: 20px;
             color: #666;
-            font-size: 0.9em;
+            font-size: 0.85em;
+        }
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            header {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .report-section {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .report-section h2 {
+                font-size: 1.5em;
+            }
+            .metadata {
+                padding: 15px;
+                margin-bottom: 20px;
+            }
+            .metadata p {
+                font-size: 1em;
+            }
         }
         {{CUSTOM_CSS}}
     </style>
@@ -86,24 +106,24 @@
     </header>
 
     <main>
-        <!-- Section 1: Test Performance Overview -->
+        <!-- Section 1: Add Benchmark -->
         <section class="report-section">
-            <h2>📊 Test Performance (Last 50 Commits)</h2>
-            <p>Median test execution times for configured test measurements with change point detection.</p>
-            {{SECTION[test-overview]
-                measurement-filter: ^(test-measure2)$
+            <h2>🚀 Add Benchmark Performance</h2>
+            <p>Median performance for add operations with change point detection and epoch boundaries.</p>
+            {{SECTION[add-benchmark]
+                measurement-filter: ^(add-benchmark)$
                 aggregate-by: median
-                depth: 50
+                show-epochs: true
                 detect-changes: true
             }}
         </section>
 
-        <!-- Section 2: Benchmark Trends -->
+        <!-- Section 2: Report Benchmark -->
         <section class="report-section">
-            <h2>🚀 Benchmark Results</h2>
-            <p>Median benchmark performance for time-based benchmarks with epoch boundaries shown.</p>
-            {{SECTION[benchmark-median]
-                measurement-filter: ^(report-benchmark|add-benchmark)$
+            <h2>📊 Report Benchmark Performance</h2>
+            <p>Median performance for report generation with change point detection and epoch boundaries.</p>
+            {{SECTION[report-benchmark]
+                measurement-filter: ^(report-benchmark)$
                 aggregate-by: median
                 show-epochs: true
                 detect-changes: true
@@ -120,34 +140,27 @@
             }}
         </section>
 
-        <!-- Section 4: Size Comparison -->
+        <!-- Section 4: Release Binary Size -->
         <section class="report-section">
-            <h2>💾 Binary and Report Sizes</h2>
-            <div class="side-by-side">
-                <div>
-                    <h3>Release Binary Size</h3>
-                    {{SECTION[binary-size]
-                        measurement-filter: ^(release-binary-size)$
-                        aggregate-by: max
-                    }}
-                </div>
-                <div>
-                    <h3>Report Size</h3>
-                    {{SECTION[report-size]
-                        measurement-filter: ^(report-size|report-size-benchmark)$
-                        aggregate-by: mean
-                    }}
-                </div>
-            </div>
+            <h2>💾 Release Binary Size</h2>
+            <p>Binary size tracking with change point detection and epoch boundaries.</p>
+            {{SECTION[binary-size]
+                measurement-filter: ^(release-binary-size)$
+                aggregate-by: max
+                show-epochs: true
+                detect-changes: true
+            }}
         </section>
 
-        <!-- Section 5: Raw Data Detail View -->
+        <!-- Section 5: Report Size -->
         <section class="report-section">
-            <h2>📈 Detailed Raw Measurements (All Tests)</h2>
-            <p>Individual test runs without aggregation - shows variability.</p>
-            {{SECTION[tests-raw]
-                measurement-filter: ^(test-measure2)$
-                aggregate-by: none
+            <h2>📄 Report Size</h2>
+            <p>Generated report size tracking with change point detection and epoch boundaries.</p>
+            {{SECTION[report-size]
+                measurement-filter: ^(report-size|report-size-benchmark)$
+                aggregate-by: mean
+                show-epochs: true
+                detect-changes: true
             }}
         </section>
 
