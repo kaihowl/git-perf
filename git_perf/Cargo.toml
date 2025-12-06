@@ -7,6 +7,9 @@ license = "MIT"
 repository = "https://github.com/kaihowl/git-perf"
 build = "build.rs"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "git-perf"
 path = "src/main.rs"

@@ -149,7 +149,7 @@ mod tests {
 
         assert_eq!(result.len(), 2);
 
-        if let ParsedMeasurement::Test(test) = &result[0] {
+        if let Some(ParsedMeasurement::Test(test)) = result.first() {
             assert_eq!(test.name, "test_one");
             assert_eq!(test.duration, Some(Duration::from_secs_f64(1.5)));
             assert_eq!(test.status, TestStatus::Passed);
@@ -180,7 +180,7 @@ mod tests {
 
         assert_eq!(result.len(), 3);
 
-        if let ParsedMeasurement::Test(test) = &result[2] {
+        if let Some(ParsedMeasurement::Test(test)) = result.get(2) {
             assert_eq!(test.name, "test_three");
             assert_eq!(test.status, TestStatus::Failed);
             assert_eq!(test.metadata.get("suite").unwrap(), "suite_two");
@@ -201,7 +201,7 @@ mod tests {
         let parser = JunitXmlParser;
         let result = parser.parse(xml).unwrap();
 
-        if let ParsedMeasurement::Test(test) = &result[0] {
+        if let Some(ParsedMeasurement::Test(test)) = result.first() {
             assert_eq!(test.status, TestStatus::Skipped);
         } else {
             panic!("Expected Test measurement");
@@ -220,7 +220,7 @@ mod tests {
         let parser = JunitXmlParser;
         let result = parser.parse(xml).unwrap();
 
-        if let ParsedMeasurement::Test(test) = &result[0] {
+        if let Some(ParsedMeasurement::Test(test)) = result.first() {
             assert_eq!(test.status, TestStatus::Error);
         } else {
             panic!("Expected Test measurement");
@@ -237,7 +237,7 @@ mod tests {
         let parser = JunitXmlParser;
         let result = parser.parse(xml).unwrap();
 
-        if let ParsedMeasurement::Test(test) = &result[0] {
+        if let Some(ParsedMeasurement::Test(test)) = result.first() {
             assert_eq!(test.duration, None);
         } else {
             panic!("Expected Test measurement");

@@ -57,6 +57,7 @@ impl Default for ConversionOptions {
 /// # Returns
 ///
 /// A vector of MeasurementData ready for storage
+#[must_use]
 pub fn convert_to_measurements(
     parsed: Vec<ParsedMeasurement>,
     options: &ConversionOptions,
@@ -189,6 +190,7 @@ fn convert_benchmark(
     // Parse benchmark ID to extract group, name, and optional input
     // Format: "group/name/input" or "group/name"
     let parts: Vec<&str> = bench.id.split('/').collect();
+    #[allow(clippy::indexing_slicing)] // Index access is safe within match arms
     let (group, bench_name, input) = match parts.len() {
         2 => (parts[0], parts[1], None),
         3 => (parts[0], parts[1], Some(parts[2])),
@@ -293,6 +295,7 @@ fn format_measurement_name(
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::parsers::{BenchStatistics, TestStatus};

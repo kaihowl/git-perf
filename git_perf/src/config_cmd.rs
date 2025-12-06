@@ -460,6 +460,7 @@ fn display_json(info: &ConfigInfo) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::test_helpers::{

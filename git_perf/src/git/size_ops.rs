@@ -236,8 +236,14 @@ pub fn get_repo_stats() -> Result<RepoStats> {
             continue;
         }
 
-        let key = parts[0].trim();
-        let value = parts[1].trim().parse::<u64>().unwrap_or(0);
+        let Some(key) = parts.first().map(|s| s.trim()) else {
+            continue;
+        };
+        let value = parts
+            .get(1)
+            .map(|s| s.trim())
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
 
         match key {
             "count" => loose_objects = value,
@@ -257,6 +263,7 @@ pub fn get_repo_stats() -> Result<RepoStats> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::test_helpers::dir_with_repo;

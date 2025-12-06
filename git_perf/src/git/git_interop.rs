@@ -648,7 +648,7 @@ fn git_push_notes_ref(
             print!("{}", &output.stdout);
             Ok(())
         }
-        Err(GitError::ExecError { command: _, output }) => {
+        Err(GitError::ExecError { output, .. }) => {
             let successful_push = output.stdout.lines().any(|l| {
                 l.contains(format!("{REFS_NOTES_BRANCH}:").as_str()) && !l.starts_with('!')
             });
@@ -732,6 +732,7 @@ pub struct ReadBranchGuard {
 
 impl ReadBranchGuard {
     /// Get the reference name for use in git commands
+    #[must_use]
     pub fn ref_name(&self) -> &str {
         &self.temp_ref.ref_name
     }
@@ -766,8 +767,8 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
                 });
             }
             Ok(Reference {
-                refname: items[0].to_string(),
-                oid: items[1].to_string(),
+                refname: items.first().map(|s| s.to_string()).unwrap_or_default(),
+                oid: items.get(1).map(|s| s.to_string()).unwrap_or_default(),
             })
         })
         .collect();
@@ -839,7 +840,10 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             let commit_hash = info
                 .get(1)
                 .expect("No commit header found before measurement line in git log output");
-            detected_shallow |= info[2..].contains(&"grafted");
+            detected_shallow |= info
+                .get(2..)
+                .map(|slice| slice.contains(&"grafted"))
+                .unwrap_or(false);
             current_commit = Some(commit_hash.to_string());
             commits.push((commit_hash.to_string(), Vec::new()));
         } else if let Some(commit_hash) = current_commit.as_ref() {
@@ -916,6 +920,7 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod test {
     use super::*;
     use crate::test_helpers::{dir_with_repo, hermetic_git_env, init_repo, run_git_command};

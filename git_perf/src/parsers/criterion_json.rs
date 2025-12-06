@@ -108,6 +108,7 @@ impl CriterionMessage {
 fn parse_benchmark_id(id: &str) -> (Option<String>, Option<String>, Option<String>) {
     let parts: Vec<&str> = id.split('/').collect();
 
+    #[allow(clippy::indexing_slicing)] // Index access is safe within match arms
     match parts.len() {
         0 => (None, None, None),
         1 => (None, Some(parts[0].to_string()), None),
@@ -144,7 +145,7 @@ mod tests {
 
         assert_eq!(result.len(), 1);
 
-        if let ParsedMeasurement::Benchmark(bench) = &result[0] {
+        if let Some(ParsedMeasurement::Benchmark(bench)) = result.first() {
             assert_eq!(bench.id, "add_measurements/add_measurement/50");
             assert_eq!(bench.statistics.unit, "ns");
             assert_eq!(bench.statistics.mean_ns, Some(15456.78));
@@ -171,7 +172,7 @@ mod tests {
 
         assert_eq!(result.len(), 2);
 
-        if let ParsedMeasurement::Benchmark(bench) = &result[0] {
+        if let Some(ParsedMeasurement::Benchmark(bench)) = result.first() {
             assert_eq!(bench.id, "fibonacci_10");
             // us to ns conversion
             assert_eq!(bench.statistics.mean_ns, Some(1234.0));
@@ -239,7 +240,7 @@ mod tests {
         let parser = CriterionJsonParser;
         let result = parser.parse(json).unwrap();
 
-        if let ParsedMeasurement::Benchmark(bench) = &result[0] {
+        if let Some(ParsedMeasurement::Benchmark(bench)) = result.first() {
             assert_eq!(bench.statistics.unit, "ns");
             assert_eq!(bench.statistics.mean_ns, Some(15456.78));
         } else {

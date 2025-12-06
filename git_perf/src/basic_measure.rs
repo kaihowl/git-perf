@@ -11,7 +11,7 @@ pub fn measure(
     key_values: &[(String, String)],
 ) -> Result<()> {
     let exe = command.first().unwrap();
-    let args = &command[1..];
+    let args = command.get(1..).unwrap_or(&[]);
     for _ in 0..repetitions {
         let mut process = process::Command::new(exe);
         process.args(args);

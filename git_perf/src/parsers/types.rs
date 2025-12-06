@@ -26,6 +26,7 @@ pub enum TestStatus {
 }
 
 impl TestStatus {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             TestStatus::Passed => "passed",
