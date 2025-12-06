@@ -86,7 +86,7 @@ impl Default for ChangePointConfig {
         Self {
             min_data_points: 10,
             min_magnitude_pct: 5.0,
-            confidence_threshold: 0.8,
+            confidence_threshold: 0.75,
             penalty: 0.5,
         }
     }
@@ -211,6 +211,7 @@ pub fn enrich_change_points(
 
     for (i, &idx) in indices.iter().enumerate() {
         if idx == 0 || idx >= measurements.len() {
+            log::debug!("Changepoint at index {} out of bounds, skipping.", idx);
             continue;
         }
 
@@ -245,6 +246,12 @@ pub fn enrich_change_points(
 
         // Skip if change is below threshold
         if magnitude_pct.abs() < config.min_magnitude_pct {
+            log::debug!(
+                "Skipping changepoint at index {} as magnitude of {} is below threshold of {}",
+                idx,
+                magnitude_pct.abs(),
+                config.min_magnitude_pct,
+            );
             continue;
         }
 
@@ -259,6 +266,12 @@ pub fn enrich_change_points(
         let confidence = calculate_confidence(idx, measurements.len(), magnitude_pct.abs());
 
         if confidence < config.confidence_threshold {
+            log::debug!(
+                "Skipping changepoint at index {} as confidence of {} is below threshold of {}",
+                idx,
+                confidence,
+                config.confidence_threshold
+            );
             continue;
         }
 
