@@ -402,9 +402,6 @@ const IMPROVEMENT_COLOR: &str = "rgba(40, 167, 69, 0.8)";
 const EPOCH_MARKER_COLOR: &str = "gray";
 
 // Line width constants for plot styling
-/// Line width for change point markers (vertical lines indicating performance changes).
-const CHANGE_POINT_LINE_WIDTH: f64 = 3.0;
-
 /// Line width for epoch markers (vertical dashed lines).
 const EPOCH_MARKER_LINE_WIDTH: f64 = 2.0;
 
@@ -527,11 +524,10 @@ trait Reporter<'a> {
     fn add_change_points(
         &mut self,
         change_points: &[ChangePoint],
+        values: &[f64],
         commit_indices: &[usize],
         measurement_name: &str,
         group_values: &[String],
-        y_min: f64,
-        y_max: f64,
     );
     fn as_bytes(&self) -> Vec<u8>;
     fn set_template_and_metadata(&mut self, template: Option<String>, metadata: ReportMetadata);
@@ -758,13 +754,22 @@ impl PlotlyReporter {
     pub fn add_change_point_traces_with_indices(
         &mut self,
         change_points: &[ChangePoint],
+        values: &[f64],
         commit_indices: &[usize],
         measurement_name: &str,
         group_values: &[String],
-        y_min: f64,
-        y_max: f64,
     ) {
+        if change_points.is_empty() {
+            return;
+        }
+
         let measurement_display = format_measurement_with_unit(measurement_name);
+
+        // Collect all change points into a single trace with markers
+        let mut x_coords: Vec<usize> = vec![];
+        let mut y_coords: Vec<f64> = vec![];
+        let mut hover_texts: Vec<String> = vec![];
+        let mut marker_colors: Vec<String> = vec![];
 
         for cp in change_points {
             let x_pos = match self.process_vertical_marker(
@@ -777,9 +782,21 @@ impl PlotlyReporter {
                 Err(()) => continue,
             };
 
-            let (color, label_prefix, symbol) = match cp.direction {
-                ChangeDirection::Increase => (REGRESSION_COLOR, "Increase", "⚠ Regression"),
-                ChangeDirection::Decrease => (IMPROVEMENT_COLOR, "Decrease", "✓ Improvement"),
+            // Get the actual y value from the measurement data
+            let y_value = if cp.index < values.len() {
+                values[cp.index]
+            } else {
+                log::warn!(
+                    "Change point index {} out of bounds for values (len={})",
+                    cp.index,
+                    values.len()
+                );
+                continue;
+            };
+
+            let (color, symbol) = match cp.direction {
+                ChangeDirection::Increase => (REGRESSION_COLOR, "⚠ Regression"),
+                ChangeDirection::Decrease => (IMPROVEMENT_COLOR, "✓ Improvement"),
             };
 
             let hover_text = format!(
@@ -790,44 +807,33 @@ impl PlotlyReporter {
                 cp.confidence * 100.0
             );
 
-            // Create vertical line from y_min to y_max
-            let mut x_coords = vec![];
-            let mut y_coords = vec![];
-            let mut hover_texts = vec![];
-
-            Self::add_vertical_line_segment(
-                &mut x_coords,
-                &mut y_coords,
-                &mut hover_texts,
-                x_pos,
-                y_min,
-                y_max,
-                hover_text,
-            );
-
-            // Remove the trailing separator (None values) since we're creating one trace per change point
-            x_coords.truncate(2);
-            y_coords.truncate(2);
-            hover_texts.truncate(2);
-
-            let trace = Scatter::new(x_coords, y_coords)
-                .visible(Visible::LegendOnly)
-                .mode(Mode::Lines)
-                .line(Line::new().color(color).width(CHANGE_POINT_LINE_WIDTH))
-                .show_legend(false)
-                .hover_text_array(hover_texts);
-
-            let trace = Self::configure_trace_legend(
-                trace,
-                group_values,
-                measurement_name,
-                &measurement_display,
-                label_prefix,
-                "change_points",
-            );
-
-            self.plot.add_trace(trace);
+            // Add single point at the actual measurement value
+            x_coords.push(x_pos);
+            y_coords.push(y_value);
+            hover_texts.push(hover_text);
+            marker_colors.push(color.to_string());
         }
+
+        let trace = Scatter::new(x_coords, y_coords)
+            .mode(Mode::Markers)
+            .marker(
+                plotly::common::Marker::new()
+                    .color_array(marker_colors)
+                    .size(12),
+            )
+            .show_legend(true)
+            .hover_text_array(hover_texts);
+
+        let trace = Self::configure_trace_legend(
+            trace,
+            group_values,
+            measurement_name,
+            &measurement_display,
+            "Change Points",
+            "change_points",
+        );
+
+        self.plot.add_trace(trace);
     }
 }
 
@@ -955,19 +961,17 @@ impl<'a> Reporter<'a> for PlotlyReporter {
     fn add_change_points(
         &mut self,
         change_points: &[ChangePoint],
+        values: &[f64],
         commit_indices: &[usize],
         measurement_name: &str,
         group_values: &[String],
-        y_min: f64,
-        y_max: f64,
     ) {
         self.add_change_point_traces_with_indices(
             change_points,
+            values,
             commit_indices,
             measurement_name,
             group_values,
-            y_min,
-            y_max,
         );
     }
 
@@ -1106,11 +1110,10 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     fn add_change_points(
         &mut self,
         _change_points: &[ChangePoint],
+        _values: &[f64],
         _commit_indices: &[usize],
         _measurement_name: &str,
         _group_values: &[String],
-        _y_min: f64,
-        _y_max: f64,
     ) {
         // CSV reporter does not support change point visualization
     }
@@ -1687,11 +1690,10 @@ pub fn report(
                     );
                     plot.add_change_points(
                         &enriched_cps,
+                        &reversed_values,
                         &reversed_commit_indices,
                         measurement_name,
                         &group_value,
-                        y_min,
-                        y_max,
                     );
                 }
             }
@@ -2400,22 +2402,22 @@ mod tests {
             direction: ChangeDirection::Increase,
         }];
 
+        let values = vec![50.0, 75.0]; // Measurement values
         let commit_indices: Vec<usize> = (0..reporter.size).collect();
         reporter.add_change_point_traces_with_indices(
             &change_points,
+            &values,
             &commit_indices,
             "build_time",
             &[],
-            0.0,
-            100.0,
         );
 
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
-        // Check that trace is set to legendonly
-        assert!(html.contains("legendonly"));
-        // Check for change point trace (increase)
-        assert!(html.contains("build_time (Increase)"));
+        // Check for change point trace (single trace for all change points)
+        assert!(html.contains("build_time (Change Points)"));
+        // Verify markers mode is used
+        assert!(html.contains("\"mode\":\"markers\""));
     }
 
     #[test]
@@ -2450,21 +2452,23 @@ mod tests {
             },
         ];
 
+        let values = vec![50.0, 55.0, 62.5, 60.0, 42.0]; // Measurement values
         let commit_indices: Vec<usize> = (0..reporter.size).collect();
         reporter.add_change_point_traces_with_indices(
             &change_points,
+            &values,
             &commit_indices,
             "metric",
             &[],
-            0.0,
-            100.0,
         );
 
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
-        // Should have both increase and decrease traces
-        assert!(html.contains("metric (Increase)"));
-        assert!(html.contains("metric (Decrease)"));
+        // Should have single change points trace containing both directions
+        assert!(html.contains("metric (Change Points)"));
+        // Verify both regression and improvement symbols are present in hover text
+        assert!(html.contains("⚠ Regression"));
+        assert!(html.contains("✓ Improvement"));
     }
 
     #[test]
@@ -2473,14 +2477,14 @@ mod tests {
         reporter.size = 10;
 
         let change_points: Vec<ChangePoint> = vec![];
+        let values = vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0];
         let commit_indices: Vec<usize> = (0..reporter.size).collect();
         reporter.add_change_point_traces_with_indices(
             &change_points,
+            &values,
             &commit_indices,
             "test",
             &[],
-            0.0,
-            100.0,
         );
 
         // Should not crash and plot should still be valid
@@ -2515,14 +2519,14 @@ mod tests {
             direction: ChangeDirection::Increase,
         }];
 
+        let values = vec![100.0, 123.5]; // Measurement values
         let commit_indices: Vec<usize> = (0..reporter.size).collect();
         reporter.add_change_point_traces_with_indices(
             &change_points,
+            &values,
             &commit_indices,
             "test",
             &[],
-            0.0,
-            100.0,
         );
 
         let bytes = reporter.as_bytes();
