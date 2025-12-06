@@ -57,6 +57,7 @@ impl Default for ConversionOptions {
 /// # Returns
 ///
 /// A vector of MeasurementData ready for storage
+#[must_use]
 pub fn convert_to_measurements(
     parsed: Vec<ParsedMeasurement>,
     options: &ConversionOptions,

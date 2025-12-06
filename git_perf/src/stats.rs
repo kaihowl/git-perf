@@ -61,6 +61,7 @@ pub fn aggregate_measurements<'a>(measurements: impl Iterator<Item = &'a f64>) -
     }
 }
 
+#[must_use]
 pub fn calculate_mad(measurements: &[f64]) -> f64 {
     if measurements.is_empty() {
         return 0.0;
@@ -99,10 +100,12 @@ impl Display for Stats {
 }
 
 impl Stats {
+    #[must_use]
     pub fn z_score(&self, other: &Stats) -> f64 {
         self.z_score_with_method(other, DispersionMethod::StandardDeviation)
     }
 
+    #[must_use]
     pub fn z_score_with_method(&self, other: &Stats, method: DispersionMethod) -> f64 {
         assert!(self.len == 1);
         assert!(other.len >= 1);
@@ -116,6 +119,7 @@ impl Stats {
         (self.mean - other.mean).abs() / dispersion
     }
 
+    #[must_use]
     pub fn is_significant(&self, other: &Stats, sigma: f64, method: DispersionMethod) -> bool {
         let z_score = self.z_score_with_method(other, method);
         z_score > sigma

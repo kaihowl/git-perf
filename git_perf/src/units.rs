@@ -37,6 +37,7 @@ pub fn parse_value_with_unit(value: f64, unit_str: &str) -> Result<Measurement, 
 }
 
 /// Format measurement with auto-scaling using human-repr
+#[must_use]
 pub fn format_measurement(measurement: Measurement) -> String {
     match measurement {
         Measurement::Duration(d) => d.human_duration().to_string(),

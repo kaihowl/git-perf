@@ -32,6 +32,7 @@ pub fn hermetic_git_env() {
 ///
 /// # Returns
 /// Array of (key, value) tuples for hermetic git environment variables
+#[must_use]
 pub fn hermetic_git_env_vars() -> [(&'static str, &'static str); 6] {
     [
         ("GIT_CONFIG_NOSYSTEM", "true"),
@@ -93,6 +94,7 @@ pub fn init_repo(dir: &Path) {
 ///
 /// # Panics
 /// Panics if the temporary directory cannot be created or git initialization fails.
+#[must_use]
 pub fn dir_with_repo() -> TempDir {
     let tempdir = tempdir().unwrap();
     init_repo(tempdir.path());
@@ -156,6 +158,7 @@ pub fn init_repo_with_file(dir: &Path) {
 ///
 /// # Panics
 /// Panics if the temporary directory cannot be created or git initialization fails.
+#[must_use]
 pub fn dir_with_repo_and_file() -> TempDir {
     let tempdir = tempdir().unwrap();
     init_repo_with_file(tempdir.path());
@@ -291,6 +294,7 @@ pub struct DirGuard {
 
 impl DirGuard {
     /// Creates a new DirGuard and changes to the specified directory.
+    #[must_use]
     pub fn new(new_dir: &Path) -> Self {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         env::set_current_dir(new_dir).expect("Failed to change directory");
@@ -321,6 +325,7 @@ impl Drop for DirGuard {
 ///
 /// # Panics
 /// Panics if any step fails.
+#[must_use]
 pub fn setup_test_env_with_config(config_content: &str) -> (TempDir, DirGuard) {
     hermetic_git_env();
     let temp_dir = dir_with_repo();

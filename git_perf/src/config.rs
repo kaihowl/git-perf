@@ -123,6 +123,7 @@ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
     Ok(conf_str)
 }
 
+#[must_use]
 pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
     let config = read_hierarchical_config()
         .map_err(|e| {
@@ -173,6 +174,7 @@ pub fn bump_epoch(measurement: &str) -> Result<()> {
 }
 
 /// Returns the backoff max elapsed seconds from config, or the default if not set.
+#[must_use]
 pub fn backoff_max_elapsed_seconds() -> u64 {
     match read_hierarchical_config() {
         Ok(config) => {
@@ -187,6 +189,7 @@ pub fn backoff_max_elapsed_seconds() -> u64 {
 }
 
 /// Returns the minimum relative deviation threshold from config, or None if not set.
+#[must_use]
 pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
@@ -202,6 +205,7 @@ pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
 }
 
 /// Returns the dispersion method from config, or StandardDeviation if not set.
+#[must_use]
 pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
     let Some(config) = read_hierarchical_config().ok() else {
         return DispersionMethod::StandardDeviation;
@@ -219,6 +223,7 @@ pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
 }
 
 /// Returns the minimum measurements from config, or None if not set.
+#[must_use]
 pub fn audit_min_measurements(measurement: &str) -> Option<u16> {
     let config = read_hierarchical_config().ok()?;
 
@@ -233,6 +238,7 @@ pub fn audit_min_measurements(measurement: &str) -> Option<u16> {
 }
 
 /// Returns the aggregate-by reduction function from config, or None if not set.
+#[must_use]
 pub fn audit_aggregate_by(measurement: &str) -> Option<git_perf_cli_types::ReductionFunc> {
     let config = read_hierarchical_config().ok()?;
 
@@ -249,6 +255,7 @@ pub fn audit_aggregate_by(measurement: &str) -> Option<git_perf_cli_types::Reduc
 }
 
 /// Returns the sigma value from config, or None if not set.
+#[must_use]
 pub fn audit_sigma(measurement: &str) -> Option<f64> {
     let config = read_hierarchical_config().ok()?;
 
@@ -262,12 +269,14 @@ pub fn audit_sigma(measurement: &str) -> Option<f64> {
 }
 
 /// Returns the configured unit for a measurement, or None if not set.
+#[must_use]
 pub fn measurement_unit(measurement: &str) -> Option<String> {
     let config = read_hierarchical_config().ok()?;
     config.get_with_parent_fallback("measurement", measurement, "unit")
 }
 
 /// Returns the report template path from config, or None if not set.
+#[must_use]
 pub fn report_template_path() -> Option<PathBuf> {
     let config = read_hierarchical_config().ok()?;
     let path_str = config.get_string("report.template_path").ok()?;
@@ -275,6 +284,7 @@ pub fn report_template_path() -> Option<PathBuf> {
 }
 
 /// Returns the report custom CSS path from config, or None if not set.
+#[must_use]
 pub fn report_custom_css_path() -> Option<PathBuf> {
     let config = read_hierarchical_config().ok()?;
     let path_str = config.get_string("report.custom_css_path").ok()?;
@@ -282,6 +292,7 @@ pub fn report_custom_css_path() -> Option<PathBuf> {
 }
 
 /// Returns the report title from config, or None if not set.
+#[must_use]
 pub fn report_title() -> Option<String> {
     let config = read_hierarchical_config().ok()?;
     config.get_string("report.title").ok()
@@ -294,6 +305,7 @@ pub fn report_title() -> Option<String> {
 /// - `min_data_points`: Minimum data points required (default: 10)
 /// - `min_magnitude_pct`: Minimum percentage change to consider significant (default: 5.0)
 /// - `penalty`: Penalty factor for PELT algorithm (default: 0.5, lower = more sensitive)
+#[must_use]
 pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePointConfig {
     let mut config = crate::change_point::ChangePointConfig::default();
 
