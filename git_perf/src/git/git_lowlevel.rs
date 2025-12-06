@@ -97,19 +97,29 @@ pub(super) fn map_git_error(err: GitError) -> GitError {
     // Parsing error messasges is not a very good idea, but(!) there are no consistent + documented error code for these cases.
     // This is tested by the git compatibility check and we add an explicit LANG to the git invocation.
     match err {
-        GitError::ExecError { command: _, output } if output.stderr.contains("cannot lock ref") => {
+        GitError::ExecError { output, .. } if output.stderr.contains("cannot lock ref") => {
             GitError::RefFailedToLock { output }
         }
-        GitError::ExecError { command: _, output } if output.stderr.contains("but expected") => {
+        GitError::ExecError { output, .. } if output.stderr.contains("but expected") => {
             GitError::RefConcurrentModification { output }
         }
-        GitError::ExecError { command: _, output } if output.stderr.contains("find remote ref") => {
+        GitError::ExecError { output, .. } if output.stderr.contains("find remote ref") => {
             GitError::NoRemoteMeasurements { output }
         }
-        GitError::ExecError { command: _, output } if output.stderr.contains("bad object") => {
+        GitError::ExecError { output, .. } if output.stderr.contains("bad object") => {
             GitError::BadObject { output }
         }
-        _ => err,
+        GitError::ExecError { .. }
+        | GitError::RefFailedToPush { .. }
+        | GitError::MissingHead { .. }
+        | GitError::RefFailedToLock { .. }
+        | GitError::ShallowRepository
+        | GitError::MissingMeasurements
+        | GitError::RefConcurrentModification { .. }
+        | GitError::NoRemoteMeasurements { .. }
+        | GitError::NoUpstream {}
+        | GitError::BadObject { .. }
+        | GitError::IoError(_) => err,
     }
 }
 

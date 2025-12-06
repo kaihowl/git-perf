@@ -68,6 +68,7 @@ pub struct Cli {
 
 impl Cli {
     /// Create a versionless command for manpage generation
+    #[must_use]
     pub fn command_without_version() -> clap::Command {
         let mut cmd = Self::command();
         cmd = cmd.version(None::<&str>);

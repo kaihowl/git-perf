@@ -168,6 +168,7 @@ fn store_measurements(measurements: &[MeasurementData]) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::git::git_interop::walk_commits;

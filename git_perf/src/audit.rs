@@ -462,6 +462,7 @@ fn audit_with_data(
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod test {
     use super::*;
 
@@ -1077,6 +1078,7 @@ min_relative_deviation = 10.0
 
     // Integration tests that verify per-measurement config determination
     #[cfg(test)]
+    #[allow(clippy::indexing_slicing)]
     mod integration {
         use super::*;
         use crate::config::{

@@ -50,13 +50,21 @@ impl ReportMetadata {
         let commit_range = if commits.is_empty() {
             "No commits".to_string()
         } else if commits.len() == 1 {
-            commits[0].commit[..7].to_string()
+            commits
+                .first()
+                .and_then(|c| c.commit.get(..7))
+                .unwrap_or("unknown")
+                .to_string()
         } else {
-            format!(
-                "{}..{}",
-                &commits.last().unwrap().commit[..7],
-                &commits[0].commit[..7]
-            )
+            let first = commits
+                .first()
+                .and_then(|c| c.commit.get(..7))
+                .unwrap_or("unknown");
+            let last = commits
+                .last()
+                .and_then(|c| c.commit.get(..7))
+                .unwrap_or("unknown");
+            format!("{}..{}", last, first)
         };
 
         let depth = commits.len();
@@ -457,7 +465,7 @@ impl PlotlyReporter {
             );
             return Err(());
         }
-        let commit_idx = commit_indices[index];
+        let commit_idx = *commit_indices.get(index).ok_or(())?;
         let x_pos = self.size - commit_idx - 1;
         Ok(x_pos)
     }
@@ -571,9 +579,7 @@ impl PlotlyReporter {
             };
 
             // Get the actual y value from the measurement data
-            let y_value = if cp.index < values.len() {
-                values[cp.index]
-            } else {
+            let Some(&y_value) = values.get(cp.index) else {
                 log::warn!(
                     "Change point index {} out of bounds for values (len={})",
                     cp.index,
@@ -833,14 +839,18 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
 
         // Add raw measurements
         for (index, measurement_data) in &self.indexed_measurements {
-            let commit = &self.hashes[*index];
+            let Some(commit) = self.hashes.get(*index) else {
+                continue;
+            };
             let row = CsvMeasurementRow::from_measurement(commit, measurement_data);
             lines.push(row.to_csv_line());
         }
 
         // Add summarized measurements
         for (index, measurement_name, group_value, summary) in &self.summarized_measurements {
-            let commit = &self.hashes[*index];
+            let Some(commit) = self.hashes.get(*index) else {
+                continue;
+            };
             let row = CsvMeasurementRow::from_summary(
                 commit,
                 measurement_name,
@@ -1091,7 +1101,7 @@ pub fn report(
                 .clone()
                 .enumerate()
                 .flat_map(|(i, ms)| {
-                    let commit_sha = commits[i].commit.clone();
+                    let commit_sha = commits.get(i).map(|c| c.commit.clone()).unwrap_or_default();
                     ms.reduce_by(reduction_func)
                         .into_iter()
                         .map(move |m| (i, m.val, m.epoch, commit_sha.clone()))

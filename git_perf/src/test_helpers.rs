@@ -32,6 +32,7 @@ pub fn hermetic_git_env() {
 ///
 /// # Returns
 /// Array of (key, value) tuples for hermetic git environment variables
+#[must_use]
 pub fn hermetic_git_env_vars() -> [(&'static str, &'static str); 6] {
     [
         ("GIT_CONFIG_NOSYSTEM", "true"),
@@ -93,6 +94,7 @@ pub fn init_repo(dir: &Path) {
 ///
 /// # Panics
 /// Panics if the temporary directory cannot be created or git initialization fails.
+#[must_use]
 pub fn dir_with_repo() -> TempDir {
     let tempdir = tempdir().unwrap();
     init_repo(tempdir.path());
@@ -156,6 +158,7 @@ pub fn init_repo_with_file(dir: &Path) {
 ///
 /// # Panics
 /// Panics if the temporary directory cannot be created or git initialization fails.
+#[must_use]
 pub fn dir_with_repo_and_file() -> TempDir {
     let tempdir = tempdir().unwrap();
     init_repo_with_file(tempdir.path());
@@ -291,6 +294,7 @@ pub struct DirGuard {
 
 impl DirGuard {
     /// Creates a new DirGuard and changes to the specified directory.
+    #[must_use]
     pub fn new(new_dir: &Path) -> Self {
         let original_dir = env::current_dir().expect("Failed to get current directory");
         env::set_current_dir(new_dir).expect("Failed to change directory");
@@ -321,6 +325,7 @@ impl Drop for DirGuard {
 ///
 /// # Panics
 /// Panics if any step fails.
+#[must_use]
 pub fn setup_test_env_with_config(config_content: &str) -> (TempDir, DirGuard) {
     hermetic_git_env();
     let temp_dir = dir_with_repo();
@@ -330,6 +335,7 @@ pub fn setup_test_env_with_config(config_content: &str) -> (TempDir, DirGuard) {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::env::set_current_dir;
@@ -390,12 +396,24 @@ mod tests {
         assert_eq!(env_vars.len(), 6);
 
         // Check each variable
-        assert_eq!(env_vars[0], ("GIT_CONFIG_NOSYSTEM", "true"));
-        assert_eq!(env_vars[1], ("GIT_CONFIG_GLOBAL", "/dev/null"));
-        assert_eq!(env_vars[2], ("GIT_AUTHOR_NAME", "testuser"));
-        assert_eq!(env_vars[3], ("GIT_AUTHOR_EMAIL", "testuser@example.com"));
-        assert_eq!(env_vars[4], ("GIT_COMMITTER_NAME", "testuser"));
-        assert_eq!(env_vars[5], ("GIT_COMMITTER_EMAIL", "testuser@example.com"));
+        assert_eq!(env_vars.get(0).unwrap(), &("GIT_CONFIG_NOSYSTEM", "true"));
+        assert_eq!(
+            env_vars.get(1).unwrap(),
+            &("GIT_CONFIG_GLOBAL", "/dev/null")
+        );
+        assert_eq!(env_vars.get(2).unwrap(), &("GIT_AUTHOR_NAME", "testuser"));
+        assert_eq!(
+            env_vars.get(3).unwrap(),
+            &("GIT_AUTHOR_EMAIL", "testuser@example.com")
+        );
+        assert_eq!(
+            env_vars.get(4).unwrap(),
+            &("GIT_COMMITTER_NAME", "testuser")
+        );
+        assert_eq!(
+            env_vars.get(5).unwrap(),
+            &("GIT_COMMITTER_EMAIL", "testuser@example.com")
+        );
 
         // Verify values are not empty
         for (key, value) in &env_vars {

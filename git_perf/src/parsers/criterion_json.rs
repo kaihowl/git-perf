@@ -110,12 +110,16 @@ fn parse_benchmark_id(id: &str) -> (Option<String>, Option<String>, Option<Strin
 
     match parts.len() {
         0 => (None, None, None),
-        1 => (None, Some(parts[0].to_string()), None),
-        2 => (Some(parts[0].to_string()), Some(parts[1].to_string()), None),
+        1 => (None, parts.first().map(|s| s.to_string()), None),
+        2 => (
+            parts.first().map(|s| s.to_string()),
+            parts.get(1).map(|s| s.to_string()),
+            None,
+        ),
         _ => (
-            Some(parts[0].to_string()),
-            Some(parts[1].to_string()),
-            Some(parts[2..].join("/")),
+            parts.first().map(|s| s.to_string()),
+            parts.get(1).map(|s| s.to_string()),
+            parts.get(2..).map(|slice| slice.join("/")),
         ),
     }
 }
@@ -144,7 +148,7 @@ mod tests {
 
         assert_eq!(result.len(), 1);
 
-        if let ParsedMeasurement::Benchmark(bench) = &result[0] {
+        if let Some(ParsedMeasurement::Benchmark(bench)) = result.first() {
             assert_eq!(bench.id, "add_measurements/add_measurement/50");
             assert_eq!(bench.statistics.unit, "ns");
             assert_eq!(bench.statistics.mean_ns, Some(15456.78));
@@ -171,7 +175,7 @@ mod tests {
 
         assert_eq!(result.len(), 2);
 
-        if let ParsedMeasurement::Benchmark(bench) = &result[0] {
+        if let Some(ParsedMeasurement::Benchmark(bench)) = result.first() {
             assert_eq!(bench.id, "fibonacci_10");
             // us to ns conversion
             assert_eq!(bench.statistics.mean_ns, Some(1234.0));
@@ -239,7 +243,7 @@ mod tests {
         let parser = CriterionJsonParser;
         let result = parser.parse(json).unwrap();
 
-        if let ParsedMeasurement::Benchmark(bench) = &result[0] {
+        if let Some(ParsedMeasurement::Benchmark(bench)) = result.first() {
             assert_eq!(bench.statistics.unit, "ns");
             assert_eq!(bench.statistics.mean_ns, Some(15456.78));
         } else {

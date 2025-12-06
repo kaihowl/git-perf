@@ -102,6 +102,7 @@ impl Default for ChangePointConfig {
 ///
 /// # Returns
 /// Vector of indices where change points are detected
+#[must_use]
 pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) -> Vec<usize> {
     let n = measurements.len();
     if n < config.min_data_points {
@@ -127,26 +128,37 @@ pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) ->
         let (min_cost, best_tau) = r
             .iter()
             .map(|&tau| {
-                let cost = f[tau] + segment_cost(measurements, tau, t) + scaled_penalty;
+                let cost = f.get(tau).copied().unwrap_or(0.0)
+                    + segment_cost(measurements, tau, t)
+                    + scaled_penalty;
                 (cost, tau)
             })
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
             .unwrap();
 
-        f[t] = min_cost;
-        cp[t] = best_tau;
+        if let Some(f_t) = f.get_mut(t) {
+            *f_t = min_cost;
+        }
+        if let Some(cp_t) = cp.get_mut(t) {
+            *cp_t = best_tau;
+        }
 
         // Pruning step: remove candidates that can never be optimal
-        r.retain(|&tau| f[tau] + segment_cost(measurements, tau, t) <= min_cost);
+        r.retain(|&tau| {
+            f.get(tau).copied().unwrap_or(0.0) + segment_cost(measurements, tau, t) <= min_cost
+        });
         r.push(t);
     }
 
     // Backtrack to find change points
     let mut result = vec![];
     let mut current = n;
-    while cp[current] > 0 {
-        result.push(cp[current]);
-        current = cp[current];
+    while let Some(&cp_current) = cp.get(current) {
+        if cp_current == 0 {
+            break;
+        }
+        result.push(cp_current);
+        current = cp_current;
     }
     result.reverse();
     result
@@ -161,7 +173,11 @@ fn segment_cost(measurements: &[f64], start: usize, end: usize) -> f64 {
         return 0.0;
     }
 
-    let segment = &measurements[start..end];
+    let segment = measurements.get(start..end).unwrap_or(&[]);
+    if segment.is_empty() {
+        return 0.0;
+    }
+
     let mean_calc: Mean = segment.iter().collect();
     let mean = mean_calc.mean();
 
@@ -201,6 +217,7 @@ fn segment_mean_or_fallback(segment: &[f64], fallback: f64) -> f64 {
 ///
 /// # Returns
 /// Vector of ChangePoint structures with metadata
+#[must_use]
 pub fn enrich_change_points(
     indices: &[usize],
     measurements: &[f64],
@@ -219,8 +236,12 @@ pub fn enrich_change_points(
         // This is the segment between the previous change point (or start) and this one.
         // Example: if change points are at indices [10, 20, 30], and we're processing CP at 20:
         //   before_segment = measurements[10..20] (the regimen from previous CP to this CP)
-        let before_start = if i > 0 { indices[i - 1] } else { 0 };
-        let before_segment = &measurements[before_start..idx];
+        let before_start = if i > 0 {
+            indices.get(i - 1).copied().unwrap_or(0)
+        } else {
+            0
+        };
+        let before_segment = measurements.get(before_start..idx).unwrap_or(&[]);
         let before_mean =
             segment_mean_or_fallback(before_segment, measurements.first().copied().unwrap_or(0.0));
 
@@ -229,11 +250,11 @@ pub fn enrich_change_points(
         // Continuing example: if we're processing CP at 20:
         //   after_segment = measurements[20..30] (the regimen from this CP to next CP)
         let after_end = if i + 1 < indices.len() {
-            indices[i + 1]
+            indices.get(i + 1).copied().unwrap_or(measurements.len())
         } else {
             measurements.len()
         };
-        let after_segment = &measurements[idx..after_end];
+        let after_segment = measurements.get(idx..after_end).unwrap_or(&[]);
         let after_mean =
             segment_mean_or_fallback(after_segment, measurements.last().copied().unwrap_or(0.0));
 
@@ -275,11 +296,7 @@ pub fn enrich_change_points(
             continue;
         }
 
-        let commit_sha = if idx < commit_shas.len() {
-            commit_shas[idx].clone()
-        } else {
-            String::new()
-        };
+        let commit_sha = commit_shas.get(idx).cloned().unwrap_or_default();
 
         result.push(ChangePoint {
             index: idx,
@@ -355,16 +372,22 @@ fn calculate_confidence(index: usize, total_len: usize, magnitude_pct: f64) -> f
 ///
 /// # Returns
 /// Vector of EpochTransition structures
+#[must_use]
 pub fn detect_epoch_transitions(epochs: &[u32]) -> Vec<EpochTransition> {
     let mut transitions = vec![];
 
     for i in 1..epochs.len() {
-        if epochs[i] != epochs[i - 1] {
-            transitions.push(EpochTransition {
-                index: i,
-                from_epoch: epochs[i - 1],
-                to_epoch: epochs[i],
-            });
+        let current = epochs.get(i).copied();
+        let previous = epochs.get(i.wrapping_sub(1)).copied();
+
+        if let (Some(curr), Some(prev)) = (current, previous) {
+            if curr != prev {
+                transitions.push(EpochTransition {
+                    index: i,
+                    from_epoch: prev,
+                    to_epoch: curr,
+                });
+            }
         }
     }
 
@@ -372,6 +395,7 @@ pub fn detect_epoch_transitions(epochs: &[u32]) -> Vec<EpochTransition> {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -453,10 +477,11 @@ mod tests {
         let enriched = enrich_change_points(&indices, &measurements, &commit_shas, &config);
 
         assert_eq!(enriched.len(), 1);
-        assert_eq!(enriched[0].index, 5);
-        assert_eq!(enriched[0].commit_sha, "sha5");
-        assert!((enriched[0].magnitude_pct - 100.0).abs() < f64::EPSILON);
-        assert_eq!(enriched[0].direction, ChangeDirection::Increase);
+        let first = &enriched.first().unwrap();
+        assert_eq!(first.index, 5);
+        assert_eq!(first.commit_sha, "sha5");
+        assert!((first.magnitude_pct - 100.0).abs() < f64::EPSILON);
+        assert_eq!(first.direction, ChangeDirection::Increase);
     }
 
     #[test]
@@ -474,8 +499,9 @@ mod tests {
         let enriched = enrich_change_points(&indices, &measurements, &commit_shas, &config);
 
         assert_eq!(enriched.len(), 1);
-        assert_eq!(enriched[0].direction, ChangeDirection::Decrease);
-        assert!((enriched[0].magnitude_pct - (-50.0)).abs() < f64::EPSILON);
+        let first = &enriched.first().unwrap();
+        assert_eq!(first.direction, ChangeDirection::Decrease);
+        assert!((first.magnitude_pct - (-50.0)).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -501,12 +527,14 @@ mod tests {
         let transitions = detect_epoch_transitions(&epochs);
 
         assert_eq!(transitions.len(), 2);
-        assert_eq!(transitions[0].index, 3);
-        assert_eq!(transitions[0].from_epoch, 1);
-        assert_eq!(transitions[0].to_epoch, 2);
-        assert_eq!(transitions[1].index, 6);
-        assert_eq!(transitions[1].from_epoch, 2);
-        assert_eq!(transitions[1].to_epoch, 3);
+        let first = &transitions.first().unwrap();
+        assert_eq!(first.index, 3);
+        assert_eq!(first.from_epoch, 1);
+        assert_eq!(first.to_epoch, 2);
+        let second = &transitions.get(1).unwrap();
+        assert_eq!(second.index, 6);
+        assert_eq!(second.from_epoch, 2);
+        assert_eq!(second.to_epoch, 3);
     }
 
     #[test]
@@ -582,9 +610,10 @@ mod tests {
         // Detect epoch transitions
         let transitions = detect_epoch_transitions(&epochs);
         assert_eq!(transitions.len(), 1);
-        assert_eq!(transitions[0].index, 10);
-        assert_eq!(transitions[0].from_epoch, 1);
-        assert_eq!(transitions[0].to_epoch, 2);
+        let first = &transitions.first().unwrap();
+        assert_eq!(first.index, 10);
+        assert_eq!(first.from_epoch, 1);
+        assert_eq!(first.to_epoch, 2);
     }
 
     #[test]

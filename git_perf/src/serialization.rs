@@ -50,7 +50,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
         return None;
     }
 
-    let epoch = components[0];
+    let epoch = components.first()?;
     let epoch = match epoch.parse::<u32>() {
         Ok(e) => e,
         Err(err) => {
@@ -59,9 +59,9 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
         }
     };
 
-    let name = components[1].to_string();
+    let name = components.get(1)?.to_string();
 
-    let timestamp = components[2];
+    let timestamp = components.get(2)?;
     let timestamp = match timestamp.parse::<f64>() {
         Ok(ts) => ts,
         Err(err) => {
@@ -70,7 +70,7 @@ fn deserialize_single(line: &str) -> Option<MeasurementData> {
         }
     };
 
-    let val = components[3];
+    let val = components.get(3)?;
     let val = match val.parse::<f64>() {
         Ok(val) => val,
         Err(err) => {
@@ -154,7 +154,7 @@ mod test {
             .into(),
         };
         assert_eq!(actual.len(), 1);
-        assert_eq!(actual[0], expected);
+        assert_eq!(actual.first().unwrap(), &expected);
     }
 
     #[test]
@@ -307,7 +307,7 @@ mod test {
         let deserialized_vec = deserialize(&serialized);
 
         assert_eq!(deserialized_vec.len(), 1);
-        let deserialized = &deserialized_vec[0];
+        let deserialized = deserialized_vec.first().unwrap();
 
         assert_eq!(deserialized.epoch, original.epoch);
         assert_eq!(deserialized.name, original.name);
@@ -324,8 +324,8 @@ mod test {
         );
         let results = deserialize(&lines);
         assert_eq!(results.len(), 2);
-        assert_eq!(results[0].name, "test1");
-        assert_eq!(results[1].name, "test2");
+        assert_eq!(results.first().unwrap().name, "test1");
+        assert_eq!(results.get(1).unwrap().name, "test2");
     }
 
     #[test]

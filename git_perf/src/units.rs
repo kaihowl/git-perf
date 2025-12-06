@@ -37,6 +37,7 @@ pub fn parse_value_with_unit(value: f64, unit_str: &str) -> Result<Measurement, 
 }
 
 /// Format measurement with auto-scaling using human-repr
+#[must_use]
 pub fn format_measurement(measurement: Measurement) -> String {
     match measurement {
         Measurement::Duration(d) => d.human_duration().to_string(),
@@ -95,11 +96,14 @@ fn parse_data_size(value: f64, unit: &str) -> Result<u64, String> {
 /// Helper: Parse data rate from value + unit (e.g., KB/s, MB/s)
 fn parse_data_rate(value: f64, unit_with_rate: &str) -> Result<f64, String> {
     let parts: Vec<&str> = unit_with_rate.split('/').collect();
-    if parts.len() != 2 || parts[1] != "s" {
+    if parts.len() != 2 || parts.get(1).copied() != Some("s") {
         return Err("Invalid rate format".to_string());
     }
 
-    let multiplier = match parts[0].to_lowercase().as_str() {
+    let unit_part = parts
+        .first()
+        .ok_or_else(|| "Missing unit part".to_string())?;
+    let multiplier = match unit_part.to_lowercase().as_str() {
         "b" => 1.0,
         "kb" => 1_000.0,
         "mb" => 1_000_000.0,
@@ -107,7 +111,7 @@ fn parse_data_rate(value: f64, unit_with_rate: &str) -> Result<f64, String> {
         "kib" => 1_024.0,
         "mib" => 1_048_576.0,
         "gib" => 1_073_741_824.0,
-        _ => return Err(format!("Unknown unit: {}", parts[0])),
+        _ => return Err(format!("Unknown unit: {}", unit_part)),
     };
 
     Ok(value * multiplier)
