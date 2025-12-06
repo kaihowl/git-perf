@@ -150,14 +150,15 @@ pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()
     if !conf.contains_key("measurement") {
         conf["measurement"] = Item::Table(Table::new());
     }
-    if let Some(measurement_table) = conf.get("measurement").and_then(|m| m.as_table()) {
-        if !measurement_table.contains_key(measurement) {
-            conf["measurement"][measurement] = Item::Table(Table::new());
-        }
+    if !conf["measurement"]
+        .as_table()
+        .unwrap()
+        .contains_key(measurement)
+    {
+        conf["measurement"][measurement] = Item::Table(Table::new());
     }
 
-    let epoch_str = head_revision.get(0..8).unwrap_or(&head_revision);
-    conf["measurement"][measurement]["epoch"] = value(epoch_str);
+    conf["measurement"][measurement]["epoch"] = value(&head_revision[0..8]);
     *conf_str = conf.to_string();
 
     Ok(())

@@ -838,19 +838,19 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
         lines.push("commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit".to_string());
 
         // Add raw measurements
+        // Note: indices come from add_trace and must correspond to valid commits
+        #[allow(clippy::indexing_slicing)]
         for (index, measurement_data) in &self.indexed_measurements {
-            let Some(commit) = self.hashes.get(*index) else {
-                continue;
-            };
+            let commit = &self.hashes[*index];
             let row = CsvMeasurementRow::from_measurement(commit, measurement_data);
             lines.push(row.to_csv_line());
         }
 
         // Add summarized measurements
+        // Note: indices come from add_summarized_trace and must correspond to valid commits
+        #[allow(clippy::indexing_slicing)]
         for (index, measurement_name, group_value, summary) in &self.summarized_measurements {
-            let Some(commit) = self.hashes.get(*index) else {
-                continue;
-            };
+            let commit = &self.hashes[*index];
             let row = CsvMeasurementRow::from_summary(
                 commit,
                 measurement_name,

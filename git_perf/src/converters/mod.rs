@@ -190,17 +190,10 @@ fn convert_benchmark(
     // Parse benchmark ID to extract group, name, and optional input
     // Format: "group/name/input" or "group/name"
     let parts: Vec<&str> = bench.id.split('/').collect();
+    #[allow(clippy::indexing_slicing)] // Index access is safe within match arms
     let (group, bench_name, input) = match parts.len() {
-        2 => (
-            parts.first().copied().unwrap_or("unknown"),
-            parts.get(1).copied().unwrap_or(&bench.id),
-            None,
-        ),
-        3 => (
-            parts.first().copied().unwrap_or("unknown"),
-            parts.get(1).copied().unwrap_or(&bench.id),
-            parts.get(2).copied(),
-        ),
+        2 => (parts[0], parts[1], None),
+        3 => (parts[0], parts[1], Some(parts[2])),
         _ => {
             // Fallback: use full ID as bench_name
             ("unknown", bench.id.as_str(), None)

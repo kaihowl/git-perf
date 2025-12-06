@@ -108,18 +108,15 @@ impl CriterionMessage {
 fn parse_benchmark_id(id: &str) -> (Option<String>, Option<String>, Option<String>) {
     let parts: Vec<&str> = id.split('/').collect();
 
+    #[allow(clippy::indexing_slicing)] // Index access is safe within match arms
     match parts.len() {
         0 => (None, None, None),
-        1 => (None, parts.first().map(|s| s.to_string()), None),
-        2 => (
-            parts.first().map(|s| s.to_string()),
-            parts.get(1).map(|s| s.to_string()),
-            None,
-        ),
+        1 => (None, Some(parts[0].to_string()), None),
+        2 => (Some(parts[0].to_string()), Some(parts[1].to_string()), None),
         _ => (
-            parts.first().map(|s| s.to_string()),
-            parts.get(1).map(|s| s.to_string()),
-            parts.get(2..).map(|slice| slice.join("/")),
+            Some(parts[0].to_string()),
+            Some(parts[1].to_string()),
+            Some(parts[2..].join("/")),
         ),
     }
 }

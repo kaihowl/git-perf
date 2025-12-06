@@ -124,44 +124,38 @@ pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) ->
     // R = candidate set for pruning
     let mut r = vec![0usize];
 
+    // PELT algorithm loop - all indexing is safe by algorithm invariants
+    #[allow(clippy::indexing_slicing)]
     for t in 1..=n {
         let (min_cost, best_tau) = r
             .iter()
             .map(|&tau| {
-                let cost = f.get(tau).copied().unwrap_or(0.0)
-                    + segment_cost(measurements, tau, t)
-                    + scaled_penalty;
+                let cost = f[tau] + segment_cost(measurements, tau, t) + scaled_penalty;
                 (cost, tau)
             })
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
             .unwrap();
 
-        if let Some(f_t) = f.get_mut(t) {
-            *f_t = min_cost;
-        }
-        if let Some(cp_t) = cp.get_mut(t) {
-            *cp_t = best_tau;
-        }
+        f[t] = min_cost;
+        cp[t] = best_tau;
 
         // Pruning step: remove candidates that can never be optimal
-        r.retain(|&tau| {
-            f.get(tau).copied().unwrap_or(0.0) + segment_cost(measurements, tau, t) <= min_cost
-        });
+        r.retain(|&tau| f[tau] + segment_cost(measurements, tau, t) <= min_cost);
         r.push(t);
     }
 
-    // Backtrack to find change points
-    let mut result = vec![];
-    let mut current = n;
-    while let Some(&cp_current) = cp.get(current) {
-        if cp_current == 0 {
-            break;
+    // Backtrack to find change points - indexing is safe by algorithm invariants
+    #[allow(clippy::indexing_slicing)]
+    {
+        let mut result = vec![];
+        let mut current = n;
+        while cp[current] > 0 {
+            result.push(cp[current]);
+            current = cp[current];
         }
-        result.push(cp_current);
-        current = cp_current;
+        result.reverse();
+        result
     }
-    result.reverse();
-    result
 }
 
 /// Calculate the cost of a segment assuming Gaussian distribution.
@@ -173,11 +167,8 @@ fn segment_cost(measurements: &[f64], start: usize, end: usize) -> f64 {
         return 0.0;
     }
 
-    let segment = measurements.get(start..end).unwrap_or(&[]);
-    if segment.is_empty() {
-        return 0.0;
-    }
-
+    #[allow(clippy::indexing_slicing)] // Called by PELT with validated indices
+    let segment = &measurements[start..end];
     let mean_calc: Mean = segment.iter().collect();
     let mean = mean_calc.mean();
 
@@ -236,12 +227,10 @@ pub fn enrich_change_points(
         // This is the segment between the previous change point (or start) and this one.
         // Example: if change points are at indices [10, 20, 30], and we're processing CP at 20:
         //   before_segment = measurements[10..20] (the regimen from previous CP to this CP)
-        let before_start = if i > 0 {
-            indices.get(i - 1).copied().unwrap_or(0)
-        } else {
-            0
-        };
-        let before_segment = measurements.get(before_start..idx).unwrap_or(&[]);
+        #[allow(clippy::indexing_slicing)] // i is valid loop index, bounds checked above
+        let before_start = if i > 0 { indices[i - 1] } else { 0 };
+        #[allow(clippy::indexing_slicing)] // idx from indices, bounds checked above
+        let before_segment = &measurements[before_start..idx];
         let before_mean =
             segment_mean_or_fallback(before_segment, measurements.first().copied().unwrap_or(0.0));
 
@@ -249,12 +238,14 @@ pub fn enrich_change_points(
         // This is the segment between this change point and the next one (or end).
         // Continuing example: if we're processing CP at 20:
         //   after_segment = measurements[20..30] (the regimen from this CP to next CP)
+        #[allow(clippy::indexing_slicing)] // i+1 bounds checked, indices validated above
         let after_end = if i + 1 < indices.len() {
-            indices.get(i + 1).copied().unwrap_or(measurements.len())
+            indices[i + 1]
         } else {
             measurements.len()
         };
-        let after_segment = measurements.get(idx..after_end).unwrap_or(&[]);
+        #[allow(clippy::indexing_slicing)] // idx and after_end validated above
+        let after_segment = &measurements[idx..after_end];
         let after_mean =
             segment_mean_or_fallback(after_segment, measurements.last().copied().unwrap_or(0.0));
 

@@ -396,7 +396,7 @@ mod tests {
         assert_eq!(env_vars.len(), 6);
 
         // Check each variable
-        assert_eq!(env_vars.get(0).unwrap(), &("GIT_CONFIG_NOSYSTEM", "true"));
+        assert_eq!(env_vars.first().unwrap(), &("GIT_CONFIG_NOSYSTEM", "true"));
         assert_eq!(
             env_vars.get(1).unwrap(),
             &("GIT_CONFIG_GLOBAL", "/dev/null")
