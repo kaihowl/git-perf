@@ -1290,6 +1290,7 @@ fn add_trace_for_measurement_group<'a>(
 /// * `detect_changes` - Whether to detect and display change points
 /// * `reverse_for_display` - Whether to reverse data before detection (needed for correct results)
 /// * `change_point_config_fn` - Function to retrieve change point config
+#[allow(clippy::too_many_arguments)]
 fn add_change_point_and_epoch_traces<F>(
     reporter: &mut dyn Reporter,
     commit_indices: &[usize],
@@ -1430,7 +1431,7 @@ fn process_measurement_group<'a, F>(
         reporter,
         group_measurements.clone(),
         measurement_name,
-        group_value,
+        &group_value,
         aggregate_by,
     );
 
@@ -1452,7 +1453,7 @@ fn process_measurement_group<'a, F>(
             &epochs,
             &commit_shas,
             measurement_name,
-            group_value,
+            &group_value,
             show_epochs,
             detect_changes,
             reverse_for_display,
@@ -1685,23 +1686,28 @@ pub fn report(
         plot.set_template_and_metadata(template, metadata);
     }
 
-    let relevant = |m: &MeasurementData| {
-        // Apply regex filters (handles both exact measurement matches and filter patterns)
-        if !crate::filter::matches_any_filter(&m.name, &filters) {
-            return false;
-        }
-
-        // Filter using subset relation: key_values ⊆ measurement.key_values
-        m.key_values_is_superset_of(key_values)
-    };
-
-    let relevant_measurements = commits
+    // Filter measurements and collect to avoid lifetime issues with the closure
+    let relevant_measurements: Vec<Vec<&MeasurementData>> = commits
         .iter()
-        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+        .map(|commit| {
+            commit
+                .measurements
+                .iter()
+                .filter(|m| {
+                    // Apply regex filters (handles both exact measurement matches and filter patterns)
+                    if !crate::filter::matches_any_filter(&m.name, &filters) {
+                        return false;
+                    }
+                    // Filter using subset relation: key_values ⊆ measurement.key_values
+                    m.key_values_is_superset_of(key_values)
+                })
+                .collect()
+        })
+        .collect();
 
     let unique_measurement_names: Vec<_> = relevant_measurements
-        .clone()
-        .flat_map(|m| m.map(|m| &m.name))
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
         .unique()
         .collect();
 
@@ -1710,30 +1716,77 @@ pub fn report(
     }
 
     for measurement_name in unique_measurement_names {
-        let filtered_measurements = relevant_measurements
-            .clone()
-            .map(|ms| ms.filter(|m| m.name == *measurement_name));
+        // Get group values first
+        let filtered_for_grouping = relevant_measurements
+            .iter()
+            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
 
         let group_values_to_process = compute_group_values_to_process(
-            filtered_measurements.clone(),
+            filtered_for_grouping,
             &separate_by,
             &format!("Measurement '{}'", measurement_name),
         )?;
 
         for group_value in group_values_to_process {
-            process_measurement_group(
+            // Filter and collect measurements directly from relevant_measurements
+            let group_measurements: Vec<Vec<&MeasurementData>> = relevant_measurements
+                .iter()
+                .map(|ms| {
+                    ms.iter()
+                        .filter(|m| {
+                            // Filter by measurement name
+                            if m.name != *measurement_name {
+                                return false;
+                            }
+                            // Filter by group value
+                            if group_value.is_empty() {
+                                return true;
+                            }
+                            separate_by.iter().zip(group_value.iter()).all(
+                                |(key, expected_val)| {
+                                    m.key_values.get(key).map(|v| v == expected_val).unwrap_or(false)
+                                },
+                            )
+                        })
+                        .copied()
+                        .collect()
+                })
+                .collect();
+
+            // Add trace visualization
+            add_trace_for_measurement_group(
                 &mut *plot,
-                filtered_measurements.clone(),
-                &commits,
+                group_measurements.iter().map(|v| v.iter().copied()),
                 measurement_name,
                 &group_value,
-                &separate_by,
                 aggregate_by,
-                show_epochs,
-                detect_changes,
-                true, // reverse_for_display=true (existing behavior)
-                crate::config::change_point_config, // Per-measurement config
             );
+
+            // Add change points and epochs if requested
+            if show_epochs || detect_changes {
+                let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+
+                let (commit_indices, values, epochs, commit_shas) =
+                    collect_measurement_data_for_change_detection(
+                        group_measurements.iter().map(|v| v.iter().copied()),
+                        &commits,
+                        reduction_func,
+                    );
+
+                add_change_point_and_epoch_traces(
+                    &mut *plot,
+                    &commit_indices,
+                    &values,
+                    &epochs,
+                    &commit_shas,
+                    measurement_name,
+                    &group_value,
+                    show_epochs,
+                    detect_changes,
+                    true, // reverse_for_display=true (existing behavior)
+                    crate::config::change_point_config, // Per-measurement config
+                );
+            }
         }
     }
 
