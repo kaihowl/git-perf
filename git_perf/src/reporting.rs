@@ -1345,11 +1345,10 @@ fn generate_section_plot(
                         );
                         reporter.add_change_points(
                             &change_points,
+                            &values,
                             &commit_indices,
                             measurement_name,
                             &group_value,
-                            y_min,
-                            y_max,
                         );
                     }
                 }
