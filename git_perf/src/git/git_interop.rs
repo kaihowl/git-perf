@@ -648,7 +648,7 @@ fn git_push_notes_ref(
             print!("{}", &output.stdout);
             Ok(())
         }
-        Err(GitError::ExecError { command: _, output }) => {
+        Err(GitError::ExecError { output, .. }) => {
             let successful_push = output.stdout.lines().any(|l| {
                 l.contains(format!("{REFS_NOTES_BRANCH}:").as_str()) && !l.starts_with('!')
             });
@@ -732,6 +732,7 @@ pub struct ReadBranchGuard {
 
 impl ReadBranchGuard {
     /// Get the reference name for use in git commands
+    #[must_use]
     pub fn ref_name(&self) -> &str {
         &self.temp_ref.ref_name
     }
