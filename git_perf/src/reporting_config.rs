@@ -39,7 +39,7 @@ pub struct ReportTemplateConfig {
 pub struct SectionConfig {
     /// Section identifier (e.g., "test-overview", "bench-median")
     pub id: String,
-    /// Original placeholder text to replace (e.g., "{{SECTION[id] param: value }}")
+    /// Original placeholder text to replace (e.g., "{{SECTION\[id\] param: value }}")
     pub placeholder: String,
     /// Regex pattern for selecting measurements
     pub measurement_filter: Option<String>,
@@ -59,7 +59,7 @@ pub struct SectionConfig {
 
 impl SectionConfig {
     /// Parse a single section placeholder into a SectionConfig
-    /// Format: {{SECTION[id] param: value, param2: value2 }}
+    /// Format: {{SECTION\[id\] param: value, param2: value2 }}
     pub fn parse(placeholder: &str) -> Result<Self> {
         // Use cached regex to extract section ID and parameters
         let section_regex = section_placeholder_regex();
