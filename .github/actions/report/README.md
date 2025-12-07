@@ -211,30 +211,6 @@ This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### Using Custom Templates
-
-By default, the action uses the professional `performance-overview.html` template. You can specify a different template:
-
-```yaml
-# Use a different template
-- uses: kaihowl/git-perf/.github/actions/report@master
-  with:
-    template: '.git-perf/templates/simple-dashboard.html'
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-
-# Disable template to use default single-plot report
-- uses: kaihowl/git-perf/.github/actions/report@master
-  with:
-    template: ''
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-**Available Templates:**
-- `performance-overview.html` (default) - Professional multi-section dashboard with styling
-- `simple-dashboard.html` - Basic multi-section template
-- `dashboard-example.html` - Comprehensive example template
-- Leave empty (`''`) to generate a single-plot report without templates
-
 ### Multi-Workflow Coordination
 
 When combining performance reports with existing documentation (MkDocs, Jekyll, etc.), use proper concurrency control:
