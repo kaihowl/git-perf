@@ -193,6 +193,22 @@ const EPOCH_MARKER_COLOR: &str = "gray";
 /// Line width for epoch markers (vertical dashed lines).
 const EPOCH_MARKER_LINE_WIDTH: f64 = 2.0;
 
+/// Default HTML template used when no custom template is provided.
+/// Replicates the behavior of plotly.rs's to_html() method while maintaining
+/// consistency with the template-based approach.
+const DEFAULT_HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{TITLE}}</title>
+    {{PLOTLY_HEAD}}
+    <style>{{CUSTOM_CSS}}</style>
+</head>
+<body>
+    {{PLOTLY_BODY}}
+</body>
+</html>"#;
+
 /// Formats a measurement name with its configured unit, if available.
 /// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
 fn format_measurement_with_unit(measurement_name: &str) -> String {
@@ -775,13 +791,21 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             self.plot.clone()
         };
 
-        // Apply template if available
-        if let (Some(template), Some(metadata)) = (&self.template, &self.metadata) {
-            apply_template(template, &final_plot, metadata)
-        } else {
-            // No template: generate standalone HTML file
-            final_plot.to_html().as_bytes().to_vec()
-        }
+        // Always use template approach for consistency
+        // If no custom template is provided, use the default template
+        let template = self.template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
+
+        // Use metadata if available, otherwise create a minimal default
+        let default_metadata = ReportMetadata {
+            title: "Performance Measurements".to_string(),
+            custom_css: String::new(),
+            timestamp: String::new(),
+            commit_range: String::new(),
+            depth: 0,
+        };
+        let metadata = self.metadata.as_ref().unwrap_or(&default_metadata);
+
+        apply_template(template, &final_plot, metadata)
     }
 
     fn set_template_and_metadata(&mut self, template: Option<String>, metadata: ReportMetadata) {
@@ -1243,6 +1267,25 @@ mod tests {
         assert!(!bytes.is_empty());
         // HTML output should contain plotly-related content
         let html = String::from_utf8_lossy(&bytes);
+        assert!(html.contains("plotly") || html.contains("Plotly"));
+    }
+
+    #[test]
+    fn test_plotly_reporter_uses_default_template() {
+        let reporter = PlotlyReporter::new();
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+
+        // Verify default template structure is present
+        assert!(html.contains("<!DOCTYPE html>"));
+        assert!(html.contains("<html>"));
+        assert!(html.contains("<head>"));
+        assert!(html.contains("<title>Performance Measurements</title>"));
+        assert!(html.contains("</head>"));
+        assert!(html.contains("<body>"));
+        assert!(html.contains("</body>"));
+        assert!(html.contains("</html>"));
+        // Verify plotly content is embedded
         assert!(html.contains("plotly") || html.contains("Plotly"));
     }
 
