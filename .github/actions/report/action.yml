@@ -59,9 +59,9 @@ inputs:
     required: false
     default: 'false'
   template:
-    description: 'Path to custom report template (relative to repo root). If empty, uses performance-overview.html'
+    description: 'Path to custom report template (relative to repo root). If empty, uses no template.'
     required: false
-    default: '.git-perf/templates/performance-overview.html'
+    default: ''
 
 outputs:
   report-url:
