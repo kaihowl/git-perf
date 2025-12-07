@@ -3,7 +3,6 @@ use std::{
     fs::{self, File},
     io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
-    sync::OnceLock,
 };
 
 use anyhow::anyhow;
@@ -21,39 +20,12 @@ use crate::{
     config,
     data::{Commit, MeasurementData, MeasurementSummary},
     measurement_retrieval::{self, MeasurementReducer},
+    reporting_config::{parse_template_sections, SectionConfig},
     stats::ReductionFunc,
 };
 
-use regex::Regex;
-
-/// Cached regex for parsing section placeholders (compiled once)
-static SECTION_PLACEHOLDER_REGEX: OnceLock<Regex> = OnceLock::new();
-
-/// Cached regex for finding all section blocks in a template (compiled once)
-static SECTION_FINDER_REGEX: OnceLock<Regex> = OnceLock::new();
-
-/// Get or compile the section placeholder parsing regex
-fn section_placeholder_regex() -> &'static Regex {
-    SECTION_PLACEHOLDER_REGEX.get_or_init(|| {
-        Regex::new(r"(?s)\{\{SECTION\[([^\]]+)\](.*?)\}\}")
-            .expect("Invalid section placeholder regex pattern")
-    })
-}
-
-/// Get or compile the section finder regex
-fn section_finder_regex() -> &'static Regex {
-    SECTION_FINDER_REGEX.get_or_init(|| {
-        Regex::new(r"(?s)\{\{SECTION\[[^\]]+\].*?\}\}")
-            .expect("Invalid section finder regex pattern")
-    })
-}
-
-/// Configuration for report templates
-pub struct ReportTemplateConfig {
-    pub template_path: Option<PathBuf>,
-    pub custom_css_path: Option<PathBuf>,
-    pub title: Option<String>,
-}
+// Re-export for backwards compatibility with CLI
+pub use crate::reporting_config::ReportTemplateConfig;
 
 /// Metadata for rendering report templates
 struct ReportMetadata {
@@ -99,191 +71,25 @@ impl ReportMetadata {
     }
 }
 
-/// Configuration for a single report section in a multi-section template
-#[derive(Debug, Clone)]
-struct SectionConfig {
-    /// Section identifier (e.g., "test-overview", "bench-median")
-    id: String,
-    /// Original placeholder text to replace (e.g., "{{SECTION[id] param: value }}")
-    placeholder: String,
-    /// Regex pattern for selecting measurements
-    measurement_filter: Option<String>,
-    /// Key-value pairs to match (e.g., os=linux,arch=x64)
-    key_value_filter: Vec<(String, String)>,
-    /// Metadata keys to split traces by (e.g., ["os", "arch"])
-    separate_by: Vec<String>,
-    /// Aggregation function (none means raw data)
-    aggregate_by: Option<ReductionFunc>,
-    /// Number of commits (overrides global depth)
-    depth: Option<usize>,
-    /// Section-specific title for the chart (parsed but not yet used in display)
-    #[allow(dead_code)]
-    title: Option<String>,
-    /// Show epoch boundaries for this section
+/// Parameters for change point and epoch detection
+struct ChangePointDetectionParams<'a> {
+    commit_indices: &'a [usize],
+    values: &'a [f64],
+    epochs: &'a [u32],
+    commit_shas: &'a [String],
+    measurement_name: &'a str,
+    group_values: &'a [String],
     show_epochs: bool,
-    /// Detect and show change points for this section
     detect_changes: bool,
 }
 
-impl SectionConfig {
-    /// Parse a single section placeholder into a SectionConfig
-    /// Format: {{SECTION[id] param: value, param2: value2 }}
-    fn parse(placeholder: &str) -> Result<Self> {
-        // Use cached regex to extract section ID and parameters
-        let section_regex = section_placeholder_regex();
-
-        let captures = section_regex
-            .captures(placeholder)
-            .ok_or_else(|| anyhow!("Invalid section placeholder format: {}", placeholder))?;
-
-        let id = captures
-            .get(1)
-            .expect("Regex capture group 1 (section ID) must exist")
-            .as_str()
-            .trim()
-            .to_string();
-        let params_str = captures
-            .get(2)
-            .expect("Regex capture group 2 (parameters) must exist")
-            .as_str()
-            .trim();
-
-        // Parse parameters
-        let mut measurement_filter = None;
-        let mut key_value_filter = Vec::new();
-        let mut separate_by = Vec::new();
-        let mut aggregate_by = None;
-        let mut depth = None;
-        let mut title = None;
-        let mut show_epochs = false;
-        let mut detect_changes = false;
-
-        if !params_str.is_empty() {
-            // Split by newlines and trim each line
-            for line in params_str.lines() {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
-
-                // Parse "param: value" format
-                if let Some((key, value)) = line.split_once(':') {
-                    let key = key.trim();
-                    let value = value.trim();
-
-                    match key {
-                        "measurement-filter" => {
-                            measurement_filter = Some(value.to_string());
-                        }
-                        "key-value-filter" => {
-                            // Parse comma-separated key=value pairs
-                            for pair in value.split(',') {
-                                let pair = pair.trim();
-                                if let Some((k, v)) = pair.split_once('=') {
-                                    let k = k.trim();
-                                    let v = v.trim();
-                                    if k.is_empty() {
-                                        bail!("Empty key in key-value-filter: '{}'", pair);
-                                    }
-                                    if v.is_empty() {
-                                        bail!("Empty value in key-value-filter: '{}'", pair);
-                                    }
-                                    key_value_filter.push((k.to_string(), v.to_string()));
-                                } else {
-                                    bail!("Invalid key-value-filter format: {}", pair);
-                                }
-                            }
-                        }
-                        "separate-by" => {
-                            // Parse comma-separated list
-                            separate_by = value
-                                .split(',')
-                                .map(|s| s.trim().to_string())
-                                .filter(|s| !s.is_empty())
-                                .collect();
-                        }
-                        "aggregate-by" => {
-                            aggregate_by = match value {
-                                "none" => None,
-                                "min" => Some(ReductionFunc::Min),
-                                "max" => Some(ReductionFunc::Max),
-                                "median" => Some(ReductionFunc::Median),
-                                "mean" => Some(ReductionFunc::Mean),
-                                _ => bail!("Invalid aggregate-by value: {}", value),
-                            };
-                        }
-                        "depth" => {
-                            depth = Some(
-                                value
-                                    .parse::<usize>()
-                                    .map_err(|_| anyhow!("Invalid depth value: {}", value))?,
-                            );
-                        }
-                        "title" => {
-                            title = Some(value.to_string());
-                        }
-                        "show-epochs" => {
-                            show_epochs = match value.to_lowercase().as_str() {
-                                "true" | "yes" | "1" => true,
-                                "false" | "no" | "0" => false,
-                                _ => bail!("Invalid show-epochs value: {} (use true/false)", value),
-                            };
-                        }
-                        "detect-changes" => {
-                            detect_changes = match value.to_lowercase().as_str() {
-                                "true" | "yes" | "1" => true,
-                                "false" | "no" | "0" => false,
-                                _ => bail!(
-                                    "Invalid detect-changes value: {} (use true/false)",
-                                    value
-                                ),
-                            };
-                        }
-                        _ => {
-                            // Unknown parameter - ignore or warn
-                            log::warn!("Unknown section parameter: {}", key);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(SectionConfig {
-            id,
-            placeholder: placeholder.to_string(),
-            measurement_filter,
-            key_value_filter,
-            separate_by,
-            aggregate_by,
-            depth,
-            title,
-            show_epochs,
-            detect_changes,
-        })
-    }
-}
-
-/// Parse all section placeholders from a template
-fn parse_template_sections(template: &str) -> Result<Vec<SectionConfig>> {
-    // Use cached regex to find all {{SECTION[...] ...}} blocks
-    let section_regex = section_finder_regex();
-
-    let mut sections = Vec::new();
-    let mut seen_ids = std::collections::HashSet::new();
-
-    for captures in section_regex.find_iter(template) {
-        let placeholder = captures.as_str();
-        let section = SectionConfig::parse(placeholder)?;
-
-        // Check for duplicate section IDs
-        if !seen_ids.insert(section.id.clone()) {
-            bail!("Duplicate section ID found: {}", section.id);
-        }
-
-        sections.push(section);
-    }
-
-    Ok(sections)
+/// Parameters for processing a measurement group
+struct MeasurementGroupParams {
+    group_value: Vec<String>,
+    separate_by: Vec<String>,
+    aggregate_by: Option<ReductionFunc>,
+    show_epochs: bool,
+    detect_changes: bool,
 }
 
 /// Extract Plotly JavaScript dependencies and plot content
@@ -1273,104 +1079,89 @@ fn add_trace_for_measurement_group<'a>(
 /// Add change point and epoch boundary annotations to a reporter.
 ///
 /// This function handles:
-/// - Data reversal for plotly's reversed axis display (when reverse_for_display=true)
+/// - Data reversal for plotly's reversed axis display
 /// - Epoch transition detection and visualization
 /// - Change point detection with configurable config
 /// - Adding visualization traces via the Reporter trait
 ///
+/// Data is always reversed because plotly doesn't support reversed axes natively,
+/// so we manually reverse the data to display newest commits on the right.
+/// This ensures change point direction matches visual interpretation.
+///
 /// # Arguments
 /// * `reporter` - Mutable reference to any Reporter implementation
-/// * `commit_indices` - Indices of commits with measurements
-/// * `values` - Measurement values (one per commit)
-/// * `epochs` - Epoch numbers (one per commit)
-/// * `commit_shas` - Commit SHAs (one per commit)
-/// * `measurement_name` - Name of the measurement for config lookup
-/// * `group_values` - Grouping metadata for legend display
-/// * `show_epochs` - Whether to detect and display epoch boundaries
-/// * `detect_changes` - Whether to detect and display change points
-/// * `reverse_for_display` - Whether to reverse data before detection (needed for correct results)
+/// * `params` - Detection parameters (indices, values, epochs, etc.)
 /// * `change_point_config_fn` - Function to retrieve change point config
-#[allow(clippy::too_many_arguments)]
 fn add_change_point_and_epoch_traces<F>(
     reporter: &mut dyn Reporter,
-    commit_indices: &[usize],
-    values: &[f64],
-    epochs: &[u32],
-    commit_shas: &[String],
-    measurement_name: &str,
-    group_values: &[String],
-    show_epochs: bool,
-    detect_changes: bool,
-    reverse_for_display: bool,
+    params: ChangePointDetectionParams,
     change_point_config_fn: F,
 ) where
     F: Fn(&str) -> crate::change_point::ChangePointConfig,
 {
-    if values.is_empty() {
+    if params.values.is_empty() {
         return;
     }
 
     log::debug!(
         "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
-        measurement_name,
-        values.len(),
-        commit_indices,
-        epochs
+        params.measurement_name,
+        params.values.len(),
+        params.commit_indices,
+        params.epochs
     );
 
     // Calculate y-axis bounds for vertical lines (10% padding)
-    let y_min = values.iter().copied().fold(f64::INFINITY, f64::min) * 0.9;
-    let y_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max) * 1.1;
+    let y_min = params.values.iter().copied().fold(f64::INFINITY, f64::min) * 0.9;
+    let y_max = params
+        .values
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max)
+        * 1.1;
 
-    // Conditionally reverse data based on display requirements
+    // Reverse data for display
     // Reversal is needed because plotly doesn't support reversed axes natively,
     // so we manually reverse the data to display newest commits on the right.
     // This ensures change point direction matches visual interpretation.
-    let (indices, vals, eps, shas) = if reverse_for_display {
-        (
-            commit_indices.iter().rev().cloned().collect::<Vec<_>>(),
-            values.iter().rev().cloned().collect::<Vec<_>>(),
-            epochs.iter().rev().cloned().collect::<Vec<_>>(),
-            commit_shas.iter().rev().cloned().collect::<Vec<_>>(),
-        )
-    } else {
-        (
-            commit_indices.to_vec(),
-            values.to_vec(),
-            epochs.to_vec(),
-            commit_shas.to_vec(),
-        )
-    };
+    let indices: Vec<usize> = params.commit_indices.iter().rev().copied().collect();
+    let vals: Vec<f64> = params.values.iter().rev().copied().collect();
+    let eps: Vec<u32> = params.epochs.iter().rev().copied().collect();
+    let shas: Vec<String> = params.commit_shas.iter().rev().cloned().collect();
 
     // Add epoch boundary traces if requested
-    if show_epochs {
+    if params.show_epochs {
         let transitions = crate::change_point::detect_epoch_transitions(&eps);
         log::debug!(
             "Epoch transitions for {}: {:?}",
-            measurement_name,
+            params.measurement_name,
             transitions
         );
         reporter.add_epoch_boundaries(
             &transitions,
             &indices,
-            measurement_name,
-            group_values,
+            params.measurement_name,
+            params.group_values,
             y_min,
             y_max,
         );
     }
 
     // Add change point traces if requested
-    if detect_changes {
-        let config = change_point_config_fn(measurement_name);
+    if params.detect_changes {
+        let config = change_point_config_fn(params.measurement_name);
         let raw_cps = crate::change_point::detect_change_points(&vals, &config);
-        log::debug!("Raw change points for {}: {:?}", measurement_name, raw_cps);
+        log::debug!(
+            "Raw change points for {}: {:?}",
+            params.measurement_name,
+            raw_cps
+        );
 
         let enriched_cps =
             crate::change_point::enrich_change_points(&raw_cps, &vals, &shas, &config);
         log::debug!(
             "Enriched change points for {}: {:?}",
-            measurement_name,
+            params.measurement_name,
             enriched_cps
         );
 
@@ -1378,8 +1169,8 @@ fn add_change_point_and_epoch_traces<F>(
             &enriched_cps,
             &vals,
             &indices,
-            measurement_name,
-            group_values,
+            params.measurement_name,
+            params.group_values,
         );
     }
 }
@@ -1397,32 +1188,23 @@ fn add_change_point_and_epoch_traces<F>(
 /// * `filtered_measurements` - Iterator over measurements for this measurement name
 /// * `commits` - All commits (needed for change detection data collection)
 /// * `measurement_name` - Name of the measurement being processed
-/// * `group_value` - Values for the split keys (empty if no splitting)
-/// * `separate_by` - Keys to split measurements by
-/// * `aggregate_by` - Optional aggregation function
-/// * `show_epochs` - Whether to show epoch boundaries
-/// * `detect_changes` - Whether to detect change points
-/// * `reverse_for_display` - Whether to reverse data for display (needed for correct change detection)
+/// * `params` - Measurement group parameters
 /// * `change_point_config_fn` - Function to retrieve change point config
-#[allow(clippy::too_many_arguments)]
 fn process_measurement_group<'a, F>(
     reporter: &mut dyn Reporter<'a>,
-    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData> + 'a> + Clone + 'a,
+    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData> + 'a>
+        + Clone
+        + 'a,
     commits: &[Commit],
     measurement_name: &str,
-    group_value: Vec<String>,
-    separate_by: Vec<String>,
-    aggregate_by: Option<ReductionFunc>,
-    show_epochs: bool,
-    detect_changes: bool,
-    reverse_for_display: bool,
+    params: MeasurementGroupParams,
     change_point_config_fn: F,
 ) where
     F: Fn(&str) -> crate::change_point::ChangePointConfig,
 {
     // Step 1: Filter measurements for this specific group
-    let sep_by = separate_by.clone();
-    let grp_val = group_value.clone();
+    let sep_by = params.separate_by.clone();
+    let grp_val = params.group_value.clone();
     let group_measurements = filtered_measurements
         .map(move |ms| filter_group_measurements(ms, sep_by.clone(), grp_val.clone()));
 
@@ -1431,13 +1213,13 @@ fn process_measurement_group<'a, F>(
         reporter,
         group_measurements.clone(),
         measurement_name,
-        &group_value,
-        aggregate_by,
+        &params.group_value,
+        params.aggregate_by,
     );
 
     // Step 3: Add change points and epochs if requested
-    if show_epochs || detect_changes {
-        let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+    if params.show_epochs || params.detect_changes {
+        let reduction_func = params.aggregate_by.unwrap_or(ReductionFunc::Min);
 
         let (commit_indices, values, epochs, commit_shas) =
             collect_measurement_data_for_change_detection(
@@ -1446,19 +1228,18 @@ fn process_measurement_group<'a, F>(
                 reduction_func,
             );
 
-        add_change_point_and_epoch_traces(
-            reporter,
-            &commit_indices,
-            &values,
-            &epochs,
-            &commit_shas,
+        let detection_params = ChangePointDetectionParams {
+            commit_indices: &commit_indices,
+            values: &values,
+            epochs: &epochs,
+            commit_shas: &commit_shas,
             measurement_name,
-            &group_value,
-            show_epochs,
-            detect_changes,
-            reverse_for_display,
-            change_point_config_fn,
-        );
+            group_values: &params.group_value,
+            show_epochs: params.show_epochs,
+            detect_changes: params.detect_changes,
+        };
+
+        add_change_point_and_epoch_traces(reporter, detection_params, change_point_config_fn);
     }
 }
 
@@ -1540,17 +1321,20 @@ fn generate_section_plot(
         )?;
 
         for group_value in group_values_to_process {
+            let params = MeasurementGroupParams {
+                group_value,
+                separate_by: section.separate_by.clone(),
+                aggregate_by: section.aggregate_by,
+                show_epochs,
+                detect_changes,
+            };
+
             process_measurement_group(
                 &mut reporter as &mut dyn Reporter,
                 filtered_measurements.clone(),
                 section_commits,
                 measurement_name,
-                group_value,
-                section.separate_by.clone(),
-                section.aggregate_by,
-                show_epochs,
-                detect_changes,
-                true, // reverse_for_display=true FIXES THE REVERSAL BUG
+                params,
                 |_| crate::change_point::ChangePointConfig::default(),
             );
         }
@@ -1742,11 +1526,15 @@ pub fn report(
                             if group_value.is_empty() {
                                 return true;
                             }
-                            separate_by.iter().zip(group_value.iter()).all(
-                                |(key, expected_val)| {
-                                    m.key_values.get(key).map(|v| v == expected_val).unwrap_or(false)
-                                },
-                            )
+                            separate_by
+                                .iter()
+                                .zip(group_value.iter())
+                                .all(|(key, expected_val)| {
+                                    m.key_values
+                                        .get(key)
+                                        .map(|v| v == expected_val)
+                                        .unwrap_or(false)
+                                })
                         })
                         .copied()
                         .collect()
@@ -1773,17 +1561,20 @@ pub fn report(
                         reduction_func,
                     );
 
-                add_change_point_and_epoch_traces(
-                    &mut *plot,
-                    &commit_indices,
-                    &values,
-                    &epochs,
-                    &commit_shas,
+                let detection_params = ChangePointDetectionParams {
+                    commit_indices: &commit_indices,
+                    values: &values,
+                    epochs: &epochs,
+                    commit_shas: &commit_shas,
                     measurement_name,
-                    &group_value,
+                    group_values: &group_value,
                     show_epochs,
                     detect_changes,
-                    true, // reverse_for_display=true (existing behavior)
+                };
+
+                add_change_point_and_epoch_traces(
+                    &mut *plot,
+                    detection_params,
                     crate::config::change_point_config, // Per-measurement config
                 );
             }
