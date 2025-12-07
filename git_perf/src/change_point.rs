@@ -102,6 +102,7 @@ impl Default for ChangePointConfig {
 ///
 /// # Returns
 /// Vector of indices where change points are detected
+#[must_use]
 pub fn detect_change_points(measurements: &[f64], config: &ChangePointConfig) -> Vec<usize> {
     let n = measurements.len();
     if n < config.min_data_points {
@@ -201,6 +202,7 @@ fn segment_mean_or_fallback(segment: &[f64], fallback: f64) -> f64 {
 ///
 /// # Returns
 /// Vector of ChangePoint structures with metadata
+#[must_use]
 pub fn enrich_change_points(
     indices: &[usize],
     measurements: &[f64],
@@ -355,6 +357,7 @@ fn calculate_confidence(index: usize, total_len: usize, magnitude_pct: f64) -> f
 ///
 /// # Returns
 /// Vector of EpochTransition structures
+#[must_use]
 pub fn detect_epoch_transitions(epochs: &[u32]) -> Vec<EpochTransition> {
     let mut transitions = vec![];
 

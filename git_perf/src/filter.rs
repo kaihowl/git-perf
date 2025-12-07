@@ -13,6 +13,7 @@ pub fn compile_filters(patterns: &[String]) -> Result<Vec<Regex>> {
 
 /// Convert measurement names to anchored regex patterns for exact matching
 /// This escapes special regex characters and adds ^ and $ anchors
+#[must_use]
 pub fn measurements_to_anchored_regex(measurements: &[String]) -> Vec<String> {
     measurements
         .iter()
@@ -22,6 +23,7 @@ pub fn measurements_to_anchored_regex(measurements: &[String]) -> Vec<String> {
 
 /// Combine measurements (as exact matches) and filter patterns into a single list
 /// Measurements are converted to anchored regex patterns for exact matching
+#[must_use]
 pub fn combine_measurements_and_filters(
     measurements: &[String],
     filter_patterns: &[String],
@@ -33,6 +35,7 @@ pub fn combine_measurements_and_filters(
 
 /// Check if a measurement name matches any of the compiled filters
 /// Returns true if filters is empty (no filters = match all)
+#[must_use]
 pub fn matches_any_filter(name: &str, filters: &[Regex]) -> bool {
     if filters.is_empty() {
         return true; // No filters = match all

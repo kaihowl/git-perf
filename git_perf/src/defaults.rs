@@ -73,24 +73,28 @@ pub const DEFAULT_EPOCH: u32 = 0;
 
 /// Returns the default minimum number of measurements for audit.
 #[inline]
+#[must_use]
 pub const fn default_min_measurements() -> u16 {
     DEFAULT_MIN_MEASUREMENTS
 }
 
 /// Returns the default sigma threshold for statistical significance.
 #[inline]
+#[must_use]
 pub const fn default_sigma() -> f64 {
     DEFAULT_SIGMA
 }
 
 /// Returns the default backoff max elapsed seconds.
 #[inline]
+#[must_use]
 pub const fn default_backoff_max_elapsed_seconds() -> u64 {
     DEFAULT_BACKOFF_MAX_ELAPSED_SECONDS
 }
 
 /// Returns the default epoch value.
 #[inline]
+#[must_use]
 pub const fn default_epoch() -> u32 {
     DEFAULT_EPOCH
 }
