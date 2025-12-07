@@ -224,7 +224,7 @@ runs:
           const sizeOutput = `${{ steps.size.outputs.size-output }}`.trim()
           const sizeSection = sizeOutput ? `\n\n## Measurement Storage Size\n\n\`\`\`\n${sizeOutput}\n\`\`\`` : ''
 
-          const commentBody = `## Full Report\n\n⏱  [Performance Results](${reportUrl})${auditSection}${sizeSection}`
+          const commentBody = `## Performance Report\n\n⏱  [Performance Results](${reportUrl})${auditSection}${sizeSection}`
 
           // Find existing performance comment
           const comments = await github.rest.issues.listComments({
