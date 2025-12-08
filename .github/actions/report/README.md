@@ -210,6 +210,38 @@ This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### Using Custom Templates
+
+The action supports custom HTML templates for multi-section dashboard reports. **Important**: Template files must be present in your repository, as the action executes `git perf report` in your repository's working directory.
+
+**Setup**:
+
+1. Copy template files from the [git-perf repository](https://github.com/kaihowl/git-perf/tree/master/.git-perf/templates) to your repository:
+   ```bash
+   # In your repository
+   mkdir -p .git-perf/templates
+   curl -o .git-perf/templates/dashboard.html \
+     https://raw.githubusercontent.com/kaihowl/git-perf/master/.git-perf/templates/dashboard.html
+   ```
+
+2. Create a `.gitperfconfig` file in your repository to reference the template:
+   ```toml
+   [report]
+   template_path = ".git-perf/templates/dashboard.html"
+   ```
+
+3. Use the action as normal - it will automatically use the template from your repository:
+   ```yaml
+   - uses: kaihowl/git-perf/.github/actions/report@master
+     with:
+       github-token: ${{ secrets.GITHUB_TOKEN }}
+   ```
+
+**Available templates**:
+- `dashboard.html` - Multi-section dashboard with configurable sections
+
+See [Dashboard Templates Documentation](https://github.com/kaihowl/git-perf/blob/master/docs/dashboard-templates.md) for detailed template configuration options.
+
 ### Multi-Workflow Coordination
 
 When combining performance reports with existing documentation (MkDocs, Jekyll, etc.), use proper concurrency control:
