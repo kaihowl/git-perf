@@ -1302,24 +1302,29 @@ fn generate_section_plot(
         vec![]
     };
 
-    // Filter function for this section
-    let relevant = |m: &MeasurementData| {
-        // Apply regex filter if specified
-        if !filters.is_empty() && !crate::filter::matches_any_filter(&m.name, &filters) {
-            return false;
-        }
-
-        // Apply key-value filters
-        m.key_values_is_superset_of(&section.key_value_filter)
-    };
-
-    let relevant_measurements = section_commits
+    // Filter measurements and collect to avoid iterator cloning
+    let relevant_measurements: Vec<Vec<&MeasurementData>> = section_commits
         .iter()
-        .map(|commit| commit.measurements.iter().filter(|m| relevant(m)));
+        .map(|commit| {
+            commit
+                .measurements
+                .iter()
+                .filter(|m| {
+                    // Apply regex filter if specified
+                    if !filters.is_empty() && !crate::filter::matches_any_filter(&m.name, &filters)
+                    {
+                        return false;
+                    }
+                    // Apply key-value filters
+                    m.key_values_is_superset_of(&section.key_value_filter)
+                })
+                .collect()
+        })
+        .collect();
 
     let unique_measurement_names: Vec<_> = relevant_measurements
-        .clone()
-        .flat_map(|m| m.map(|m| &m.name))
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
         .unique()
         .collect();
 
@@ -1334,17 +1339,46 @@ fn generate_section_plot(
     let detect_changes = section.detect_changes || global_detect_changes;
 
     for measurement_name in unique_measurement_names {
-        let filtered_measurements = relevant_measurements
-            .clone()
-            .map(|ms| ms.filter(|m| m.name == *measurement_name));
+        // Get group values first
+        let filtered_for_grouping = relevant_measurements
+            .iter()
+            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
 
         let group_values_to_process = compute_group_values_to_process(
-            filtered_measurements.clone(),
+            filtered_for_grouping,
             &section.separate_by,
             &format!("Section '{}'", section.id),
         )?;
 
         for group_value in group_values_to_process {
+            // Filter and collect measurements directly from relevant_measurements
+            let group_measurements: Vec<Vec<&MeasurementData>> = relevant_measurements
+                .iter()
+                .map(|ms| {
+                    ms.iter()
+                        .filter(|m| {
+                            // Filter by measurement name
+                            if m.name != *measurement_name {
+                                return false;
+                            }
+                            // Filter by group value
+                            if group_value.is_empty() {
+                                return true;
+                            }
+                            section.separate_by.iter().zip(group_value.iter()).all(
+                                |(key, expected_val)| {
+                                    m.key_values
+                                        .get(key)
+                                        .map(|v| v == expected_val)
+                                        .unwrap_or(false)
+                                },
+                            )
+                        })
+                        .copied()
+                        .collect()
+                })
+                .collect();
+
             let params = MeasurementGroupParams {
                 group_value,
                 separate_by: section.separate_by.clone(),
@@ -1355,7 +1389,7 @@ fn generate_section_plot(
 
             process_measurement_group(
                 &mut reporter as &mut dyn Reporter,
-                filtered_measurements.clone(),
+                group_measurements.iter().map(|v| v.iter().copied()),
                 section_commits,
                 measurement_name,
                 params,
