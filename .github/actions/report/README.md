@@ -213,20 +213,30 @@ This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
 
 ### Using Dashboard Templates
 
-The action supports multi-section dashboard templates for comprehensive performance reports:
+The action supports multi-section dashboard templates for comprehensive performance reports. **Important**: Template files must be present in your repository, as the action executes `git perf report` in your repository's working directory.
 
-```yaml
-# Use a dashboard template
-- uses: kaihowl/git-perf/.github/actions/report@master
-  with:
-    template: '.git-perf/templates/performance-overview.html'
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-```
+**Setup**:
+
+1. Copy template files from the [git-perf repository](https://github.com/kaihowl/git-perf/tree/master/.git-perf/templates) to your repository:
+   ```bash
+   # In your repository
+   mkdir -p .git-perf/templates
+   curl -o .git-perf/templates/performance-overview.html \
+     https://raw.githubusercontent.com/kaihowl/git-perf/master/.git-perf/templates/performance-overview.html
+   ```
+
+2. Use the template in your workflow:
+   ```yaml
+   - uses: kaihowl/git-perf/.github/actions/report@master
+     with:
+       template: '.git-perf/templates/performance-overview.html'
+       github-token: ${{ secrets.GITHUB_TOKEN }}
+   ```
 
 **Available Templates:**
-- `.git-perf/templates/performance-overview.html` - Professional multi-section dashboard (recommended)
-- `.git-perf/templates/simple-dashboard.html` - Basic multi-section template
-- `.git-perf/templates/dashboard-example.html` - Comprehensive example template
+- `performance-overview.html` - Professional multi-section dashboard (recommended)
+- `simple-dashboard.html` - Basic multi-section template
+- `dashboard-example.html` - Comprehensive example template
 
 See [Dashboard Templates Guide](../../docs/dashboard-templates.md) for template syntax and customization.
 
