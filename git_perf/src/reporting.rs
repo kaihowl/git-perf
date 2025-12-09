@@ -1291,6 +1291,7 @@ fn process_measurement_group<'a, F>(
 }
 
 /// Generate a plot for a single section with specific configuration
+/// This is the lenient version that allows empty sections (for multi-section reports)
 #[allow(clippy::too_many_arguments)]
 fn generate_section_plot(
     commits: &[Commit],
@@ -1341,6 +1342,91 @@ fn generate_section_plot(
         return Ok(reporter.plot);
     }
 
+    // Continue with the rest of the function
+    generate_section_plot_internal(
+        reporter,
+        section_commits,
+        section,
+        &relevant_measurements,
+        &unique_measurement_names,
+        global_show_epochs,
+        global_detect_changes,
+    )
+}
+
+/// Generate a plot for a single section with strict validation
+/// This version fails if there are no matching measurements (for single-section reports)
+#[allow(clippy::too_many_arguments)]
+fn generate_section_plot_strict(
+    commits: &[Commit],
+    section: &SectionConfig,
+    global_show_epochs: bool,
+    global_detect_changes: bool,
+) -> Result<Plot> {
+    let mut reporter = PlotlyReporter::new();
+    reporter.add_commits(commits);
+
+    // Determine the number of commits to use for this section
+    let section_commits = if let Some(depth) = section.depth {
+        if depth > commits.len() {
+            log::warn!(
+                "Section '{}' requested depth {} but only {} commits available",
+                section.id,
+                depth,
+                commits.len()
+            );
+            commits
+        } else {
+            &commits[..depth]
+        }
+    } else {
+        commits
+    };
+
+    // Compile filter pattern if specified
+    let filters = if let Some(ref pattern) = section.measurement_filter {
+        crate::filter::compile_filters(std::slice::from_ref(pattern))?
+    } else {
+        vec![]
+    };
+
+    // Filter measurements using the shared helper function
+    let relevant_measurements: Vec<Vec<&MeasurementData>> =
+        filter_measurements_by_criteria(section_commits, &filters, &section.key_value_filter);
+
+    let unique_measurement_names: Vec<_> = relevant_measurements
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        bail!("No performance measurements found.");
+    }
+
+    // Continue with the rest of the function
+    generate_section_plot_internal(
+        reporter,
+        section_commits,
+        section,
+        &relevant_measurements,
+        &unique_measurement_names,
+        global_show_epochs,
+        global_detect_changes,
+    )
+}
+
+/// Internal helper to generate the plot after validation
+#[allow(clippy::too_many_arguments)]
+fn generate_section_plot_internal(
+    mut reporter: PlotlyReporter,
+    section_commits: &[Commit],
+    section: &SectionConfig,
+    relevant_measurements: &[Vec<&MeasurementData>],
+    unique_measurement_names: &[&String],
+    global_show_epochs: bool,
+    global_detect_changes: bool,
+) -> Result<Plot> {
     // Determine epoch and change point settings for this section
     let show_epochs = section.show_epochs || global_show_epochs;
     let detect_changes = section.detect_changes || global_detect_changes;
@@ -1349,7 +1435,7 @@ fn generate_section_plot(
         // Get group values first
         let filtered_for_grouping = relevant_measurements
             .iter()
-            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
+            .map(|ms| ms.iter().filter(|m| m.name == **measurement_name).copied());
 
         let group_values_to_process = compute_group_values_to_process(
             filtered_for_grouping,
@@ -1365,7 +1451,7 @@ fn generate_section_plot(
                     ms.iter()
                         .filter(|m| {
                             // Filter by measurement name
-                            if m.name != *measurement_name {
+                            if m.name != **measurement_name {
                                 return false;
                             }
                             // Filter by group value
@@ -1541,8 +1627,15 @@ pub fn report(
             };
 
             // Generate the single plot
-            let plot =
-                generate_section_plot(&commits, &single_section, show_epochs, detect_changes)?;
+            // For single-section reports, we need to check if there are measurements first
+            // and fail early if none are found (unlike multi-section reports where empty
+            // sections are allowed)
+            let plot = generate_section_plot_strict(
+                &commits,
+                &single_section,
+                show_epochs,
+                detect_changes,
+            )?;
 
             // Apply template rendering
             let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
