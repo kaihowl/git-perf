@@ -824,7 +824,6 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         apply_template(template, &final_plot, metadata)
     }
-
 }
 
 struct CsvReporter<'a> {
@@ -915,7 +914,6 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
             ));
         }
     }
-
 
     fn add_epoch_boundaries(
         &mut self,
@@ -1461,7 +1459,7 @@ pub fn report(
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
-    let _filters = crate::filter::compile_filters(combined_patterns)?;
+    let filters = crate::filter::compile_filters(combined_patterns)?;
 
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
@@ -1560,6 +1558,117 @@ pub fn report(
     }
 
     // CSV output path - use the old Reporter trait approach
+    // Filter measurements and collect to avoid lifetime issues with the closure
+    let relevant_measurements: Vec<Vec<&MeasurementData>> = commits
+        .iter()
+        .map(|commit| {
+            commit
+                .measurements
+                .iter()
+                .filter(|m| {
+                    // Apply regex filters (handles both exact measurement matches and filter patterns)
+                    if !crate::filter::matches_any_filter(&m.name, &filters) {
+                        return false;
+                    }
+                    // Filter using subset relation: key_values ⊆ measurement.key_values
+                    m.key_values_is_superset_of(key_values)
+                })
+                .collect()
+        })
+        .collect();
+
+    if relevant_measurements.iter().all(|ms| ms.is_empty()) {
+        bail!("No performance measurements found.")
+    }
+
+    let unique_measurement_names: Vec<_> = relevant_measurements
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
+        .unique()
+        .collect();
+
+    for measurement_name in unique_measurement_names {
+        // Get group values first
+        let filtered_for_grouping = relevant_measurements
+            .iter()
+            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
+
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_for_grouping,
+            &separate_by,
+            &format!("Measurement '{}'", measurement_name),
+        )?;
+
+        for group_value in group_values_to_process {
+            // Filter and collect measurements directly from relevant_measurements
+            let group_measurements: Vec<Vec<&MeasurementData>> = relevant_measurements
+                .iter()
+                .map(|ms| {
+                    ms.iter()
+                        .filter(|m| {
+                            // Filter by measurement name
+                            if m.name != *measurement_name {
+                                return false;
+                            }
+                            // Filter by group value
+                            if group_value.is_empty() {
+                                return true;
+                            }
+                            separate_by
+                                .iter()
+                                .zip(group_value.iter())
+                                .all(|(key, expected_val)| {
+                                    m.key_values
+                                        .get(key)
+                                        .map(|v| v == expected_val)
+                                        .unwrap_or(false)
+                                })
+                        })
+                        .copied()
+                        .collect()
+                })
+                .collect();
+
+            // Add trace visualization
+            add_trace_for_measurement_group(
+                &mut *plot,
+                group_measurements.iter().map(|v| v.iter().copied()),
+                measurement_name,
+                &group_value,
+                aggregate_by,
+            );
+
+            // Add change points and epochs if requested
+            if show_epochs || detect_changes {
+                let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+
+                let (commit_indices, values, epochs, commit_shas) =
+                    collect_measurement_data_for_change_detection(
+                        group_measurements.iter().map(|v| v.iter().copied()),
+                        &commits,
+                        reduction_func,
+                    );
+
+                let detection_params = ChangePointDetectionParams {
+                    commit_indices: &commit_indices,
+                    values: &values,
+                    epochs: &epochs,
+                    commit_shas: &commit_shas,
+                    measurement_name,
+                    group_values: &group_value,
+                    show_epochs,
+                    detect_changes,
+                };
+
+                add_change_point_and_epoch_traces(
+                    &mut *plot,
+                    detection_params,
+                    crate::config::change_point_config, // Per-measurement config
+                );
+            }
+        }
+    }
+
     let output_bytes = plot.as_bytes();
 
     if output == Path::new("-") {
