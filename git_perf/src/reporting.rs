@@ -1291,14 +1291,14 @@ fn process_measurement_group<'a, F>(
 }
 
 /// Generate a plot for a single section with specific configuration
-/// This is the lenient version that allows empty sections (for multi-section reports)
+/// Returns the plot and the count of matched measurements
 #[allow(clippy::too_many_arguments)]
 fn generate_section_plot(
     commits: &[Commit],
     section: &SectionConfig,
     global_show_epochs: bool,
     global_detect_changes: bool,
-) -> Result<Plot> {
+) -> Result<(Plot, usize)> {
     let mut reporter = PlotlyReporter::new();
     reporter.add_commits(commits);
 
@@ -1336,14 +1336,15 @@ fn generate_section_plot(
         .unique()
         .collect();
 
-    if unique_measurement_names.is_empty() {
-        log::warn!("Section '{}' has no matching measurements", section.id);
-        // Return an empty plot
-        return Ok(reporter.plot);
+    let match_count = unique_measurement_names.len();
+
+    if match_count == 0 {
+        // Return empty plot with zero count
+        return Ok((reporter.plot, 0));
     }
 
     // Continue with the rest of the function
-    generate_section_plot_internal(
+    let plot = generate_section_plot_internal(
         reporter,
         section_commits,
         section,
@@ -1351,69 +1352,9 @@ fn generate_section_plot(
         &unique_measurement_names,
         global_show_epochs,
         global_detect_changes,
-    )
-}
+    )?;
 
-/// Generate a plot for a single section with strict validation
-/// This version fails if there are no matching measurements (for single-section reports)
-#[allow(clippy::too_many_arguments)]
-fn generate_section_plot_strict(
-    commits: &[Commit],
-    section: &SectionConfig,
-    global_show_epochs: bool,
-    global_detect_changes: bool,
-) -> Result<Plot> {
-    let mut reporter = PlotlyReporter::new();
-    reporter.add_commits(commits);
-
-    // Determine the number of commits to use for this section
-    let section_commits = if let Some(depth) = section.depth {
-        if depth > commits.len() {
-            log::warn!(
-                "Section '{}' requested depth {} but only {} commits available",
-                section.id,
-                depth,
-                commits.len()
-            );
-            commits
-        } else {
-            &commits[..depth]
-        }
-    } else {
-        commits
-    };
-
-    // Compile filter pattern if specified
-    let filters = if let Some(ref pattern) = section.measurement_filter {
-        crate::filter::compile_filters(std::slice::from_ref(pattern))?
-    } else {
-        vec![]
-    };
-
-    // Filter measurements using the shared helper function
-    let relevant_measurements: Vec<Vec<&MeasurementData>> =
-        filter_measurements_by_criteria(section_commits, &filters, &section.key_value_filter);
-
-    let unique_measurement_names: Vec<_> = relevant_measurements
-        .iter()
-        .flat_map(|ms| ms.iter().map(|m| &m.name))
-        .unique()
-        .collect();
-
-    if unique_measurement_names.is_empty() {
-        bail!("No performance measurements found.");
-    }
-
-    // Continue with the rest of the function
-    generate_section_plot_internal(
-        reporter,
-        section_commits,
-        section,
-        &relevant_measurements,
-        &unique_measurement_names,
-        global_show_epochs,
-        global_detect_changes,
-    )
+    Ok((plot, match_count))
 }
 
 /// Internal helper to generate the plot after validation
@@ -1521,8 +1462,12 @@ fn generate_multi_section_report(
         log::info!("Generating section: {}", section.id);
 
         // Generate the plot for this section
-        let plot =
+        let (plot, match_count) =
             generate_section_plot(commits, &section, global_show_epochs, global_detect_changes)?;
+
+        if match_count == 0 {
+            log::warn!("Section '{}' has no matching measurements", section.id);
+        }
 
         // Extract plotly parts
         let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
@@ -1627,15 +1572,13 @@ pub fn report(
             };
 
             // Generate the single plot
-            // For single-section reports, we need to check if there are measurements first
-            // and fail early if none are found (unlike multi-section reports where empty
-            // sections are allowed)
-            let plot = generate_section_plot_strict(
-                &commits,
-                &single_section,
-                show_epochs,
-                detect_changes,
-            )?;
+            // For single-section reports, fail if no measurements found
+            let (plot, match_count) =
+                generate_section_plot(&commits, &single_section, show_epochs, detect_changes)?;
+
+            if match_count == 0 {
+                bail!("No performance measurements found.");
+            }
 
             // Apply template rendering
             let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
