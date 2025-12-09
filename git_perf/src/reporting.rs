@@ -1003,6 +1003,39 @@ fn compute_group_values_to_process<'a>(
     Ok(group_values)
 }
 
+/// Filter measurements by regex patterns and key-value pairs.
+///
+/// This helper consolidates the filtering logic used by both HTML and CSV report paths.
+/// Returns a nested vector where each inner vector contains filtered measurements for one commit.
+///
+/// # Arguments
+/// * `commits` - The commits to filter measurements from
+/// * `filters` - Compiled regex filters for measurement names (empty = no regex filtering)
+/// * `key_values` - Key-value pairs that measurements must match
+fn filter_measurements_by_criteria<'a>(
+    commits: &'a [Commit],
+    filters: &[regex::Regex],
+    key_values: &[(String, String)],
+) -> Vec<Vec<&'a MeasurementData>> {
+    commits
+        .iter()
+        .map(|commit| {
+            commit
+                .measurements
+                .iter()
+                .filter(|m| {
+                    // Apply regex filter if specified
+                    if !filters.is_empty() && !crate::filter::matches_any_filter(&m.name, filters) {
+                        return false;
+                    }
+                    // Apply key-value filters
+                    m.key_values_is_superset_of(key_values)
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// Filter measurements that match all key-value pairs in the group.
 ///
 /// If group_value is empty, returns all measurements (no filtering).
@@ -1292,25 +1325,9 @@ fn generate_section_plot(
         vec![]
     };
 
-    // Filter measurements and collect to avoid iterator cloning
-    let relevant_measurements: Vec<Vec<&MeasurementData>> = section_commits
-        .iter()
-        .map(|commit| {
-            commit
-                .measurements
-                .iter()
-                .filter(|m| {
-                    // Apply regex filter if specified
-                    if !filters.is_empty() && !crate::filter::matches_any_filter(&m.name, &filters)
-                    {
-                        return false;
-                    }
-                    // Apply key-value filters
-                    m.key_values_is_superset_of(&section.key_value_filter)
-                })
-                .collect()
-        })
-        .collect();
+    // Filter measurements using the shared helper function
+    let relevant_measurements: Vec<Vec<&MeasurementData>> =
+        filter_measurements_by_criteria(section_commits, &filters, &section.key_value_filter);
 
     let unique_measurement_names: Vec<_> = relevant_measurements
         .iter()
@@ -1558,24 +1575,9 @@ pub fn report(
     }
 
     // CSV output path - use the old Reporter trait approach
-    // Filter measurements and collect to avoid lifetime issues with the closure
-    let relevant_measurements: Vec<Vec<&MeasurementData>> = commits
-        .iter()
-        .map(|commit| {
-            commit
-                .measurements
-                .iter()
-                .filter(|m| {
-                    // Apply regex filters (handles both exact measurement matches and filter patterns)
-                    if !crate::filter::matches_any_filter(&m.name, &filters) {
-                        return false;
-                    }
-                    // Filter using subset relation: key_values ⊆ measurement.key_values
-                    m.key_values_is_superset_of(key_values)
-                })
-                .collect()
-        })
-        .collect();
+    // Filter measurements using the shared helper function
+    let relevant_measurements: Vec<Vec<&MeasurementData>> =
+        filter_measurements_by_criteria(&commits, &filters, key_values);
 
     if relevant_measurements.iter().all(|ms| ms.is_empty()) {
         bail!("No performance measurements found.")
