@@ -1566,7 +1566,7 @@ pub fn report(
                 key_value_filter: key_values.to_vec(),
                 separate_by: separate_by.clone(),
                 aggregate_by,
-                depth: Some(num_commits),
+                depth: None,
                 show_epochs,
                 detect_changes,
             };
