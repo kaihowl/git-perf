@@ -145,8 +145,10 @@ runs:
             TEMPLATE_FLAG="--template ${{ inputs.template }}"
             echo "Using custom template: ${{ inputs.template }}"
           else
-            echo "Warning: Template file not found: ${{ inputs.template }}"
-            echo "Falling back to default report generation"
+            echo "::error::Template file not found: ${{ inputs.template }}"
+            echo "::error::Please ensure the template file exists in your repository"
+            echo "::error::Available templates: .git-perf/templates/performance-overview.html, .git-perf/templates/simple-dashboard.html"
+            exit 1
           fi
         fi
 
