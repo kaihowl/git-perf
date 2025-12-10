@@ -1222,6 +1222,61 @@ fn add_change_point_and_epoch_traces<F>(
     }
 }
 
+/// Helper to add change point and epoch detection traces for a measurement group
+///
+/// This function encapsulates the common pattern of:
+/// 1. Checking if change detection is requested
+/// 2. Collecting measurement data for change detection
+/// 3. Creating detection parameters
+/// 4. Adding traces to the reporter
+///
+/// # Arguments
+/// * `reporter` - Mutable reference to any Reporter implementation
+/// * `group_measurements` - Iterator over measurements for this group
+/// * `commits` - All commits (needed for change detection data collection)
+/// * `measurement_name` - Name of the measurement being processed
+/// * `group_value` - Group values for this specific group
+/// * `aggregate_by` - Aggregation function to use
+/// * `show_epochs` - Whether to show epoch annotations
+/// * `detect_changes` - Whether to detect and show change points
+/// * `change_point_config_fn` - Function to retrieve change point config per measurement
+#[allow(clippy::too_many_arguments)]
+fn add_detection_traces_if_requested<'a, F>(
+    reporter: &mut dyn Reporter<'a>,
+    group_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData>> + Clone,
+    commits: &[Commit],
+    measurement_name: &str,
+    group_value: &[String],
+    aggregate_by: Option<ReductionFunc>,
+    show_epochs: bool,
+    detect_changes: bool,
+    change_point_config_fn: F,
+) where
+    F: Fn(&str) -> crate::change_point::ChangePointConfig,
+{
+    if !show_epochs && !detect_changes {
+        return;
+    }
+
+    let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
+
+    let (commit_indices, values, epochs, commit_shas) =
+        collect_measurement_data_for_change_detection(group_measurements, commits, reduction_func);
+
+    let detection_params = ChangePointDetectionParams {
+        commit_indices: &commit_indices,
+        values: &values,
+        epochs: &epochs,
+        commit_shas: &commit_shas,
+        measurement_name,
+        group_values: group_value,
+        show_epochs,
+        detect_changes,
+    };
+
+    add_change_point_and_epoch_traces(reporter, detection_params, change_point_config_fn);
+}
+
 /// Process a single measurement group: add trace and optionally detect changes/epochs.
 ///
 /// This is a high-level orchestration function that combines multiple steps:
@@ -1265,29 +1320,17 @@ fn process_measurement_group<'a, F>(
     );
 
     // Step 3: Add change points and epochs if requested
-    if params.show_epochs || params.detect_changes {
-        let reduction_func = params.aggregate_by.unwrap_or(ReductionFunc::Min);
-
-        let (commit_indices, values, epochs, commit_shas) =
-            collect_measurement_data_for_change_detection(
-                group_measurements,
-                commits,
-                reduction_func,
-            );
-
-        let detection_params = ChangePointDetectionParams {
-            commit_indices: &commit_indices,
-            values: &values,
-            epochs: &epochs,
-            commit_shas: &commit_shas,
-            measurement_name,
-            group_values: &params.group_value,
-            show_epochs: params.show_epochs,
-            detect_changes: params.detect_changes,
-        };
-
-        add_change_point_and_epoch_traces(reporter, detection_params, change_point_config_fn);
-    }
+    add_detection_traces_if_requested(
+        reporter,
+        group_measurements,
+        commits,
+        measurement_name,
+        &params.group_value,
+        params.aggregate_by,
+        params.show_epochs,
+        params.detect_changes,
+        change_point_config_fn,
+    );
 }
 
 /// Generate a plot for a single section with specific configuration
@@ -1427,7 +1470,7 @@ fn generate_section_plot_internal(
                 section_commits,
                 measurement_name,
                 params,
-                |_| crate::change_point::ChangePointConfig::default(),
+                crate::config::change_point_config,
             );
         }
     }
@@ -1677,33 +1720,17 @@ pub fn report(
             );
 
             // Add change points and epochs if requested
-            if show_epochs || detect_changes {
-                let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
-
-                let (commit_indices, values, epochs, commit_shas) =
-                    collect_measurement_data_for_change_detection(
-                        group_measurements.iter().map(|v| v.iter().copied()),
-                        &commits,
-                        reduction_func,
-                    );
-
-                let detection_params = ChangePointDetectionParams {
-                    commit_indices: &commit_indices,
-                    values: &values,
-                    epochs: &epochs,
-                    commit_shas: &commit_shas,
-                    measurement_name,
-                    group_values: &group_value,
-                    show_epochs,
-                    detect_changes,
-                };
-
-                add_change_point_and_epoch_traces(
-                    &mut *plot,
-                    detection_params,
-                    crate::config::change_point_config, // Per-measurement config
-                );
-            }
+            add_detection_traces_if_requested(
+                &mut *plot,
+                group_measurements.iter().map(|v| v.iter().copied()),
+                &commits,
+                measurement_name,
+                &group_value,
+                aggregate_by,
+                show_epochs,
+                detect_changes,
+                crate::config::change_point_config,
+            );
         }
     }
 
