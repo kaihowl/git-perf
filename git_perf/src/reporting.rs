@@ -1565,6 +1565,13 @@ pub fn report(
 
     plot.add_commits(&commits);
 
+    // Warn if template is provided with CSV output
+    let is_csv =
+        output.extension().and_then(|s| s.to_str()) == Some("csv") || output == Path::new("-");
+    if is_csv && template_config.template_path.is_some() {
+        log::warn!("Template argument is ignored for CSV output format");
+    }
+
     // For HTML reports, always use the template-based approach (single or multi-section)
     if output.extension().and_then(|s| s.to_str()) == Some("html") {
         let template = load_template(template_config.template_path.as_ref())?;
