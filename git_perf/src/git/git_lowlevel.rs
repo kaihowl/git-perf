@@ -87,7 +87,6 @@ pub(super) fn feed_git_command(
     } else {
         trace!("exec failed");
         Err(GitError::ExecError {
-            command: args.join(" "),
             output: git_output,
         })
     }
@@ -263,7 +262,6 @@ mod test {
             stderr: "fatal: cannot lock ref 'refs/heads/main': Unable to create lock".to_string(),
         };
         let error = GitError::ExecError {
-            command: "update-ref".to_string(),
             output,
         };
 
@@ -278,7 +276,6 @@ mod test {
             stderr: "fatal: ref updates forbidden, but expected commit abc123".to_string(),
         };
         let error = GitError::ExecError {
-            command: "update-ref".to_string(),
             output,
         };
 
@@ -292,10 +289,7 @@ mod test {
             stdout: String::new(),
             stderr: "fatal: couldn't find remote ref refs/notes/measurements".to_string(),
         };
-        let error = GitError::ExecError {
-            command: "fetch".to_string(),
-            output,
-        };
+        let error = GitError::ExecError { output };
 
         let mapped = map_git_error(error);
         assert!(matches!(mapped, GitError::NoRemoteMeasurements { .. }));
@@ -307,10 +301,7 @@ mod test {
             stdout: String::new(),
             stderr: "error: bad object abc123def456".to_string(),
         };
-        let error = GitError::ExecError {
-            command: "cat-file".to_string(),
-            output,
-        };
+        let error = GitError::ExecError { output };
 
         let mapped = map_git_error(error);
         assert!(matches!(mapped, GitError::BadObject { .. }));
@@ -322,10 +313,7 @@ mod test {
             stdout: String::new(),
             stderr: "fatal: some other error".to_string(),
         };
-        let error = GitError::ExecError {
-            command: "status".to_string(),
-            output,
-        };
+        let error = GitError::ExecError { output };
 
         let mapped = map_git_error(error);
         // Should remain as ExecError for unrecognized patterns
@@ -339,10 +327,7 @@ mod test {
             stdout: String::new(),
             stderr: "this message mentions 'lock' without the full pattern".to_string(),
         };
-        let error = GitError::ExecError {
-            command: "test".to_string(),
-            output,
-        };
+        let error = GitError::ExecError { output };
 
         let mapped = map_git_error(error);
         // Should NOT be mapped to RefFailedToLock
@@ -364,10 +349,7 @@ mod test {
                 stdout: String::new(),
                 stderr: stderr_msg.to_string(),
             };
-            let error = GitError::ExecError {
-                command: "test".to_string(),
-                output,
-            };
+            let error = GitError::ExecError { output };
 
             let mapped = map_git_error(error);
             if should_map {
@@ -401,10 +383,7 @@ mod test {
                 stdout: String::new(),
                 stderr: stderr_msg.to_string(),
             };
-            let error = GitError::ExecError {
-                command: "test".to_string(),
-                output,
-            };
+            let error = GitError::ExecError { output };
 
             let mapped = map_git_error(error);
             if should_map {

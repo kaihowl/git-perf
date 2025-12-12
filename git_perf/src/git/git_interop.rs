@@ -759,7 +759,6 @@ fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
             let items = s.split('\0').take(2).collect_vec();
             if items.len() != 2 {
                 return Err(GitError::ExecError {
-                    command: format!("git {}", args.join(" ")),
                     output: GitOutput {
                         stdout: format!("Unexpected git for-each-ref output format: {}", s),
                         stderr: String::new(),
