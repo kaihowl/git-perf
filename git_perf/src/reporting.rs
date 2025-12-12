@@ -1478,13 +1478,15 @@ fn generate_section_plot_internal(
     Ok(reporter.plot)
 }
 
-/// Generate CSV output for a single section (mirrors generate_section_plot for PlotlyReporter)
-fn generate_section_plot_internal_csv<'a>(
-    mut reporter: CsvReporter<'a>,
+/// Generate a single-section report (works for both CSV and HTML using the Reporter trait)
+fn generate_single_section_report<'a>(
+    reporter: &mut dyn Reporter<'a>,
     commits: &'a [Commit],
     section: &SectionConfig,
     global_show_epochs: bool,
     global_detect_changes: bool,
+    output_path: &Path,
+    template_config: &ReportTemplateConfig,
 ) -> Result<Vec<u8>> {
     reporter.add_commits(commits);
 
@@ -1513,8 +1515,8 @@ fn generate_section_plot_internal_csv<'a>(
     let show_epochs = section.show_epochs || global_show_epochs;
     let detect_changes = section.detect_changes || global_detect_changes;
 
+    // Process all measurement groups - same logic for both CSV and HTML
     for measurement_name in unique_measurement_names {
-        // Get group values first
         let filtered_for_grouping = relevant_measurements
             .iter()
             .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
@@ -1522,7 +1524,7 @@ fn generate_section_plot_internal_csv<'a>(
         let group_values_to_process = compute_group_values_to_process(
             filtered_for_grouping,
             &section.separate_by,
-            "CSV output",
+            &format!("Section '{}'", section.id),
         )?;
 
         for group_value in group_values_to_process {
@@ -1532,11 +1534,9 @@ fn generate_section_plot_internal_csv<'a>(
                 .map(|ms| {
                     ms.iter()
                         .filter(|m| {
-                            // Filter by measurement name
                             if m.name != *measurement_name {
                                 return false;
                             }
-                            // Filter by group value
                             if group_value.is_empty() {
                                 return true;
                             }
@@ -1554,18 +1554,18 @@ fn generate_section_plot_internal_csv<'a>(
                 })
                 .collect();
 
-            // Add trace visualization (using same helper as HTML)
+            // Add trace visualization
             add_trace_for_measurement_group(
-                &mut reporter as &mut dyn Reporter,
+                reporter,
                 group_measurements_vec.iter().map(|v| v.iter().copied()),
                 measurement_name,
                 &group_value,
                 section.aggregate_by,
             );
 
-            // Add change points and epochs if requested (using same helper as HTML)
+            // Add change points and epochs if requested
             add_detection_traces_if_requested(
-                &mut reporter as &mut dyn Reporter,
+                reporter,
                 group_measurements_vec.iter().map(|v| v.iter().copied()),
                 commits,
                 measurement_name,
@@ -1578,7 +1578,44 @@ fn generate_section_plot_internal_csv<'a>(
         }
     }
 
-    Ok(reporter.as_bytes())
+    // For HTML output, apply template rendering
+    if output_path.extension().and_then(|s| s.to_str()) == Some("html") {
+        let template = load_template(template_config.template_path.as_ref())?;
+        let template_str = template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
+
+        let resolved_title = template_config.title.clone().or_else(config::report_title);
+        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+        let metadata = ReportMetadata::new(resolved_title, custom_css_content, commits);
+
+        // Get the raw plotly output
+        let raw_bytes = reporter.as_bytes();
+        let plot_str = String::from_utf8(raw_bytes)?;
+
+        // Extract plotly parts
+        let (_plotly_head, plotly_body) = extract_plotly_parts_from_str(&plot_str);
+        let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+
+        let output_html = template_str
+            .replace("{{TITLE}}", &metadata.title)
+            .replace("{{PLOTLY_HEAD}}", &plotly_head)
+            .replace("{{PLOTLY_BODY}}", &plotly_body)
+            .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+            .replace("{{TIMESTAMP}}", &metadata.timestamp)
+            .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+            .replace("{{DEPTH}}", &metadata.depth.to_string())
+            .replace("{{AUDIT_SECTION}}", "");
+
+        Ok(output_html.into_bytes())
+    } else {
+        // For CSV, return raw bytes
+        Ok(reporter.as_bytes())
+    }
+}
+
+// Helper to extract plotly parts from HTML string
+fn extract_plotly_parts_from_str(plot_html: &str) -> (String, String) {
+    // Return the whole thing as the body (head is generated separately)
+    (String::new(), plot_html.to_string())
 }
 
 /// Generate a multi-section report from a template with section placeholders
@@ -1663,11 +1700,6 @@ pub fn report(
         );
     }
 
-    let mut plot =
-        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
-
-    plot.add_commits(&commits);
-
     // Warn if template is provided with CSV output
     let is_csv =
         output.extension().and_then(|s| s.to_str()) == Some("csv") || output == Path::new("-");
@@ -1675,7 +1707,46 @@ pub fn report(
         log::warn!("Template argument is ignored for CSV output format");
     }
 
-    // Create a synthetic section from CLI arguments (used for both HTML single-section and CSV)
+    // For HTML reports, check if multi-section template is requested
+    if output.extension().and_then(|s| s.to_str()) == Some("html") {
+        let template = load_template(template_config.template_path.as_ref())?;
+        let template_str = template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
+        let sections = parse_template_sections(template_str)?;
+
+        if !sections.is_empty() {
+            // Multi-section template path
+            log::info!(
+                "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
+                sections.len()
+            );
+
+            let resolved_title = template_config.title.clone().or_else(config::report_title);
+            let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+            let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
+
+            let report_bytes = generate_multi_section_report(
+                template_str,
+                &commits,
+                &metadata,
+                show_epochs,
+                detect_changes,
+            )?;
+
+            if output == Path::new("-") {
+                match io::stdout().write_all(&report_bytes) {
+                    Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+                    res => res,
+                }?;
+            } else {
+                File::create(&output)?.write_all(&report_bytes)?;
+            }
+
+            return Ok(());
+        }
+    }
+
+    // Unified single-section path for both CSV and HTML
+    // Create a synthetic section from CLI arguments
     let single_section = SectionConfig {
         id: "main".to_string(),
         placeholder: "{{PLOTLY_BODY}}".to_string(),
@@ -1692,98 +1763,22 @@ pub fn report(
         detect_changes,
     };
 
-    // For HTML reports with multi-section templates, use the template-based approach
-    if output.extension().and_then(|s| s.to_str()) == Some("html") {
-        let template = load_template(template_config.template_path.as_ref())?;
+    // Use factory to create the appropriate reporter
+    let mut reporter =
+        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
 
-        // Resolve title: CLI > config > None
-        let resolved_title = template_config.title.or_else(config::report_title);
-
-        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-        let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
-
-        // Determine the template to use (custom or default)
-        let template_str = template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
-
-        // Check if template contains section placeholders
-        let sections = parse_template_sections(template_str)?;
-
-        if !sections.is_empty() {
-            // Multi-section template - use generate_multi_section_report
-            log::info!(
-                "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
-                sections.len()
-            );
-
-            let report_bytes = generate_multi_section_report(
-                template_str,
-                &commits,
-                &metadata,
-                show_epochs,
-                detect_changes,
-            )?;
-
-            // Write output
-            if output == Path::new("-") {
-                match io::stdout().write_all(&report_bytes) {
-                    Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
-                    res => res,
-                }?;
-            } else {
-                File::create(&output)?.write_all(&report_bytes)?;
-            }
-
-            return Ok(());
-        }
-
-        // Single-section HTML: fall through to use shared section-based path below
-        // Generate the single plot using shared code
-        let (html_plot, match_count) =
-            generate_section_plot(&commits, &single_section, show_epochs, detect_changes)?;
-
-        if match_count == 0 {
-            bail!("No performance measurements found.");
-        }
-
-        // Apply template rendering for HTML
-        let (_plotly_head, plotly_body) = extract_plotly_parts(&html_plot);
-        let (plotly_head, _) = extract_plotly_parts(&Plot::new());
-
-        let output_html = template_str
-            .replace("{{TITLE}}", &metadata.title)
-            .replace("{{PLOTLY_HEAD}}", &plotly_head)
-            .replace("{{PLOTLY_BODY}}", &plotly_body)
-            .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
-            .replace("{{TIMESTAMP}}", &metadata.timestamp)
-            .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
-            .replace("{{DEPTH}}", &metadata.depth.to_string())
-            .replace("{{AUDIT_SECTION}}", "");
-
-        let output_bytes = output_html.as_bytes();
-
-        if output == Path::new("-") {
-            match io::stdout().write_all(output_bytes) {
-                Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
-                res => res,
-            }?;
-        } else {
-            File::create(&output)?.write_all(output_bytes)?;
-        }
-
-        return Ok(());
-    }
-
-    // CSV output path - use the same section-based approach
-    // Generate CSV output using shared section logic
-    let csv_reporter = CsvReporter::new();
-    let output_bytes = generate_section_plot_internal_csv(
-        csv_reporter,
+    // Generate report using unified section-based logic
+    let output_bytes = generate_single_section_report(
+        &mut *reporter,
         &commits,
         &single_section,
         show_epochs,
         detect_changes,
+        &output,
+        &template_config,
     )?;
 
+    // Write output
     if output == Path::new("-") {
         match io::stdout().write_all(&output_bytes) {
             Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
