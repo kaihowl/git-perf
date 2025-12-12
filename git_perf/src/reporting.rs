@@ -1478,6 +1478,109 @@ fn generate_section_plot_internal(
     Ok(reporter.plot)
 }
 
+/// Generate CSV output for a single section (mirrors generate_section_plot for PlotlyReporter)
+fn generate_section_plot_internal_csv<'a>(
+    mut reporter: CsvReporter<'a>,
+    commits: &'a [Commit],
+    section: &SectionConfig,
+    global_show_epochs: bool,
+    global_detect_changes: bool,
+) -> Result<Vec<u8>> {
+    reporter.add_commits(commits);
+
+    // Compile filter pattern if specified
+    let filters = if let Some(ref pattern) = section.measurement_filter {
+        crate::filter::compile_filters(std::slice::from_ref(pattern))?
+    } else {
+        vec![]
+    };
+
+    // Filter measurements using the shared helper function
+    let relevant_measurements: Vec<Vec<&MeasurementData>> =
+        filter_measurements_by_criteria(commits, &filters, &section.key_value_filter);
+
+    let unique_measurement_names: Vec<_> = relevant_measurements
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        bail!("No performance measurements found.");
+    }
+
+    // Determine epoch and change point settings for this section
+    let show_epochs = section.show_epochs || global_show_epochs;
+    let detect_changes = section.detect_changes || global_detect_changes;
+
+    for measurement_name in unique_measurement_names {
+        // Get group values first
+        let filtered_for_grouping = relevant_measurements
+            .iter()
+            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
+
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_for_grouping,
+            &section.separate_by,
+            "CSV output",
+        )?;
+
+        for group_value in group_values_to_process {
+            // Filter and collect measurements for this group
+            let group_measurements_vec: Vec<Vec<&MeasurementData>> = relevant_measurements
+                .iter()
+                .map(|ms| {
+                    ms.iter()
+                        .filter(|m| {
+                            // Filter by measurement name
+                            if m.name != *measurement_name {
+                                return false;
+                            }
+                            // Filter by group value
+                            if group_value.is_empty() {
+                                return true;
+                            }
+                            section.separate_by.iter().zip(group_value.iter()).all(
+                                |(key, expected_val)| {
+                                    m.key_values
+                                        .get(key)
+                                        .map(|v| v == expected_val)
+                                        .unwrap_or(false)
+                                },
+                            )
+                        })
+                        .copied()
+                        .collect()
+                })
+                .collect();
+
+            // Add trace visualization (using same helper as HTML)
+            add_trace_for_measurement_group(
+                &mut reporter as &mut dyn Reporter,
+                group_measurements_vec.iter().map(|v| v.iter().copied()),
+                measurement_name,
+                &group_value,
+                section.aggregate_by,
+            );
+
+            // Add change points and epochs if requested (using same helper as HTML)
+            add_detection_traces_if_requested(
+                &mut reporter as &mut dyn Reporter,
+                group_measurements_vec.iter().map(|v| v.iter().copied()),
+                commits,
+                measurement_name,
+                &group_value,
+                section.aggregate_by,
+                show_epochs,
+                detect_changes,
+                crate::config::change_point_config,
+            );
+        }
+    }
+
+    Ok(reporter.as_bytes())
+}
+
 /// Generate a multi-section report from a template with section placeholders
 fn generate_multi_section_report(
     template: &str,
@@ -1550,7 +1653,7 @@ pub fn report(
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
-    let filters = crate::filter::compile_filters(combined_patterns)?;
+    let _filters = crate::filter::compile_filters(combined_patterns)?;
 
     let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
 
@@ -1572,7 +1675,24 @@ pub fn report(
         log::warn!("Template argument is ignored for CSV output format");
     }
 
-    // For HTML reports, always use the template-based approach (single or multi-section)
+    // Create a synthetic section from CLI arguments (used for both HTML single-section and CSV)
+    let single_section = SectionConfig {
+        id: "main".to_string(),
+        placeholder: "{{PLOTLY_BODY}}".to_string(),
+        measurement_filter: if combined_patterns.is_empty() {
+            None
+        } else {
+            Some(combined_patterns.join("|"))
+        },
+        key_value_filter: key_values.to_vec(),
+        separate_by: separate_by.clone(),
+        aggregate_by,
+        depth: None,
+        show_epochs,
+        detect_changes,
+    };
+
+    // For HTML reports with multi-section templates, use the template-based approach
     if output.extension().and_then(|s| s.to_str()) == Some("html") {
         let template = load_template(template_config.template_path.as_ref())?;
 
@@ -1588,160 +1708,81 @@ pub fn report(
         // Check if template contains section placeholders
         let sections = parse_template_sections(template_str)?;
 
-        let report_bytes = if !sections.is_empty() {
+        if !sections.is_empty() {
             // Multi-section template - use generate_multi_section_report
             log::info!(
                 "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
                 sections.len()
             );
 
-            generate_multi_section_report(
+            let report_bytes = generate_multi_section_report(
                 template_str,
                 &commits,
                 &metadata,
                 show_epochs,
                 detect_changes,
-            )?
-        } else {
-            // Single-section template (or no template/default template)
-            // Create a synthetic section from CLI arguments
-            let single_section = SectionConfig {
-                id: "main".to_string(),
-                placeholder: "{{PLOTLY_BODY}}".to_string(),
-                measurement_filter: if combined_patterns.is_empty() {
-                    None
-                } else {
-                    Some(combined_patterns.join("|"))
-                },
-                key_value_filter: key_values.to_vec(),
-                separate_by: separate_by.clone(),
-                aggregate_by,
-                depth: None,
-                show_epochs,
-                detect_changes,
-            };
+            )?;
 
-            // Generate the single plot
-            // For single-section reports, fail if no measurements found
-            let (plot, match_count) =
-                generate_section_plot(&commits, &single_section, show_epochs, detect_changes)?;
-
-            if match_count == 0 {
-                bail!("No performance measurements found.");
+            // Write output
+            if output == Path::new("-") {
+                match io::stdout().write_all(&report_bytes) {
+                    Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+                    res => res,
+                }?;
+            } else {
+                File::create(&output)?.write_all(&report_bytes)?;
             }
 
-            // Apply template rendering
-            let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
-            let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+            return Ok(());
+        }
 
-            let output = template_str
-                .replace("{{TITLE}}", &metadata.title)
-                .replace("{{PLOTLY_HEAD}}", &plotly_head)
-                .replace("{{PLOTLY_BODY}}", &plotly_body)
-                .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
-                .replace("{{TIMESTAMP}}", &metadata.timestamp)
-                .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
-                .replace("{{DEPTH}}", &metadata.depth.to_string())
-                .replace("{{AUDIT_SECTION}}", "");
+        // Single-section HTML: fall through to use shared section-based path below
+        // Generate the single plot using shared code
+        let (html_plot, match_count) =
+            generate_section_plot(&commits, &single_section, show_epochs, detect_changes)?;
 
-            output.as_bytes().to_vec()
-        };
+        if match_count == 0 {
+            bail!("No performance measurements found.");
+        }
 
-        // Write output
+        // Apply template rendering for HTML
+        let (_plotly_head, plotly_body) = extract_plotly_parts(&html_plot);
+        let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+
+        let output_html = template_str
+            .replace("{{TITLE}}", &metadata.title)
+            .replace("{{PLOTLY_HEAD}}", &plotly_head)
+            .replace("{{PLOTLY_BODY}}", &plotly_body)
+            .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+            .replace("{{TIMESTAMP}}", &metadata.timestamp)
+            .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+            .replace("{{DEPTH}}", &metadata.depth.to_string())
+            .replace("{{AUDIT_SECTION}}", "");
+
+        let output_bytes = output_html.as_bytes();
+
         if output == Path::new("-") {
-            match io::stdout().write_all(&report_bytes) {
+            match io::stdout().write_all(output_bytes) {
                 Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
                 res => res,
             }?;
         } else {
-            File::create(&output)?.write_all(&report_bytes)?;
+            File::create(&output)?.write_all(output_bytes)?;
         }
 
         return Ok(());
     }
 
-    // CSV output path - use the same pattern as single-section HTML reports
-    // Filter measurements using the shared helper function
-    let relevant_measurements: Vec<Vec<&MeasurementData>> =
-        filter_measurements_by_criteria(&commits, &filters, key_values);
-
-    if relevant_measurements.iter().all(|ms| ms.is_empty()) {
-        bail!("No performance measurements found.")
-    }
-
-    let unique_measurement_names: Vec<_> = relevant_measurements
-        .iter()
-        .flat_map(|ms| ms.iter().map(|m| &m.name))
-        .unique()
-        .collect();
-
-    // Use the same helper functions as single-section HTML reports
-    // (Note: can't use process_measurement_group directly due to lifetime constraints with Box<dyn Reporter>)
-    for measurement_name in unique_measurement_names {
-        // Get group values first
-        let filtered_for_grouping = relevant_measurements
-            .iter()
-            .map(|ms| ms.iter().filter(|m| m.name == *measurement_name).copied());
-
-        let group_values_to_process = compute_group_values_to_process(
-            filtered_for_grouping,
-            &separate_by,
-            &format!("Measurement '{}'", measurement_name),
-        )?;
-
-        for group_value in group_values_to_process {
-            // Filter and collect measurements for this group
-            // Inline filtering (same as original) - using filter_group_measurements causes lifetime issues
-            let group_measurements_vec: Vec<Vec<&MeasurementData>> = relevant_measurements
-                .iter()
-                .map(|ms| {
-                    ms.iter()
-                        .filter(|m| {
-                            // Filter by measurement name (already done in relevant_measurements)
-                            // Filter by group value
-                            if group_value.is_empty() {
-                                return true;
-                            }
-                            separate_by
-                                .iter()
-                                .zip(group_value.iter())
-                                .all(|(key, expected_val)| {
-                                    m.key_values
-                                        .get(key)
-                                        .map(|v| v == expected_val)
-                                        .unwrap_or(false)
-                                })
-                        })
-                        .copied()
-                        .collect()
-                })
-                .collect();
-
-            // Add trace visualization (using same helper as single-section HTML)
-            add_trace_for_measurement_group(
-                &mut *plot,
-                group_measurements_vec.iter().map(|v| v.iter().copied()),
-                measurement_name,
-                &group_value,
-                aggregate_by,
-            );
-
-            // Add change points and epochs if requested (using same helper as single-section HTML)
-            add_detection_traces_if_requested(
-                &mut *plot,
-                group_measurements_vec.iter().map(|v| v.iter().copied()),
-                &commits,
-                measurement_name,
-                &group_value,
-                aggregate_by,
-                show_epochs,
-                detect_changes,
-                crate::config::change_point_config,
-            );
-        }
-    }
-
-    let output_bytes = plot.as_bytes();
+    // CSV output path - use the same section-based approach
+    // Generate CSV output using shared section logic
+    let csv_reporter = CsvReporter::new();
+    let output_bytes = generate_section_plot_internal_csv(
+        csv_reporter,
+        &commits,
+        &single_section,
+        show_epochs,
+        detect_changes,
+    )?;
 
     if output == Path::new("-") {
         match io::stdout().write_all(&output_bytes) {
