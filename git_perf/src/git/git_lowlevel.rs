@@ -86,9 +86,7 @@ pub(super) fn feed_git_command(
         Ok(git_output)
     } else {
         trace!("exec failed");
-        Err(GitError::ExecError {
-            output: git_output,
-        })
+        Err(GitError::ExecError { output: git_output })
     }
 }
 
@@ -261,9 +259,7 @@ mod test {
             stdout: String::new(),
             stderr: "fatal: cannot lock ref 'refs/heads/main': Unable to create lock".to_string(),
         };
-        let error = GitError::ExecError {
-            output,
-        };
+        let error = GitError::ExecError { output };
 
         let mapped = map_git_error(error);
         assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
@@ -275,9 +271,7 @@ mod test {
             stdout: String::new(),
             stderr: "fatal: ref updates forbidden, but expected commit abc123".to_string(),
         };
-        let error = GitError::ExecError {
-            output,
-        };
+        let error = GitError::ExecError { output };
 
         let mapped = map_git_error(error);
         assert!(matches!(mapped, GitError::RefConcurrentModification { .. }));
