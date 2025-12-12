@@ -1660,7 +1660,7 @@ pub fn report(
         return Ok(());
     }
 
-    // CSV output path - use the old Reporter trait approach
+    // CSV output path - use the same pattern as single-section HTML reports
     // Filter measurements using the shared helper function
     let relevant_measurements: Vec<Vec<&MeasurementData>> =
         filter_measurements_by_criteria(&commits, &filters, key_values);
@@ -1675,6 +1675,8 @@ pub fn report(
         .unique()
         .collect();
 
+    // Use the same helper functions as single-section HTML reports
+    // (Note: can't use process_measurement_group directly due to lifetime constraints with Box<dyn Reporter>)
     for measurement_name in unique_measurement_names {
         // Get group values first
         let filtered_for_grouping = relevant_measurements
@@ -1688,16 +1690,14 @@ pub fn report(
         )?;
 
         for group_value in group_values_to_process {
-            // Filter and collect measurements directly from relevant_measurements
-            let group_measurements: Vec<Vec<&MeasurementData>> = relevant_measurements
+            // Filter and collect measurements for this group
+            // Inline filtering (same as original) - using filter_group_measurements causes lifetime issues
+            let group_measurements_vec: Vec<Vec<&MeasurementData>> = relevant_measurements
                 .iter()
                 .map(|ms| {
                     ms.iter()
                         .filter(|m| {
-                            // Filter by measurement name
-                            if m.name != *measurement_name {
-                                return false;
-                            }
+                            // Filter by measurement name (already done in relevant_measurements)
                             // Filter by group value
                             if group_value.is_empty() {
                                 return true;
@@ -1717,19 +1717,19 @@ pub fn report(
                 })
                 .collect();
 
-            // Add trace visualization
+            // Add trace visualization (using same helper as single-section HTML)
             add_trace_for_measurement_group(
                 &mut *plot,
-                group_measurements.iter().map(|v| v.iter().copied()),
+                group_measurements_vec.iter().map(|v| v.iter().copied()),
                 measurement_name,
                 &group_value,
                 aggregate_by,
             );
 
-            // Add change points and epochs if requested
+            // Add change points and epochs if requested (using same helper as single-section HTML)
             add_detection_traces_if_requested(
                 &mut *plot,
-                group_measurements.iter().map(|v| v.iter().copied()),
+                group_measurements_vec.iter().map(|v| v.iter().copied()),
                 &commits,
                 measurement_name,
                 &group_value,
