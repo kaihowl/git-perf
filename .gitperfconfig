@@ -27,7 +27,7 @@ aggregate_by = "median"
 min_measurements = 10
 
 [measurement."add-benchmark"]
-epoch = "e1b4d14"
+epoch = "d1f2833"
 unit = "ns"
 sigma = 3.5
 aggregate_by = "median"
