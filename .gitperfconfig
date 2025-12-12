@@ -20,7 +20,7 @@ unit = "bytes"
 min_measurements = 10
 
 [measurement."report-benchmark"]
-epoch = "e1b4d14"
+epoch = "36b8efc"
 unit = "ns"
 sigma = 3
 aggregate_by = "median"
