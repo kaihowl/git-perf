@@ -193,7 +193,42 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
-        pages_url=$(gh api repos/${{ github.repository }}/pages --jq '.html_url')
+        # Check if GitHub Pages is configured
+        if ! pages_url=$(gh api repos/${{ github.repository }}/pages --jq '.html_url' 2>&1); then
+          echo "::error::GitHub Pages is not configured for this repository!"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📄 GitHub Pages Setup Required"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "The report action has successfully generated your performance report,"
+          echo "but cannot publish it because GitHub Pages is not yet configured."
+          echo ""
+          echo "To fix this, follow these steps:"
+          echo ""
+          echo "1. Go to your repository Settings → Pages"
+          echo "   https://github.com/${{ github.repository }}/settings/pages"
+          echo ""
+          echo "2. Under 'Build and deployment':"
+          echo "   - Source: Select 'Deploy from a branch'"
+          echo "   - Branch: Select 'gh-pages' and '/ (root)'"
+          echo "   - Click 'Save'"
+          echo ""
+          echo "3. Wait a few minutes for GitHub Pages to initialize"
+          echo ""
+          echo "4. Re-run this workflow:"
+          echo "   - Go to the Actions tab"
+          echo "   - Click on this workflow run"
+          echo "   - Click 'Re-run all jobs'"
+          echo ""
+          echo "Note: The 'gh-pages' branch was created by the previous step in this"
+          echo "workflow. If you don't see it in the dropdown, refresh the page or"
+          echo "wait a moment for GitHub to update."
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          exit 1
+        fi
+
         echo "pages-url=$pages_url" >> $GITHUB_OUTPUT
         echo "Pages URL: $pages_url"
 

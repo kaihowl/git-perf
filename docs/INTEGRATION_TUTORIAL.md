@@ -114,7 +114,13 @@ jobs:
       - name: Install git-perf
         uses: kaihowl/git-perf/.github/actions/install@master
         with:
-          version: latest
+          release: latest
+
+      # Configure git identity (required for git-perf to commit measurements)
+      - name: Configure git identity
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
 
       # Example: Measure build time using the measure command
       - name: Build project and measure
@@ -135,6 +141,7 @@ jobs:
 **Important Notes:**
 - The `fetch-depth: 0` fetches full history; you can use a specific depth (e.g., `fetch-depth: 50`) matching the `-n` flag used in `report` or `audit` commands
 - The `contents: write` permission is needed to push measurement data
+- **Git identity configuration is required** because git-perf stores measurements as git-notes (git commits)
 - The `git perf measure` command automatically times the execution of the supplied command
 - Push is unconditional to ensure measurements are always saved
 
@@ -165,7 +172,12 @@ jobs:
       - name: Install git-perf
         uses: kaihowl/git-perf/.github/actions/install@master
         with:
-          version: latest
+          release: latest
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
 
       - name: Build project and measure
         run: git perf measure -m build_time -- cargo build --release
@@ -187,11 +199,36 @@ jobs:
 
 ### Enable GitHub Pages
 
-1. Go to your repository settings
-2. Navigate to "Pages" in the left sidebar
-3. Under "Source", select the `gh-pages` branch
-4. Click "Save"
-5. Your report will be available at `https://<username>.github.io/<repository>/`
+**Important**: The first workflow run will intentionally fail with clear setup instructions. This is expected behavior.
+
+**First Run (Expected to Fail):**
+
+When you push the workflow for the first time:
+1. ✅ The workflow will successfully generate your performance report
+2. ✅ The workflow will create and push the `gh-pages` branch
+3. ❌ The workflow will fail at "Get Pages URL" with detailed instructions
+
+**After First Run, Configure GitHub Pages:**
+
+1. Go to **Settings → Pages** in your repository
+   - Direct link: `https://github.com/<owner>/<repo>/settings/pages`
+
+2. Under **"Build and deployment"**:
+   - **Source**: Select "Deploy from a branch"
+   - **Branch**: Select `gh-pages` and `/ (root)`
+   - Click **"Save"**
+
+3. Wait a few minutes for GitHub Pages to initialize
+
+4. **Re-run the workflow**:
+   - Go to the Actions tab
+   - Find the failed workflow run
+   - Click "Re-run all jobs"
+
+5. ✅ The workflow will now succeed and your report will be available at:
+   - `https://<username>.github.io/<repository>/`
+
+**Note**: The `gh-pages` branch is automatically created by the report action on the first run. If you don't see it in the dropdown immediately, refresh the Settings page.
 
 ## Step 5: Configure Measurement Cleanup
 
@@ -338,6 +375,34 @@ git perf audit -m build_time -s env=prod
 
 ## Troubleshooting
 
+### Issue: Git Identity Not Configured
+
+**Symptom**: Workflow fails with "Author identity unknown" or "empty ident name not allowed"
+
+**Error Message**:
+```
+Error: Permanent failure while adding note line to head
+
+Caused by:
+    Git failed to execute.
+
+    stderr:
+    Author identity unknown
+
+    *** Please tell me who you are.
+```
+
+**Solution**:
+Add git identity configuration before any git-perf measurement commands:
+```yaml
+- name: Configure git identity
+  run: |
+    git config --global user.email "actions@github.com"
+    git config --global user.name "GitHub Actions"
+```
+
+**Why**: Git-perf stores measurements as git-notes, which require git commits. All commits need a configured user identity.
+
 ### Issue: Push Fails in GitHub Actions
 
 **Symptom**: `git perf push` fails with authentication errors
@@ -346,6 +411,30 @@ git perf audit -m build_time -s env=prod
 1. Ensure `contents: write` permission is set in the workflow
 2. Use `fetch-depth: 0` when checking out the repository
 3. Verify the branch is not protected (or add exception for Actions)
+
+### Issue: Report Action Fails - GitHub Pages Not Configured
+
+**Symptom**: Workflow fails at "Get Pages URL" step with "Not Found (HTTP 404)"
+
+**Error Message**:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 GitHub Pages Setup Required
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**This is Expected on First Run!**
+
+The workflow intentionally fails with detailed instructions on how to configure GitHub Pages.
+
+**Solution**:
+1. The `gh-pages` branch has already been created by the workflow
+2. Go to Settings → Pages in your repository
+3. Select `gh-pages` branch and `/ (root)` folder
+4. Click "Save"
+5. Re-run the workflow
+
+See the [Enable GitHub Pages](#enable-github-pages) section for complete instructions.
 
 ### Issue: Audit Fails Unexpectedly
 
