@@ -14,6 +14,7 @@ pub mod measurement_retrieval;
 pub mod measurement_storage;
 pub mod parsers;
 pub mod reporting;
+pub mod reporting_config;
 pub mod serialization;
 pub mod size;
 pub mod stats;
