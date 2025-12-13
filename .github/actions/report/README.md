@@ -2,6 +2,8 @@
 
 A GitHub Action to generate and publish git-perf performance reports to GitHub Pages.
 
+> **⚠️ First-Time Setup Required**: On your first workflow run, the action will fail with clear instructions to configure GitHub Pages. After enabling Pages in your repository settings, simply re-run the workflow. See [Prerequisites](#prerequisites) for details.
+
 ## Features
 
 - Generates HTML performance reports using `git-perf report`
@@ -11,6 +13,7 @@ A GitHub Action to generate and publish git-perf performance reports to GitHub P
 - Automatically comments on pull requests with report URL and audit results
 - Supports custom report naming and depth configuration
 - Returns report URL and audit output for use in subsequent steps
+- **Provides clear setup instructions** when GitHub Pages is not configured
 
 ## Usage
 
@@ -104,20 +107,51 @@ The action automatically comments on PRs by default. To disable automatic commen
 
 ## Prerequisites
 
-- Repository must have GitHub Pages enabled
-- Workflow must have appropriate permissions:
-  ```yaml
-  permissions:
-    pages: write
-    contents: write
-    pull-requests: write  # If using comment-on-pr
-  ```
-- **Important**: To prevent concurrent pushes to gh-pages branch, add concurrency control to your workflow:
-  ```yaml
-  concurrency:
-    group: gh-pages-${{ github.ref }}
-    cancel-in-progress: false  # Don't cancel, let them queue
-  ```
+### 1. GitHub Pages Configuration (REQUIRED)
+
+**The action will fail with a clear error message if GitHub Pages is not configured.**
+
+On first run, the workflow will:
+1. ✅ Generate the performance report successfully
+2. ✅ Push the `gh-pages` branch to your repository
+3. ❌ Fail at the "Get Pages URL" step with instructions
+
+**Setup Instructions:**
+
+After the first workflow run creates the `gh-pages` branch, configure GitHub Pages:
+
+1. Go to **Settings → Pages** in your repository
+   - Direct link: `https://github.com/<owner>/<repo>/settings/pages`
+
+2. Under **"Build and deployment"**:
+   - **Source**: Select "Deploy from a branch"
+   - **Branch**: Select `gh-pages` and `/ (root)`
+   - Click **"Save"**
+
+3. Wait a few minutes for GitHub Pages to initialize
+
+4. **Re-run the workflow** and it will succeed
+
+The action will provide detailed setup instructions if Pages is not configured.
+
+### 2. Workflow Permissions
+
+Workflow must have appropriate permissions:
+```yaml
+permissions:
+  pages: write
+  contents: write
+  pull-requests: write  # If using comment-on-pr
+```
+
+### 3. Concurrency Control
+
+**Important**: To prevent concurrent pushes to gh-pages branch, add concurrency control to your workflow:
+```yaml
+concurrency:
+  group: gh-pages-${{ github.ref }}
+  cancel-in-progress: false  # Don't cancel, let them queue
+```
 
 ## Report Naming
 
