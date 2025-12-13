@@ -2,3 +2,4 @@
 # Pin Rust version to prevent unexpected CI breakages from new compiler releases
 # Dependabot will automatically create PRs to update this version
 channel = "1.91.1"
+components = ["clippy", "rustfmt"]
