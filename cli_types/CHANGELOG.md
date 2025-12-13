@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.2.1...git_perf_cli_types-v0.3.0) - 2025-12-13
+
+### Added
+
+- *(change_point)* add PELT detection with epochs, enrichment, CLI, and visualization ([#474](https://github.com/kaihowl/git-perf/pull/474))
+- *(reporting)* add HTML template support for customizable reports ([#502](https://github.com/kaihowl/git-perf/pull/502))
+
+### Fixed
+
+- *(ci)* resolve 500 error and add --dry-run flag ([#501](https://github.com/kaihowl/git-perf/pull/501))
+
+### Other
+
+- *(clippy)* drop index_slicing lint; add must_use, pattern matching ([#525](https://github.com/kaihowl/git-perf/pull/525))
+- clarify minimum measurement requirement ([#489](https://github.com/kaihowl/git-perf/pull/489))
+
 ## [0.2.1](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.2.0...git_perf_cli_types-v0.2.1) - 2025-11-15
 
 ### Added

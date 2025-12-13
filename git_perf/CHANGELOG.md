@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.1...git-perf-v0.18.2) - 2025-12-13
+
+### Added
+
+- *(change_point)* add PELT detection with epochs, enrichment, CLI, and visualization ([#474](https://github.com/kaihowl/git-perf/pull/474))
+- *(reporting)* add HTML template support for customizable reports ([#502](https://github.com/kaihowl/git-perf/pull/502))
+
+### Fixed
+
+- *(ci)* resolve 500 error and add --dry-run flag ([#501](https://github.com/kaihowl/git-perf/pull/501))
+
+### Other
+
+- *(clippy)* drop index_slicing lint; add must_use, pattern matching ([#525](https://github.com/kaihowl/git-perf/pull/525))
+- *(reporting)* use markers for change points instead of vertical lines ([#523](https://github.com/kaihowl/git-perf/pull/523))
+- *(git)* expand mutation tests for size_ops; exclude test_helpers.rs ([#507](https://github.com/kaihowl/git-perf/pull/507))
+- *(defaults)* centralize default config values and remove magic numbers ([#511](https://github.com/kaihowl/git-perf/pull/511))
+- clean up test helpers for hermiticity ([#496](https://github.com/kaihowl/git-perf/pull/496))
+- fix non hermetic test_gather_global_settings test ([#495](https://github.com/kaihowl/git-perf/pull/495))
+- remove unused imports ([#494](https://github.com/kaihowl/git-perf/pull/494))
+- fix missing canonicalization of paths for macOS ([#493](https://github.com/kaihowl/git-perf/pull/493))
+- clarify minimum measurement requirement ([#489](https://github.com/kaihowl/git-perf/pull/489))
+
 ## [0.18.1](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.0...git-perf-v0.18.1) - 2025-11-15
 
 ### Added
