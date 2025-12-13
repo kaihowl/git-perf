@@ -9,6 +9,46 @@ This tutorial walks you through integrating git-perf into your GitHub project fo
 - For GitHub Actions integration: A GitHub repository with Actions enabled
 - Basic familiarity with Git and YAML (for GitHub Actions setup)
 
+### Verify Git Version
+
+Check your Git version:
+
+```bash
+git --version
+# Should output: git version 2.43.0 or higher
+```
+
+If you need to upgrade Git:
+
+**Ubuntu/Debian:**
+```bash
+sudo add-apt-repository ppa:git-core/ppa
+sudo apt update && sudo apt install git
+```
+
+**macOS:**
+```bash
+brew upgrade git
+```
+
+**Windows:**
+Download the latest version from [git-scm.com](https://git-scm.com/download/win)
+
+### Data Format Version (perf-v3)
+
+Git-perf stores measurements in versioned git-notes (currently **v3** format).
+
+**For new projects**: You'll use v3 automatically - no action needed.
+
+**For existing git-perf users**: If you previously used git-perf v1 or v2, you'll need to migrate your data:
+
+- **Current version uses**: `refs/notes/perf-v3`
+- **Version compatibility**: Measurements are format-specific; v3 cannot read v2 measurements without migration
+- **Migration scripts**: Available in the git-perf repository (`scripts/to_v2.sh`, `scripts/to_v3.sh`)
+- **Migration guide**: See the [main README](../README.md#migration) for detailed migration instructions
+
+**Important**: If you're starting fresh with git-perf, you can skip this - the latest version automatically uses v3 format.
+
 ## Step 1: Install git-perf Locally
 
 See the [Installation section in the README](../README.md#installation) for complete installation instructions, including:
@@ -36,9 +76,14 @@ cd /path/to/your/project
 # You'll typically get this value from your build or test process
 git perf add -m build_time 42.5
 
-# View measurements in a report
+# Generate an HTML report (creates output.html by default)
 git perf report
+
+# Or specify a custom output location
+git perf report -o my-report.html
 ```
+
+**Note**: The `git perf report` command generates an HTML file (default: `output.html`) and produces no terminal output. Open the HTML file in a browser to view your performance data with interactive charts.
 
 ### Configure Measurement Settings
 
@@ -80,6 +125,22 @@ Units are displayed in audit output, HTML reports, and CSV exports. They help ma
 ```bash
 git add .gitperfconfig
 git commit -m "chore: add git-perf configuration"
+```
+
+### Verification
+
+Verify your local setup is working correctly:
+
+```bash
+# Check that measurements were recorded
+git notes --ref=refs/notes/perf-v3 list
+
+# Verify the measurement data in git notes
+git log --show-notes=refs/notes/perf-v3 --oneline -1
+
+# Generate and view a report
+git perf report -o test-report.html
+# Open test-report.html in your browser to verify the report displays correctly
 ```
 
 ## Step 3: Configure GitHub Actions
@@ -145,6 +206,29 @@ jobs:
 - The `git perf measure` command automatically times the execution of the supplied command
 - Push is unconditional to ensure measurements are always saved
 
+### Verification
+
+After pushing your workflow, verify it runs successfully:
+
+```bash
+# Push the workflow file
+git add .github/workflows/performance-tracking.yml
+git commit -m "ci: add performance tracking workflow"
+git push
+
+# Check the workflow status
+gh run list --workflow=performance-tracking.yml --limit 5
+
+# View the most recent run
+gh run view --log
+
+# Verify measurements were pushed
+git fetch origin refs/notes/perf-v3:refs/notes/perf-v3
+git notes --ref=refs/notes/perf-v3 list
+```
+
+**Expected Result**: The workflow should complete successfully and push measurements to git-notes.
+
 ## Step 4: Set Up Automatic Reporting
 
 ### Generate HTML Reports
@@ -161,9 +245,15 @@ jobs:
       contents: write
       pages: write
       pull-requests: write  # Required for PR comments
+
+    # Concurrency control prevents race conditions when multiple workflows
+    # try to update the gh-pages branch simultaneously. Without this, you may
+    # encounter "failed to push" errors or lost reports when multiple PRs or
+    # commits trigger the workflow at the same time.
     concurrency:
-      group: gh-pages-${{ github.ref }}
-      cancel-in-progress: false  # Let jobs queue to prevent conflicts
+      group: gh-pages-${{ github.ref }}      # One deployment per branch at a time
+      cancel-in-progress: false              # Queue jobs instead of canceling
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -229,6 +319,23 @@ When you push the workflow for the first time:
    - `https://<username>.github.io/<repository>/`
 
 **Note**: The `gh-pages` branch is automatically created by the report action on the first run. If you don't see it in the dropdown immediately, refresh the Settings page.
+
+### Verification
+
+Verify GitHub Pages is working correctly:
+
+```bash
+# Check that gh-pages branch exists
+git ls-remote origin gh-pages
+
+# View the GitHub Pages deployment status
+gh api repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/pages
+
+# Visit your report URL (replace with your details)
+# https://<username>.github.io/<repository>/<branch-name>.html
+```
+
+**Expected Result**: GitHub Pages should show as "built and deployed" and your report should be accessible via the URL.
 
 ## Step 5: Configure Measurement Cleanup
 
@@ -474,6 +581,142 @@ See the [Enable GitHub Pages](#enable-github-pages) section for complete instruc
    cleanup-reports: false
    ```
 
+### Issue: Shallow Clone Errors
+
+**Symptom**: `git perf push` or `git perf pull` fails with "shallow clone detected" error
+
+**Error Message**:
+```
+Error: fatal: shallow clone detected. git-perf requires full repository history
+```
+
+**Solution**:
+Convert your shallow clone to a full clone:
+```bash
+git fetch --unshallow
+```
+
+**For GitHub Actions**: Ensure you use `fetch-depth: 0` in checkout:
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0  # Required for git-perf
+```
+
+### Issue: Merge Conflicts in Git Notes
+
+**Symptom**: Push fails with "Updates were rejected" or git-notes merge conflicts
+
+**Error Message**:
+```
+! [rejected]        refs/notes/perf-v3 -> refs/notes/perf-v3 (non-fast-forward)
+error: failed to push some refs
+```
+
+**Solution**:
+Pull and merge git-notes before pushing:
+```bash
+# Fetch the latest notes
+git perf pull
+
+# If there are conflicts, git-perf will attempt to merge automatically
+# If automatic merge fails, manually resolve:
+git notes merge refs/notes/perf-v3
+
+# Then push again
+git perf push
+```
+
+**Prevention**: Use concurrency control in your workflow (see Step 4) to prevent simultaneous pushes.
+
+### Issue: Measurements Not Appearing After Push
+
+**Symptom**: Workflow completes but measurements don't show up in reports
+
+**Debug Steps**:
+1. Check if notes were actually pushed:
+   ```bash
+   git ls-remote origin refs/notes/perf-v3
+   ```
+
+2. Fetch notes manually:
+   ```bash
+   git fetch origin refs/notes/perf-v3:refs/notes/perf-v3
+   ```
+
+3. Verify measurements exist locally:
+   ```bash
+   git notes --ref=refs/notes/perf-v3 list
+   ```
+
+4. Check workflow logs for push errors:
+   ```bash
+   gh run view --log | grep -A 10 "Push measurements"
+   ```
+
+**Common Causes**:
+- Git identity not configured (measurements can't be committed)
+- Insufficient permissions (`contents: write` missing)
+- Shallow clone (use `fetch-depth: 0`)
+- Protected branch rules blocking git-notes push
+
+### Issue: Workflow Fails with Permission Errors
+
+**Symptom**: "Resource not accessible by integration" or similar permission errors
+
+**Error Message**:
+```
+Error: Resource not accessible by integration
+```
+
+**Solutions**:
+1. Verify workflow permissions in YAML:
+   ```yaml
+   permissions:
+     contents: write
+     pages: write
+     pull-requests: write
+   ```
+
+2. Check repository Settings → Actions → General → Workflow permissions:
+   - Ensure "Read and write permissions" is enabled
+   - Or grant specific permissions in the workflow file
+
+3. For organization repositories, check organization-level permissions
+
+### Issue: Audit Always Failing
+
+**Symptom**: Audit step always fails even with normal performance
+
+**Common Causes**:
+1. **Insufficient measurements**: Need enough historical data for statistical analysis
+   ```bash
+   # Check how many measurements exist
+   git perf report --csv-aggregate median | wc -l
+   ```
+
+   **Solution**: Wait until you have at least 10 measurements, or reduce `--min-measurements`:
+   ```yaml
+   audit-args: '-m build_time --min-measurements 3'
+   ```
+
+2. **Thresholds too strict**: Default settings may be too sensitive for your use case
+
+   **Solution**: Adjust in `.gitperfconfig`:
+   ```toml
+   [measurement."build_time"]
+   min_relative_deviation = 15.0  # Allow more variance
+   sigma = 6.0                     # Increase from default 4.0
+   ```
+
+3. **High variance in CI**: GitHub Actions runners can have performance variations
+
+   **Solution**: Use MAD (Median Absolute Deviation) which is more robust to outliers:
+   ```toml
+   [measurement]
+   dispersion_method = "mad"
+   ```
+
 ## Best Practices
 
 ### 1. Measurement Granularity
@@ -544,6 +787,58 @@ Units will automatically appear in:
 - Skip permissions declarations
 - Forget concurrency control when publishing to gh-pages
 
+### 5. Testing Your Integration
+
+**Before deploying to your main branch**, test the integration on a feature branch:
+
+1. **Create a test branch**:
+   ```bash
+   git checkout -b test-git-perf-integration
+   ```
+
+2. **Add workflow files and configuration**:
+   ```bash
+   git add .github/workflows/ .gitperfconfig
+   git commit -m "test: add git-perf integration"
+   git push -u origin test-git-perf-integration
+   ```
+
+3. **Verify the workflow runs successfully**:
+   ```bash
+   # Watch the workflow run
+   gh run watch
+
+   # Check for errors
+   gh run list --branch test-git-perf-integration --limit 5
+   ```
+
+4. **Test with manual workflow dispatch first** before enabling automatic triggers:
+   ```yaml
+   on:
+     workflow_dispatch:  # Only manual triggering initially
+     # push:              # Enable after testing
+     #   branches: [main]
+   ```
+
+5. **Make small, incremental changes**:
+   - Start with just measurement collection (Step 3)
+   - Then add reporting (Step 4)
+   - Then add cleanup (Step 5)
+   - Finally add audit (Step 6)
+
+6. **Once verified, merge to main**:
+   ```bash
+   gh pr create --title "feat: add performance tracking with git-perf"
+   # After review and approval
+   gh pr merge --squash
+   ```
+
+**Benefits of Testing First**:
+- Catch configuration errors before they affect main branch
+- Experiment with settings without polluting production data
+- Understand the full workflow before team-wide rollout
+- Avoid breaking CI/CD for the entire team
+
 ## Example Real-World Workflow
 
 Here's a complete, production-ready workflow combining all best practices:
@@ -596,6 +891,131 @@ jobs:
           audit-args: '-m build_time -m binary_size -m test_duration -d 4.0 --min-measurements 5'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+## What Success Looks Like: End-to-End Flow
+
+Here's what a complete, successful git-perf integration looks like in action:
+
+### Step-by-Step Walkthrough
+
+1. **You make a code change** that affects performance (e.g., optimize a function)
+
+2. **Create a pull request**:
+   ```bash
+   git checkout -b optimize-parser
+   git commit -am "perf: optimize JSON parser"
+   git push -u origin optimize-parser
+   gh pr create --title "perf: optimize JSON parser"
+   ```
+
+3. **GitHub Actions automatically runs**:
+   - ✅ Checks out code with full history (`fetch-depth: 0`)
+   - ✅ Installs git-perf
+   - ✅ Configures git identity
+   - ✅ Builds project and measures `build_time`
+   - ✅ Runs tests and measures `test_duration`
+   - ✅ Measures `binary_size`
+   - ✅ Pushes measurements to `refs/notes/perf-v3`
+   - ✅ Generates interactive HTML report
+   - ✅ Publishes report to GitHub Pages
+   - ✅ Runs audit to check for regressions
+   - ✅ Comments on your PR with results
+
+4. **You receive a PR comment** with performance analysis:
+
+   ```markdown
+   ## Performance Report
+
+   ⏱  [Performance Results](https://username.github.io/repo/abc123def.html)
+
+   ## Audit Results
+
+   ✅ 'build_time' (seconds)
+   z-score (mad): ↓ 2.15
+   Head: μ: 38.2 σ: 0.5 MAD: 0.3 n: 1
+   Tail: μ: 42.1 σ: 1.8 MAD: 1.2 n: 15
+    [-9.3% improvement] ▃▅▄▆▅▄▅▃▅▂↓
+
+   ✅ 'test_duration' (ms)
+   z-score (mad): → 0.45
+   Head: μ: 1250 σ: 12 MAD: 8 n: 1
+   Tail: μ: 1248 σ: 25 MAD: 18 n: 15
+    [+0.2% – within normal variance] ▃▅▄▆▅▄▅▃▅▄
+
+   ❌ 'binary_size' (bytes)
+   z-score (mad): ↑ 5.23
+   Head: μ: 4,823,552 σ: 0 MAD: 0 n: 1
+   Tail: μ: 4,512,128 σ: 8,192 MAD: 4,096 n: 15
+    [+6.9% – REGRESSION DETECTED] ▃▅▄▆▅▄▅▃▅↑
+
+   _Created by [git-perf](https://github.com/kaihowl/git-perf/)_
+   ```
+
+5. **You analyze the results**:
+   - ✅ Build time improved by 9.3% - Great!
+   - ✅ Test duration unchanged - Expected
+   - ❌ Binary size increased by 6.9% - Needs investigation
+
+6. **You click the report link** to see the interactive dashboard:
+   - View historical trends with Plotly charts
+   - Filter by branch, measurement, or time range
+   - See sparklines showing performance over time
+   - Export data as CSV for further analysis
+
+7. **You investigate the binary size regression**:
+   ```bash
+   # Check what changed
+   git diff main...optimize-parser -- Cargo.lock
+
+   # Turns out the optimization added a new dependency
+   # You decide the performance gain is worth the size increase
+   # Or you find a way to achieve the optimization without the dependency
+   ```
+
+8. **Team reviews and approves** the PR, understanding the performance trade-offs
+
+9. **PR is merged to main**:
+   - Measurements become part of the main branch history
+   - Future PRs will be compared against this new baseline
+   - Performance dashboard updates with main branch data
+
+### What You Get Over Time
+
+After using git-perf for a while, you'll have:
+
+- **Historical Performance Data**: Months of measurements showing trends
+- **Automated Regression Detection**: Catch performance regressions in code review
+- **Performance Dashboard**: Share `https://yourname.github.io/repo/` with your team
+- **Data-Driven Decisions**: "Should we take this dependency? Let's check the performance impact"
+- **Performance Culture**: Team awareness of performance implications in every PR
+
+### Visual Example of Report Output
+
+When you open the HTML report, you see:
+
+- **Interactive Charts**: Plotly graphs showing performance over time
+  - Line charts for trending metrics (build time, test duration)
+  - Bar charts comparing commits
+  - Hover for detailed measurement values
+
+- **Filtering Options**:
+  - By measurement name
+  - By branch
+  - By date range
+  - By commit
+
+- **Statistical Summaries**:
+  - Mean, median, standard deviation
+  - Min/max values
+  - Outlier detection
+  - Change point detection (when performance characteristics shifted)
+
+- **Export Options**:
+  - Download as CSV
+  - Aggregate by mean, median, min, or max
+  - Include all measurements or filter by criteria
+
+This complete workflow ensures you **never accidentally ship performance regressions** and can **confidently make performance improvements** backed by data.
 
 ## Next Steps
 
