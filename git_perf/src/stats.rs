@@ -53,24 +53,9 @@ concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
 pub fn aggregate_measurements<'a>(measurements: impl Iterator<Item = &'a f64>) -> Stats {
     let measurements_vec: Vec<f64> = measurements.cloned().collect();
     let s: AggStats = measurements_vec.iter().collect();
-
-    // The average crate 0.16+ returns NaN for sample_variance when n <= 1,
-    // and NaN for mean when n == 0.
-    // We convert NaN to 0.0 to maintain backward compatibility and avoid breaking
-    // z-score calculations (NaN/x = NaN, but 0/x could = Inf which is expected).
-    let mean = s.mean();
-    let mean = if mean.is_nan() { 0.0 } else { mean };
-
-    let variance = s.sample_variance();
-    let stddev = if variance.is_nan() {
-        0.0
-    } else {
-        variance.sqrt()
-    };
-
     Stats {
-        mean,
-        stddev,
+        mean: s.mean(),
+        stddev: s.sample_variance().sqrt(),
         mad: calculate_mad(&measurements_vec),
         len: s.mean.len() as usize,
     }
@@ -265,7 +250,9 @@ mod test {
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 1);
         assert_eq!(stats.mean, 1.0);
-        assert_eq!(stats.stddev, 0.0);
+        // The average crate 0.16+ returns NaN for sample variance when n <= 1,
+        // which is mathematically correct (sample variance undefined for n < 2).
+        assert!(stats.stddev.is_nan(), "stddev should be NaN for single measurement");
     }
 
     #[test]
@@ -273,8 +260,9 @@ mod test {
         let measurements = [];
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 0);
-        assert_eq!(stats.mean, 0.0);
-        assert_eq!(stats.stddev, 0.0);
+        // The average crate 0.16+ returns NaN for mean when n == 0.
+        assert!(stats.mean.is_nan(), "mean should be NaN for empty measurements");
+        assert!(stats.stddev.is_nan(), "stddev should be NaN for empty measurements");
     }
 
     #[test]
