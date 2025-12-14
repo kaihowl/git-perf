@@ -252,7 +252,10 @@ mod test {
         assert_eq!(stats.mean, 1.0);
         // The average crate 0.16+ returns NaN for sample variance when n <= 1,
         // which is mathematically correct (sample variance undefined for n < 2).
-        assert!(stats.stddev.is_nan(), "stddev should be NaN for single measurement");
+        assert!(
+            stats.stddev.is_nan(),
+            "stddev should be NaN for single measurement"
+        );
     }
 
     #[test]
@@ -261,8 +264,14 @@ mod test {
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 0);
         // The average crate 0.16+ returns NaN for mean when n == 0.
-        assert!(stats.mean.is_nan(), "mean should be NaN for empty measurements");
-        assert!(stats.stddev.is_nan(), "stddev should be NaN for empty measurements");
+        assert!(
+            stats.mean.is_nan(),
+            "mean should be NaN for empty measurements"
+        );
+        assert!(
+            stats.stddev.is_nan(),
+            "stddev should be NaN for empty measurements"
+        );
     }
 
     #[test]
