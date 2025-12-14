@@ -918,7 +918,7 @@ When you open the HTML report, you see:
   - Change point detection (when performance characteristics shifted)
 
 - **Export Options**:
-  - Download as CSV
+  - Export as CSV
   - Aggregate by mean, median, min, or max
   - Include all measurements or filter by criteria
 
