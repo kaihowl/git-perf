@@ -15,7 +15,7 @@ min_relative_deviation = 10.0
 unit = "ns"
 
 [measurement."release-binary-size"]
-epoch = "c692cdd"
+epoch = "b2c72c42"
 unit = "bytes"
 min_measurements = 10
 
