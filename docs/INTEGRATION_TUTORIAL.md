@@ -832,8 +832,7 @@ Here's what a complete, successful git-perf integration looks like in action:
    ⏱  [Performance Results](https://username.github.io/repo/abc123def.html)
 
    ## Audit Results
-
-   ```
+   
    ✅ 'build_time'
    z-score (stddev): ↓ 2.62
    Head: μ: 38.2s σ: 0ns MAD: 0ns n: 1
@@ -849,7 +848,6 @@ Here's what a complete, successful git-perf integration looks like in action:
    Head: μ: 4.8MB σ: 0B MAD: 0B n: 1
    Tail: μ: 4.5MB σ: 8.2kB MAD: 4.1kB n: 15
     [+6.91% – +6.91%] ▃▅▄▆▅▄▅▃▅
-   ```
 
    _Created by [git-perf](https://github.com/kaihowl/git-perf/)_
    ```
