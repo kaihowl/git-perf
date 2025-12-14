@@ -289,6 +289,10 @@ fn audit_with_data(
     sigma: f64,
     dispersion_method: DispersionMethod,
 ) -> Result<AuditResult> {
+    // Note: CLI enforces min_count >= 2 via clap::value_parser!(u16).range(2..)
+    // Tests may use lower values for edge case testing, but production code
+    // should never call this with min_count < 2
+
     // Get unit for this measurement from config
     let unit = config::measurement_unit(measurement);
     let unit_str = unit.as_deref();
@@ -1672,27 +1676,14 @@ dispersion_method = "mad"
     }
 
     #[test]
-    fn test_min_measurements_zero_with_no_tail() {
-        // Test behavior when min_measurements=0 with no tail measurements.
-        // Current behavior: This will panic because z-score calculation requires
-        // at least 1 tail measurement (tail_summary.len >= 1 assertion).
-        //
-        // With min_count=0 and 0 tail measurements:
-        // - Skip condition (tail_summary.len < min_count) is false (0 < 0 = false)
-        // - Code proceeds to calculate z-score, which panics
-        //
-        // TODO: This edge case should be handled gracefully. Options:
-        // 1. Always require min_count >= 1 for statistical comparison
-        // 2. Add special handling for min_count=0 with empty tail
-        // 3. Skip when tail is empty, regardless of min_count
-        //
-        // For now, this test documents the current behavior by using min_count=1
-        // instead to avoid the panic.
+    fn test_min_measurements_two_with_no_tail() {
+        // Test the minimum allowed min_measurements value (2) with no tail measurements.
+        // This should skip the audit since we have 0 < 2 tail measurements.
         let result = audit_with_data(
             "test_measurement",
             15.0,   // head
             vec![], // no tail measurements
-            1,      // Use min_count=1 to trigger skip (avoids panic)
+            2,      // min_count = 2 (minimum allowed by CLI)
             2.0,
             DispersionMethod::StandardDeviation,
         );
@@ -1700,50 +1691,52 @@ dispersion_method = "mad"
         assert!(result.is_ok());
         let audit_result = result.unwrap();
 
-        // Should pass (skipped) since we have 0 < 1 tail measurements
+        // Should pass (skipped) since we have 0 < 2 tail measurements
         assert!(audit_result.passed);
         assert!(audit_result.message.contains("Skipping test"));
         assert!(audit_result
             .message
             .contains("0 historical measurements found"));
+        assert!(audit_result
+            .message
+            .contains("Less than requested min_measurements of 2"));
 
-        // Should show Head summary only
+        // Should show Head summary only (total_measurements = 1)
         assert!(audit_result.message.contains("Head:"));
         assert!(!audit_result.message.contains("z-score"));
         assert!(!audit_result.message.contains("Tail:"));
     }
 
     #[test]
-    fn test_min_measurements_zero_with_single_tail() {
-        // Test that when min_measurements=0 and there is one tail measurement,
-        // the audit performs statistical comparison and passes (when within sigma).
-        //
-        // With min_count=0 and 1 tail measurement:
-        // - Skip condition (tail_summary.len < min_count) is false (1 < 0 = false)
-        // - Code proceeds to calculate z-score (which succeeds with 1 tail measurement)
-        // - Audit result depends on whether z-score exceeds sigma
+    fn test_min_measurements_two_with_single_tail() {
+        // Test the minimum allowed min_measurements value (2) with a single tail measurement.
+        // This should skip since we have 1 < 2 tail measurements.
         let result = audit_with_data(
             "test_measurement",
             15.0,       // head
             vec![10.0], // single tail measurement
-            0,          // min_count = 0
-            10.0,       // high sigma to ensure it passes
+            2,          // min_count = 2 (minimum allowed by CLI)
+            2.0,
             DispersionMethod::StandardDeviation,
         );
 
         assert!(result.is_ok());
         let audit_result = result.unwrap();
 
-        // Should pass (not skip) since we meet min_count=0 and have 1 tail measurement
+        // Should pass (skipped) since we have 1 < 2 tail measurements
         assert!(audit_result.passed);
-        assert!(!audit_result.message.contains("Skipping test"));
+        assert!(audit_result.message.contains("Skipping test"));
+        assert!(audit_result
+            .message
+            .contains("1 historical measurement found"));
+        assert!(audit_result
+            .message
+            .contains("Less than requested min_measurements of 2"));
 
-        // Should show success indicator
-        assert!(audit_result.message.contains("✅"));
-
-        // Should display z-score and summary since we have 2 total measurements
-        assert!(audit_result.message.contains("z-score"));
+        // Should show both Head and Tail summaries with z-score (total_measurements = 2)
         assert!(audit_result.message.contains("Head:"));
         assert!(audit_result.message.contains("Tail:"));
+        assert!(audit_result.message.contains("z-score"));
+        assert!(audit_result.message.contains("["));
     }
 }
