@@ -603,32 +603,6 @@ git fetch --unshallow
     fetch-depth: 0  # Required for git-perf
 ```
 
-### Issue: Merge Conflicts in Git Notes
-
-**Symptom**: Push fails with "Updates were rejected" or git-notes merge conflicts
-
-**Error Message**:
-```
-! [rejected]        refs/notes/perf-v3 -> refs/notes/perf-v3 (non-fast-forward)
-error: failed to push some refs
-```
-
-**Solution**:
-Pull and merge git-notes before pushing:
-```bash
-# Fetch the latest notes
-git perf pull
-
-# If there are conflicts, git-perf will attempt to merge automatically
-# If automatic merge fails, manually resolve:
-git notes merge refs/notes/perf-v3
-
-# Then push again
-git perf push
-```
-
-**Prevention**: Use concurrency control in your workflow (see Step 4) to prevent simultaneous pushes.
-
 ### Issue: Measurements Not Appearing After Push
 
 **Symptom**: Workflow completes but measurements don't show up in reports
