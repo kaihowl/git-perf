@@ -34,21 +34,6 @@ brew upgrade git
 **Windows:**
 Download the latest version from [git-scm.com](https://git-scm.com/download/win)
 
-### Data Format Version (perf-v3)
-
-Git-perf stores measurements in versioned git-notes (currently **v3** format).
-
-**For new projects**: You'll use v3 automatically - no action needed.
-
-**For existing git-perf users**: If you previously used git-perf v1 or v2, you'll need to migrate your data:
-
-- **Current version uses**: `refs/notes/perf-v3`
-- **Version compatibility**: Measurements are format-specific; v3 cannot read v2 measurements without migration
-- **Migration scripts**: Available in the git-perf repository (`scripts/to_v2.sh`, `scripts/to_v3.sh`)
-- **Migration guide**: See the [main README](../README.md#migration) for detailed migration instructions
-
-**Important**: If you're starting fresh with git-perf, you can skip this - the latest version automatically uses v3 format.
-
 ## Step 1: Install git-perf Locally
 
 See the [Installation section in the README](../README.md#installation) for complete installation instructions, including:
@@ -223,11 +208,11 @@ gh run list --workflow=performance-tracking.yml --limit 5
 gh run view --log
 
 # Verify measurements were pushed
-git fetch origin refs/notes/perf-v3:refs/notes/perf-v3
-git notes --ref=refs/notes/perf-v3 list
+git perf pull
+git perf report
 ```
 
-**Expected Result**: The workflow should complete successfully and push measurements to git-notes.
+**Expected Result**: The workflow should complete successfully and push measurements to git-notes. The `git perf pull` command retrieves the measurements, and `git perf report` displays them.
 
 ## Step 4: Set Up Automatic Reporting
 
@@ -581,28 +566,6 @@ See the [Enable GitHub Pages](#enable-github-pages) section for complete instruc
    cleanup-reports: false
    ```
 
-### Issue: Shallow Clone Errors
-
-**Symptom**: `git perf push` or `git perf pull` fails with "shallow clone detected" error
-
-**Error Message**:
-```
-Error: fatal: shallow clone detected. git-perf requires full repository history
-```
-
-**Solution**:
-Convert your shallow clone to a full clone:
-```bash
-git fetch --unshallow
-```
-
-**For GitHub Actions**: Ensure you use `fetch-depth: 0` in checkout:
-```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0  # Required for git-perf
-```
-
 ### Issue: Measurements Not Appearing After Push
 
 **Symptom**: Workflow completes but measurements don't show up in reports
@@ -631,7 +594,6 @@ git fetch --unshallow
 **Common Causes**:
 - Git identity not configured (measurements can't be committed)
 - Insufficient permissions (`contents: write` missing)
-- Shallow clone (use `fetch-depth: 0`)
 - Protected branch rules blocking git-notes push
 
 ### Issue: Workflow Fails with Permission Errors
@@ -657,39 +619,6 @@ Error: Resource not accessible by integration
    - Or grant specific permissions in the workflow file
 
 3. For organization repositories, check organization-level permissions
-
-### Issue: Audit Always Failing
-
-**Symptom**: Audit step always fails even with normal performance
-
-**Common Causes**:
-1. **Insufficient measurements**: Need enough historical data for statistical analysis
-   ```bash
-   # Check how many measurements exist
-   git perf report --csv-aggregate median | wc -l
-   ```
-
-   **Solution**: Wait until you have at least 10 measurements, or reduce `--min-measurements`:
-   ```yaml
-   audit-args: '-m build_time --min-measurements 3'
-   ```
-
-2. **Thresholds too strict**: Default settings may be too sensitive for your use case
-
-   **Solution**: Adjust in `.gitperfconfig`:
-   ```toml
-   [measurement."build_time"]
-   min_relative_deviation = 15.0  # Allow more variance
-   sigma = 6.0                     # Increase from default 4.0
-   ```
-
-3. **High variance in CI**: GitHub Actions runners can have performance variations
-
-   **Solution**: Use MAD (Median Absolute Deviation) which is more robust to outliers:
-   ```toml
-   [measurement]
-   dispersion_method = "mad"
-   ```
 
 ## Best Practices
 
@@ -904,23 +833,23 @@ Here's what a complete, successful git-perf integration looks like in action:
 
    ## Audit Results
 
-   ✅ 'build_time' (seconds)
-   z-score (mad): ↓ 2.15
-   Head: μ: 38.2 σ: 0.5 MAD: 0.3 n: 1
-   Tail: μ: 42.1 σ: 1.8 MAD: 1.2 n: 15
-    [-9.3% improvement] ▃▅▄▆▅▄▅▃▅▂↓
-
-   ✅ 'test_duration' (ms)
-   z-score (mad): → 0.45
-   Head: μ: 1250 σ: 12 MAD: 8 n: 1
-   Tail: μ: 1248 σ: 25 MAD: 18 n: 15
-    [+0.2% – within normal variance] ▃▅▄▆▅▄▅▃▅▄
-
-   ❌ 'binary_size' (bytes)
-   z-score (mad): ↑ 5.23
-   Head: μ: 4,823,552 σ: 0 MAD: 0 n: 1
-   Tail: μ: 4,512,128 σ: 8,192 MAD: 4,096 n: 15
-    [+6.9% – REGRESSION DETECTED] ▃▅▄▆▅▄▅▃▅↑
+   ```
+   ✅ 'build_time'
+   z-score (stddev): ↓ 2.62
+   Head: μ: 38.2s σ: 0ns MAD: 0ns n: 1
+   Tail: μ: 42.1s σ: 1.8s MAD: 1.2s n: 15
+    [-9.26% – +0.50%] ▃▅▄▆▅▄▅▃▅▂▁
+   ✅ 'test_duration'
+   z-score (stddev): ↓ 1.62
+   Head: μ: 1.2s σ: 0ns MAD: 0ns n: 1
+   Tail: μ: 1.5s σ: 0.1s MAD: 0.08s n: 15
+    [-20.00% – +5.00%] ▃▅▄▆▅▄▅▃▅▄▁
+   ❌ 'binary_size'
+   z-score (stddev): ↑ 5.23
+   Head: μ: 4.8MB σ: 0B MAD: 0B n: 1
+   Tail: μ: 4.5MB σ: 8.2kB MAD: 4.1kB n: 15
+    [+6.91% – +6.91%] ▃▅▄▆▅▄▅▃▅↑
+   ```
 
    _Created by [git-perf](https://github.com/kaihowl/git-perf/)_
    ```
@@ -942,8 +871,12 @@ Here's what a complete, successful git-perf integration looks like in action:
    git diff main...optimize-parser -- Cargo.lock
 
    # Turns out the optimization added a new dependency
-   # You decide the performance gain is worth the size increase
-   # Or you find a way to achieve the optimization without the dependency
+   # If the performance gain is worth the size increase, accept the regression
+   # by bumping the epoch for this measurement:
+   git perf add -m binary_size <new_value> --bump-epoch
+
+   # This resets the baseline, and future measurements will be compared
+   # against this new baseline instead
    ```
 
 8. **Team reviews and approves** the PR, understanding the performance trade-offs
