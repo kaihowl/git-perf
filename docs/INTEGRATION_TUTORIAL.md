@@ -873,7 +873,7 @@ Here's what a complete, successful git-perf integration looks like in action:
    # Turns out the optimization added a new dependency
    # If the performance gain is worth the size increase, accept the regression
    # by bumping the epoch for this measurement:
-   git perf add -m binary_size <new_value> --bump-epoch
+   git perf bump-epoch -m binary_size
 
    # This resets the baseline, and future measurements will be compared
    # against this new baseline instead
