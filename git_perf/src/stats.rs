@@ -53,9 +53,24 @@ concatenate!(AggStats, [Mean, mean], [Variance, sample_variance]);
 pub fn aggregate_measurements<'a>(measurements: impl Iterator<Item = &'a f64>) -> Stats {
     let measurements_vec: Vec<f64> = measurements.cloned().collect();
     let s: AggStats = measurements_vec.iter().collect();
+
+    // The average crate 0.16+ returns NaN for sample_variance when n <= 1,
+    // and NaN for mean when n == 0.
+    // We convert NaN to 0.0 to maintain backward compatibility and avoid breaking
+    // z-score calculations (NaN/x = NaN, but 0/x could = Inf which is expected).
+    let mean = s.mean();
+    let mean = if mean.is_nan() { 0.0 } else { mean };
+
+    let variance = s.sample_variance();
+    let stddev = if variance.is_nan() {
+        0.0
+    } else {
+        variance.sqrt()
+    };
+
     Stats {
-        mean: s.mean(),
-        stddev: s.sample_variance().sqrt(),
+        mean,
+        stddev,
         mad: calculate_mad(&measurements_vec),
         len: s.mean.len() as usize,
     }
