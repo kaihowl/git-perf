@@ -848,7 +848,7 @@ Here's what a complete, successful git-perf integration looks like in action:
    z-score (stddev): ↑ 5.23
    Head: μ: 4.8MB σ: 0B MAD: 0B n: 1
    Tail: μ: 4.5MB σ: 8.2kB MAD: 4.1kB n: 15
-    [+6.91% – +6.91%] ▃▅▄▆▅▄▅▃▅↑
+    [+6.91% – +6.91%] ▃▅▄▆▅▄▅▃▅
    ```
 
    _Created by [git-perf](https://github.com/kaihowl/git-perf/)_
