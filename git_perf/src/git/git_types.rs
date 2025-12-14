@@ -28,7 +28,7 @@ pub(super) enum GitError {
     #[error("A concurrent change to the ref occurred:\n{0}\n{1}", output.stdout, output.stderr)]
     RefConcurrentModification { output: GitOutput },
 
-    #[error("Git failed to execute.\n\nstdout:\n{0}\nstderr:\n{1}", output.stdout, output.stderr)]
+    #[error("Git command failed: {command}\n\nstdout:\n{0}\nstderr:\n{1}", output.stdout, output.stderr)]
     ExecError { command: String, output: GitOutput },
 
     #[error("Remote repository is empty or has never been pushed to. Please push some measurements first.\n{0}\n{1}", output.stdout, output.stderr)]
