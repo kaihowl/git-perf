@@ -13,6 +13,7 @@ git-perf provides a comprehensive solution for tracking and analyzing performanc
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
+- [How git-perf Works: Storage and Workflow](#how-git-perf-works-storage-and-workflow)
 - [Audit System](#audit-system)
 - [Understanding Audit Output](#understanding-audit-output)
 - [Configuration](#configuration)
@@ -61,7 +62,10 @@ cargo install --path .
 
 ```bash
 # Add a performance measurement
-git perf add build_time 42.5
+git perf add 42.5 -m build_time
+
+# Verify measurement was stored (optional)
+git notes --ref=refs/notes/perf-v3 list | head -1
 
 # Audit for performance regressions
 git perf audit -m build_time
@@ -101,6 +105,61 @@ See the [Importing Measurements Guide](./docs/importing-measurements.md) for com
 - **Regression Detection**: Automated detection of performance changes
 - **Centralized Collection**: Designed for centralized metric gathering (e.g., CI/CD)
 - **Multiple Formats**: Support for data migration between format versions
+
+## How git-perf Works: Storage and Workflow
+
+### Git-Notes Storage Model
+
+git-perf uses **git-notes**, a Git feature for attaching metadata to commits without modifying commit SHAs. Performance measurements are stored in `refs/notes/perf-v3` as line-by-line field-separated data.
+
+**Storage Format**:
+- Each measurement is one line in the git note
+- Fields are concatenated with a special delimiter
+- Format: `{epoch}{name}{timestamp}{value}{key=value pairs...}\n`
+- Multiple measurements on the same commit = multiple lines in the note
+
+**Example raw format**:
+```
+0build_time1702685461.234542.5
+0memory_usage1702685461.567256.0
+```
+
+### Merge Strategy: cat_sort_uniq
+
+When multiple processes add measurements concurrently, git-perf uses the `cat_sort_uniq` merge strategy:
+1. All lines from both sides are concatenated
+2. Lines are sorted
+3. Duplicates are removed
+4. This ensures exact deduplication of identical measurements
+
+### Pull Request Workflow
+
+In GitHub PRs, git-perf uses **first-parent traversal**:
+- GitHub creates a merge commit when PRs are merged
+- git-perf stores measurements on the merge commit (HEAD)
+- `--first-parent` follows back through the target branch for historical data
+- This means PR measurements attach to the merge commit, not individual feature commits
+- Historical lineage comes from the target branch
+
+### Why Git-Notes?
+
+1. **Non-invasive**: Measurements don't pollute commit history
+2. **Retroactive**: Add measurements after commits are made
+3. **Independent sync**: Push/pull measurements separately from code
+4. **Centralized collection**: CI can add measurements without creating commits
+
+### Verifying Stored Measurements
+
+```bash
+# List commits with measurements
+git notes --ref=refs/notes/perf-v3 list
+
+# View measurements for current commit
+git log --show-notes=refs/notes/perf-v3 --oneline -1
+
+# View raw measurement data for specific commit
+git notes --ref=refs/notes/perf-v3 show <commit-sha>
+```
 
 ## ⚠️ Important Notes
 
@@ -193,6 +252,109 @@ Choose between two statistical methods for calculating dispersion:
 - ✅ You want to focus on typical performance changes
 - ✅ You're measuring in environments with variable system load
 - ✅ You need more robust regression detection
+
+### Epochs: Accepting Expected Performance Changes
+
+**Epochs** are boundaries in measurement history that allow you to accept expected performance changes without triggering audit failures.
+
+#### What Are Epochs?
+
+- Each measurement includes an epoch identifier (default: `0`)
+- Epochs are commit SHAs (first 8 characters) configured in `.gitperfconfig`
+- When you bump an epoch, the audit system **only compares against measurements in the current epoch**
+- Prior measurements (old epoch) are excluded from statistical comparison
+
+#### Why Epochs Are Checked Into Version Control
+
+Epochs are stored in `.gitperfconfig` (version controlled) rather than git notes because:
+
+1. **Merge visibility**: Changes become part of the PR and target branch
+2. **Conflict detection**: Multiple authors changing the same measurement's epoch provokes merge conflicts
+3. **Team coordination**: Forces explicit discussion when multiple people tune performance
+4. **History tracking**: Git history shows who approved which performance changes
+
+**This conflict behavior is intentional** - it prevents silent overwrites of performance expectations and ensures team visibility.
+
+#### Using Epochs
+
+**Scenario**: You refactored code and performance legitimately changed.
+
+```bash
+# Measurement fails audit (regression detected)
+git perf audit -m build_time
+# Output: ❌ 'build_time' - HEAD measurement 85.3 is outside acceptable range
+
+# Accept this as expected change
+git perf bump-epoch -m build_time
+
+# This updates .gitperfconfig with current commit SHA:
+# [measurement."build_time"]
+# epoch = "abc12345"  # First 8 chars of HEAD commit
+
+# Commit the configuration change
+git add .gitperfconfig
+git commit -m "Accept build_time increase from optimization changes"
+
+# Add new measurement (will have the new epoch)
+git perf add 85.3 -m build_time
+
+# Now audit passes - only comparing against current epoch measurements
+git perf audit -m build_time
+# Output: ✅ 'build_time' - Within acceptable range
+```
+
+#### Multiple Measurements
+
+Bump multiple epochs at once:
+```bash
+git perf bump-epoch -m metric1 -m metric2 -m metric3
+```
+
+#### How Epochs Affect Audit
+
+The audit system filters historical data by epoch:
+1. Fetch historical measurements from git notes
+2. Filter to only measurements with the same epoch as HEAD
+3. Calculate statistical baselines (mean, stddev/MAD) from same-epoch data
+4. Compare HEAD measurement against these baselines
+
+This allows clean separation between:
+- **Statistical noise** (handled within an epoch)
+- **Intentional changes** (marked by epoch boundaries)
+
+#### Configuration Example
+
+In `.gitperfconfig`:
+```toml
+[measurement]
+epoch = "00000000"  # Global default
+
+[measurement."build_time"]
+epoch = "abc12345"  # Per-measurement epoch
+
+[measurement."memory_usage"]
+epoch = "def67890"  # Different measurements can have different epochs
+```
+
+### Audit Prerequisites
+
+The audit system requires historical data for statistical comparison:
+
+- **Minimum commits**: At least `--min-measurements` commits with data (default: 10)
+- **Same epoch**: Only measurements in the current epoch are used
+- **First measurement**: Audit will skip with informational message
+
+**Example workflow**:
+```bash
+# First commit with measurement
+git perf add 42.5 -m build_time
+git perf audit -m build_time
+# Output: ⏭️ 'build_time' - Only 1 measurement found. Less than min_measurements of 10.
+
+# After 10+ commits with measurements in same epoch
+git perf audit -m build_time
+# Output: ✅ 'build_time' - Statistical comparison with historical data
+```
 
 ## Configuration
 
