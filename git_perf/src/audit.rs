@@ -292,6 +292,7 @@ fn audit_with_data(
     // Note: CLI enforces min_count >= 2 via clap::value_parser!(u16).range(2..)
     // Tests may use lower values for edge case testing, but production code
     // should never call this with min_count < 2
+    assert!(min_count >= 2, "min_count must be at least 2");
 
     // Get unit for this measurement from config
     let unit = config::measurement_unit(measurement);
@@ -759,7 +760,7 @@ mod test {
             "test_measurement",
             25.0,                   // head
             vec![10.0, 10.0, 10.0], // tail, median = 10.0
-            1,
+            2,
             10.0, // High sigma to avoid z-score failures
             DispersionMethod::StandardDeviation,
         );
@@ -794,7 +795,7 @@ mod test {
             "test_measurement",                 // No config threshold for this name
             100.0,                              // Very high head value
             vec![10.0, 10.0, 10.0, 10.0, 10.0], // Low tail values
-            1,
+            2,
             0.5, // Low sigma threshold
             DispersionMethod::StandardDeviation,
         );
@@ -809,7 +810,7 @@ mod test {
             "test_measurement",
             10.2,                               // Close to tail values
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Some variance to avoid zero stddev
-            1,
+            2,
             100.0, // Very high sigma threshold
             DispersionMethod::StandardDeviation,
         );
@@ -830,7 +831,7 @@ mod test {
             "test_measurement",
             1000.0, // Extreme outlier
             vec![10.0, 10.0, 10.0, 10.0, 10.0],
-            1,
+            2,
             0.1, // Very strict sigma
             DispersionMethod::StandardDeviation,
         );
@@ -846,7 +847,7 @@ mod test {
             "test_measurement",
             10.01,                              // Very close to tail
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Varied values to avoid zero variance
-            1,
+            2,
             100.0, // Very lenient sigma
             DispersionMethod::StandardDeviation,
         );
@@ -868,7 +869,7 @@ mod test {
             "test_measurement",
             head,
             tail.clone(),
-            1,
+            2,
             2.0,
             DispersionMethod::StandardDeviation,
         );
@@ -877,7 +878,7 @@ mod test {
             "test_measurement",
             head,
             tail,
-            1,
+            2,
             2.0,
             DispersionMethod::MedianAbsoluteDeviation,
         );
@@ -914,7 +915,7 @@ unit = "ms"
             "build_time",
             head,
             tail,
-            1,
+            2,
             10.0, // High sigma to ensure it passes
             DispersionMethod::StandardDeviation,
         );
@@ -1014,7 +1015,7 @@ min_relative_deviation = 10.0
             "build_time",
             10.1,                               // Very close to tail values
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Low variance
-            1,
+            2,
             100.0, // Very high sigma threshold - won't be exceeded
             DispersionMethod::StandardDeviation,
         );
@@ -1037,7 +1038,7 @@ min_relative_deviation = 10.0
             "build_time",
             1002.0, // High z-score outlier but low relative deviation
             vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
-            1,
+            2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
         );
@@ -1061,7 +1062,7 @@ min_relative_deviation = 10.0
             "build_time",
             1200.0, // High z-score AND high relative deviation
             vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
-            1,
+            2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
         );
