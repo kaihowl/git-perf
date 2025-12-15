@@ -15,7 +15,7 @@ use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use itertools::Itertools;
 
 use chrono::prelude::*;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 
 use crate::config;
 
@@ -174,7 +174,7 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
 }
 
 fn random_suffix() -> String {
-    let suffix: u32 = thread_rng().gen();
+    let suffix: u32 = rng().random::<u32>();
     format!("{suffix:08x}")
 }
 

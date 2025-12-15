@@ -6,7 +6,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
 };
-use toml_edit::{value, Document, Item, Table};
+use toml_edit::{value, DocumentMut, Item, Table};
 
 use crate::defaults;
 use crate::git::git_interop::{get_head_revision, get_repository_root};
@@ -140,7 +140,7 @@ pub fn determine_epoch_from_config(measurement: &str) -> Option<u32> {
 
 pub fn bump_epoch_in_conf(measurement: &str, conf_str: &mut String) -> Result<()> {
     let mut conf = conf_str
-        .parse::<Document>()
+        .parse::<DocumentMut>()
         .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
 
     let head_revision = get_head_revision()?;

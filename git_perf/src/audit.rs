@@ -289,6 +289,11 @@ fn audit_with_data(
     sigma: f64,
     dispersion_method: DispersionMethod,
 ) -> Result<AuditResult> {
+    // Note: CLI enforces min_count >= 2 via clap::value_parser!(u16).range(2..)
+    // Tests may use lower values for edge case testing, but production code
+    // should never call this with min_count < 2
+    assert!(min_count >= 2, "min_count must be at least 2");
+
     // Get unit for this measurement from config
     let unit = config::measurement_unit(measurement);
     let unit_str = unit.as_deref();
@@ -755,7 +760,7 @@ mod test {
             "test_measurement",
             25.0,                   // head
             vec![10.0, 10.0, 10.0], // tail, median = 10.0
-            1,
+            2,
             10.0, // High sigma to avoid z-score failures
             DispersionMethod::StandardDeviation,
         );
@@ -790,7 +795,7 @@ mod test {
             "test_measurement",                 // No config threshold for this name
             100.0,                              // Very high head value
             vec![10.0, 10.0, 10.0, 10.0, 10.0], // Low tail values
-            1,
+            2,
             0.5, // Low sigma threshold
             DispersionMethod::StandardDeviation,
         );
@@ -805,7 +810,7 @@ mod test {
             "test_measurement",
             10.2,                               // Close to tail values
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Some variance to avoid zero stddev
-            1,
+            2,
             100.0, // Very high sigma threshold
             DispersionMethod::StandardDeviation,
         );
@@ -826,7 +831,7 @@ mod test {
             "test_measurement",
             1000.0, // Extreme outlier
             vec![10.0, 10.0, 10.0, 10.0, 10.0],
-            1,
+            2,
             0.1, // Very strict sigma
             DispersionMethod::StandardDeviation,
         );
@@ -842,7 +847,7 @@ mod test {
             "test_measurement",
             10.01,                              // Very close to tail
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Varied values to avoid zero variance
-            1,
+            2,
             100.0, // Very lenient sigma
             DispersionMethod::StandardDeviation,
         );
@@ -864,7 +869,7 @@ mod test {
             "test_measurement",
             head,
             tail.clone(),
-            1,
+            2,
             2.0,
             DispersionMethod::StandardDeviation,
         );
@@ -873,7 +878,7 @@ mod test {
             "test_measurement",
             head,
             tail,
-            1,
+            2,
             2.0,
             DispersionMethod::MedianAbsoluteDeviation,
         );
@@ -910,7 +915,7 @@ unit = "ms"
             "build_time",
             head,
             tail,
-            1,
+            2,
             10.0, // High sigma to ensure it passes
             DispersionMethod::StandardDeviation,
         );
@@ -1010,7 +1015,7 @@ min_relative_deviation = 10.0
             "build_time",
             10.1,                               // Very close to tail values
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Low variance
-            1,
+            2,
             100.0, // Very high sigma threshold - won't be exceeded
             DispersionMethod::StandardDeviation,
         );
@@ -1033,7 +1038,7 @@ min_relative_deviation = 10.0
             "build_time",
             1002.0, // High z-score outlier but low relative deviation
             vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
-            1,
+            2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
         );
@@ -1057,7 +1062,7 @@ min_relative_deviation = 10.0
             "build_time",
             1200.0, // High z-score AND high relative deviation
             vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
-            1,
+            2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
         );
@@ -1669,5 +1674,70 @@ dispersion_method = "mad"
         // Should show absolute range [0 - 0]
         assert!(!audit_result.message.to_lowercase().contains("inf"));
         assert!(!audit_result.message.to_lowercase().contains("nan"));
+    }
+
+    #[test]
+    fn test_min_measurements_two_with_no_tail() {
+        // Test the minimum allowed min_measurements value (2) with no tail measurements.
+        // This should skip the audit since we have 0 < 2 tail measurements.
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,   // head
+            vec![], // no tail measurements
+            2,      // min_count = 2 (minimum allowed by CLI)
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+
+        // Should pass (skipped) since we have 0 < 2 tail measurements
+        assert!(audit_result.passed);
+        assert!(audit_result.message.contains("Skipping test"));
+        assert!(audit_result
+            .message
+            .contains("0 historical measurements found"));
+        assert!(audit_result
+            .message
+            .contains("Less than requested min_measurements of 2"));
+
+        // Should show Head summary only (total_measurements = 1)
+        assert!(audit_result.message.contains("Head:"));
+        assert!(!audit_result.message.contains("z-score"));
+        assert!(!audit_result.message.contains("Tail:"));
+    }
+
+    #[test]
+    fn test_min_measurements_two_with_single_tail() {
+        // Test the minimum allowed min_measurements value (2) with a single tail measurement.
+        // This should skip since we have 1 < 2 tail measurements.
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,       // head
+            vec![10.0], // single tail measurement
+            2,          // min_count = 2 (minimum allowed by CLI)
+            2.0,
+            DispersionMethod::StandardDeviation,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+
+        // Should pass (skipped) since we have 1 < 2 tail measurements
+        assert!(audit_result.passed);
+        assert!(audit_result.message.contains("Skipping test"));
+        assert!(audit_result
+            .message
+            .contains("1 historical measurement found"));
+        assert!(audit_result
+            .message
+            .contains("Less than requested min_measurements of 2"));
+
+        // Should show both Head and Tail summaries with z-score (total_measurements = 2)
+        assert!(audit_result.message.contains("Head:"));
+        assert!(audit_result.message.contains("Tail:"));
+        assert!(audit_result.message.contains("z-score"));
+        assert!(audit_result.message.contains("["));
     }
 }

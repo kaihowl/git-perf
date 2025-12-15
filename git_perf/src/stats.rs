@@ -88,12 +88,22 @@ pub struct Stats {
 
 impl Display for Stats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let stddev_str = if self.stddev.is_nan() {
+            "N/A".to_string()
+        } else {
+            format!("{}", Float::from(self.stddev))
+        };
+        let mad_str = if self.mad.is_nan() {
+            "N/A".to_string()
+        } else {
+            format!("{}", Float::from(self.mad))
+        };
         write!(
             f,
             "μ: {} σ: {} MAD: {} n: {}",
             Float::from(self.mean),
-            Float::from(self.stddev),
-            Float::from(self.mad),
+            stddev_str,
+            mad_str,
             Unsigned::from(self.len),
         )
     }
@@ -155,6 +165,7 @@ impl<'a> Display for StatsWithUnit<'a> {
                     Ok(measurement) if !matches!(measurement, Measurement::Count(_)) => {
                         format_measurement(measurement.clone())
                     }
+                    _ if self.stats.stddev.is_nan() => "N/A".to_string(),
                     _ => format!("{}", Float::from(self.stats.stddev)),
                 };
 
@@ -164,6 +175,7 @@ impl<'a> Display for StatsWithUnit<'a> {
                     Ok(measurement) if !matches!(measurement, Measurement::Count(_)) => {
                         format_measurement(measurement.clone())
                     }
+                    _ if self.stats.mad.is_nan() => "N/A".to_string(),
                     _ => format!("{}", Float::from(self.stats.mad)),
                 };
 
@@ -238,7 +250,12 @@ mod test {
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 1);
         assert_eq!(stats.mean, 1.0);
-        assert_eq!(stats.stddev, 0.0);
+        // The average crate 0.16+ returns NaN for sample variance when n <= 1,
+        // which is mathematically correct (sample variance undefined for n < 2).
+        assert!(
+            stats.stddev.is_nan(),
+            "stddev should be NaN for single measurement"
+        );
     }
 
     #[test]
@@ -246,8 +263,15 @@ mod test {
         let measurements = [];
         let stats = aggregate_measurements(measurements.iter());
         assert_eq!(stats.len, 0);
-        assert_eq!(stats.mean, 0.0);
-        assert_eq!(stats.stddev, 0.0);
+        // The average crate 0.16+ returns NaN for mean when n == 0.
+        assert!(
+            stats.mean.is_nan(),
+            "mean should be NaN for empty measurements"
+        );
+        assert!(
+            stats.stddev.is_nan(),
+            "stddev should be NaN for empty measurements"
+        );
     }
 
     #[test]
