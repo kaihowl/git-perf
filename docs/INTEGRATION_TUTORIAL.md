@@ -59,7 +59,7 @@ cd /path/to/your/project
 
 # Add a measurement (e.g., build time in seconds)
 # You'll typically get this value from your build or test process
-git perf add -m build_time 42.5
+git perf add 42.5 -m build_time
 
 # Generate an HTML report (creates output.html by default)
 git perf report
@@ -177,7 +177,7 @@ jobs:
       - name: Measure binary size
         run: |
           binary_size=$(stat -c%s target/release/your-binary)
-          git perf add -m binary_size "$binary_size"
+          git perf add "$binary_size" -m binary_size
 
       # Push measurements back to the repository
       - name: Push measurements
@@ -260,7 +260,7 @@ jobs:
       - name: Measure binary size
         run: |
           binary_size=$(stat -c%s target/release/your-binary)
-          git perf add -m binary_size "$binary_size"
+          git perf add "$binary_size" -m binary_size
 
       - name: Push measurements
         run: git perf push
@@ -779,7 +779,7 @@ jobs:
           git perf measure -m build_time -- cargo build --release
 
           size=$(stat -c%s target/release/my-app)
-          git perf add -m binary_size "$size"
+          git perf add "$size" -m binary_size
 
       - name: Test and measure
         run: git perf measure -m test_duration -- cargo test --release
