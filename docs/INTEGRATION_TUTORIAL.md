@@ -36,13 +36,15 @@ Download the latest version from [git-scm.com](https://git-scm.com/download/win)
 
 ## Step 1: Install git-perf Locally
 
-See the [Installation section in the README](../README.md#installation) for complete installation instructions, including:
-- Shell installer (recommended)
-- Installing from crates.io
-- Pre-built binaries
-- Building from source
+**Shell Installer (Recommended for Linux/macOS):**
 
-Verify installation:
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh | sh
+```
+
+For other installation methods (pre-built binaries, cargo install, building from source), see the [Installation section in the README](../README.md#installation).
+
+**Verify Installation:**
 
 ```bash
 git perf --version
@@ -118,10 +120,7 @@ Verify your local setup is working correctly:
 
 ```bash
 # Check that measurements were recorded
-git notes --ref=refs/notes/perf-v3 list
-
-# Verify the measurement data in git notes
-git log --show-notes=refs/notes/perf-v3 --oneline -1
+git perf report -o -
 
 # Generate and view a report
 git perf report -o test-report.html
@@ -583,7 +582,7 @@ See the [Enable GitHub Pages](#enable-github-pages) section for complete instruc
 
 3. Verify measurements exist locally:
    ```bash
-   git notes --ref=refs/notes/perf-v3 list
+   git perf report -o -
    ```
 
 4. Check workflow logs for push errors:
