@@ -36,13 +36,39 @@ Download the latest version from [git-scm.com](https://git-scm.com/download/win)
 
 ## Step 1: Install git-perf Locally
 
-See the [Installation section in the README](../README.md#installation) for complete installation instructions, including:
-- Shell installer (recommended)
-- Installing from crates.io
-- Pre-built binaries
-- Building from source
+### Quick Installation
 
-Verify installation:
+**Shell Installer (Recommended for Linux/macOS):**
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh | sh
+```
+
+**Pre-built Binaries:**
+
+Download from [latest release](https://github.com/kaihowl/git-perf/releases/latest):
+
+```bash
+# Linux x86_64
+curl -LO https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-x86_64-unknown-linux-gnu.tar.xz
+tar xf git-perf-x86_64-unknown-linux-gnu.tar.xz
+sudo mv git-perf /usr/local/bin/
+
+# macOS ARM64 (Apple Silicon)
+curl -LO https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-aarch64-apple-darwin.tar.xz
+tar xf git-perf-aarch64-apple-darwin.tar.xz
+sudo mv git-perf /usr/local/bin/
+```
+
+**From crates.io:**
+
+```bash
+cargo install git-perf
+```
+
+For additional installation methods, see the [Installation section in the README](../README.md#installation).
+
+### Verify Installation
 
 ```bash
 git perf --version
