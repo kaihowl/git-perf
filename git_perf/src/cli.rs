@@ -10,7 +10,7 @@ use crate::config::bump_epoch;
 use crate::config_cmd;
 use crate::git::git_interop::check_git_version;
 use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push};
-use crate::import::handle_import;
+use crate::import::{handle_import, ImportOptions};
 use crate::measurement_storage::{add_to_commit as add, remove_measurements_from_commits};
 use crate::reporting::report;
 use crate::size;
@@ -63,10 +63,17 @@ pub fn handle_calls() -> Result<()> {
             dry_run,
             verbose,
         } => {
-            let commit = commit.as_deref().unwrap_or("HEAD");
-            handle_import(
-                commit, format, file, prefix, metadata, filter, dry_run, verbose,
-            )
+            let commit = commit.as_deref().unwrap_or("HEAD").to_string();
+            handle_import(ImportOptions {
+                commit,
+                format,
+                file,
+                prefix,
+                metadata,
+                filter,
+                dry_run,
+                verbose,
+            })
         }
         Commands::Push { remote } => push(None, remote.as_deref()),
         Commands::Pull {} => pull(None),

@@ -18,20 +18,33 @@ use crate::defaults;
 use crate::parsers::{CriterionJsonParser, JunitXmlParser, Parser};
 use crate::serialization::serialize_multiple;
 
+/// Options for the import command
+pub struct ImportOptions {
+    pub commit: String,
+    pub format: ImportFormat,
+    pub file: Option<String>,
+    pub prefix: Option<String>,
+    pub metadata: Vec<(String, String)>,
+    pub filter: Option<String>,
+    pub dry_run: bool,
+    pub verbose: bool,
+}
+
 /// Handle the import command
 ///
 /// Reads input from stdin or file, parses it according to the specified format,
 /// converts to MeasurementData, and stores in git notes.
-pub fn handle_import(
-    commit: &str,
-    format: ImportFormat,
-    file: Option<String>,
-    prefix: Option<String>,
-    metadata: Vec<(String, String)>,
-    filter: Option<String>,
-    dry_run: bool,
-    verbose: bool,
-) -> Result<()> {
+pub fn handle_import(options: ImportOptions) -> Result<()> {
+    let ImportOptions {
+        commit,
+        format,
+        file,
+        prefix,
+        metadata,
+        filter,
+        dry_run,
+        verbose,
+    } = options;
     // Read input from stdin or file
     let input = read_input(file.as_deref())?;
 
@@ -133,7 +146,7 @@ pub fn handle_import(
     if dry_run {
         println!("\n[DRY RUN] Measurements not stored");
     } else {
-        store_measurements(commit, &measurements)?;
+        store_measurements(&commit, &measurements)?;
         println!("Successfully imported {} measurements", measurements.len());
     }
 
@@ -227,16 +240,16 @@ mod tests {
         let commits_before = walk_commits(1).unwrap();
         let notes_before = commits_before[0].1.len();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            None,
-            true,  // dry_run
-            false, // verbose
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: None,
+            dry_run: true,
+            verbose: false,
+        });
 
         assert!(result.is_ok(), "Import should succeed: {:?}", result);
 
@@ -260,16 +273,16 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            None,
-            false, // not dry_run
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: None,
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(result.is_ok(), "Import should succeed: {:?}", result);
 
@@ -312,16 +325,16 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            Some("ci".to_string()), // prefix
-            vec![],
-            None,
-            false,
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: Some("ci".to_string()),
+            metadata: vec![],
+            filter: None,
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(result.is_ok(), "Import with prefix should succeed");
 
@@ -343,19 +356,19 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![
                 ("ci".to_string(), "true".to_string()),
                 ("branch".to_string(), "main".to_string()),
             ],
-            None,
-            false,
-            false,
-        );
+            filter: None,
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(result.is_ok(), "Import with metadata should succeed");
 
@@ -383,16 +396,16 @@ mod tests {
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
         // Filter to only import tests matching "passed"
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            Some("passed".to_string()), // filter
-            false,
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: Some("passed".to_string()),
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(result.is_ok(), "Import with filter should succeed");
 
@@ -418,16 +431,16 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", SAMPLE_CRITERION_JSON).unwrap();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::CriterionJson,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            None,
-            false,
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::CriterionJson,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: None,
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(
             result.is_ok(),
@@ -468,16 +481,16 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "invalid xml content").unwrap();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            None,
-            false,
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: None,
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(result.is_err(), "Should fail with invalid XML");
         assert!(
@@ -503,16 +516,16 @@ mod tests {
         let commits_before = walk_commits(1).unwrap();
         let notes_before = commits_before[0].1.len();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            None,
-            false,
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: None,
+            dry_run: false,
+            verbose: false,
+        });
 
         // Should succeed but import no measurements
         assert!(result.is_ok(), "Should handle empty test results");
@@ -537,16 +550,16 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
-        let result = handle_import(
-            "HEAD",
-            ImportFormat::Junit,
-            Some(file.path().to_str().unwrap().to_string()),
-            None,
-            vec![],
-            Some("[invalid(regex".to_string()), // invalid regex
-            false,
-            false,
-        );
+        let result = handle_import(ImportOptions {
+            commit: "HEAD".to_string(),
+            format: ImportFormat::Junit,
+            file: Some(file.path().to_str().unwrap().to_string()),
+            prefix: None,
+            metadata: vec![],
+            filter: Some("[invalid(regex".to_string()),
+            dry_run: false,
+            verbose: false,
+        });
 
         assert!(result.is_err(), "Should fail with invalid regex");
         assert!(
