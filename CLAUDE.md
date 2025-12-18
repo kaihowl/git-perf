@@ -184,7 +184,6 @@ rustc --version && cargo fmt --version && cargo nextest --version
 
 **For Contributors:**
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Complete contribution guidelines with code quality standards, testing requirements, and PR process
-- **[Code of Conduct](./CODE_OF_CONDUCT.md)** - Community guidelines and expectations
 
 **For Users:**
 - **[Documentation Index](./docs/README.md)** - All available documentation
