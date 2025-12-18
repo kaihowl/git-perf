@@ -115,7 +115,6 @@ Want to understand the internals?
 
 ## Need Help?
 
-- **Search**: Use your browser's search (Ctrl/Cmd+F) to find specific topics in the README or guides
 - **FAQ**: Check the [Frequently Asked Questions](../README.md#frequently-asked-questions) for common issues
 - **Troubleshooting**: See [Integration Tutorial Troubleshooting](./INTEGRATION_TUTORIAL.md#troubleshooting) for CI/CD issues
 - **Issues**: [Open an issue](https://github.com/kaihowl/git-perf/issues/new/choose) if you can't find an answer
