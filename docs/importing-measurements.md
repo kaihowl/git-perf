@@ -410,7 +410,15 @@ The import feature enables you to:
 3. Set up CI integration
 4. Start auditing for regressions
 
-For more information, see:
-- [Main README](../README.md)
-- [Integration Tutorial](./INTEGRATION_TUTORIAL.md)
-- [git-perf manpage](./manpage.md)
+## See Also
+
+**Related Documentation:**
+- **[Integration Tutorial](./INTEGRATION_TUTORIAL.md)** - Set up GitHub Actions to automatically import measurements in CI
+- **[Configuration Guide](../README.md#configuration)** - Configure audit thresholds for imported measurements
+- **[Audit System](../README.md#audit-system)** - Understanding how regression detection works with imported data
+- **[CLI Reference](./manpage.md)** - Complete import command documentation
+- **[FAQ](../README.md#frequently-asked-questions)** - Common questions about importing and auditing
+
+**GitHub Actions:**
+- **[Report Action](../.github/actions/report/README.md)** - Generate reports from imported measurements
+- **[Cleanup Action](../.github/actions/cleanup/README.md)** - Manage retention of imported measurements

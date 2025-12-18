@@ -409,6 +409,85 @@ Update your workflow to run audits and fail on regressions. You can also integra
 
 The report action will automatically comment on pull requests with both the report URL and audit results.
 
+## Step 6.5: Understanding and Managing Epochs
+
+When your audit detects a performance change that is intentional and expected (e.g., after a refactoring or optimization), you can use **epochs** to accept this change without future audits treating it as a regression.
+
+### What Are Epochs?
+
+Epochs are boundaries in measurement history that mark intentional performance changes. Each measurement includes an epoch identifier (a commit SHA), and the audit system only compares measurements within the same epoch. This allows you to:
+
+- Accept expected performance changes (like major refactorings)
+- Reset the performance baseline for specific measurements
+- Prevent false positives when you deliberately change performance characteristics
+
+### When to Use Epochs
+
+Use the `git perf bump-epoch` command when:
+
+1. **Intentional optimization**: You've improved performance and want to accept the new baseline
+2. **Major refactoring**: Architecture changes that legitimately alter performance
+3. **Algorithm changes**: Switching to a different approach with different performance profile
+4. **Dependency updates**: External library changes that affect measurements
+
+### Example: Accepting a Performance Change
+
+```bash
+# Scenario: You refactored code and performance legitimately changed
+
+# Run audit and see it fails
+git perf audit -m build_time
+# Output: ❌ 'build_time' - HEAD measurement 85.3 is outside acceptable range
+
+# Accept this as the new baseline
+git perf bump-epoch -m build_time
+
+# This updates .gitperfconfig with the current commit SHA:
+# [measurement."build_time"]
+# epoch = "abc12345"  # First 8 chars of HEAD commit
+
+# Commit the configuration change
+git add .gitperfconfig
+git commit -m "perf: accept build_time increase from refactoring"
+
+# Future measurements will be compared against this new baseline
+git perf add 85.3 -m build_time
+git perf audit -m build_time
+# Output: ✅ 'build_time' - Within acceptable range
+```
+
+### Why Epochs Are Version Controlled
+
+Epochs are stored in `.gitperfconfig` (not in git-notes) for important reasons:
+
+- **Team coordination**: Changes require pull request review, preventing silent baseline changes
+- **Merge conflicts**: Multiple developers bumping the same epoch triggers conflicts, forcing discussion
+- **History tracking**: Git history shows who approved performance changes and why
+- **Visibility**: Changes appear in PRs, not hidden in git-notes
+
+### Managing Epochs in Your Workflow
+
+**Bump multiple epochs at once:**
+```bash
+git perf bump-epoch -m metric1 -m metric2 -m metric3
+```
+
+**View current epochs:**
+```bash
+# Check .gitperfconfig for epoch values
+cat .gitperfconfig | grep epoch
+```
+
+**In CI workflows:**
+When an audit fails due to a legitimate change:
+1. Review the performance change locally
+2. Determine if it's acceptable
+3. Bump the epoch and commit the config
+4. Include rationale in commit message
+5. Push and let CI verify the new baseline
+
+For complete details on epochs, including how they affect statistical analysis, see the [Epochs section in the README](../README.md#epochs-accepting-expected-performance-changes).
+
 ## Step 7: Advanced Configuration
 
 ### Custom Statistical Methods
@@ -929,17 +1008,30 @@ This complete workflow ensures you **never accidentally ship performance regress
 - Schedule regular cleanup to maintain repository size
 - Share your performance dashboard URL with your team
 
-## Additional Resources
+## See Also
 
-- [git-perf README](../README.md) - Full feature documentation
-- [Command Reference](./manpage.md) - Complete CLI documentation
-- [Configuration Guide](../README.md#configuration) - Detailed `.gitperfconfig` options
-- [Audit System](../README.md#audit-system) - Statistical methods and regression detection
-- [GitHub Actions](../.github/actions/) - Reusable actions: [install](../.github/actions/install/), [report](../.github/actions/report/), [cleanup](../.github/actions/cleanup/)
-- [Example Report](https://kaihowl.github.io/git-perf/master.html) - Live performance dashboard
+**Core Documentation:**
+- **[Documentation Index](./README.md)** - Complete guide to all available documentation
+- **[Main README](../README.md)** - Full feature documentation and quick start
+- **[Configuration Guide](../README.md#configuration)** - Detailed `.gitperfconfig` options with all available settings
+- **[Audit System](../README.md#audit-system)** - Statistical methods and regression detection explained
+- **[Epochs](../README.md#epochs-accepting-expected-performance-changes)** - Complete epoch documentation
+
+**Related Guides:**
+- **[Importing Measurements](./importing-measurements.md)** - Track test and benchmark performance automatically
+- **[CLI Reference](./manpage.md)** - Complete command documentation
+- **[FAQ](../README.md#frequently-asked-questions)** - Common questions and troubleshooting
+
+**GitHub Actions:**
+- **[Install Action](../.github/actions/install/README.md)** - Install git-perf in workflows
+- **[Report Action](../.github/actions/report/README.md)** - Generate and publish reports
+- **[Cleanup Action](../.github/actions/cleanup/README.md)** - Manage measurement retention
+
+**Examples:**
+- **[Live Example Report](https://kaihowl.github.io/git-perf/master.html)** - See git-perf in action on this repository
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/kaihowl/git-perf/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/kaihowl/git-perf/discussions)
-- **Documentation**: Check the `docs/` directory for detailed guides
+- **Issues**: [GitHub Issues](https://github.com/kaihowl/git-perf/issues) - Report bugs or request features
+- **Discussions**: [GitHub Discussions](https://github.com/kaihowl/git-perf/discussions) - Ask questions and share ideas
+- **Documentation**: [docs/ directory](./README.md) - All guides and references
