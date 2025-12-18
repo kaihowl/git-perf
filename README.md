@@ -873,7 +873,7 @@ Units configured in `.gitperfconfig` automatically appear in the CSV output.
 
 ## Documentation
 
-**📚 [Complete Documentation Index](./docs/README.md)** - Start here for a comprehensive guide to all documentation
+**📚 [Documentation Index](./docs/README.md)** - Start here for a comprehensive guide to all documentation
 
 ### Getting Started
 
