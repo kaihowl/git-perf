@@ -340,9 +340,11 @@ epoch = "def67890"  # Different measurements can have different epochs
 
 The audit system requires historical data for statistical comparison:
 
-- **Minimum commits**: At least `--min-measurements` commits with data (default: 10)
+- **Minimum commits**: At least `--min-measurements` commits with data (built-in default: 2, recommended: 10)
 - **Same epoch**: Only measurements in the current epoch are used
 - **First measurement**: Audit will skip with informational message
+
+**Note**: While the built-in default is 2 measurements, we recommend using at least 10 measurements (via CLI flag or configuration) for reliable statistical analysis.
 
 **Example workflow**:
 ```bash
@@ -871,12 +873,37 @@ Units configured in `.gitperfconfig` automatically appear in the CSV output.
 
 ## Documentation
 
-### Available Documentation
+**📚 [Documentation Index](./docs/README.md)** - Start here for a comprehensive guide to all documentation
 
-- **[Importing Measurements Guide](./docs/importing-measurements.md)** - Import test and benchmark results
-- **[Manpages](./docs/manpage.md)** - Complete CLI reference
-- **[Integration Tutorial](./docs/INTEGRATION_TUTORIAL.md)** - GitHub Actions integration guide
-- **[Evaluation Tools](./evaluation/README.md)** - Statistical method comparison tools
+### Getting Started
+
+- **[Integration Tutorial](./docs/INTEGRATION_TUTORIAL.md)** - Complete GitHub Actions setup guide (recommended starting point)
+- **[Quick Start](#quick-start)** - Get running in 5 minutes
+
+### User Guides
+
+- **[Importing Measurements](./docs/importing-measurements.md)** - Import test and benchmark results
+  - JUnit XML (pytest, Jest, cargo-nextest, JUnit, etc.)
+  - Criterion JSON (Rust benchmarks)
+- **[Configuration](#configuration)** - Complete .gitperfconfig reference
+- **[Audit System](#audit-system)** - Understand regression detection
+
+### Reference
+
+- **[CLI Reference](./docs/manpage.md)** - All commands and options
+- **[Config Example](./docs/example_config.toml)** - Annotated configuration template
+- **[FAQ](#frequently-asked-questions)** - Common questions answered
+
+### Contributing
+
+- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute
+- **[Development Setup](./CLAUDE.md)** - Developer and agent instructions
+- **[Evaluation Tools](./evaluation/INDEX.md)** - Statistical analysis tools
+
+### Additional Resources
+
+- **[Live Example Report](https://kaihowl.github.io/git-perf/master.html)** - See git-perf in action
+- **[GitHub Discussions](https://github.com/kaihowl/git-perf/discussions)** - Ask questions and share ideas
 
 ### Generating Documentation
 

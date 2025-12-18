@@ -1,5 +1,13 @@
 # Example .gitperfconfig file for git-perf
 # This file should be placed in your repository root
+#
+# For detailed explanations of all options, see:
+# https://github.com/kaihowl/git-perf/blob/master/README.md#configuration
+#
+# Quick links:
+# - Configuration Guide: ../README.md#configuration
+# - Integration Tutorial: ./INTEGRATION_TUTORIAL.md
+# - Audit System: ../README.md#audit-system
 
 # Default settings for all measurements (parent table)
 [measurement]

@@ -140,7 +140,7 @@ Lower penalty values are better for detecting multiple regime changes in perform
 
 ## Requirements
 
-- **Git**: 2.40+ (version checked automatically)
+- **Git**: 2.43.0+ (version checked automatically)
 - **Rust**: Edition 2021
 - **nextest**: Required for test execution
 
@@ -179,3 +179,12 @@ rustc --version && cargo fmt --version && cargo nextest --version
 
 - `.github/ISSUE_TEMPLATE/`: bug_report.md, feature_request.md, documentation.md
 - `.github/pull_request_template.md`: Checklist for testing and verification
+
+## See Also
+
+**For Contributors:**
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - Complete contribution guidelines with code quality standards, testing requirements, and PR process
+
+**For Users:**
+- **[Documentation Index](./docs/README.md)** - All available documentation
+- **[Integration Tutorial](./docs/INTEGRATION_TUTORIAL.md)** - GitHub Actions setup guide
