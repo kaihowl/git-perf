@@ -5,10 +5,6 @@
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
-git_perf() {
-    cargo run --quiet --bin git-perf -- "$@"
-}
-
 setup_test_repo() {
     cd_empty_repo
     create_commit
@@ -28,7 +24,7 @@ test_add_to_specific_commit() {
     local commit3=$(git rev-parse HEAD)
 
     # Add measurement to commit2 (not HEAD) - write operation uses --commit flag
-    git_perf add 100.5 -m test_metric --commit "$commit2"
+    git perf add 100.5 -m test_metric --commit "$commit2"
 
     # Verify measurement was added to commit2
     local notes=$(git notes --ref refs/notes/perf-v3 show "$commit2")
@@ -54,7 +50,7 @@ test_add_using_HEAD_tilde() {
     local commit1=$(git rev-parse HEAD~2)
 
     # Add measurement to HEAD~2 - write operation uses --commit flag
-    git_perf add 200.5 -m test_metric2 --commit HEAD~2
+    git perf add 200.5 -m test_metric2 --commit HEAD~2
 
     # Verify measurement was added to HEAD~2
     local notes=$(git notes --ref refs/notes/perf-v3 show "$commit1")
@@ -76,7 +72,7 @@ test_add_using_branch_name() {
     git commit --allow-empty -m "Master commit"
 
     # Add measurement to feature-branch commit - write operation uses --commit flag
-    git_perf add 300.5 -m test_metric3 --commit feature-branch
+    git perf add 300.5 -m test_metric3 --commit feature-branch
 
     # Verify measurement was added to feature branch commit
     local notes=$(git notes --ref refs/notes/perf-v3 show "$feature_commit")
@@ -91,17 +87,17 @@ test_audit_specific_commit() {
 
     # Create commits with measurements
     git commit --allow-empty -m "Commit 1"
-    git_perf add 100.0 -m perf_test
+    git perf add 100.0 -m perf_test
 
     git commit --allow-empty -m "Commit 2"
-    git_perf add 105.0 -m perf_test
+    git perf add 105.0 -m perf_test
 
     git commit --allow-empty -m "Commit 3"
     local commit3=$(git rev-parse HEAD)
-    git_perf add 110.0 -m perf_test
+    git perf add 110.0 -m perf_test
 
     # Audit commit3 specifically - read operation uses positional argument
-    local output=$(git_perf audit "$commit3" -m perf_test -n 3)
+    local output=$(git perf audit "$commit3" -m perf_test -n 3)
 
     # Should show audit results for commit3
     assert_contains "$output" "perf_test"
@@ -115,7 +111,7 @@ test_default_to_HEAD() {
     git commit --allow-empty -m "Commit 1"
 
     # Add measurement without --commit flag (should default to HEAD)
-    git_perf add 42.0 -m default_test
+    git perf add 42.0 -m default_test
 
     # Verify measurement was added to HEAD
     local head_commit=$(git rev-parse HEAD)
@@ -132,7 +128,7 @@ test_invalid_committish_error() {
     git commit --allow-empty -m "Commit 1"
 
     # Try to add measurement to invalid commit - write operation uses --commit flag
-    if git_perf add 50.0 -m error_test --commit nonexistent_commit 2>/dev/null; then
+    if git perf add 50.0 -m error_test --commit nonexistent_commit 2>/dev/null; then
         fail "Should have failed with invalid committish"
     fi
 
