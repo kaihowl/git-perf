@@ -14,10 +14,6 @@ New to git-perf? Start here:
 
 Detailed guides for specific use cases:
 
-- **[Importing Measurements](./importing-measurements.md)** - Import test execution times and benchmark results
-  - JUnit XML format (pytest, Jest, cargo-nextest, JUnit, and more)
-  - Criterion JSON format (Rust benchmarks)
-  - Cross-language examples and best practices
 - **[Configuration Guide](../README.md#configuration)** - Complete `.gitperfconfig` reference
   - Statistical dispersion methods (stddev vs MAD)
   - Per-measurement configuration overrides
@@ -28,6 +24,10 @@ Detailed guides for specific use cases:
   - Threshold configuration
   - Interpreting audit output
   - Managing epochs for expected changes
+- **[Importing Measurements](./importing-measurements.md)** - Import test execution times and benchmark results
+  - JUnit XML format (pytest, Jest, cargo-nextest, JUnit, and more)
+  - Criterion JSON format (Rust benchmarks)
+  - Cross-language examples and best practices
 
 ## Reference Documentation
 
