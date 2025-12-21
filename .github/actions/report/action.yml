@@ -58,6 +58,10 @@ inputs:
     description: 'Whether to detect and display change points in the report'
     required: false
     default: 'false'
+  template:
+    description: 'Path to custom report template (relative to repo root). If empty, uses no template.'
+    required: false
+    default: ''
 
 outputs:
   report-url:
@@ -135,7 +139,20 @@ runs:
           CHANGES_FLAG="--show-changes"
         fi
 
-        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG ${{ inputs.additional-args }}
+        TEMPLATE_FLAG=""
+        if [ -n "${{ inputs.template }}" ]; then
+          if [ -f "${{ inputs.template }}" ]; then
+            TEMPLATE_FLAG="--template ${{ inputs.template }}"
+            echo "Using custom template: ${{ inputs.template }}"
+          else
+            echo "::error::Template file not found: ${{ inputs.template }}"
+            echo "::error::Please ensure the template file exists in your repository"
+            echo "::error::Available templates: .git-perf/templates/performance-overview.html, .git-perf/templates/simple-dashboard.html"
+            exit 1
+          fi
+        fi
+
+        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG $TEMPLATE_FLAG ${{ inputs.additional-args }}
 
     - name: Run audit
       id: audit
