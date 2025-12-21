@@ -937,7 +937,7 @@ pub fn report(
     combined_patterns: &[String],
     template_config: ReportTemplateConfig,
     show_epochs: bool,
-    detect_changes: bool,
+    show_changes: bool,
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
@@ -1147,7 +1147,7 @@ pub fn report(
                 }
 
                 // Add change point traces if requested
-                if detect_changes {
+                if show_changes {
                     log::debug!("Running change point detection for {}", measurement_name);
                     let config = crate::config::change_point_config(measurement_name);
                     // Reverse measurements to match display order (newest on left, oldest on right)

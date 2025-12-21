@@ -233,7 +233,7 @@ impl PlotlyReporter {
 
 ```bash
 # Report with visualizations
-git perf report output.html --show-epochs --detect-changes
+git perf report output.html --show-epochs --show-changes
 
 # Audit with change point warning
 git perf audit -m build_time  # warns if change point in epoch

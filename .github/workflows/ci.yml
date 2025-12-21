@@ -269,7 +269,7 @@ jobs:
           show-size: 'true'
           size-use-disk-size: 'true'
           show-epochs: 'true'
-          detect-changes: 'true'
+          show-changes: 'true'
 
   release-binary-size:
     name: release-binary-size
