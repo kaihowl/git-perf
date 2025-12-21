@@ -132,20 +132,7 @@ fn apply_template(template: &str, plot: &Plot, metadata: &ReportMetadata) -> Vec
 }
 
 /// Load template from file or return default
-fn load_template(template_path: Option<&PathBuf>) -> Result<Option<String>> {
-    let template_path = match template_path {
-        Some(path) => path.clone(),
-        None => {
-            // Try config
-            if let Some(config_path) = config::report_template_path() {
-                config_path
-            } else {
-                // No template specified
-                return Ok(None);
-            }
-        }
-    };
-
+fn load_template(template_path: &Path) -> Result<String> {
     if !template_path.exists() {
         bail!("Template file not found: {}", template_path.display());
     }
@@ -158,7 +145,7 @@ fn load_template(template_path: Option<&PathBuf>) -> Result<Option<String>> {
         )
     })?;
 
-    Ok(Some(template_content))
+    Ok(template_content)
 }
 
 /// Load custom CSS content from file
@@ -320,6 +307,10 @@ impl CsvMeasurementRow {
     }
 }
 
+// TODO add function to return type of file
+// TODO type of file should be enum
+// TODO use that in other places in the report function to remove the manual parsing of the file
+// extension
 trait Reporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]);
     fn add_trace(
@@ -1550,32 +1541,34 @@ fn generate_single_section_report<'a>(
 
     // For HTML output, apply template rendering
     if output_path.extension().and_then(|s| s.to_str()) == Some("html") {
-        let template = load_template(template_config.template_path.as_ref())?;
-        let template_str = template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
+        panic!("No no");
+        // // TODO duplicated code path with the multi section report
+        // let template = load_template(template_config.template_path)?;
+        // let template_str = template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
 
-        let resolved_title = template_config.title.clone().or_else(config::report_title);
-        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-        let metadata = ReportMetadata::new(resolved_title, custom_css_content, commits);
+        // let resolved_title = template_config.title.clone().or_else(config::report_title);
+        // let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+        // let metadata = ReportMetadata::new(resolved_title, custom_css_content, commits);
 
-        // Get the raw plotly output
-        let raw_bytes = reporter.as_bytes();
-        let plot_str = String::from_utf8(raw_bytes)?;
+        // // Get the raw plotly output
+        // let raw_bytes = reporter.as_bytes();
+        // let plot_str = String::from_utf8(raw_bytes)?;
 
-        // Extract plotly parts
-        let (_plotly_head, plotly_body) = extract_plotly_parts_from_str(&plot_str);
-        let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+        // // Extract plotly parts
+        // let (_plotly_head, plotly_body) = extract_plotly_parts_from_str(&plot_str);
+        // let (plotly_head, _) = extract_plotly_parts(&Plot::new());
 
-        let output_html = template_str
-            .replace("{{TITLE}}", &metadata.title)
-            .replace("{{PLOTLY_HEAD}}", &plotly_head)
-            .replace("{{PLOTLY_BODY}}", &plotly_body)
-            .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
-            .replace("{{TIMESTAMP}}", &metadata.timestamp)
-            .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
-            .replace("{{DEPTH}}", &metadata.depth.to_string())
-            .replace("{{AUDIT_SECTION}}", "");
+        // let output_html = template_str
+        //     .replace("{{TITLE}}", &metadata.title)
+        //     .replace("{{PLOTLY_HEAD}}", &plotly_head)
+        //     .replace("{{PLOTLY_BODY}}", &plotly_body)
+        //     .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+        //     .replace("{{TIMESTAMP}}", &metadata.timestamp)
+        //     .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+        //     .replace("{{DEPTH}}", &metadata.depth.to_string())
+        //     .replace("{{AUDIT_SECTION}}", "");
 
-        Ok(output_html.into_bytes())
+        // Ok(output_html.into_bytes())
     } else {
         // For CSV, return raw bytes
         Ok(reporter.as_bytes())
@@ -1591,20 +1584,10 @@ fn extract_plotly_parts_from_str(plot_html: &str) -> (String, String) {
 /// Generate a multi-section report from a template with section placeholders
 fn generate_multi_section_report(
     template: &str,
+    sections: &[SectionConfig],
     commits: &[Commit],
     metadata: &ReportMetadata,
-    global_show_epochs: bool,
-    global_show_changes: bool,
 ) -> Result<Vec<u8>> {
-    let sections = parse_template_sections(template)?
-        .into_iter()
-        .map(|sc| SectionConfig {
-            show_epochs: sc.show_epochs || global_show_epochs,
-            show_changes: sc.show_changes || global_show_changes,
-            ..sc
-        })
-        .collect_vec();
-
     if sections.is_empty() {
         // No sections found - this shouldn't happen if called correctly
         bail!("Template contains no section placeholders");
@@ -1685,43 +1668,89 @@ pub fn report(
 
     // For HTML reports, check if multi-section template is requested
     if output.extension().and_then(|s| s.to_str()) == Some("html") {
-        let template = load_template(template_config.template_path.as_ref())?;
-        let template_str = template.as_deref().unwrap_or(DEFAULT_HTML_TEMPLATE);
-        let sections = parse_template_sections(template_str)?;
+        let template_path = template_config
+            .template_path
+            .clone()
+            .or(config::report_template_path());
 
-        if !sections.is_empty() {
-            // Multi-section template path
-            log::info!(
-                "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
-                sections.len()
-            );
+        let template_str = if let Some(template_path) = template_path {
+            load_template(&template_path)?
+        } else {
+            DEFAULT_HTML_TEMPLATE.into()
+        };
 
-            let resolved_title = template_config.title.clone().or_else(config::report_title);
-            let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-            let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
+        // TODO move to test
+        // the default template should not have sections
+        assert!(parse_template_sections(DEFAULT_HTML_TEMPLATE)?.is_empty());
 
-            let report_bytes = generate_multi_section_report(
-                template_str,
-                &commits,
-                &metadata,
-                show_epochs,
-                show_changes,
-            )?;
+        // TODO add proper tests for all case combinations
+        let sections = match parse_template_sections(&template_str)? {
+            sections if sections.is_empty() => {
+                log::info!(
+                    "Single-section template detected. Using CLI arguments for filtering/aggregation.",
+                );
 
-            if output == Path::new("-") {
-                match io::stdout().write_all(&report_bytes) {
-                    Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
-                    res => res,
-                }?;
-            } else {
-                File::create(&output)?.write_all(&report_bytes)?;
+                let single_section = SectionConfig {
+                    id: "main".to_string(),
+                    placeholder: "{{PLOTLY_BODY}}".to_string(),
+                    measurement_filter: if combined_patterns.is_empty() {
+                        None
+                    } else {
+                        // TODO incorrect, must add paranthesis, missing test
+                        Some(combined_patterns.join("|"))
+                    },
+                    key_value_filter: key_values.to_vec(),
+                    separate_by: separate_by.clone(),
+                    aggregate_by,
+                    depth: None,
+                    show_epochs,
+                    show_changes,
+                };
+                vec![single_section]
             }
+            sections => {
+                log::info!(
+                    "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
+                    sections.len()
+                );
+                sections
+            }
+        };
 
-            return Ok(());
+        assert!(!sections.is_empty());
+
+        let resolved_title = template_config.title.clone().or_else(config::report_title);
+        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+        let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
+
+        let sections = sections
+            .into_iter()
+            .map(|sc| SectionConfig {
+                show_epochs: sc.show_epochs || show_epochs,
+                show_changes: sc.show_changes || show_changes,
+                ..sc
+            })
+            .collect_vec();
+
+        // TODO parses the template twice
+        let report_bytes =
+            generate_multi_section_report(&template_str, &sections, &commits, &metadata)?;
+
+        if output == Path::new("-") {
+            match io::stdout().write_all(&report_bytes) {
+                Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+                res => res,
+            }?;
+        } else {
+            File::create(&output)?.write_all(&report_bytes)?;
         }
+
+        return Ok(());
     }
 
     // Unified single-section path for both CSV and HTML
+    // TODO this is dead code for html. If there is no template, then the DEFAULT_HTML_TEMPLATE
+    // above will still yield a single section and the above code is used.
     // Create a synthetic section from CLI arguments
     let single_section = SectionConfig {
         id: "main".to_string(),
@@ -1729,6 +1758,7 @@ pub fn report(
         measurement_filter: if combined_patterns.is_empty() {
             None
         } else {
+            // TODO incorrect, must add paranthesis, missing test
             Some(combined_patterns.join("|"))
         },
         key_value_filter: key_values.to_vec(),
