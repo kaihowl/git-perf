@@ -1662,10 +1662,6 @@ pub fn report(
             DEFAULT_HTML_TEMPLATE.into()
         };
 
-        // TODO move to test
-        // the default template should not have sections
-        assert!(parse_template_sections(DEFAULT_HTML_TEMPLATE)?.is_empty());
-
         // TODO add proper tests for all case combinations
         let sections = match parse_template_sections(&template_str)? {
             sections if sections.is_empty() => {
@@ -2624,5 +2620,14 @@ mod tests {
         // Hover text should contain percentage and short SHA
         assert!(html.contains("+23.5%"));
         assert!(html.contains("xyz789"));
+    }
+
+    #[test]
+    fn test_default_template_has_no_sections() {
+        // The default template should not have sections
+        // It should be a single-section template
+        let sections = parse_template_sections(DEFAULT_HTML_TEMPLATE)
+            .expect("Failed to parse default template");
+        assert!(sections.is_empty());
     }
 }
