@@ -54,7 +54,7 @@ inputs:
     description: 'Whether to show epoch boundaries in the report'
     required: false
     default: 'false'
-  detect-changes:
+  show-changes:
     description: 'Whether to detect and display change points in the report'
     required: false
     default: 'false'
@@ -131,8 +131,8 @@ runs:
         fi
 
         CHANGES_FLAG=""
-        if [ "${{ inputs.detect-changes }}" = "true" ]; then
-          CHANGES_FLAG="--detect-changes"
+        if [ "${{ inputs.show-changes }}" = "true" ]; then
+          CHANGES_FLAG="--show-changes"
         fi
 
         git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG ${{ inputs.additional-args }}
