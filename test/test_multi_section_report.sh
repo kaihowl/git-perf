@@ -188,6 +188,7 @@ echo "Invalid section parameter should be warned"
 cd_temp_repo
 
 # Create template with unknown parameter (should warn but not fail)
+# Needs two sections to pass. A single section with no fitting measurements is treated as an error
 cat > warning-template.html <<'EOF'
 <!DOCTYPE html>
 <html>
@@ -198,6 +199,10 @@ cat > warning-template.html <<'EOF'
 <body>
     {{SECTION[test]
         measurement-filter: ^test
+        unknown-param: value
+    }}
+    {{SECTION[test2]
+        measurement-filter: ^test2
         unknown-param: value
     }}
 </body>
