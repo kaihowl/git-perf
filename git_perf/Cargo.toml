@@ -60,6 +60,7 @@ criterion = "0.7.0"
 tempfile = "3.23.0"
 httptest = "0.16.3"
 tokio = { version = "1", features = ["net"] }
+rstest = "0.26.1"
 
 [features]
 vendored-openssl = []
