@@ -532,27 +532,23 @@ assert_file_exists ".gitperfconfig" "Config file should exist"
 
 ## Example Tests
 
-### test_framework_example.sh
+### FRAMEWORK_EXAMPLE.sh
 
-A comprehensive example demonstrating all assertion types and patterns. Located at `test/test_framework_example.sh`.
+A comprehensive example demonstrating all assertion types and patterns. Located at `test/FRAMEWORK_EXAMPLE.sh`.
 
-To run:
+This is a documentation example showing:
+- All assertion types with examples
+- Migration patterns with before/after code
+- Test organization with sections
+- Proper usage of TEST_TRACE=0
+
+To run (requires git-perf in PATH):
 ```bash
-./test/test_framework_example.sh
+export PATH="$PWD/target/release:$PATH"
+bash test/FRAMEWORK_EXAMPLE.sh
 ```
 
-### test_audit_basic.sh
-
-A real-world migration example showing before/after patterns. This test:
-- Uses `TEST_TRACE=0` for clean output
-- Uses `test_section()` for organization
-- Uses `assert_success`/`assert_failure` for command validation
-- Shows `test_stats` at end
-
-To run:
-```bash
-./test/test_audit_basic.sh
-```
+Note: This file is not run as part of the automated test suite (renamed from test_*.sh to avoid automatic execution).
 
 ## Debugging Failed Tests
 
