@@ -1,10 +1,12 @@
 #[cfg(test)]
 mod test {
     use std::env;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    fn run_bash_tests(start_filter: &str) {
+    use rstest::*;
+
+    fn run_bash_test(bash_file: &Path) {
         let binary_path = Path::new(env!("CARGO_BIN_EXE_git-perf"));
 
         // Prepend binary path to PATH
@@ -17,7 +19,7 @@ mod test {
         // These environment variables ensure tests don't use system/global git config
         // which could have commit signing or other settings that interfere with tests
         let output = Command::new("bash")
-            .args(["../test/run_tests.sh", start_filter])
+            .args([bash_file])
             .env("PATH", new_path)
             .env("GIT_CONFIG_NOSYSTEM", "true")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -39,13 +41,8 @@ mod test {
         assert!(output.status.success(), "Bash test script failed");
     }
 
-    #[test]
-    fn run_quick_bash_tests_with_binary() {
-        run_bash_tests("test_");
-    }
-
-    #[test]
-    fn run_slow_bash_tests_with_binary() {
-        run_bash_tests("testslow_");
+    #[rstest]
+    fn for_each_file(#[files("../test/test*.sh")] path: PathBuf) {
+        run_bash_test(&path);
     }
 }
