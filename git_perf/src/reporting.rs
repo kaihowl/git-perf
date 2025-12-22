@@ -1616,6 +1616,62 @@ fn generate_multi_section_report(
     Ok(output.as_bytes().to_vec())
 }
 
+/// Wraps measurement filter patterns in non-capturing groups and joins them with |
+/// This ensures correct precedence when combining multiple regex patterns
+fn wrap_patterns_for_regex(patterns: &[String]) -> Option<String> {
+    if patterns.is_empty() {
+        None
+    } else {
+        Some(
+            patterns
+                .iter()
+                .map(|p| format!("(?:{})", p))
+                .collect::<Vec<_>>()
+                .join("|"),
+        )
+    }
+}
+
+/// Builds a single-section config from CLI arguments
+/// Used when template has no SECTION blocks (single-section mode)
+fn build_single_section_config(
+    combined_patterns: &[String],
+    key_values: &[(String, String)],
+    separate_by: Vec<String>,
+    aggregate_by: Option<ReductionFunc>,
+    show_epochs: bool,
+    show_changes: bool,
+) -> SectionConfig {
+    SectionConfig {
+        id: "main".to_string(),
+        placeholder: "{{PLOTLY_BODY}}".to_string(),
+        measurement_filter: wrap_patterns_for_regex(combined_patterns),
+        key_value_filter: key_values.to_vec(),
+        separate_by,
+        aggregate_by,
+        depth: None,
+        show_epochs,
+        show_changes,
+    }
+}
+
+/// Merges global show flags with section-level flags using OR logic
+/// Global flags override section flags (if global is true, result is true)
+fn merge_show_flags(
+    sections: Vec<SectionConfig>,
+    global_show_epochs: bool,
+    global_show_changes: bool,
+) -> Vec<SectionConfig> {
+    sections
+        .into_iter()
+        .map(|sc| SectionConfig {
+            show_epochs: sc.show_epochs || global_show_epochs,
+            show_changes: sc.show_changes || global_show_changes,
+            ..sc
+        })
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn report(
     output: PathBuf,
@@ -1662,35 +1718,20 @@ pub fn report(
             DEFAULT_HTML_TEMPLATE.into()
         };
 
-        // TODO add proper tests for all case combinations
         let sections = match parse_template_sections(&template_str)? {
             sections if sections.is_empty() => {
                 log::info!(
                     "Single-section template detected. Using CLI arguments for filtering/aggregation.",
                 );
 
-                let single_section = SectionConfig {
-                    id: "main".to_string(),
-                    placeholder: "{{PLOTLY_BODY}}".to_string(),
-                    measurement_filter: if combined_patterns.is_empty() {
-                        None
-                    } else {
-                        // Wrap each pattern in a non-capturing group to ensure correct precedence
-                        Some(
-                            combined_patterns
-                                .iter()
-                                .map(|p| format!("(?:{})", p))
-                                .collect::<Vec<_>>()
-                                .join("|"),
-                        )
-                    },
-                    key_value_filter: key_values.to_vec(),
-                    separate_by: separate_by.clone(),
+                let single_section = build_single_section_config(
+                    combined_patterns,
+                    key_values,
+                    separate_by.clone(),
                     aggregate_by,
-                    depth: None,
                     show_epochs,
                     show_changes,
-                };
+                );
                 vec![single_section]
             }
             sections => {
@@ -1708,14 +1749,7 @@ pub fn report(
         let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
         let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
 
-        let sections = sections
-            .into_iter()
-            .map(|sc| SectionConfig {
-                show_epochs: sc.show_epochs || show_epochs,
-                show_changes: sc.show_changes || show_changes,
-                ..sc
-            })
-            .collect_vec();
+        let sections = merge_show_flags(sections, show_epochs, show_changes);
 
         let report_bytes =
             generate_multi_section_report(&template_str, &sections, &commits, &metadata)?;
@@ -2629,5 +2663,243 @@ mod tests {
         let sections = parse_template_sections(DEFAULT_HTML_TEMPLATE)
             .expect("Failed to parse default template");
         assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn test_wrap_patterns_for_regex_empty() {
+        // Test with empty patterns - should return None
+        let patterns = vec![];
+        let result = wrap_patterns_for_regex(&patterns);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_wrap_patterns_for_regex_single() {
+        // Test with single pattern - should wrap in non-capturing group
+        let patterns = vec!["test.*".to_string()];
+        let result = wrap_patterns_for_regex(&patterns);
+        assert_eq!(result, Some("(?:test.*)".to_string()));
+    }
+
+    #[test]
+    fn test_wrap_patterns_for_regex_multiple() {
+        // Test with multiple patterns - should wrap each and join with |
+        let patterns = vec!["test.*".to_string(), "bench.*".to_string()];
+        let result = wrap_patterns_for_regex(&patterns);
+        assert_eq!(result, Some("(?:test.*)|(?:bench.*)".to_string()));
+    }
+
+    #[test]
+    fn test_wrap_patterns_for_regex_complex() {
+        // Test with complex regex patterns
+        let patterns = vec!["^test-[0-9]+$".to_string(), "bench-(foo|bar)".to_string()];
+        let result = wrap_patterns_for_regex(&patterns);
+        assert_eq!(
+            result,
+            Some("(?:^test-[0-9]+$)|(?:bench-(foo|bar))".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_single_section_config_no_filters() {
+        // Test building section config with no filters
+        let section = build_single_section_config(&[], &[], vec![], None, false, false);
+
+        assert_eq!(section.id, "main");
+        assert_eq!(section.placeholder, "{{PLOTLY_BODY}}");
+        assert_eq!(section.measurement_filter, None);
+        assert!(section.key_value_filter.is_empty());
+        assert!(section.separate_by.is_empty());
+        assert_eq!(section.aggregate_by, None);
+        assert_eq!(section.depth, None);
+        assert!(!section.show_epochs);
+        assert!(!section.show_changes);
+    }
+
+    #[test]
+    fn test_build_single_section_config_with_patterns() {
+        // Test building section config with measurement patterns
+        let patterns = vec!["test.*".to_string(), "bench.*".to_string()];
+        let section = build_single_section_config(&patterns, &[], vec![], None, false, false);
+
+        assert_eq!(
+            section.measurement_filter,
+            Some("(?:test.*)|(?:bench.*)".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_single_section_config_with_all_params() {
+        // Test building section config with all parameters
+        let patterns = vec!["test.*".to_string()];
+        let kv_filters = vec![
+            ("os".to_string(), "linux".to_string()),
+            ("arch".to_string(), "x64".to_string()),
+        ];
+        let separate = vec!["os".to_string(), "arch".to_string()];
+
+        let section = build_single_section_config(
+            &patterns,
+            &kv_filters,
+            separate.clone(),
+            Some(ReductionFunc::Median),
+            true,
+            true,
+        );
+
+        assert_eq!(section.measurement_filter, Some("(?:test.*)".to_string()));
+        assert_eq!(section.key_value_filter, kv_filters);
+        assert_eq!(section.separate_by, separate);
+        assert_eq!(section.aggregate_by, Some(ReductionFunc::Median));
+        assert!(section.show_epochs);
+        assert!(section.show_changes);
+    }
+
+    #[test]
+    fn test_merge_show_flags_both_false() {
+        // When both section and global flags are false, result should be false
+        let sections = vec![SectionConfig {
+            id: "test".to_string(),
+            placeholder: "{{SECTION[test]}}".to_string(),
+            measurement_filter: None,
+            key_value_filter: vec![],
+            separate_by: vec![],
+            aggregate_by: None,
+            depth: None,
+            show_epochs: false,
+            show_changes: false,
+        }];
+
+        let merged = merge_show_flags(sections, false, false);
+
+        assert_eq!(merged.len(), 1);
+        assert!(!merged[0].show_epochs);
+        assert!(!merged[0].show_changes);
+    }
+
+    #[test]
+    fn test_merge_show_flags_section_true_global_false() {
+        // When section flag is true and global is false, result should be true (OR logic)
+        let sections = vec![SectionConfig {
+            id: "test".to_string(),
+            placeholder: "{{SECTION[test]}}".to_string(),
+            measurement_filter: None,
+            key_value_filter: vec![],
+            separate_by: vec![],
+            aggregate_by: None,
+            depth: None,
+            show_epochs: true,
+            show_changes: true,
+        }];
+
+        let merged = merge_show_flags(sections, false, false);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0].show_epochs);
+        assert!(merged[0].show_changes);
+    }
+
+    #[test]
+    fn test_merge_show_flags_section_false_global_true() {
+        // When global flag is true and section is false, result should be true (OR logic)
+        let sections = vec![SectionConfig {
+            id: "test".to_string(),
+            placeholder: "{{SECTION[test]}}".to_string(),
+            measurement_filter: None,
+            key_value_filter: vec![],
+            separate_by: vec![],
+            aggregate_by: None,
+            depth: None,
+            show_epochs: false,
+            show_changes: false,
+        }];
+
+        let merged = merge_show_flags(sections, true, true);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0].show_epochs);
+        assert!(merged[0].show_changes);
+    }
+
+    #[test]
+    fn test_merge_show_flags_both_true() {
+        // When both section and global flags are true, result should be true
+        let sections = vec![SectionConfig {
+            id: "test".to_string(),
+            placeholder: "{{SECTION[test]}}".to_string(),
+            measurement_filter: None,
+            key_value_filter: vec![],
+            separate_by: vec![],
+            aggregate_by: None,
+            depth: None,
+            show_epochs: true,
+            show_changes: true,
+        }];
+
+        let merged = merge_show_flags(sections, true, true);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0].show_epochs);
+        assert!(merged[0].show_changes);
+    }
+
+    #[test]
+    fn test_merge_show_flags_mixed_flags() {
+        // Test with mixed flag combinations
+        let sections = vec![SectionConfig {
+            id: "test".to_string(),
+            placeholder: "{{SECTION[test]}}".to_string(),
+            measurement_filter: None,
+            key_value_filter: vec![],
+            separate_by: vec![],
+            aggregate_by: None,
+            depth: None,
+            show_epochs: true,
+            show_changes: false,
+        }];
+
+        let merged = merge_show_flags(sections, false, true);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0].show_epochs); // section true OR global false = true
+        assert!(merged[0].show_changes); // section false OR global true = true
+    }
+
+    #[test]
+    fn test_merge_show_flags_multiple_sections() {
+        // Test merging flags for multiple sections
+        let sections = vec![
+            SectionConfig {
+                id: "section1".to_string(),
+                placeholder: "{{SECTION[section1]}}".to_string(),
+                measurement_filter: None,
+                key_value_filter: vec![],
+                separate_by: vec![],
+                aggregate_by: None,
+                depth: None,
+                show_epochs: false,
+                show_changes: false,
+            },
+            SectionConfig {
+                id: "section2".to_string(),
+                placeholder: "{{SECTION[section2]}}".to_string(),
+                measurement_filter: None,
+                key_value_filter: vec![],
+                separate_by: vec![],
+                aggregate_by: None,
+                depth: None,
+                show_epochs: true,
+                show_changes: false,
+            },
+        ];
+
+        let merged = merge_show_flags(sections, true, true);
+
+        assert_eq!(merged.len(), 2);
+        // Both sections should have both flags true due to global flags
+        assert!(merged[0].show_epochs);
+        assert!(merged[0].show_changes);
+        assert!(merged[1].show_epochs);
+        assert!(merged[1].show_changes);
     }
 }

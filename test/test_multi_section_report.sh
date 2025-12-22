@@ -252,4 +252,149 @@ cli_content=$(cat cli-ignore-report.html)
 # Should contain the plot since template filter matches cli-test
 assert_output_contains "$cli_content" "Plotly.newPlot" "Template should use its own filter, not CLI filter"
 
+echo "Single-section template with show-epochs global flag"
+cd_temp_repo
+
+# Add measurements
+git perf add -m epochs-test 100.0
+
+# Create single-section template (no SECTION blocks)
+cat > epochs-template.html <<'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Epochs Test</title>
+    {{PLOTLY_HEAD}}
+</head>
+<body>
+    <h1>Epochs Test</h1>
+    {{PLOTLY_BODY}}
+</body>
+</html>
+EOF
+
+# Generate report with --show-epochs flag (global flag on single-section template)
+git perf report --template epochs-template.html --show-epochs -o epochs-report.html
+
+# Verify report was created
+if [[ ! -f epochs-report.html ]]; then
+  echo "Epochs report file not created"
+  exit 1
+fi
+
+echo "Single-section template with show-changes global flag"
+cd_temp_repo
+
+# Add measurements
+git perf add -m changes-test 100.0
+create_commit
+git perf add -m changes-test 150.0
+
+# Create single-section template
+cat > changes-template.html <<'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Changes Test</title>
+    {{PLOTLY_HEAD}}
+</head>
+<body>
+    <h1>Changes Test</h1>
+    {{PLOTLY_BODY}}
+</body>
+</html>
+EOF
+
+# Generate report with --show-changes flag
+git perf report --template changes-template.html --show-changes -o changes-report.html
+
+# Verify report was created
+if [[ ! -f changes-report.html ]]; then
+  echo "Changes report file not created"
+  exit 1
+fi
+
+echo "Multi-section template with global show-epochs flag override"
+cd_temp_repo
+
+# Add measurements
+git perf add -m override-test1 100.0
+git perf add -m override-test2 200.0
+
+# Create multi-section template with show-epochs=false in section
+cat > override-template.html <<'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Override Test</title>
+    {{PLOTLY_HEAD}}
+</head>
+<body>
+    <h1>Override Test</h1>
+    <h2>Section 1 (no show-epochs in config)</h2>
+    {{SECTION[section1]
+        measurement-filter: ^override-test1$
+        show-epochs: false
+    }}
+
+    <h2>Section 2 (with show-changes)</h2>
+    {{SECTION[section2]
+        measurement-filter: ^override-test2$
+        show-changes: true
+    }}
+</body>
+</html>
+EOF
+
+# Generate report with global --show-epochs flag
+# The global flag should merge with section flags using OR logic
+git perf report --template override-template.html --show-epochs --show-changes -o override-report.html
+
+# Verify report was created
+if [[ ! -f override-report.html ]]; then
+  echo "Override report file not created"
+  exit 1
+fi
+
+# The report should be generated successfully (OR-merge should work)
+override_content=$(cat override-report.html)
+assert_output_contains "$override_content" "Plotly.newPlot" "Override report should contain plots"
+
+echo "Single-section template with multiple measurement patterns"
+cd_temp_repo
+
+# Add measurements with different prefixes
+git perf add -m test-measure-1 100.0
+git perf add -m test-measure-2 150.0
+git perf add -m bench-measure-1 200.0
+git perf add -m other-measure 250.0
+
+# Create single-section template
+cat > multi-pattern-template.html <<'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi Pattern Test</title>
+    {{PLOTLY_HEAD}}
+</head>
+<body>
+    <h1>Multi Pattern Test</h1>
+    {{PLOTLY_BODY}}
+</body>
+</html>
+EOF
+
+# Generate report with multiple --filter patterns
+# Should match both test-* and bench-* but not other-*
+git perf report --template multi-pattern-template.html --filter "^test-" --filter "^bench-" -o multi-pattern-report.html
+
+# Verify report was created
+if [[ ! -f multi-pattern-report.html ]]; then
+  echo "Multi pattern report file not created"
+  exit 1
+fi
+
+multi_pattern_content=$(cat multi-pattern-report.html)
+assert_output_contains "$multi_pattern_content" "Plotly.newPlot" "Multi pattern report should contain plots"
+
 exit 0
