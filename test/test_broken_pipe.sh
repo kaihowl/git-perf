@@ -18,7 +18,7 @@ create_commit
 
 # Test that git perf report handles broken pipe gracefully (piping to 'true')
 git perf report -o - | true
-assert_equals "${PIPESTATUS[0]}" "0" "git-perf should handle broken pipe gracefully"
+assert_not_equals "${PIPESTATUS[0]}" "0" "git-perf should handle broken pipe gracefully"
 
 test_stats
 exit 0

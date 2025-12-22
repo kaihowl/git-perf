@@ -17,7 +17,7 @@ work_dir=$(pwd)
 cd /tmp
 
 # Test that git-perf works when invoked with -C from a different directory
-assert_success output git -C "$work_dir" perf report -o -
+assert_success_with_output output git -C "$work_dir" perf report -o -
 assert_contains "$output" "test-measure" "Failed to retrieve measurement from different working directory"
 
 test_stats
