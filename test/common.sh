@@ -226,22 +226,30 @@ assert_not_matches() {
 
 assert_success() {
   # If first arg looks like a variable name (no slashes, no dashes at start),
-  # treat it as output variable name
+  # AND first arg is NOT a command in PATH,
+  # treat first arg as output variable name
   local output_var=""
-  if [[ $# -gt 1 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-    output_var="$1"
-    shift
+  if [[ $# -gt 2 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ && ! "$1" =~ / ]]; then
+    # Check if $1 is a command - if it is, it's not a variable name
+    if command -v "$1" >/dev/null 2>&1; then
+      # $1 is a command, not a variable name
+      output_var=""
+    else
+      # $1 is not a command, so it's likely an output variable
+      output_var="$1"
+      shift
+    fi
   fi
 
-  local output
+  local _cmd_output
   local exit_code
 
   if [[ -n "$output_var" ]]; then
-    output=$("$@" 2>&1)
+    _cmd_output=$("$@" 2>&1)
     exit_code=$?
-    eval "$output_var=\$output"
+    eval "$output_var=\$_cmd_output"
   else
-    output=$("$@" 2>&1)
+    _cmd_output=$("$@" 2>&1)
     exit_code=$?
   fi
 
@@ -249,37 +257,45 @@ assert_success() {
     _test_fail "Command should succeed but failed with exit code $exit_code" \
       "Command: $*" \
       "Output:" \
-      "$output"
+      "$_cmd_output"
   fi
   _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
 }
 
 assert_failure() {
   # If first arg looks like a variable name (no slashes, no dashes at start),
-  # treat it as output variable name
+  # AND first arg is NOT a command in PATH,
+  # treat first arg as output variable name
   local output_var=""
-  if [[ $# -gt 1 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-    output_var="$1"
-    shift
+  if [[ $# -gt 2 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ && ! "$1" =~ / ]]; then
+    # Check if $1 is a command - if it is, it's not a variable name
+    if command -v "$1" >/dev/null 2>&1; then
+      # $1 is a command, not a variable name
+      output_var=""
+    else
+      # $1 is not a command, so it's likely an output variable
+      output_var="$1"
+      shift
+    fi
   fi
 
-  local output
+  local _cmd_output
   local exit_code
 
   set +e
-  output=$("$@" 2>&1)
+  _cmd_output=$("$@" 2>&1)
   exit_code=$?
   set -e
 
   if [[ -n "$output_var" ]]; then
-    eval "$output_var=\$output"
+    eval "$output_var=\$_cmd_output"
   fi
 
   if [[ $exit_code -eq 0 ]]; then
     _test_fail "Command should fail but succeeded" \
       "Command: $*" \
       "Output:" \
-      "$output"
+      "$_cmd_output"
   fi
   _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
 }
