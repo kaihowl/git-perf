@@ -26,7 +26,7 @@ epoch = "87654321"
 unit = "s"
 EOF
 # List config
-assert_success output git perf config --list
+assert_success_with_output output git perf config --list
 # Should show both measurements
 assert_contains "$output" "build_time"
 assert_contains "$output" "test_time"
@@ -47,7 +47,7 @@ sigma = 2.0
 unit = "ms"
 EOF
 # List with detailed flag
-assert_success output git perf config --list --detailed
+assert_success_with_output output git perf config --list --detailed
 # Should show all settings
 assert_matches "$output" "epoch.*12345678"
 assert_matches "$output" "min_relative_deviation.*5"
@@ -66,7 +66,7 @@ epoch = "12345678"
 unit = "ms"
 EOF
 # List as JSON
-assert_success output git perf config --list --format json
+assert_success_with_output output git perf config --list --format json
 # Should be valid JSON (test by piping through jq)
 echo "$output" | jq . > /dev/null
 # Should contain expected fields
@@ -87,7 +87,7 @@ epoch = "12345678"
 epoch = "87654321"
 EOF
 # Filter for specific measurement
-assert_success output git perf config --list --measurement build_time
+assert_success_with_output output git perf config --list --measurement build_time
 # Should show build_time
 assert_contains "$output" "build_time"
 # Should NOT show test_time
@@ -115,7 +115,7 @@ cat > .gitperfconfig << 'EOF'
 unit = "ms"
 EOF
 # Validate should fail (exit non-zero)
-assert_failure output git perf config --list --validate
+assert_failure_with_output output git perf config --list --validate
 # Should show validation error
 assert_contains "$output" "No epoch configured"
 
@@ -128,7 +128,7 @@ epoch = "12345678"
 sigma = -1.0
 EOF
 # Validate should fail
-assert_failure output git perf config --list --validate
+assert_failure_with_output output git perf config --list --validate
 # Should show validation error
 assert_contains "$output" "Invalid sigma value"
 
@@ -141,7 +141,7 @@ epoch = "12345678"
 min_measurements = 1
 EOF
 # Validate should fail
-assert_failure output git perf config --list --validate
+assert_failure_with_output output git perf config --list --validate
 # Should show validation error
 assert_contains "$output" "Invalid min_measurements"
 
@@ -155,7 +155,7 @@ min_relative_deviation = -5.0
 min_measurements = 1
 EOF
 # Validate should fail
-assert_failure output git perf config --list --validate
+assert_failure_with_output output git perf config --list --validate
 # Should show multiple validation errors
 assert_contains "$output" "Invalid sigma value"
 assert_contains "$output" "Invalid min_relative_deviation"
@@ -169,7 +169,7 @@ cat > .gitperfconfig << 'EOF'
 epoch = "12345678"
 EOF
 # Output should show git context
-assert_success output git perf config --list
+assert_success_with_output output git perf config --list
 assert_contains "$output" "Git Context:"
 assert_contains "$output" "Branch:"
 assert_contains "$output" "Repository:"

@@ -41,9 +41,9 @@ pushd shallow_clone
 git perf pull
 assert_success git perf report -n 2
 assert_success git perf audit -n 2 -m test-measure
-assert_failure output git perf report -n 3
+assert_failure_with_output output git perf report -n 3
 assert_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
-assert_failure output git perf audit -n 3 -m test-measure
+assert_failure_with_output output git perf audit -n 3 -m test-measure
 assert_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
 
 popd
@@ -96,7 +96,7 @@ git checkout local-ref
 git perf pull
 
 # Must fail as this expects more history
-assert_failure output git perf report -n 11
+assert_failure_with_output output git perf report -n 11
 assert_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
 
 # Must work as this is the exact history length

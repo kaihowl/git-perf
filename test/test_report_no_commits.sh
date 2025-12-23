@@ -22,7 +22,7 @@ git clone "file://$orig" test_repo
 cd test_repo
 
 # Try to run report on empty repository - should fail with helpful message
-assert_failure output git perf report
+assert_failure_with_output output git perf report
 assert_contains "$output" "No commits found in repository" "Missing 'No commits found in repository' in output"
 assert_contains "$output" "Ensure commits exist and were pushed to the remote" "Missing guidance about pushing to remote in output"
 

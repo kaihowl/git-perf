@@ -47,7 +47,7 @@ pushd "$repo2"
 
 git perf add -m echo 0.5
 
-assert_success output git perf push
+assert_success_with_output output git perf push
 assert_contains "$output" "retrying" "Output is missing 'retrying'"
 
 popd
@@ -57,7 +57,7 @@ test_section "Check number of measurements from myworkrepo"
 pushd "$myworkrepo"
 
 git perf pull
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # CSV now includes header row, so 2 measurements + 1 header = 3 lines
 assert_equals "$num_measurements" "3" "Expected two measurements (3 lines with header)"

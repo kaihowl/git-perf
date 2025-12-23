@@ -52,7 +52,7 @@ git perf add -m echo 0.5
 git checkout master
 git perf add -m echo 0.5
 
-assert_success output git perf push
+assert_success_with_output output git perf push
 assert_contains "$output" "new reference"
 
 test_section "Second push should be no-op"

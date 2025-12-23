@@ -8,7 +8,7 @@ source "$script_dir/common.sh"
 
 test_section "Missing arguments"
 cd_temp_repo
-assert_failure output git perf measure -m test-measure
+assert_failure_with_output output git perf measure -m test-measure
 assert_matches "$output" ".*following (required )?arguments.*" "Missing 'following arguments' in output"
 
 test_section "Non-existing command"
@@ -40,7 +40,7 @@ assert_equals "$val" "0.5" "Expected measurement value 0.5"
 
 test_section "Measurement with padding spaces (quoted)"
 cd_temp_repo
-assert_failure output git perf add -m test-measure " 0.5 "
+assert_failure_with_output output git perf add -m test-measure " 0.5 "
 assert_matches "$output" ".*invalid float.*" "Error message should mention problem with float literal value"
 
 test_stats

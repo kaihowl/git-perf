@@ -18,7 +18,7 @@ git perf add -m metric3 300
 assert_success git perf bump-epoch -m metric1 -m metric2 -m metric3
 
 # Verify that all three measurements have epochs in the config
-assert_success config cat .gitperfconfig
+assert_success_with_output config cat .gitperfconfig
 assert_contains "$config" "metric1"
 assert_contains "$config" "metric2"
 assert_contains "$config" "metric3"

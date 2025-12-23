@@ -49,17 +49,17 @@ EOF
 
 # We have 6 measurements total
 # build_time requires 5, memory_usage requires 2 (both should have enough)
-assert_success AUDIT_BUILD git perf audit -m build_time -n 10
+assert_success_with_output AUDIT_BUILD git perf audit -m build_time -n 10
 assert_contains "$AUDIT_BUILD" "z-score"
 assert_contains "$AUDIT_BUILD" "Tail:"
 
-assert_success AUDIT_MEMORY git perf audit -m memory_usage -n 10
+assert_success_with_output AUDIT_MEMORY git perf audit -m memory_usage -n 10
 assert_contains "$AUDIT_MEMORY" "z-score"
 assert_contains "$AUDIT_MEMORY" "Tail:"
 
 # Test with insufficient measurements: build_time needs 5 but only get 2 (HEAD + 1 tail with n=1)
 # This should skip the test
-assert_success AUDIT_BUILD_INSUFFICIENT git perf audit -m build_time -n 1
+assert_success_with_output AUDIT_BUILD_INSUFFICIENT git perf audit -m build_time -n 1
 assert_contains "$AUDIT_BUILD_INSUFFICIENT" "min_measurements of 5"
 assert_contains "$AUDIT_BUILD_INSUFFICIENT" "⏭️"
 
@@ -77,8 +77,8 @@ EOF
 
 # Run audits - we can't directly observe aggregate_by in output,
 # but we verify the commands run without error
-assert_success AUDIT_BUILD_AGG git perf audit -m build_time -n 10
-assert_success AUDIT_MEMORY_AGG git perf audit -m memory_usage -n 10
+assert_success_with_output AUDIT_BUILD_AGG git perf audit -m build_time -n 10
+assert_success_with_output AUDIT_MEMORY_AGG git perf audit -m memory_usage -n 10
 
 assert_contains "$AUDIT_BUILD_AGG" "z-score"
 assert_contains "$AUDIT_MEMORY_AGG" "z-score"
@@ -96,8 +96,8 @@ sigma = 2.0
 EOF
 
 # Run audits - sigma affects pass/fail thresholds
-assert_success AUDIT_BUILD_SIGMA git perf audit -m build_time -n 10
-assert_success AUDIT_MEMORY_SIGMA git perf audit -m memory_usage -n 10
+assert_success_with_output AUDIT_BUILD_SIGMA git perf audit -m build_time -n 10
+assert_success_with_output AUDIT_MEMORY_SIGMA git perf audit -m memory_usage -n 10
 
 assert_contains "$AUDIT_BUILD_SIGMA" "z-score"
 assert_contains "$AUDIT_MEMORY_SIGMA" "z-score"
@@ -115,7 +115,7 @@ dispersion_method = "stddev"
 EOF
 
 # Run audit with BOTH measurements at once
-assert_success AUDIT_MULTI git perf audit -m build_time -m memory_usage -n 10
+assert_success_with_output AUDIT_MULTI git perf audit -m build_time -m memory_usage -n 10
 
 # Verify both measurements were audited with their respective methods
 assert_contains "$AUDIT_MULTI" "build_time"
@@ -139,12 +139,12 @@ dispersion_method = "mad"
 EOF
 
 # CLI should override all config values
-assert_success AUDIT_CLI_OVERRIDE git perf audit -m build_time -n 10 --min-measurements 2 -a min -d 3.0 --dispersion-method stddev
+assert_success_with_output AUDIT_CLI_OVERRIDE git perf audit -m build_time -n 10 --min-measurements 2 -a min -d 3.0 --dispersion-method stddev
 assert_contains "$AUDIT_CLI_OVERRIDE" "z-score (stddev):"
 
 # CRITICAL: CLI --min-measurements should apply to ALL measurements
 # Config says build_time needs 10 and memory_usage needs 8, but CLI says 2 for all
-assert_success AUDIT_CLI_MIN_ALL git perf audit -m build_time -m memory_usage -n 3 --min-measurements 2
+assert_success_with_output AUDIT_CLI_MIN_ALL git perf audit -m build_time -m memory_usage -n 3 --min-measurements 2
 # Both should succeed with only 3 measurements because CLI overrides config for ALL
 assert_contains "$AUDIT_CLI_MIN_ALL" "build_time"
 assert_contains "$AUDIT_CLI_MIN_ALL" "memory_usage"
@@ -190,7 +190,7 @@ dispersion_method = "mad"
 EOF
 
 # Run audit with all three measurements
-assert_success AUDIT_THREE git perf audit -m build_time -m memory_usage -m test_metric -n 10
+assert_success_with_output AUDIT_THREE git perf audit -m build_time -m memory_usage -m test_metric -n 10
 
 # Verify all three were audited
 assert_contains "$AUDIT_THREE" "build_time"
@@ -215,7 +215,7 @@ EOF
 
 # build_time should use stddev (specific) but inherit other global settings
 # memory_usage should use all global settings
-assert_success AUDIT_FALLBACK git perf audit -m build_time -m memory_usage -n 10
+assert_success_with_output AUDIT_FALLBACK git perf audit -m build_time -m memory_usage -n 10
 
 assert_contains "$AUDIT_FALLBACK" "z-score (stddev):"
 assert_contains "$AUDIT_FALLBACK" "z-score (mad):"
@@ -231,7 +231,7 @@ EOF
 
 # Test with max_count=3, which is less than both config values
 # This should produce warnings for both measurements
-assert_success AUDIT_WARNING git perf audit -m build_time -m memory_usage -n 3
+assert_success_with_output AUDIT_WARNING git perf audit -m build_time -m memory_usage -n 3
 
 # Verify warnings appear for both measurements
 assert_contains "$AUDIT_WARNING" "Warning: --max_count (3) is less than min_measurements (10)"
@@ -248,7 +248,7 @@ EOF
 
 # Test with max_count=5, which is >= config min_measurements (3)
 # This should NOT produce a warning
-assert_success AUDIT_NO_WARNING git perf audit -m build_time -n 5
+assert_success_with_output AUDIT_NO_WARNING git perf audit -m build_time -n 5
 
 # Verify no warning appears
 assert_not_contains "$AUDIT_NO_WARNING" "Warning.*max_count"
@@ -256,7 +256,7 @@ assert_not_contains "$AUDIT_NO_WARNING" "Warning.*max_count"
 test_section "CLI validation prevents invalid max_count/min_measurements combination"
 
 # This should fail with CLI validation error, not reach our warning
-assert_failure AUDIT_CLI_INVALID git perf audit -m build_time -n 3 --min-measurements 5
+assert_failure_with_output AUDIT_CLI_INVALID git perf audit -m build_time -n 3 --min-measurements 5
 
 # Should have CLI validation error, not our runtime warning
 assert_contains "$AUDIT_CLI_INVALID" "minimal number of measurements"

@@ -24,7 +24,7 @@ git perf add -m test-metric 98
 git checkout master
 
 # Run audit and capture output - this should show the skip message with header (3 measurements < 10)
-assert_success output git perf audit -m test-metric --min-measurements 10
+assert_success_with_output output git perf audit -m test-metric --min-measurements 10
 
 # Verify the output contains the header with measurement name
 assert_contains "$output" "⏭️ 'test-metric'" "Header with measurement name NOT found"

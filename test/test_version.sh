@@ -9,10 +9,10 @@ source "$script_dir/common.sh"
 
 test_section "Version and help output"
 
-assert_failure output git perf
+assert_failure_with_output output git perf
 assert_contains "$output" "--help"
 
-assert_success output git perf --version
+assert_success_with_output output git perf --version
 assert_matches "$output" "^(git-perf )?[0-9]+\.[0-9]+\.[0-9]+$"
 
 test_section "Git version compatibility checks"

@@ -67,7 +67,7 @@ export FAKETIME='-28d'
 
 create_commit
 git perf add -m test-measure-one 10.0
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # Exactly one measurement should be present (plus header row = 2 lines)
 assert_equals "$num_measurements" "2" "Expected 1 measurement plus header"
@@ -80,7 +80,7 @@ test_section "Test remove with 7 day threshold (should keep measurement)"
 # Note: --older-than uses <= (inclusive), so measurements at exactly 7 days will be removed
 # These tests will become flaky if run at exactly the 7 day boundary
 git perf remove --older-than 7d
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # Nothing should have been removed (1 measurement + header = 2 lines)
 assert_equals "$num_measurements" "2" "Expected 1 measurement still present"
@@ -92,7 +92,7 @@ export FAKETIME='-14d'
 
 create_commit
 git perf add -m test-measure-two 20.0
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # Two measurements should be there (plus header = 3 lines)
 assert_equals "$num_measurements" "3" "Expected 2 measurements plus header"
@@ -111,7 +111,7 @@ git for-each-ref
 test_section "Remove measurements older than 7 days"
 
 git perf remove --older-than 7d
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # One measurement should still be there (plus header = 2 lines)
 assert_equals "$num_measurements" "2" "Expected 1 measurement after removal"
@@ -149,7 +149,7 @@ prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 git perf remove --older-than 7d
 
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # No measurement should be there
 assert_equals "$num_measurements" "0" "Expected no measurements after final removal"
@@ -189,7 +189,7 @@ git perf add -m test-measure-three 30.0
 git push
 git perf push
 
-assert_success report git perf report -o -
+assert_success_with_output report git perf report -o -
 num_measurements=$(echo "$report" | wc -l)
 # One measurement should be there (plus header = 2 lines)
 assert_equals "$num_measurements" "2" "Expected 1 measurement after adding new one"

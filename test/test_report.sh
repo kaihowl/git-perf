@@ -59,10 +59,10 @@ separated_single_content=$(cat separated_single_result.html)
 assert_not_contains "$single_content" "timer2" "Single measurement HTML should not contain 'timer2'"
 assert_not_contains "$separated_single_content" "timer2" "Separated single measurement HTML should not contain 'timer2'"
 
-assert_failure output git perf report -m timer-does-not-exist
+assert_failure_with_output output git perf report -m timer-does-not-exist
 assert_contains "$output" "no performance measurements" "No warning for missing measurements"
 
-assert_failure output git perf report -s does-not-exist
+assert_failure_with_output output git perf report -s does-not-exist
 assert_contains "$output" "invalid separator" "No warning for invalid separator 'does-not-exist'"
 
 test_stats

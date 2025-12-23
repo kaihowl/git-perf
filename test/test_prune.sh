@@ -29,14 +29,14 @@ pushd "$(mktemp -d)"
 git init
 git remote add origin "${repo}"
 git fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 --update-head-ok origin master:master
-assert_failure output git perf prune
+assert_failure_with_output output git perf prune
 assert_contains "$output" "shallow" "No warning for 'shallow' clone"
 popd
 
 test_section "Test running git perf prune outside of a git repository"
 
 pushd "$(mktemp -d)"
-assert_failure output git perf prune
+assert_failure_with_output output git perf prune
 # Check for either expected error message
 if [[ $output != *'not a git repository'* ]]; then
   assert_contains "$output" "fatal" "Expected error for running outside a git repo"

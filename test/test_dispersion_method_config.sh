@@ -34,11 +34,11 @@ git checkout master
 git perf add -m build_time 110
 
 test_section "Default behavior uses stddev"
-assert_success AUDIT_DEFAULT git perf audit -m build_time
+assert_success_with_output AUDIT_DEFAULT git perf audit -m build_time
 assert_contains "$AUDIT_DEFAULT" "z-score (stddev):"
 
 test_section "CLI option overrides default"
-assert_success AUDIT_CLI_MAD git perf audit -m build_time --dispersion-method mad
+assert_success_with_output AUDIT_CLI_MAD git perf audit -m build_time --dispersion-method mad
 assert_contains "$AUDIT_CLI_MAD" "z-score (mad):"
 
 test_section "Global configuration overrides default"
@@ -48,7 +48,7 @@ dispersion_method = "mad"
 EOF
 
 # Run the audit command from the git repository directory
-assert_success AUDIT_GLOBAL_MAD git perf audit -m build_time
+assert_success_with_output AUDIT_GLOBAL_MAD git perf audit -m build_time
 assert_contains "$AUDIT_GLOBAL_MAD" "z-score (mad):"
 
 test_section "Measurement-specific configuration overrides global"
@@ -61,11 +61,11 @@ dispersion_method = "stddev"
 EOF
 
 # Run the audit command from the git repository directory
-assert_success AUDIT_MEASUREMENT_STDDEV git perf audit -m build_time
+assert_success_with_output AUDIT_MEASUREMENT_STDDEV git perf audit -m build_time
 assert_contains "$AUDIT_MEASUREMENT_STDDEV" "z-score (stddev):"
 
 test_section "CLI option overrides configuration"
-assert_success AUDIT_CLI_OVERRIDE git perf audit -m build_time --dispersion-method mad
+assert_success_with_output AUDIT_CLI_OVERRIDE git perf audit -m build_time --dispersion-method mad
 assert_contains "$AUDIT_CLI_OVERRIDE" "z-score (mad):"
 
 test_section "Other measurements use global configuration"
@@ -89,7 +89,7 @@ cat > .gitperfconfig << 'EOF'
 dispersion_method = "mad"
 EOF
 
-assert_success AUDIT_OTHER_MEASUREMENT git perf audit -m memory_usage
+assert_success_with_output AUDIT_OTHER_MEASUREMENT git perf audit -m memory_usage
 assert_contains "$AUDIT_OTHER_MEASUREMENT" "z-score (mad):"
 
 test_section "Invalid configuration falls back to default"
@@ -98,7 +98,7 @@ cat > .gitperfconfig << 'EOF'
 dispersion_method = "invalid_value"
 EOF
 
-assert_success AUDIT_INVALID_CONFIG git perf audit -m build_time
+assert_success_with_output AUDIT_INVALID_CONFIG git perf audit -m build_time
 assert_contains "$AUDIT_INVALID_CONFIG" "z-score (stddev):"
 
 test_section "Malformed TOML falls back to default"
@@ -107,13 +107,13 @@ cat > .gitperfconfig << 'EOF'
 dispersion_method = "mad"
 EOF
 
-assert_success AUDIT_MALFORMED_TOML git perf audit -m build_time
+assert_success_with_output AUDIT_MALFORMED_TOML git perf audit -m build_time
 assert_contains "$AUDIT_MALFORMED_TOML" "z-score (stddev):"
 
 test_section "Empty configuration falls back to default"
 echo "" > .gitperfconfig
 
-assert_success AUDIT_EMPTY_CONFIG git perf audit -m build_time
+assert_success_with_output AUDIT_EMPTY_CONFIG git perf audit -m build_time
 assert_contains "$AUDIT_EMPTY_CONFIG" "z-score (stddev):"
 
 test_section "Verify dispersion method differences"
@@ -124,11 +124,11 @@ dispersion_method = "mad"
 EOF
 
 # Run audit with MAD (from config)
-assert_success AUDIT_CONFIG_MAD git perf audit -m build_time
+assert_success_with_output AUDIT_CONFIG_MAD git perf audit -m build_time
 Z_SCORE_CONFIG_MAD=$(echo "$AUDIT_CONFIG_MAD" | grep "z-score (mad):" | sed 's/.*z-score (mad):[[:space:]]*↓[[:space:]]*\([0-9.]*\).*/\1/')
 
 # Run audit with stddev (CLI override)
-assert_success AUDIT_CLI_STDDEV git perf audit -m build_time --dispersion-method stddev
+assert_success_with_output AUDIT_CLI_STDDEV git perf audit -m build_time --dispersion-method stddev
 Z_SCORE_CLI_STDDEV=$(echo "$AUDIT_CLI_STDDEV" | grep "z-score (stddev):" | sed 's/.*z-score (stddev):[[:space:]]*↓[[:space:]]*\([0-9.]*\).*/\1/')
 
 # Verify z-scores are different

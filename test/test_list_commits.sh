@@ -10,7 +10,7 @@ test_section "Check git perf list-commits functionality"
 
 test_section "Test with empty repository (no measurements)"
 cd_empty_repo
-assert_success output git perf list-commits
+assert_success_with_output output git perf list-commits
 assert_equals "$output" "" "Expected empty output for repository without measurements"
 popd
 
@@ -19,7 +19,7 @@ cd_empty_repo
 create_commit
 current_commit=$(git rev-parse HEAD)
 git perf add -m test 1.0
-assert_success output git perf list-commits
+assert_success_with_output output git perf list-commits
 assert_contains "$output" "$current_commit" "Expected current commit in list-commits output"
 popd
 
@@ -33,7 +33,7 @@ create_commit
 second_commit=$(git rev-parse HEAD)
 git perf add -m test 2.0
 
-assert_success output git perf list-commits
+assert_success_with_output output git perf list-commits
 assert_contains "$output" "$first_commit" "Expected first commit in list-commits output"
 assert_contains "$output" "$second_commit" "Expected second commit in list-commits output"
 
@@ -59,7 +59,7 @@ git perf add -m test 1.0
 git perf push
 
 # Verify measurement was added
-assert_success output git perf list-commits
+assert_success_with_output output git perf list-commits
 assert_contains "$output" "$current_commit" "Expected commit to have measurement before removal"
 
 # Wait a moment to ensure timestamp difference
@@ -69,7 +69,7 @@ sleep 2
 git perf remove --older-than 0d
 
 # Verify measurement was removed
-assert_success output git perf list-commits
+assert_success_with_output output git perf list-commits
 assert_equals "$output" "" "Expected empty output after removing all measurements"
 popd
 popd

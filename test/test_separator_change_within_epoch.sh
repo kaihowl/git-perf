@@ -48,7 +48,7 @@ assert_success git perf report -o separated_result.html -s os
 assert_file_exists "separated_result.html" "Expected HTML file 'separated_result.html' was not created"
 
 # Check that separated report contains measurements with the separator
-assert_success separated_content cat separated_result.html
+assert_success_with_output separated_content cat separated_result.html
 assert_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
 assert_contains "$separated_content" "timer" "Separated HTML missing 'timer' measurement name"
 
@@ -58,12 +58,12 @@ assert_success git perf report -o all_result.html
 assert_file_exists "all_result.html" "Expected HTML file 'all_result.html' was not created"
 
 # Verify the unseparated report contains all measurements
-assert_success html_content cat all_result.html
+assert_success_with_output html_content cat all_result.html
 assert_contains "$html_content" "timer" "HTML file missing measurement name 'timer'"
 
 test_section "Test separator key that doesn't exist in any measurements"
 
-assert_failure output git perf report -s does-not-exist
+assert_failure_with_output output git perf report -s does-not-exist
 assert_contains "$output" "invalid separator" "No error for separator key that doesn't exist in any measurements"
 
 test_stats

@@ -33,10 +33,10 @@ git perf add -m build_time 110
 test_section "Running audits with different dispersion methods"
 
 # Run audit with stddev method
-assert_success AUDIT_STDDEV git perf audit -m build_time --dispersion-method stddev
+assert_success_with_output AUDIT_STDDEV git perf audit -m build_time --dispersion-method stddev
 
 # Run audit with MAD method
-assert_success AUDIT_MAD git perf audit -m build_time --dispersion-method mad
+assert_success_with_output AUDIT_MAD git perf audit -m build_time --dispersion-method mad
 
 test_section "Verify correct method names in output"
 assert_contains "$AUDIT_STDDEV" "z-score (stddev):"

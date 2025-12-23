@@ -8,7 +8,7 @@ source "$script_dir/common.sh"
 
 test_section "Test that audit fails with no -m"
 cd_temp_repo
-assert_failure output git perf audit
+assert_failure_with_output output git perf audit
 assert_contains "$output" "required"
 
 test_section "Reset for the rest of the tests"
@@ -44,7 +44,7 @@ assert_success git checkout master
 assert_success create_commit
 assert_success git perf add -m timer 10
 assert_success git perf add -m memory 130
-assert_failure output git perf audit -m timer -m memory -d 2
+assert_failure_with_output output git perf audit -m timer -m memory -d 2
 assert_contains "$output" "❌ 'timer'"
 assert_contains "$output" "One or more measurements failed audit"
 
@@ -53,7 +53,7 @@ assert_success git reset --hard HEAD~1
 assert_success create_commit
 assert_success git perf add -m timer 15
 assert_success git perf add -m memory 200
-assert_failure output git perf audit -m timer -m memory -d 2
+assert_failure_with_output output git perf audit -m timer -m memory -d 2
 assert_contains "$output" "❌ 'timer'"
 assert_contains "$output" "❌ 'memory'"
 assert_contains "$output" "One or more measurements failed audit"

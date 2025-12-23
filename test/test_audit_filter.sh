@@ -42,25 +42,25 @@ git perf add -m timer 13
 
 test_section "Filter with regex pattern matching bench_* measurements"
 # Test pure filter behavior without requiring -m
-assert_success output git perf audit --filter "bench_.*" -d 10
+assert_success_with_output output git perf audit --filter "bench_.*" -d 10
 assert_contains "$output" "bench_cpu" "Should audit bench_cpu"
 assert_contains "$output" "bench_memory" "Should audit bench_memory"
 assert_not_contains "$output" "test_unit"
 assert_not_contains "$output" "'timer'"
 
 test_section "Combine -m and --filter (OR behavior)"
-assert_success output git perf audit -m timer --filter "bench_cpu" -d 10
+assert_success_with_output output git perf audit -m timer --filter "bench_cpu" -d 10
 assert_contains "$output" "timer" "Should audit explicit measurement 'timer'"
 assert_contains "$output" "bench_cpu" "Should audit filtered measurement 'bench_cpu'"
 assert_not_contains "$output" "bench_memory"
 assert_not_contains "$output" "test_unit"
 
 test_section "Filter matches no measurements (should error)"
-assert_failure output git perf audit --filter "nonexistent.*" -d 10
+assert_failure_with_output output git perf audit --filter "nonexistent.*" -d 10
 assert_contains "$output" "No measurements found matching the provided patterns" "Should error with appropriate message"
 
 test_section "Invalid regex pattern (should error)"
-assert_failure output git perf audit --filter "[invalid" -d 10
+assert_failure_with_output output git perf audit --filter "[invalid" -d 10
 assert_contains "$output" "Invalid regex pattern" "Should error about invalid regex"
 
 test_section "Filter with selectors"
@@ -86,7 +86,7 @@ git perf add -m bench_cpu 115 -k os=linux
 git perf add -m bench_cpu 165 -k os=mac
 git perf add -m test_unit 56 -k os=linux
 
-assert_success output git perf audit --filter "bench_.*" -s os=linux -d 10
+assert_success_with_output output git perf audit --filter "bench_.*" -s os=linux -d 10
 assert_contains "$output" "bench_cpu" "Should audit bench_cpu with os=linux"
 assert_not_contains "$output" "test_unit"
 
@@ -112,7 +112,7 @@ git perf add -m bench_cpu 115
 git perf add -m test_unit 56
 git perf add -m other_metric 28
 
-assert_success output git perf audit --filter "bench_.*" --filter "test_.*" -d 10
+assert_success_with_output output git perf audit --filter "bench_.*" --filter "test_.*" -d 10
 assert_contains "$output" "bench_cpu" "Should audit bench_cpu"
 assert_contains "$output" "test_unit" "Should audit test_unit"
 assert_not_contains "$output" "other_metric"
@@ -133,7 +133,7 @@ create_commit
 git perf add -m bench_fast 100
 
 # Should fail with low sigma
-assert_failure output git perf audit --filter "bench_.*" -d 0.5
+assert_failure_with_output output git perf audit --filter "bench_.*" -d 0.5
 assert_contains "$output" "❌ 'bench_fast'" "Should show failure for bench_fast"
 assert_contains "$output" "differs significantly" "Should indicate significant difference"
 
@@ -152,7 +152,7 @@ create_commit
 git perf add -m my_benchmark 106
 
 # Both -m and --filter specify the same measurement (dedup behavior)
-assert_success output git perf audit -m my_benchmark --filter "my_.*" -d 10
+assert_success_with_output output git perf audit -m my_benchmark --filter "my_.*" -d 10
 assert_contains "$output" "✅ 'my_benchmark'" "Should successfully audit measurement"
 # Should only appear once in output (not duplicated)
 assert_true '[[ $(echo "$output" | grep -c "'"'"'my_benchmark'"'"'") -le 2 ]]' "Measurement should not be duplicated"
