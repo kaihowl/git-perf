@@ -930,6 +930,7 @@ dependencies = [
  "env_logger",
  "fundu",
  "git_perf_cli_types",
+ "glob_test",
  "hex",
  "httptest",
  "human-repr",
@@ -958,6 +959,22 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+]
+
+[[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
+name = "glob_test"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "707daa7175d1020bc297b566b9cf52235c5ab9ec59cf12be65ae885dd541a5de"
+dependencies = [
+ "glob",
+ "proc-macro2",
 ]
 
 [[package]]
