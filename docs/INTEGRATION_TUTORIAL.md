@@ -151,7 +151,7 @@ jobs:
       contents: write  # Required to push measurements
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch all history for git-perf
 
@@ -239,7 +239,7 @@ jobs:
       cancel-in-progress: false              # Queue jobs instead of canceling
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -343,7 +343,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -846,7 +846,7 @@ jobs:
       group: gh-pages-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

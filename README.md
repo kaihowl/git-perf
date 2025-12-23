@@ -827,7 +827,7 @@ Common causes and solutions:
 
 2. **Insufficient fetch depth**:
    ```yaml
-   - uses: actions/checkout@v4
+   - uses: actions/checkout@v6
      with:
        fetch-depth: 0  # Fetch full history
    ```
