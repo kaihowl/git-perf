@@ -181,7 +181,7 @@ jobs:
       group: gh-pages-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 40
 
@@ -268,7 +268,7 @@ jobs:
   report:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 100
 
@@ -300,7 +300,7 @@ jobs:
   deploy-docs:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
       - run: pip install mkdocs-material
       - run: mkdocs build

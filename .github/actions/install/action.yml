@@ -26,7 +26,7 @@ runs:
         git-perf --help
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       shell: bash
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
       if: ${{ inputs.release == 'branch' }}
       with:
         fetch-depth: 40
