@@ -164,6 +164,11 @@ pub(super) fn git_rev_parse(reference: &str) -> Result<String, GitError> {
         .map(|s| s.stdout.trim().to_owned())
 }
 
+/// Resolve a committish (commit, branch, tag, HEAD~3, etc.) to a full SHA-1 hash
+pub fn resolve_committish(committish: &str) -> Result<String> {
+    git_rev_parse(committish).map_err(|e| anyhow!(e))
+}
+
 pub(super) fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
     capture_git_output(&["symbolic-ref", "-q", reference], &None)
         .ok()

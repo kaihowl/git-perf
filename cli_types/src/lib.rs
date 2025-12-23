@@ -130,6 +130,10 @@ pub enum Commands {
         #[command(flatten)]
         measurement: CliMeasurement,
 
+        /// Target commit for measurement (default: HEAD)
+        #[arg(long = "commit", value_name = "COMMIT")]
+        commit: Option<String>,
+
         /// Command to measure
         #[arg(required(true), last(true))]
         command: Vec<String>,
@@ -142,6 +146,10 @@ pub enum Commands {
 
         #[command(flatten)]
         measurement: CliMeasurement,
+
+        /// Target commit for measurement (default: HEAD)
+        #[arg(long = "commit", value_name = "COMMIT")]
+        commit: Option<String>,
     },
 
     /// Import measurements from test runners and benchmarks
@@ -195,6 +203,10 @@ pub enum Commands {
         /// Input file path (use '-' or omit for stdin)
         file: Option<String>,
 
+        /// Target commit for measurements (default: HEAD)
+        #[arg(long = "commit", value_name = "COMMIT")]
+        commit: Option<String>,
+
         /// Optional prefix to prepend to measurement names
         #[arg(short, long)]
         prefix: Option<String>,
@@ -228,6 +240,10 @@ pub enum Commands {
 
     /// Create an HTML performance report
     Report {
+        /// Target commit to start report from (default: HEAD)
+        #[arg(value_name = "COMMIT")]
+        commit: Option<String>,
+
         /// HTML output file
         #[arg(short, long, default_value = "output.html")]
         output: PathBuf,
@@ -345,6 +361,10 @@ pub enum Commands {
     /// The sparkline visualization shows the range of measurements relative to
     /// the tail median (historical measurements only).
     Audit {
+        /// Target commit to audit (default: HEAD)
+        #[arg(value_name = "COMMIT")]
+        commit: Option<String>,
+
         /// Specific measurement names to audit (can be specified multiple times).
         /// At least one of --measurement or --filter must be provided.
         /// Multiple measurements use OR logic.

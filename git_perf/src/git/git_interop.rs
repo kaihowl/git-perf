@@ -39,6 +39,8 @@ pub use super::git_lowlevel::check_git_version;
 
 pub use super::git_lowlevel::get_repository_root;
 
+pub use super::git_lowlevel::resolve_committish;
+
 /// Check if the current repository is a shallow clone
 pub fn is_shallow_repository() -> Result<bool> {
     super::git_lowlevel::is_shallow_repo()
@@ -69,26 +71,36 @@ fn default_backoff() -> ExponentialBackoff {
         .build()
 }
 
-pub fn add_note_line_to_head(line: &str) -> Result<()> {
+/// Add a note line to a specific commit
+pub fn add_note_line(commit: &str, line: &str) -> Result<()> {
     let op = || -> Result<(), ::backoff::Error<GitError>> {
-        raw_add_note_line_to_head(line).map_err(map_git_error_for_backoff)
+        raw_add_note_line(commit, line).map_err(map_git_error_for_backoff)
     };
 
     let backoff = default_backoff();
 
     ::backoff::retry(backoff, op).map_err(|e| match e {
-        ::backoff::Error::Permanent(err) => {
-            anyhow!(err).context("Permanent failure while adding note line to head")
-        }
-        ::backoff::Error::Transient { err, .. } => {
-            anyhow!(err).context("Timed out while adding note line to head")
-        }
+        ::backoff::Error::Permanent(err) => anyhow!(err).context(format!(
+            "Permanent failure while adding note line to commit {}",
+            commit
+        )),
+        ::backoff::Error::Transient { err, .. } => anyhow!(err).context(format!(
+            "Timed out while adding note line to commit {}",
+            commit
+        )),
     })?;
 
     Ok(())
 }
 
-fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
+/// Add a note line to HEAD (convenience wrapper)
+pub fn add_note_line_to_head(line: &str) -> Result<()> {
+    let head = internal_get_head_revision()
+        .map_err(|e| anyhow!(e).context("Failed to get HEAD revision"))?;
+    add_note_line(&head, line)
+}
+
+fn raw_add_note_line(commit: &str, line: &str) -> Result<(), GitError> {
     ensure_symbolic_write_ref_exists()?;
 
     // `git notes append` is not safe to use concurrently.
@@ -103,15 +115,19 @@ fn raw_add_note_line_to_head(line: &str) -> Result<(), GitError> {
     defer!(remove_reference(&temp_target)
         .expect("Deleting our own temp ref for adding should never fail"));
 
-    // Test if the repo has any commit checked out at HEAD
-    if internal_get_head_revision().is_err() {
-        return Err(GitError::MissingHead {
-            reference: "HEAD".to_string(),
-        });
-    }
+    // Verify the target commit exists by resolving it
+    let resolved_commit = git_rev_parse(commit)?;
 
     capture_git_output(
-        &["notes", "--ref", &temp_target, "append", "-m", line],
+        &[
+            "notes",
+            "--ref",
+            &temp_target,
+            "append",
+            "-m",
+            line,
+            &resolved_commit,
+        ],
         &None,
     )?;
 
@@ -808,9 +824,17 @@ fn update_read_branch() -> Result<TempRef> {
     Ok(temp_ref)
 }
 
-pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
+/// Walk commits starting from a specific commit
+pub fn walk_commits_from(
+    start_commit: &str,
+    num_commits: usize,
+) -> Result<Vec<(String, Vec<String>)>> {
     // update local read branch
     let temp_ref = update_read_branch()?;
+
+    // Resolve the starting commit to ensure it exists
+    let resolved_commit = git_rev_parse(start_commit)
+        .map_err(|e| anyhow!(e).context(format!("Failed to resolve commit '{}'", start_commit)))?;
 
     let output = capture_git_output(
         &[
@@ -824,11 +848,11 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
             "--pretty=--,%H,%D%n%N",
             "--decorate=full",
             format!("--notes={}", temp_ref.ref_name).as_str(),
-            "HEAD",
+            &resolved_commit,
         ],
         &None,
     )
-    .context("Failed to retrieve commits")?;
+    .context(format!("Failed to retrieve commits from {}", start_commit))?;
 
     let mut commits: Vec<(String, Vec<String>)> = Vec::new();
     let mut detected_shallow = false;
@@ -858,6 +882,11 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
     }
 
     Ok(commits)
+}
+
+/// Walk commits starting from HEAD (convenience wrapper)
+pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
+    walk_commits_from("HEAD", num_commits)
 }
 
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {

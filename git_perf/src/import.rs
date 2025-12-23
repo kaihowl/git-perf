@@ -23,6 +23,7 @@ use crate::serialization::serialize_multiple;
 /// Reads input from stdin or file, parses it according to the specified format,
 /// converts to MeasurementData, and stores in git notes.
 pub fn handle_import(
+    commit: &str,
     format: ImportFormat,
     file: Option<String>,
     prefix: Option<String>,
@@ -132,7 +133,7 @@ pub fn handle_import(
     if dry_run {
         println!("\n[DRY RUN] Measurements not stored");
     } else {
-        store_measurements(&measurements)?;
+        store_measurements(commit, &measurements)?;
         println!("Successfully imported {} measurements", measurements.len());
     }
 
@@ -161,9 +162,9 @@ fn read_input(file: Option<&str>) -> Result<String> {
 ///
 /// This is similar to `measurement_storage::add_multiple` but handles
 /// measurements with different names and metadata.
-fn store_measurements(measurements: &[MeasurementData]) -> Result<()> {
+fn store_measurements(commit: &str, measurements: &[MeasurementData]) -> Result<()> {
     let serialized = serialize_multiple(measurements);
-    crate::git::git_interop::add_note_line_to_head(&serialized)?;
+    crate::git::git_interop::add_note_line(commit, &serialized)?;
     Ok(())
 }
 
@@ -227,6 +228,7 @@ mod tests {
         let notes_before = commits_before[0].1.len();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -259,6 +261,7 @@ mod tests {
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -310,6 +313,7 @@ mod tests {
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             Some("ci".to_string()), // prefix
@@ -340,6 +344,7 @@ mod tests {
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -379,6 +384,7 @@ mod tests {
 
         // Filter to only import tests matching "passed"
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -413,6 +419,7 @@ mod tests {
         write!(file, "{}", SAMPLE_CRITERION_JSON).unwrap();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::CriterionJson,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -462,6 +469,7 @@ mod tests {
         write!(file, "invalid xml content").unwrap();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -496,6 +504,7 @@ mod tests {
         let notes_before = commits_before[0].1.len();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -529,6 +538,7 @@ mod tests {
         write!(file, "{}", SAMPLE_JUNIT_XML).unwrap();
 
         let result = handle_import(
+            "HEAD",
             ImportFormat::Junit,
             Some(file.path().to_str().unwrap().to_string()),
             None,
@@ -579,7 +589,7 @@ mod tests {
             },
         ];
 
-        let result = store_measurements(&measurements);
+        let result = store_measurements("HEAD", &measurements);
         assert!(
             result.is_ok(),
             "Storing measurements should succeed: {:?}",

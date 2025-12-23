@@ -11,7 +11,7 @@ use crate::config_cmd;
 use crate::git::git_interop::check_git_version;
 use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push};
 use crate::import::handle_import;
-use crate::measurement_storage::{add, remove_measurements_from_commits};
+use crate::measurement_storage::{add_to_commit as add, remove_measurements_from_commits};
 use crate::reporting::report;
 use crate::size;
 use crate::stats::ReductionFunc;
@@ -32,29 +32,46 @@ pub fn handle_calls() -> Result<()> {
     match cli.command {
         Commands::Measure {
             repetitions,
-            command,
             measurement,
-        } => measure(
-            &measurement.name,
-            repetitions,
-            &command,
-            &measurement.key_value,
-        ),
-        Commands::Add { value, measurement } => {
-            add(&measurement.name, value, &measurement.key_value)
+            commit,
+            command,
+        } => {
+            let commit = commit.as_deref().unwrap_or("HEAD");
+            measure(
+                commit,
+                &measurement.name,
+                repetitions,
+                &command,
+                &measurement.key_value,
+            )
+        }
+        Commands::Add {
+            value,
+            measurement,
+            commit,
+        } => {
+            let commit = commit.as_deref().unwrap_or("HEAD");
+            add(commit, &measurement.name, value, &measurement.key_value)
         }
         Commands::Import {
             format,
             file,
+            commit,
             prefix,
             metadata,
             filter,
             dry_run,
             verbose,
-        } => handle_import(format, file, prefix, metadata, filter, dry_run, verbose),
+        } => {
+            let commit = commit.as_deref().unwrap_or("HEAD");
+            handle_import(
+                commit, format, file, prefix, metadata, filter, dry_run, verbose,
+            )
+        }
         Commands::Push { remote } => push(None, remote.as_deref()),
         Commands::Pull {} => pull(None),
         Commands::Report {
+            commit,
             output,
             separate_by,
             report_history,
@@ -68,6 +85,8 @@ pub fn handle_calls() -> Result<()> {
             show_epochs,
             show_changes,
         } => {
+            let commit = commit.as_deref().unwrap_or("HEAD");
+
             // Combine measurements (as exact matches) and filter patterns into unified regex patterns
             let combined_patterns =
                 crate::filter::combine_measurements_and_filters(&measurement, &filter);
@@ -79,6 +98,7 @@ pub fn handle_calls() -> Result<()> {
             };
 
             report(
+                commit,
                 output,
                 separate_by,
                 report_history.max_count,
@@ -91,6 +111,7 @@ pub fn handle_calls() -> Result<()> {
             )
         }
         Commands::Audit {
+            commit,
             measurement,
             report_history,
             selectors,
@@ -101,6 +122,7 @@ pub fn handle_calls() -> Result<()> {
             filter,
             no_change_point_warning,
         } => {
+            let commit = commit.as_deref().unwrap_or("HEAD");
             // Validate that at least one of measurement or filter is provided
             // (clap's required_unless_present should handle this, but double-check for safety)
             if measurement.is_empty() && filter.is_empty() {
@@ -124,6 +146,7 @@ pub fn handle_calls() -> Result<()> {
                 crate::filter::combine_measurements_and_filters(&measurement, &filter);
 
             audit::audit_multiple(
+                commit,
                 report_history.max_count,
                 min_measurements,
                 &selectors,

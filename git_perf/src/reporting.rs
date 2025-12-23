@@ -929,6 +929,7 @@ impl ReporterFactory {
 
 #[allow(clippy::too_many_arguments)]
 pub fn report(
+    start_commit: &str,
     output: PathBuf,
     separate_by: Vec<String>,
     num_commits: usize,
@@ -943,7 +944,8 @@ pub fn report(
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
 
-    let commits: Vec<Commit> = measurement_retrieval::walk_commits(num_commits)?.try_collect()?;
+    let commits: Vec<Commit> =
+        measurement_retrieval::walk_commits_from(start_commit, num_commits)?.try_collect()?;
 
     if commits.is_empty() {
         bail!(
