@@ -48,3 +48,5 @@
 236670228add-benchmark1766487171.079218619119659.0rust=stableos=ubuntu-22.04
 
 236670228report-benchmark1766487171.124758224272670.0os=ubuntu-22.04rust=stable
+
+236670228report-benchmark1766487171.164556523946830.0rust=stableos=ubuntu-22.04
