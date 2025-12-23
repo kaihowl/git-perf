@@ -1,8 +1,13 @@
 #!/bin/bash
 
 set -e
-PS4='${BASH_SOURCE}:${LINENO}: '
-set -x
+
+# Optional tracing (default: enabled for backward compatibility)
+# Set TEST_TRACE=0 to disable verbose set -x output
+if [[ "${TEST_TRACE:-1}" == "1" ]]; then
+  PS4='${BASH_SOURCE}:${LINENO}: '
+  set -x
+fi
 
 export RUST_BACKTRACE=1
 
@@ -47,6 +52,7 @@ function cd_temp_repo() {
   create_commit
 }
 
+# Deprecated: Use assert_contains instead
 function assert_output_contains() {
   local output="$1"
   local expected="$2"
@@ -59,6 +65,7 @@ function assert_output_contains() {
   fi
 }
 
+# Deprecated: Use assert_not_contains instead
 function assert_output_not_contains() {
   local output="$1"
   local unexpected="$2"
@@ -68,5 +75,338 @@ function assert_output_not_contains() {
     echo "$error_message:"
     echo "$output"
     exit 1
+  fi
+}
+
+# ============================================================================
+# New Test Framework - Explicit Assertions with Clear Failure Output
+# ============================================================================
+
+# Test state tracking
+_TEST_SECTION_COUNT=0
+_TEST_PASS_COUNT=0
+_TEST_FAIL_COUNT=0
+
+# Internal failure handler
+# Captures context and formats output with FAIL:/ERROR: prefixes for easy grepping
+_test_fail() {
+  _TEST_FAIL_COUNT=$((_TEST_FAIL_COUNT + 1))
+
+  # Get caller information for better context
+  local caller_line="${BASH_LINENO[1]}"
+  local caller_file="${BASH_SOURCE[2]}"
+  local test_name=$(basename "$caller_file" .sh)
+
+  # Disable set -x temporarily for clean error output
+  local xtrace_enabled=0
+  if [[ "$-" =~ x ]]; then
+    xtrace_enabled=1
+    set +x
+  fi
+
+  echo "" >&2
+  echo "FAIL: $test_name:$caller_line" >&2
+  echo "ERROR: $1" >&2
+  shift
+
+  # Print additional context lines
+  while [[ $# -gt 0 ]]; do
+    echo "       $1" >&2
+    shift
+  done
+
+  echo "" >&2
+
+  # Re-enable set -x if it was on
+  if [[ $xtrace_enabled -eq 1 ]]; then
+    set -x
+  fi
+
+  # Exit immediately if TEST_FAIL_FAST is set (default: yes)
+  if [[ "${TEST_FAIL_FAST:-1}" == "1" ]]; then
+    exit 1
+  fi
+}
+
+# ============================================================================
+# Equality Assertions
+# ============================================================================
+
+assert_equals() {
+  local actual="$1"
+  local expected="$2"
+  local message="${3:-Assertion failed: values not equal}"
+
+  if [[ "$actual" != "$expected" ]]; then
+    _test_fail "$message" \
+      "Expected: $expected" \
+      "Actual:   $actual"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_not_equals() {
+  local actual="$1"
+  local expected="$2"
+  local message="${3:-Assertion failed: values should not be equal}"
+
+  if [[ "$actual" == "$expected" ]]; then
+    _test_fail "$message" \
+      "Value should not equal: $expected" \
+      "But got:                $actual"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+# ============================================================================
+# String Containment Assertions
+# ============================================================================
+
+assert_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local message="${3:-Assertion failed: string not found}"
+
+  if [[ "$haystack" != *"$needle"* ]]; then
+    _test_fail "$message" \
+      "Expected to find: $needle" \
+      "In output:" \
+      "$haystack"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local message="${3:-Assertion failed: unexpected string found}"
+
+  if [[ "$haystack" == *"$needle"* ]]; then
+    _test_fail "$message" \
+      "Expected NOT to find: $needle" \
+      "But found it in output:" \
+      "$haystack"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+# ============================================================================
+# Regex Matching Assertions
+# ============================================================================
+
+assert_matches() {
+  local string="$1"
+  local regex="$2"
+  local message="${3:-Assertion failed: pattern does not match}"
+
+  if ! [[ "$string" =~ $regex ]]; then
+    _test_fail "$message" \
+      "Pattern: $regex" \
+      "String:  $string"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_not_matches() {
+  local string="$1"
+  local regex="$2"
+  local message="${3:-Assertion failed: pattern should not match}"
+
+  if [[ "$string" =~ $regex ]]; then
+    _test_fail "$message" \
+      "Pattern should not match: $regex" \
+      "But matched string:       $string"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+# ============================================================================
+# Command Execution Assertions
+# ============================================================================
+
+assert_success() {
+  # If first arg looks like a variable name (no slashes, no dashes at start),
+  # treat it as output variable name
+  local output_var=""
+  if [[ $# -gt 1 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+    output_var="$1"
+    shift
+  fi
+
+  local output
+  local exit_code
+
+  if [[ -n "$output_var" ]]; then
+    output=$("$@" 2>&1)
+    exit_code=$?
+    eval "$output_var=\$output"
+  else
+    output=$("$@" 2>&1)
+    exit_code=$?
+  fi
+
+  if [[ $exit_code -ne 0 ]]; then
+    _test_fail "Command should succeed but failed with exit code $exit_code" \
+      "Command: $*" \
+      "Output:" \
+      "$output"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_failure() {
+  # If first arg looks like a variable name (no slashes, no dashes at start),
+  # treat it as output variable name
+  local output_var=""
+  if [[ $# -gt 1 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+    output_var="$1"
+    shift
+  fi
+
+  local output
+  local exit_code
+
+  set +e
+  output=$("$@" 2>&1)
+  exit_code=$?
+  set -e
+
+  if [[ -n "$output_var" ]]; then
+    eval "$output_var=\$output"
+  fi
+
+  if [[ $exit_code -eq 0 ]]; then
+    _test_fail "Command should fail but succeeded" \
+      "Command: $*" \
+      "Output:" \
+      "$output"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+# ============================================================================
+# Boolean Condition Assertions
+# ============================================================================
+
+assert_true() {
+  local condition="$1"
+  local message="${2:-Assertion failed: condition is false}"
+
+  if ! eval "$condition"; then
+    _test_fail "$message" \
+      "Condition: $condition" \
+      "Expected: true" \
+      "Actual:   false"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_false() {
+  local condition="$1"
+  local message="${2:-Assertion failed: condition is true}"
+
+  if eval "$condition"; then
+    _test_fail "$message" \
+      "Condition: $condition" \
+      "Expected: false" \
+      "Actual:   true"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+# ============================================================================
+# File/Directory Assertions
+# ============================================================================
+
+assert_file_exists() {
+  local file="$1"
+  local message="${2:-File does not exist: $file}"
+
+  if [[ ! -f "$file" ]]; then
+    _test_fail "$message"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_file_not_exists() {
+  local file="$1"
+  local message="${2:-File should not exist: $file}"
+
+  if [[ -f "$file" ]]; then
+    _test_fail "$message"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+assert_dir_exists() {
+  local dir="$1"
+  local message="${2:-Directory does not exist: $dir}"
+
+  if [[ ! -d "$dir" ]]; then
+    _test_fail "$message"
+  fi
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+}
+
+# ============================================================================
+# Test Organization Functions
+# ============================================================================
+
+test_section() {
+  local section_name="$1"
+  _TEST_SECTION_COUNT=$((_TEST_SECTION_COUNT + 1))
+
+  # Disable set -x temporarily for clean output
+  local xtrace_enabled=0
+  if [[ "$-" =~ x ]]; then
+    xtrace_enabled=1
+    set +x
+  fi
+
+  echo ""
+  echo "=== Section $_TEST_SECTION_COUNT: $section_name ==="
+
+  # Re-enable set -x if it was on
+  if [[ $xtrace_enabled -eq 1 ]]; then
+    set -x
+  fi
+}
+
+test_pass() {
+  local message="${1:-Test passed}"
+  _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
+
+  # Disable set -x temporarily for clean output
+  local xtrace_enabled=0
+  if [[ "$-" =~ x ]]; then
+    xtrace_enabled=1
+    set +x
+  fi
+
+  echo "PASS: $message"
+
+  # Re-enable set -x if it was on
+  if [[ $xtrace_enabled -eq 1 ]]; then
+    set -x
+  fi
+}
+
+test_stats() {
+  # Disable set -x temporarily for clean output
+  local xtrace_enabled=0
+  if [[ "$-" =~ x ]]; then
+    xtrace_enabled=1
+    set +x
+  fi
+
+  echo ""
+  echo "Test Statistics:"
+  echo "  Sections: ${_TEST_SECTION_COUNT:-0}"
+  echo "  Assertions Passed: ${_TEST_PASS_COUNT:-0}"
+  echo "  Assertions Failed: ${_TEST_FAIL_COUNT:-0}"
+
+  # Re-enable set -x if it was on
+  if [[ $xtrace_enabled -eq 1 ]]; then
+    set -x
   fi
 }

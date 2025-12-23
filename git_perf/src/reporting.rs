@@ -937,7 +937,7 @@ pub fn report(
     combined_patterns: &[String],
     template_config: ReportTemplateConfig,
     show_epochs: bool,
-    detect_changes: bool,
+    show_changes: bool,
 ) -> Result<()> {
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
@@ -1078,11 +1078,10 @@ pub fn report(
                 plot.add_trace(trace_measurements, measurement_name, &group_value);
             }
 
-            // Add change point detection for this measurement
-            // Collect measurement values, epochs, commit indices and SHAs for change point detection
+            // Collect measurement data for epoch and change point analysis
             // Note: We need the original commit index (i) to map back to the correct x-coordinate
             // IMPORTANT: We must aggregate multiple measurements per commit to get one value per commit
-            // Otherwise, change point detection will see incorrect patterns
+            // Otherwise, epoch transition and change point detection will see incorrect patterns
 
             // Default to min aggregation if no aggregation specified
             let reduction_func = aggregate_by.unwrap_or(ReductionFunc::Min);
@@ -1111,7 +1110,7 @@ pub fn report(
                 .collect();
 
             log::debug!(
-                "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+                "Collected measurement data for {}: {} measurements, indices {:?}, epochs {:?}",
                 measurement_name,
                 values.len(),
                 commit_indices,
@@ -1125,6 +1124,7 @@ pub fn report(
 
                 // Add epoch boundary traces if requested
                 if show_epochs {
+                    log::debug!("Detecting epoch transitions for {}", measurement_name);
                     // Reverse epochs and commit indices to match display order (newest on left, oldest on right)
                     let reversed_epochs: Vec<u32> = epochs.iter().rev().cloned().collect();
                     let reversed_commit_indices: Vec<usize> =
@@ -1147,7 +1147,8 @@ pub fn report(
                 }
 
                 // Add change point traces if requested
-                if detect_changes {
+                if show_changes {
+                    log::debug!("Running change point detection for {}", measurement_name);
                     let config = crate::config::change_point_config(measurement_name);
                     // Reverse measurements to match display order (newest on left, oldest on right)
                     // This ensures change point direction (regression/improvement) matches visual interpretation

@@ -278,7 +278,7 @@ pub enum Commands {
 
         /// Detect and show change points in the report (hidden by default, toggleable via legend)
         #[arg(long)]
-        detect_changes: bool,
+        show_changes: bool,
     },
 
     /// For given measurements, check perfomance deviations of the HEAD commit

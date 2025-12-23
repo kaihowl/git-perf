@@ -182,7 +182,7 @@ Create an HTML performance report
 * `-c`, `--custom-css <CUSTOM_CSS>` — Path to custom CSS file to inject into the template
 * `--title <TITLE>` — Custom title for the report (overrides default)
 * `--show-epochs` — Show epoch boundary markers in the report (hidden by default, toggleable via legend)
-* `--detect-changes` — Detect and show change points in the report (hidden by default, toggleable via legend)
+* `--show-changes` — Detect and show change points in the report (hidden by default, toggleable via legend)
 
 
 

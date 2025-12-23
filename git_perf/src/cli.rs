@@ -66,7 +66,7 @@ pub fn handle_calls() -> Result<()> {
             custom_css,
             title,
             show_epochs,
-            detect_changes,
+            show_changes,
         } => {
             // Combine measurements (as exact matches) and filter patterns into unified regex patterns
             let combined_patterns =
@@ -87,7 +87,7 @@ pub fn handle_calls() -> Result<()> {
                 &combined_patterns,
                 template_config,
                 show_epochs,
-                detect_changes,
+                show_changes,
             )
         }
         Commands::Audit {

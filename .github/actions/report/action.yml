@@ -54,7 +54,7 @@ inputs:
     description: 'Whether to show epoch boundaries in the report'
     required: false
     default: 'false'
-  detect-changes:
+  show-changes:
     description: 'Whether to detect and display change points in the report'
     required: false
     default: 'false'
@@ -92,10 +92,29 @@ runs:
           echo "✓ Using root directory (no subdirectory specified)"
         fi
 
-    - name: Install git-perf
-      uses: kaihowl/git-perf/.github/actions/install@master
+    - name: Install git-perf (from branch - internal testing)
+      if: ${{ inputs.git-perf-version == 'branch' }}
+      uses: ./.github/actions/install
       with:
-        release: ${{ inputs.git-perf-version }}
+        release: 'branch'
+
+    - name: Install git-perf (from release - external usage)
+      if: ${{ inputs.git-perf-version != 'branch' }}
+      shell: bash
+      run: |
+        latest=""
+        version=""
+        if [ "${{ inputs.git-perf-version }}" = "latest" ]; then
+          latest="latest/"
+        else
+          version="${{ inputs.git-perf-version }}/"
+        fi
+        download_url="https://github.com/kaihowl/git-perf/releases/${latest}download/${version}git-perf-installer.sh"
+        echo "Downloading $download_url"
+        curl --proto '=https' --tlsv1.2 -LsSf "$download_url" | sh
+        export PATH=$HOME/.cargo/bin:$PATH
+        git-perf --help
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
     - name: Inject slug/short variables
       uses: rlespinasse/github-slug-action@v5
@@ -131,8 +150,8 @@ runs:
         fi
 
         CHANGES_FLAG=""
-        if [ "${{ inputs.detect-changes }}" = "true" ]; then
-          CHANGES_FLAG="--detect-changes"
+        if [ "${{ inputs.show-changes }}" = "true" ]; then
+          CHANGES_FLAG="--show-changes"
         fi
 
         git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG ${{ inputs.additional-args }}

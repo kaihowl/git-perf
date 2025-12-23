@@ -86,7 +86,7 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `reports-subdirectory` | Subdirectory within gh-pages for reports (e.g., "perf", "reports"). Empty for root. | No | `` |
 | `preserve-existing` | Preserve existing gh-pages content outside reports subdirectory | No | `true` |
 | `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
-| `detect-changes` | Whether to detect and display change points in the report | No | `false` |
+| `show-changes` | Whether to detect and display change points in the report | No | `false` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
 
 ### Common Audit Arguments
@@ -240,7 +240,7 @@ This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
 - uses: kaihowl/git-perf/.github/actions/report@master
   with:
     show-epochs: 'true'
-    detect-changes: 'true'
+    show-changes: 'true'
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
