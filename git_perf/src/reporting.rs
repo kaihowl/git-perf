@@ -28,6 +28,7 @@ use crate::{
 pub use crate::reporting_config::ReportTemplateConfig;
 
 /// Metadata for rendering report templates
+#[derive(Clone)]
 struct ReportMetadata {
     title: String,
     custom_css: String,
@@ -83,15 +84,6 @@ struct ChangePointDetectionParams<'a> {
     show_changes: bool,
 }
 
-/// Parameters for processing a measurement group
-struct MeasurementGroupParams {
-    group_value: Vec<String>,
-    separate_by: Vec<String>,
-    aggregate_by: Option<ReductionFunc>,
-    show_epochs: bool,
-    show_changes: bool,
-}
-
 /// Extract Plotly JavaScript dependencies and plot content
 ///
 /// Uses Plotly's native API to generate proper HTML components:
@@ -112,23 +104,6 @@ fn extract_plotly_parts(plot: &Plot) -> (String, String) {
     let plotly_body = plot.to_inline_html(None);
 
     (plotly_head, plotly_body)
-}
-
-/// Apply template with placeholder substitution
-fn apply_template(template: &str, plot: &Plot, metadata: &ReportMetadata) -> Vec<u8> {
-    let (plotly_head, plotly_body) = extract_plotly_parts(plot);
-
-    let output = template
-        .replace("{{TITLE}}", &metadata.title)
-        .replace("{{PLOTLY_HEAD}}", &plotly_head)
-        .replace("{{PLOTLY_BODY}}", &plotly_body)
-        .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
-        .replace("{{TIMESTAMP}}", &metadata.timestamp)
-        .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
-        .replace("{{DEPTH}}", &metadata.depth.to_string())
-        .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
-
-    output.as_bytes().to_vec()
 }
 
 /// Load template from file or return default
@@ -213,6 +188,24 @@ const DEFAULT_HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
     {{PLOTLY_BODY}}
 </body>
 </html>"#;
+
+/// Write bytes to file or stdout, handling BrokenPipe error.
+///
+/// If `output_path` is "-", writes to stdout. Otherwise, creates/overwrites the file.
+/// BrokenPipe errors are suppressed to allow piping to commands like `head` or `less`.
+fn write_output(output_path: &Path, bytes: &[u8]) -> Result<()> {
+    if output_path == Path::new("-") {
+        // Write to stdout
+        match io::stdout().write_all(bytes) {
+            Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
+            res => res,
+        }
+    } else {
+        // Write to file
+        File::create(output_path)?.write_all(bytes)
+    }?;
+    Ok(())
+}
 
 /// Formats a measurement name with its configured unit, if available.
 /// Returns "measurement_name (unit)" if unit is configured, otherwise just "measurement_name".
@@ -331,8 +324,29 @@ impl CsvMeasurementRow {
     }
 }
 
+/// Output from processing a single section.
+///
+/// For HTML reports, contains the plot div + script for template replacement.
+/// For CSV reports, this is typically empty (CSV accumulates all data internally).
+struct SectionOutput {
+    section_id: String,
+    placeholder: String, // For HTML template replacement (e.g., "{{SECTION[id]}}")
+    content: Vec<u8>,    // Section-specific content (plot HTML or empty for CSV)
+}
+
 trait Reporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]);
+
+    // Section lifecycle methods
+    fn begin_section(&mut self, section_id: &str, placeholder: &str);
+    fn end_section(&mut self) -> Result<SectionOutput>;
+    fn finalize(
+        self: Box<Self>,
+        sections: Vec<SectionOutput>,
+        metadata: &ReportMetadata,
+    ) -> Vec<u8>;
+
+    // Data addition methods (section-scoped)
     fn add_trace(
         &mut self,
         indexed_measurements: Vec<(usize, &'a MeasurementData)>,
@@ -362,21 +376,29 @@ trait Reporter<'a> {
         measurement_name: &str,
         group_values: &[String],
     );
+
+    // Deprecated: Use finalize() instead
+    #[allow(dead_code)]
     fn as_bytes(&self) -> Vec<u8>;
 }
 
 struct PlotlyReporter {
-    plot: Plot,
+    // Global state (set once via add_commits or with_template)
+    all_commits: Vec<Commit>,
     // Manual axis data reversal implementation: plotly-rs does not support autorange="reversed"
     // The autorange parameter only accepts boolean values (as of v0.13.5), requiring manual
     // index reversal to achieve reversed axis display (newest commits on right, oldest on left)
     // See: https://github.com/kaihowl/git-perf/issues/339
     size: usize,
-    // Track units for all measurements to determine if we should add unit to Y-axis label
-    measurement_units: Vec<Option<String>>,
-    // Template and metadata for customized output
     template: Option<String>,
     metadata: Option<ReportMetadata>,
+
+    // Per-section state (reset on begin_section)
+    current_section_id: Option<String>,
+    current_placeholder: Option<String>,
+    current_plot: Plot,
+    // Track units for all measurements to determine if we should add unit to Y-axis label
+    measurement_units: Vec<Option<String>>,
 }
 
 impl PlotlyReporter {
@@ -385,11 +407,30 @@ impl PlotlyReporter {
         let mut plot = Plot::new();
         plot.set_configuration(config);
         PlotlyReporter {
-            plot,
+            all_commits: Vec::new(),
             size: 0,
-            measurement_units: Vec::new(),
             template: None,
             metadata: None,
+            current_section_id: None,
+            current_placeholder: None,
+            current_plot: plot,
+            measurement_units: Vec::new(),
+        }
+    }
+
+    fn with_template(template: String, metadata: ReportMetadata) -> PlotlyReporter {
+        let config = Configuration::default().responsive(true).fill_frame(false);
+        let mut plot = Plot::new();
+        plot.set_configuration(config);
+        PlotlyReporter {
+            all_commits: Vec::new(),
+            size: 0,
+            template: Some(template),
+            metadata: Some(metadata),
+            current_section_id: None,
+            current_placeholder: None,
+            current_plot: plot,
+            measurement_units: Vec::new(),
         }
     }
 
@@ -576,7 +617,7 @@ impl PlotlyReporter {
             "epochs",
         );
 
-        self.plot.add_trace(trace);
+        self.current_plot.add_trace(trace);
     }
 
     /// Add change point traces with explicit commit index mapping.
@@ -665,15 +706,28 @@ impl PlotlyReporter {
             "change_points",
         );
 
-        self.plot.add_trace(trace);
+        self.current_plot.add_trace(trace);
     }
 }
 
 impl<'a> Reporter<'a> for PlotlyReporter {
     fn add_commits(&mut self, commits: &'a [Commit]) {
-        let enumerated_commits = commits.iter().rev().enumerate();
+        // Store commits for later use in begin_section
+        self.all_commits = commits.to_vec();
         self.size = commits.len();
+    }
 
+    fn begin_section(&mut self, section_id: &str, placeholder: &str) {
+        self.current_section_id = Some(section_id.to_string());
+        self.current_placeholder = Some(placeholder.to_string());
+
+        // Create new plot for this section
+        let config = Configuration::default().responsive(true).fill_frame(false);
+        let mut plot = Plot::new();
+        plot.set_configuration(config);
+
+        // Set up layout with commit axis (from stored commits)
+        let enumerated_commits = self.all_commits.iter().rev().enumerate();
         let (commit_nrs, short_hashes): (Vec<_>, Vec<_>) = enumerated_commits
             .map(|(n, c)| {
                 (
@@ -696,7 +750,79 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                     .orientation(plotly::common::Orientation::Horizontal),
             );
 
-        self.plot.set_layout(layout);
+        plot.set_layout(layout);
+        self.current_plot = plot;
+        self.measurement_units.clear();
+    }
+
+    fn end_section(&mut self) -> Result<SectionOutput> {
+        let section_id = self
+            .current_section_id
+            .take()
+            .ok_or_else(|| anyhow!("end_section called without begin_section"))?;
+
+        let placeholder = self
+            .current_placeholder
+            .take()
+            .ok_or_else(|| anyhow!("end_section called without placeholder"))?;
+
+        // Finalize current plot (add y-axis if all units match)
+        let final_plot = if let Some(y_axis) = self.compute_y_axis() {
+            let mut plot_with_y_axis = self.current_plot.clone();
+            let mut layout = plot_with_y_axis.layout().clone();
+            layout = layout.y_axis(y_axis);
+            plot_with_y_axis.set_layout(layout);
+            plot_with_y_axis
+        } else {
+            self.current_plot.clone()
+        };
+
+        // Extract plotly body (just the div + script, no <html> wrapper)
+        let (_plotly_head, plotly_body) = extract_plotly_parts(&final_plot);
+
+        Ok(SectionOutput {
+            section_id,
+            placeholder,
+            content: plotly_body.into_bytes(),
+        })
+    }
+
+    fn finalize(
+        self: Box<Self>,
+        sections: Vec<SectionOutput>,
+        metadata: &ReportMetadata,
+    ) -> Vec<u8> {
+        // If template is provided, use template replacement
+        if let Some(template) = self.template {
+            let mut output = template;
+
+            // Replace section placeholders
+            for section in &sections {
+                output = output.replace(
+                    &section.placeholder,
+                    &String::from_utf8_lossy(&section.content),
+                );
+            }
+
+            // Replace global placeholders
+            let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+            output = output
+                .replace("{{TITLE}}", &metadata.title)
+                .replace("{{PLOTLY_HEAD}}", &plotly_head)
+                .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+                .replace("{{TIMESTAMP}}", &metadata.timestamp)
+                .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+                .replace("{{DEPTH}}", &metadata.depth.to_string())
+                .replace("{{AUDIT_SECTION}}", "");
+
+            output.into_bytes()
+        } else {
+            // No template - single section output (for backward compatibility)
+            if sections.len() != 1 {
+                panic!("Multiple sections require template");
+            }
+            sections[0].content.clone()
+        }
     }
 
     fn add_trace(
@@ -732,7 +858,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             trace.name(&measurement_display)
         };
 
-        self.plot.add_trace(trace);
+        self.current_plot.add_trace(trace);
     }
 
     fn add_summarized_trace(
@@ -768,7 +894,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             trace.name(&measurement_display)
         };
 
-        self.plot.add_trace(trace);
+        self.current_plot.add_trace(trace);
     }
 
     fn add_epoch_boundaries(
@@ -810,13 +936,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
     fn as_bytes(&self) -> Vec<u8> {
         // Get the final plot (with or without custom y-axis)
         let final_plot = if let Some(y_axis) = self.compute_y_axis() {
-            let mut plot_with_y_axis = self.plot.clone();
+            let mut plot_with_y_axis = self.current_plot.clone();
             let mut layout = plot_with_y_axis.layout().clone();
             layout = layout.y_axis(y_axis);
             plot_with_y_axis.set_layout(layout);
             plot_with_y_axis
         } else {
-            self.plot.clone()
+            self.current_plot.clone()
         };
 
         // Always use template approach for consistency
@@ -833,7 +959,19 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         };
         let metadata = self.metadata.as_ref().unwrap_or(&default_metadata);
 
-        apply_template(template, &final_plot, metadata)
+        // Apply template with placeholder substitution
+        let (plotly_head, plotly_body) = extract_plotly_parts(&final_plot);
+        let output = template
+            .replace("{{TITLE}}", &metadata.title)
+            .replace("{{PLOTLY_HEAD}}", &plotly_head)
+            .replace("{{PLOTLY_BODY}}", &plotly_body)
+            .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
+            .replace("{{TIMESTAMP}}", &metadata.timestamp)
+            .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
+            .replace("{{DEPTH}}", &metadata.depth.to_string())
+            .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
+
+        output.as_bytes().to_vec()
     }
 }
 
@@ -856,6 +994,58 @@ impl CsvReporter<'_> {
 impl<'a> Reporter<'a> for CsvReporter<'a> {
     fn add_commits(&mut self, hashes: &'a [Commit]) {
         self.hashes = hashes.iter().map(|c| c.commit.to_owned()).collect();
+    }
+
+    fn begin_section(&mut self, _section_id: &str, _placeholder: &str) {
+        // CSV doesn't care about section boundaries - no-op
+    }
+
+    fn end_section(&mut self) -> Result<SectionOutput> {
+        // CSV returns empty SectionOutput - actual data stays in reporter
+        // All data will be emitted in finalize()
+        Ok(SectionOutput {
+            section_id: "csv".to_string(),
+            placeholder: String::new(),
+            content: Vec::new(),
+        })
+    }
+
+    fn finalize(
+        self: Box<Self>,
+        _sections: Vec<SectionOutput>,
+        _metadata: &ReportMetadata,
+    ) -> Vec<u8> {
+        // Ignore sections parameter - CSV is flat
+        // Generate single TSV output from accumulated data
+        if self.indexed_measurements.is_empty() && self.summarized_measurements.is_empty() {
+            return Vec::new();
+        }
+
+        let mut lines = Vec::new();
+        lines.push("commit\tepoch\tmeasurement\ttimestamp\tvalue\tunit".to_string());
+
+        // Add raw measurements
+        for (index, measurement_data) in &self.indexed_measurements {
+            let commit = &self.hashes[*index];
+            let row = CsvMeasurementRow::from_measurement(commit, measurement_data);
+            lines.push(row.to_csv_line());
+        }
+
+        // Add summarized measurements
+        for (index, measurement_name, group_value, summary) in &self.summarized_measurements {
+            let commit = &self.hashes[*index];
+            let row = CsvMeasurementRow::from_summary(
+                commit,
+                measurement_name,
+                summary,
+                group_value.as_ref(),
+            );
+            lines.push(row.to_csv_line());
+        }
+
+        let mut output = lines.join("\n");
+        output.push('\n');
+        output.into_bytes()
     }
 
     fn add_trace(
@@ -950,18 +1140,6 @@ impl<'a> Reporter<'a> for CsvReporter<'a> {
     }
 }
 
-struct ReporterFactory {}
-
-impl ReporterFactory {
-    fn from_file_name(path: &Path) -> Option<Box<dyn Reporter<'_> + '_>> {
-        let format = OutputFormat::from_path(path)?;
-        match format {
-            OutputFormat::Html => Some(Box::new(PlotlyReporter::new()) as Box<dyn Reporter<'_>>),
-            OutputFormat::Csv => Some(Box::new(CsvReporter::new()) as Box<dyn Reporter<'_>>),
-        }
-    }
-}
-
 /// Compute group value combinations for splitting measurements by metadata keys.
 ///
 /// Returns a vector of group values where each inner vector contains the values
@@ -1036,31 +1214,6 @@ fn filter_measurements_by_criteria<'a>(
                 .collect()
         })
         .collect()
-}
-
-/// Filter measurements that match all key-value pairs in the group.
-///
-/// If group_value is empty, returns all measurements (no filtering).
-fn filter_group_measurements<'a>(
-    measurements: impl Iterator<Item = &'a MeasurementData> + 'a,
-    separate_by: Vec<String>,
-    group_value: Vec<String>,
-) -> Box<dyn Iterator<Item = &'a MeasurementData> + 'a> {
-    Box::new(measurements.filter(move |m| {
-        if group_value.is_empty() {
-            return true;
-        }
-
-        separate_by
-            .iter()
-            .zip(group_value.iter())
-            .all(|(key, expected_val)| {
-                m.key_values
-                    .get(key)
-                    .map(|v| v == expected_val)
-                    .unwrap_or(false)
-            })
-    }))
 }
 
 /// Collect and aggregate measurement data for change point detection.
@@ -1271,351 +1424,6 @@ fn add_detection_traces_if_requested<'a>(
     add_change_point_and_epoch_traces(reporter, detection_params);
 }
 
-/// Process a single measurement group: add trace and optionally show changes/epochs.
-///
-/// This is a high-level orchestration function that combines multiple steps:
-/// 1. Filter measurements for the specific group
-/// 2. Add trace visualization
-/// 3. Add change point and epoch annotations
-///
-/// # Arguments
-/// * `reporter` - Mutable reference to any Reporter implementation
-/// * `filtered_measurements` - Iterator over measurements for this measurement name
-/// * `commits` - All commits (needed for change detection data collection)
-/// * `measurement_name` - Name of the measurement being processed
-/// * `params` - Measurement group parameters
-fn process_measurement_group<'a>(
-    reporter: &mut dyn Reporter<'a>,
-    filtered_measurements: impl Iterator<Item = impl Iterator<Item = &'a MeasurementData> + 'a>
-        + Clone
-        + 'a,
-    commits: &[Commit],
-    measurement_name: &str,
-    params: MeasurementGroupParams,
-) {
-    // Step 1: Filter measurements for this specific group
-    let sep_by = params.separate_by.clone();
-    let grp_val = params.group_value.clone();
-    let group_measurements = filtered_measurements
-        .map(move |ms| filter_group_measurements(ms, sep_by.clone(), grp_val.clone()));
-
-    // Step 2: Add trace visualization
-    add_trace_for_measurement_group(
-        reporter,
-        group_measurements.clone(),
-        measurement_name,
-        &params.group_value,
-        params.aggregate_by,
-    );
-
-    // Step 3: Add change points and epochs if requested
-    add_detection_traces_if_requested(
-        reporter,
-        group_measurements,
-        commits,
-        measurement_name,
-        &params.group_value,
-        params.aggregate_by,
-        params.show_epochs,
-        params.show_changes,
-    );
-}
-
-/// Generate a plot for a single section with specific configuration
-/// Returns the plot and the count of matched measurements
-#[allow(clippy::too_many_arguments)]
-fn generate_section_plot(commits: &[Commit], section: &SectionConfig) -> Result<(Plot, usize)> {
-    let mut reporter = PlotlyReporter::new();
-    reporter.add_commits(commits);
-
-    // Determine the number of commits to use for this section
-    let section_commits = if let Some(depth) = section.depth {
-        if depth > commits.len() {
-            log::warn!(
-                "Section '{}' requested depth {} but only {} commits available",
-                section.id,
-                depth,
-                commits.len()
-            );
-            commits
-        } else {
-            &commits[..depth]
-        }
-    } else {
-        commits
-    };
-
-    // Compile filter pattern if specified
-    let filters = if let Some(ref pattern) = section.measurement_filter {
-        crate::filter::compile_filters(std::slice::from_ref(pattern))?
-    } else {
-        vec![]
-    };
-
-    // Filter measurements using the shared helper function
-    let relevant_measurements: Vec<Vec<&MeasurementData>> =
-        filter_measurements_by_criteria(section_commits, &filters, &section.key_value_filter);
-
-    let unique_measurement_names: Vec<_> = relevant_measurements
-        .iter()
-        .flat_map(|ms| ms.iter().map(|m| &m.name))
-        .unique()
-        .collect();
-
-    let match_count = unique_measurement_names.len();
-
-    if match_count == 0 {
-        // Return empty plot with zero count
-        return Ok((reporter.plot, 0));
-    }
-
-    // Continue with the rest of the function
-    let plot = generate_section_plot_internal(
-        reporter,
-        section_commits,
-        section,
-        &relevant_measurements,
-        &unique_measurement_names,
-    )?;
-
-    Ok((plot, match_count))
-}
-
-/// Internal helper to generate the plot after validation
-#[allow(clippy::too_many_arguments)]
-fn generate_section_plot_internal(
-    mut reporter: PlotlyReporter,
-    section_commits: &[Commit],
-    section: &SectionConfig,
-    relevant_measurements: &[Vec<&MeasurementData>],
-    unique_measurement_names: &[&String],
-) -> Result<Plot> {
-    for measurement_name in unique_measurement_names {
-        // Get group values first
-        let filtered_for_grouping = relevant_measurements
-            .iter()
-            .flat_map(|ms| ms.iter().copied().filter(|m| m.name == **measurement_name));
-
-        let group_values_to_process = compute_group_values_to_process(
-            filtered_for_grouping,
-            &section.separate_by,
-            &format!("Section '{}'", section.id),
-        )?;
-
-        for group_value in group_values_to_process {
-            // Filter and collect measurements directly from relevant_measurements
-            let group_measurements: Vec<Vec<&MeasurementData>> = relevant_measurements
-                .iter()
-                .map(|ms| {
-                    ms.iter()
-                        .filter(|m| {
-                            // Filter by measurement name
-                            if m.name != **measurement_name {
-                                return false;
-                            }
-                            // Filter by group value
-                            if group_value.is_empty() {
-                                return true;
-                            }
-                            section.separate_by.iter().zip(group_value.iter()).all(
-                                |(key, expected_val)| {
-                                    m.key_values
-                                        .get(key)
-                                        .map(|v| v == expected_val)
-                                        .unwrap_or(false)
-                                },
-                            )
-                        })
-                        .copied()
-                        .collect()
-                })
-                .collect();
-
-            let params = MeasurementGroupParams {
-                group_value,
-                separate_by: section.separate_by.clone(),
-                aggregate_by: section.aggregate_by,
-                show_epochs: section.show_epochs,
-                show_changes: section.show_changes,
-            };
-
-            process_measurement_group(
-                &mut reporter as &mut dyn Reporter,
-                group_measurements.iter().map(|v| v.iter().copied()),
-                section_commits,
-                measurement_name,
-                params,
-            );
-        }
-    }
-
-    Ok(reporter.plot)
-}
-
-/// Generate a single-section report (works for both CSV and HTML using the Reporter trait)
-fn generate_single_section_report<'a>(
-    reporter: &mut dyn Reporter<'a>,
-    commits: &'a [Commit],
-    section: &SectionConfig,
-    global_show_epochs: bool,
-    global_show_changes: bool,
-) -> Result<Vec<u8>> {
-    reporter.add_commits(commits);
-
-    // Compile filter pattern if specified
-    let filters = if let Some(ref pattern) = section.measurement_filter {
-        crate::filter::compile_filters(std::slice::from_ref(pattern))?
-    } else {
-        vec![]
-    };
-
-    // Filter measurements using the shared helper function
-    let relevant_measurements: Vec<Vec<&MeasurementData>> =
-        filter_measurements_by_criteria(commits, &filters, &section.key_value_filter);
-
-    let unique_measurement_names: Vec<_> = relevant_measurements
-        .iter()
-        .flat_map(|ms| ms.iter().map(|m| &m.name))
-        .unique()
-        .collect();
-
-    if unique_measurement_names.is_empty() {
-        bail!("No performance measurements found.");
-    }
-
-    // Determine epoch and change point settings for this section
-    let show_epochs = section.show_epochs || global_show_epochs;
-    let show_changes = section.show_changes || global_show_changes;
-
-    // Process all measurement groups - same logic for both CSV and HTML
-    for measurement_name in unique_measurement_names {
-        let filtered_for_grouping = relevant_measurements
-            .iter()
-            .flat_map(|ms| ms.iter().copied().filter(|m| m.name == *measurement_name));
-
-        let group_values_to_process = compute_group_values_to_process(
-            filtered_for_grouping,
-            &section.separate_by,
-            &format!("Section '{}'", section.id),
-        )?;
-
-        for group_value in group_values_to_process {
-            // Filter and collect measurements for this group
-            let group_measurements_vec: Vec<Vec<&MeasurementData>> = relevant_measurements
-                .iter()
-                .map(|ms| {
-                    ms.iter()
-                        .filter(|m| {
-                            if m.name != *measurement_name {
-                                return false;
-                            }
-                            if group_value.is_empty() {
-                                return true;
-                            }
-                            section.separate_by.iter().zip(group_value.iter()).all(
-                                |(key, expected_val)| {
-                                    m.key_values
-                                        .get(key)
-                                        .map(|v| v == expected_val)
-                                        .unwrap_or(false)
-                                },
-                            )
-                        })
-                        .copied()
-                        .collect()
-                })
-                .collect();
-
-            // Add trace visualization
-            add_trace_for_measurement_group(
-                reporter,
-                group_measurements_vec.iter().map(|v| v.iter().copied()),
-                measurement_name,
-                &group_value,
-                section.aggregate_by,
-            );
-
-            // Add change points and epochs if requested
-            add_detection_traces_if_requested(
-                reporter,
-                group_measurements_vec.iter().map(|v| v.iter().copied()),
-                commits,
-                measurement_name,
-                &group_value,
-                section.aggregate_by,
-                show_epochs,
-                show_changes,
-            );
-        }
-    }
-
-    // This function should only be called for CSV output.
-    // HTML reports are handled by the multi-section report path.
-    Ok(reporter.as_bytes())
-}
-
-/// Generate a multi-section report from a template with section placeholders
-fn generate_multi_section_report(
-    template: &str,
-    sections: &[SectionConfig],
-    commits: &[Commit],
-    metadata: &ReportMetadata,
-) -> Result<Vec<u8>> {
-    if sections.is_empty() {
-        // No sections found - this shouldn't happen if called correctly
-        bail!("Template contains no section placeholders");
-    }
-
-    log::info!(
-        "Generating multi-section report with {} sections",
-        sections.len()
-    );
-
-    let mut output = template.to_string();
-    let mut total_match_count = 0;
-
-    // Generate each section
-    for section in sections {
-        log::info!("Generating section: {}", section.id);
-
-        // Generate the plot for this section
-        let (plot, match_count) = generate_section_plot(commits, section)?;
-
-        total_match_count += match_count;
-
-        if match_count == 0 {
-            log::warn!("Section '{}' has no matching measurements", section.id);
-        }
-
-        // Extract plotly parts
-        let (_plotly_head, plotly_body) = extract_plotly_parts(&plot);
-
-        // For sections, we only want the body (the actual plot div + script)
-        // The head (plotly.js library) will be included once in the global template
-        // Replace the section placeholder with just the plotly body
-        output = output.replace(&section.placeholder, &plotly_body);
-    }
-
-    // For single-section templates (e.g., default template), fail if no measurements matched
-    if sections.len() == 1 && total_match_count == 0 {
-        bail!("No performance measurements found.");
-    }
-
-    // Now apply global placeholders
-    let (plotly_head, _) = extract_plotly_parts(&Plot::new()); // Get just the plotly.js script tags
-
-    output = output
-        .replace("{{TITLE}}", &metadata.title)
-        .replace("{{PLOTLY_HEAD}}", &plotly_head)
-        .replace("{{CUSTOM_CSS}}", &metadata.custom_css)
-        .replace("{{TIMESTAMP}}", &metadata.timestamp)
-        .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
-        .replace("{{DEPTH}}", &metadata.depth.to_string())
-        .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
-
-    Ok(output.as_bytes().to_vec())
-}
-
 /// Wraps measurement filter patterns in non-capturing groups and joins them with |
 /// This ensures correct precedence when combining multiple regex patterns
 fn wrap_patterns_for_regex(patterns: &[String]) -> Option<String> {
@@ -1672,6 +1480,217 @@ fn merge_show_flags(
         .collect()
 }
 
+/// Prepare sections, template, and metadata based on output format and configuration.
+///
+/// For HTML: Loads template, parses sections, creates metadata.
+/// For CSV: Creates synthetic single section, minimal metadata.
+///
+/// Returns (sections, template_str, metadata).
+#[allow(clippy::too_many_arguments)]
+fn prepare_sections_and_metadata(
+    output_format: OutputFormat,
+    template_config: &ReportTemplateConfig,
+    combined_patterns: &[String],
+    key_values: &[(String, String)],
+    separate_by: Vec<String>,
+    aggregate_by: Option<ReductionFunc>,
+    show_epochs: bool,
+    show_changes: bool,
+    commits: &[Commit],
+) -> Result<(Vec<SectionConfig>, Option<String>, ReportMetadata)> {
+    match output_format {
+        OutputFormat::Html => {
+            // Load template (custom or default)
+            let template_path = template_config
+                .template_path
+                .clone()
+                .or(config::report_template_path());
+            let template_str = if let Some(path) = template_path {
+                load_template(&path)?
+            } else {
+                DEFAULT_HTML_TEMPLATE.to_string()
+            };
+
+            // Parse or synthesize sections
+            let sections = match parse_template_sections(&template_str)? {
+                sections if sections.is_empty() => {
+                    log::info!(
+                        "Single-section template detected. Using CLI arguments for filtering/aggregation."
+                    );
+                    vec![build_single_section_config(
+                        combined_patterns,
+                        key_values,
+                        separate_by,
+                        aggregate_by,
+                        show_epochs,
+                        show_changes,
+                    )]
+                }
+                sections => {
+                    log::info!(
+                        "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
+                        sections.len()
+                    );
+                    merge_show_flags(sections, show_epochs, show_changes)
+                }
+            };
+
+            // Build metadata
+            let resolved_title = template_config.title.clone().or_else(config::report_title);
+            let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
+            let metadata = ReportMetadata::new(resolved_title, custom_css_content, commits);
+
+            Ok((sections, Some(template_str), metadata))
+        }
+        OutputFormat::Csv => {
+            // Warn if template provided
+            if template_config.template_path.is_some() {
+                log::warn!("Template argument is ignored for CSV output format");
+            }
+
+            // Create synthetic single section for CSV
+            let section = build_single_section_config(
+                combined_patterns,
+                key_values,
+                separate_by,
+                aggregate_by,
+                show_epochs,
+                show_changes,
+            );
+
+            // CSV doesn't use metadata, but provide default for API consistency
+            let metadata = ReportMetadata::new(None, String::new(), commits);
+
+            Ok((vec![section], None, metadata))
+        }
+    }
+}
+
+/// Process a single section using the Reporter trait.
+///
+/// Calls reporter.begin_section(), filters measurements, processes groups,
+/// and returns the section output via reporter.end_section().
+#[allow(clippy::too_many_arguments)]
+fn process_section<'a>(
+    reporter: &mut dyn Reporter<'a>,
+    commits: &'a [Commit],
+    section: &SectionConfig,
+    global_show_epochs: bool,
+    global_show_changes: bool,
+) -> Result<SectionOutput> {
+    reporter.begin_section(&section.id, &section.placeholder);
+
+    // Determine section-specific commits (depth override)
+    let section_commits = if let Some(depth) = section.depth {
+        if depth > commits.len() {
+            log::warn!(
+                "Section '{}' requested depth {} but only {} commits available",
+                section.id,
+                depth,
+                commits.len()
+            );
+            commits
+        } else {
+            &commits[..depth]
+        }
+    } else {
+        commits
+    };
+
+    // Filter measurements
+    let filters = if let Some(ref pattern) = section.measurement_filter {
+        crate::filter::compile_filters(std::slice::from_ref(pattern))?
+    } else {
+        vec![]
+    };
+
+    let relevant_measurements: Vec<Vec<&MeasurementData>> =
+        filter_measurements_by_criteria(section_commits, &filters, &section.key_value_filter);
+
+    let unique_measurement_names: Vec<_> = relevant_measurements
+        .iter()
+        .flat_map(|ms| ms.iter().map(|m| &m.name))
+        .unique()
+        .collect();
+
+    if unique_measurement_names.is_empty() {
+        log::warn!("Section '{}' has no matching measurements", section.id);
+        // Return empty section output without generating plot content
+        return Ok(SectionOutput {
+            section_id: section.id.clone(),
+            placeholder: section.placeholder.clone(),
+            content: Vec::new(),
+        });
+    }
+
+    // Merge section and global flags
+    let show_epochs = section.show_epochs || global_show_epochs;
+    let show_changes = section.show_changes || global_show_changes;
+
+    // Process measurement groups (same logic as current generate_single_section_report)
+    for measurement_name in unique_measurement_names {
+        let filtered_for_grouping = relevant_measurements
+            .iter()
+            .flat_map(|ms| ms.iter().copied().filter(|m| m.name == *measurement_name));
+
+        let group_values_to_process = compute_group_values_to_process(
+            filtered_for_grouping,
+            &section.separate_by,
+            &format!("Section '{}'", section.id),
+        )?;
+
+        for group_value in group_values_to_process {
+            let group_measurements_vec: Vec<Vec<&MeasurementData>> = relevant_measurements
+                .iter()
+                .map(|ms| {
+                    ms.iter()
+                        .filter(|m| {
+                            if m.name != *measurement_name {
+                                return false;
+                            }
+                            if group_value.is_empty() {
+                                return true;
+                            }
+                            section.separate_by.iter().zip(group_value.iter()).all(
+                                |(key, expected_val)| {
+                                    m.key_values
+                                        .get(key)
+                                        .map(|v| v == expected_val)
+                                        .unwrap_or(false)
+                                },
+                            )
+                        })
+                        .copied()
+                        .collect()
+                })
+                .collect();
+
+            // Add trace
+            add_trace_for_measurement_group(
+                reporter,
+                group_measurements_vec.iter().map(|v| v.iter().copied()),
+                measurement_name,
+                &group_value,
+                section.aggregate_by,
+            );
+
+            // Add detection traces
+            add_detection_traces_if_requested(
+                reporter,
+                group_measurements_vec.iter().map(|v| v.iter().copied()),
+                section_commits,
+                measurement_name,
+                &group_value,
+                section.aggregate_by,
+                show_epochs,
+                show_changes,
+            );
+        }
+    }
+
+    reporter.end_section()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn report(
     output: PathBuf,
@@ -1700,118 +1719,62 @@ pub fn report(
     let output_format = OutputFormat::from_path(&output)
         .ok_or_else(|| anyhow!("Could not determine output format from file extension"))?;
 
-    // Warn if template is provided with CSV output
-    if output_format == OutputFormat::Csv && template_config.template_path.is_some() {
-        log::warn!("Template argument is ignored for CSV output format");
-    }
-
-    // For HTML reports, check if multi-section template is requested
-    if output_format == OutputFormat::Html {
-        let template_path = template_config
-            .template_path
-            .clone()
-            .or(config::report_template_path());
-
-        let template_str = if let Some(template_path) = template_path {
-            load_template(&template_path)?
-        } else {
-            DEFAULT_HTML_TEMPLATE.into()
-        };
-
-        let sections = match parse_template_sections(&template_str)? {
-            sections if sections.is_empty() => {
-                log::info!(
-                    "Single-section template detected. Using CLI arguments for filtering/aggregation.",
-                );
-
-                let single_section = build_single_section_config(
-                    combined_patterns,
-                    key_values,
-                    separate_by.clone(),
-                    aggregate_by,
-                    show_epochs,
-                    show_changes,
-                );
-                vec![single_section]
-            }
-            sections => {
-                log::info!(
-                    "Multi-section template detected with {} sections. CLI arguments for filtering/aggregation will be ignored.",
-                    sections.len()
-                );
-                sections
-            }
-        };
-
-        assert!(!sections.is_empty());
-
-        let resolved_title = template_config.title.clone().or_else(config::report_title);
-        let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-        let metadata = ReportMetadata::new(resolved_title, custom_css_content, &commits);
-
-        let sections = merge_show_flags(sections, show_epochs, show_changes);
-
-        let report_bytes =
-            generate_multi_section_report(&template_str, &sections, &commits, &metadata)?;
-
-        if output == Path::new("-") {
-            match io::stdout().write_all(&report_bytes) {
-                Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
-                res => res,
-            }?;
-        } else {
-            File::create(&output)?.write_all(&report_bytes)?;
-        }
-
-        return Ok(());
-    }
-
-    // CSV-only path: create a synthetic section from CLI arguments
-    let single_section = SectionConfig {
-        id: "main".to_string(),
-        placeholder: "{{PLOTLY_BODY}}".to_string(),
-        measurement_filter: if combined_patterns.is_empty() {
-            None
-        } else {
-            // Wrap each pattern in a non-capturing group to ensure correct precedence
-            Some(
-                combined_patterns
-                    .iter()
-                    .map(|p| format!("(?:{})", p))
-                    .collect::<Vec<_>>()
-                    .join("|"),
-            )
-        },
-        key_value_filter: key_values.to_vec(),
-        separate_by: separate_by.clone(),
+    // Parse or synthesize sections and metadata
+    let (sections, template_str, metadata) = prepare_sections_and_metadata(
+        output_format,
+        &template_config,
+        combined_patterns,
+        key_values,
+        separate_by.clone(),
         aggregate_by,
-        depth: None,
         show_epochs,
         show_changes,
-    };
-
-    // Use factory to create the appropriate reporter
-    let mut reporter =
-        ReporterFactory::from_file_name(&output).ok_or(anyhow!("Could not infer output format"))?;
-
-    // Generate report using unified section-based logic
-    let output_bytes = generate_single_section_report(
-        &mut *reporter,
         &commits,
-        &single_section,
-        show_epochs,
-        show_changes,
     )?;
 
-    // Write output
-    if output == Path::new("-") {
-        match io::stdout().write_all(&output_bytes) {
-            Err(e) if e.kind() == ErrorKind::BrokenPipe => Ok(()),
-            res => res,
-        }?;
-    } else {
-        File::create(&output)?.write_all(&output_bytes)?;
+    // Create appropriate reporter
+    let mut reporter: Box<dyn Reporter> = match output_format {
+        OutputFormat::Html => {
+            let template = template_str.expect("HTML requires template");
+            Box::new(PlotlyReporter::with_template(template, metadata.clone()))
+        }
+        OutputFormat::Csv => Box::new(CsvReporter::new()),
+    };
+
+    // UNIFIED PATH: Process all sections using Reporter trait
+    reporter.add_commits(&commits);
+
+    let section_outputs = sections
+        .iter()
+        .map(|section| {
+            process_section(&mut *reporter, &commits, section, show_epochs, show_changes)
+        })
+        .collect::<Result<Vec<SectionOutput>>>()?;
+
+    // Check if any section found measurements
+    // For HTML: check if any section has non-empty content
+    // For CSV: report_bytes will be empty if no measurements
+    let has_measurements = match output_format {
+        OutputFormat::Html => section_outputs.iter().any(|s| !s.content.is_empty()),
+        OutputFormat::Csv => !section_outputs.is_empty(), // Will check after finalize
+    };
+
+    // Finalize report
+    let report_bytes = reporter.finalize(section_outputs, &metadata);
+
+    // Check if any measurements were found
+    // For multi-section templates (>1 section), allow empty sections (just log warnings)
+    // For single-section reports, bail if no measurements found
+    let is_multi_section = sections.len() > 1;
+    if !is_multi_section {
+        if (output_format == OutputFormat::Html && !has_measurements)
+            || (output_format == OutputFormat::Csv && report_bytes.is_empty()) {
+            bail!("No performance measurements found.");
+        }
     }
+
+    // Write output
+    write_output(&output, &report_bytes)?;
 
     Ok(())
 }
@@ -1885,48 +1848,6 @@ mod tests {
     }
 
     #[test]
-    fn test_reporter_factory_html_extension() {
-        let path = Path::new("output.html");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_reporter_factory_csv_extension() {
-        let path = Path::new("output.csv");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_reporter_factory_stdout() {
-        let path = Path::new("-");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
-    fn test_reporter_factory_unsupported_extension() {
-        let path = Path::new("output.txt");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_none());
-    }
-
-    #[test]
-    fn test_reporter_factory_no_extension() {
-        let path = Path::new("output");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_none());
-    }
-
-    #[test]
-    fn test_reporter_factory_uppercase_extension() {
-        let path = Path::new("output.HTML");
-        let reporter = ReporterFactory::from_file_name(path);
-        assert!(reporter.is_some());
-    }
-
-    #[test]
     fn test_format_measurement_with_unit_no_unit() {
         // Test measurement without unit configured
         let result = format_measurement_with_unit("unknown_measurement");
@@ -1970,82 +1891,6 @@ mod tests {
         assert!(!body.contains("<html>"));
         assert!(!body.contains("<head>"));
         assert!(!body.contains("<body>"));
-    }
-
-    #[test]
-    fn test_apply_template_basic() {
-        let template = r#"<html><head>{{PLOTLY_HEAD}}</head><body><h1>{{TITLE}}</h1>{{PLOTLY_BODY}}</body></html>"#;
-
-        // Create a simple plot
-        let mut plot = Plot::new();
-        let trace = plotly::Scatter::new(vec![1, 2], vec![3, 4]).name("test");
-        plot.add_trace(trace);
-
-        let metadata = ReportMetadata {
-            title: "Test Report".to_string(),
-            custom_css: "".to_string(),
-            timestamp: "2024-01-01 00:00:00 UTC".to_string(),
-            commit_range: "abc123".to_string(),
-            depth: 1,
-        };
-
-        let result = apply_template(template, &plot, &metadata);
-        let result_str = String::from_utf8(result).unwrap();
-
-        assert!(result_str.contains("Test Report"));
-        // Should contain plotly script tags in head
-        assert!(result_str.contains("<script"));
-        assert!(result_str.contains("plotly"));
-        // Should contain plot div and script in body
-        assert!(result_str.contains("<div"));
-        assert!(result_str.contains("Plotly.newPlot"));
-    }
-
-    #[test]
-    fn test_apply_template_all_placeholders() {
-        let template = r#"
-            <html>
-            <head>
-                <title>{{TITLE}}</title>
-                {{PLOTLY_HEAD}}
-                <style>{{CUSTOM_CSS}}</style>
-            </head>
-            <body>
-                <h1>{{TITLE}}</h1>
-                <p>Generated: {{TIMESTAMP}}</p>
-                <p>Commits: {{COMMIT_RANGE}}</p>
-                <p>Depth: {{DEPTH}}</p>
-                {{PLOTLY_BODY}}
-                {{AUDIT_SECTION}}
-            </body>
-            </html>
-        "#;
-
-        // Create a simple plot
-        let mut plot = Plot::new();
-        let trace = plotly::Scatter::new(vec![1, 2, 3], vec![10, 20, 30]).name("chart");
-        plot.add_trace(trace);
-
-        let metadata = ReportMetadata {
-            title: "Performance Report".to_string(),
-            custom_css: "body { color: red; }".to_string(),
-            timestamp: "2024-01-15 12:00:00 UTC".to_string(),
-            commit_range: "abc123..def456".to_string(),
-            depth: 50,
-        };
-
-        let result = apply_template(template, &plot, &metadata);
-        let result_str = String::from_utf8(result).unwrap();
-
-        assert!(result_str.contains("Performance Report"));
-        assert!(result_str.contains("body { color: red; }"));
-        assert!(result_str.contains("2024-01-15 12:00:00 UTC"));
-        assert!(result_str.contains("abc123..def456"));
-        assert!(result_str.contains("50"));
-        // Should contain plotly script tags and plot content
-        assert!(result_str.contains("<script"));
-        assert!(result_str.contains("plotly"));
-        assert!(result_str.contains("<div"));
     }
 
     #[test]
