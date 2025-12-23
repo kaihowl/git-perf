@@ -4,8 +4,6 @@ mod test {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use rstest::*;
-
     fn run_bash_test(bash_file: &Path) {
         let binary_path = Path::new(env!("CARGO_BIN_EXE_git-perf"));
 
@@ -41,8 +39,8 @@ mod test {
         assert!(output.status.success(), "Bash test script failed");
     }
 
-    #[rstest]
-    fn for_each_file(#[files("../test/test*.sh")] path: PathBuf) {
+    #[glob_test::glob("./bash_tests/test*.sh")]
+    fn for_each_file(path: PathBuf) {
         run_bash_test(&path);
     }
 }
