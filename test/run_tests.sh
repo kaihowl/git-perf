@@ -27,13 +27,14 @@ fi
 
 # Function to execute command and capture output
 execute_command() {
+    local test_script="$1"
     local output_file
     output_file=$(mktemp)
-    local test_name=$(basename "$1")
+    local test_name=$(basename "$test_script")
 
     echo "Running '$test_name'"
 
-    if ! "$@" > "$output_file" 2>&1; then
+    if ! bash "$test_script" > "$output_file" 2>&1; then
         echo -e "${RED}✗ FAILED${NC}: $test_name"
         echo ""
         echo "--- Test Output ---"
@@ -73,7 +74,7 @@ pids=()
 
 # Execute commands in parallel with a maximum of 3 processes at a time
 for cmd in "${commands[@]}"; do
-    execute_command bash -c "$cmd" &
+    execute_command "$cmd" &
     pids+=($!)
     # Limit the number of concurrent processes
     while [ $(jobs -p | wc -l) -ge $num_procs ]; do

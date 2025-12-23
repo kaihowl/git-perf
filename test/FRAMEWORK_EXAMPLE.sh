@@ -57,7 +57,7 @@ cd_temp_repo
 assert_success git perf --version
 
 # Assert command succeeds and capture output
-assert_success output git perf --version
+assert_success_with_output output git perf --version
 assert_contains "$output" "git-perf"
 
 # OLD PATTERN:
@@ -70,8 +70,8 @@ test_section "Command execution assertions - failure cases"
 assert_failure git perf invalid-command
 
 # Assert command fails and capture error message
-assert_failure error_msg git perf audit -m nonexistent
-assert_contains "$error_msg" "No measurements found"
+assert_failure_with_output error_msg git perf audit -m nonexistent
+assert_contains "$error_msg" "No measurement for HEAD"
 
 # OLD PATTERN:
 # git perf invalid-command && exit 1
@@ -170,7 +170,7 @@ create_commit && git perf add -m timer 3
 create_commit && git perf add -m timer 4
 
 # Verify measurements were added
-assert_success output git perf list
+assert_success_with_output output git perf list
 assert_contains "$output" "timer"
 
 # Audit should pass with large deviation threshold
@@ -180,7 +180,7 @@ assert_success git perf audit -m timer -d 4
 assert_failure git perf audit -m timer -d 1
 
 # Verify we can get size information
-assert_success size_output git perf size
+assert_success_with_output size_output git perf size
 assert_matches "$size_output" "[0-9]+ bytes"
 
 # ============================================================================
@@ -192,11 +192,11 @@ test_section "Validating error messages"
 cd_empty_repo
 
 # Test that appropriate error is shown for missing measurements
-assert_failure err git perf audit -m nonexistent
-assert_contains "$err" "No measurements found"
+assert_failure_with_output err git perf audit -m nonexistent
+assert_contains "$err" "No measurement for HEAD"
 
 # Test invalid flag produces error
-assert_failure err git perf --invalid-flag
+assert_failure_with_output err git perf --invalid-flag
 assert_matches "$err" "(unknown|invalid|unrecognized)"
 
 # ============================================================================
@@ -223,10 +223,10 @@ git perf add -m build_time 100
 #        echo "Missing build_time"
 #        exit 1
 #      fi
-# NEW: assert_success output git perf list
+# NEW: assert_success_with_output output git perf list
 #      assert_contains "$output" "build_time"
 
-assert_success output git perf list
+assert_success_with_output output git perf list
 assert_contains "$output" "build_time"
 
 # Pattern 4: Negative grep

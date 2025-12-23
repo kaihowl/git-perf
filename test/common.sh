@@ -225,61 +225,54 @@ assert_not_matches() {
 # ============================================================================
 
 assert_success() {
-  # If first arg looks like a variable name (no slashes, no dashes at start),
-  # treat it as output variable name
-  local output_var=""
-  if [[ $# -gt 1 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-    output_var="$1"
-    shift
-  fi
+  local _unused_output
+  assert_success_with_output _unused_output "$@"
+}
 
-  local output
+assert_success_with_output() {
+  local output_var="$1"
+  shift
+
+  local _cmd_output
   local exit_code
 
-  if [[ -n "$output_var" ]]; then
-    output=$("$@" 2>&1)
-    exit_code=$?
-    eval "$output_var=\$output"
-  else
-    output=$("$@" 2>&1)
-    exit_code=$?
-  fi
+  _cmd_output=$("$@" 2>&1)
+  exit_code=$?
+  eval "$output_var=\$_cmd_output"
 
   if [[ $exit_code -ne 0 ]]; then
     _test_fail "Command should succeed but failed with exit code $exit_code" \
       "Command: $*" \
       "Output:" \
-      "$output"
+      "$_cmd_output"
   fi
   _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
 }
 
 assert_failure() {
-  # If first arg looks like a variable name (no slashes, no dashes at start),
-  # treat it as output variable name
-  local output_var=""
-  if [[ $# -gt 1 && "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-    output_var="$1"
-    shift
-  fi
+  local _unused_output
+  assert_failure_with_output _unused_output "$@"
+}
 
-  local output
+assert_failure_with_output() {
+  local output_var="$1"
+  shift
+
+  local _cmd_output
   local exit_code
 
   set +e
-  output=$("$@" 2>&1)
+  _cmd_output=$("$@" 2>&1)
   exit_code=$?
   set -e
 
-  if [[ -n "$output_var" ]]; then
-    eval "$output_var=\$output"
-  fi
+  eval "$output_var=\$_cmd_output"
 
   if [[ $exit_code -eq 0 ]]; then
     _test_fail "Command should fail but succeeded" \
       "Command: $*" \
       "Output:" \
-      "$output"
+      "$_cmd_output"
   fi
   _TEST_PASS_COUNT=$((_TEST_PASS_COUNT + 1))
 }

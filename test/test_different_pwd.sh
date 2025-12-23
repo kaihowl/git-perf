@@ -1,21 +1,24 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing (recommended for new tests)
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-echo New repo but current working directory different
+test_section "New repo but current working directory different"
+
 cd_empty_repo
 create_commit
-git perf add -m test-measure 10
+assert_success git perf add -m test-measure 10
 
 work_dir=$(pwd)
 cd /tmp
 
-if ! (git -C "$work_dir" perf report -o - | grep test-measure); then
-  echo "Failed to change to work_dir and retrieve measurement"
-  exit 1
-fi
+# Test that git-perf works when invoked with -C from a different directory
+assert_success_with_output output git -C "$work_dir" perf report -o -
+assert_contains "$output" "test-measure" "Failed to retrieve measurement from different working directory"
+
+test_stats
+exit 0
