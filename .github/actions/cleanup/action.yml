@@ -43,7 +43,7 @@ runs:
 
     - name: Install git-perf
       if: inputs.git-perf-version != 'skip'
-      uses: kaihowl/git-perf/.github/actions/install@master
+      uses: ./.github/actions/install
       with:
         release: ${{ inputs.git-perf-version }}
 

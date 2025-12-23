@@ -93,7 +93,7 @@ runs:
         fi
 
     - name: Install git-perf
-      uses: kaihowl/git-perf/.github/actions/install@master
+      uses: ./.github/actions/install
       with:
         release: ${{ inputs.git-perf-version }}
 
