@@ -1,16 +1,12 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-echo "Test audit with filter-only (no -m required)"
-
-# This test demonstrates the new feature where --filter can be used without -m
-# Previously, -m was always required, forcing users to provide dummy values
+test_section "Test audit with filter-only (no -m required)"
 
 cd_empty_repo
 
@@ -43,42 +39,26 @@ git perf add -m bench_throughput 56
 git perf add -m bench_latency 28
 git perf add -m test_coverage 88
 
-echo "Test 1: Audit all measurements with 'perf_' prefix using filter-only"
-output=$(git perf audit --filter "^perf_" -d 10 2>&1)
-assert_output_contains "$output" "perf_cpu" "Should audit perf_cpu"
-assert_output_contains "$output" "perf_memory" "Should audit perf_memory"
-if echo "$output" | grep -q "bench_"; then
-  echo "FAIL: bench_ measurements should not be audited"
-  exit 1
-fi
-if echo "$output" | grep -q "test_"; then
-  echo "FAIL: test_ measurements should not be audited"
-  exit 1
-fi
-echo "PASS: Filter-only successfully audited perf_* measurements"
+test_section "Audit all measurements with 'perf_' prefix using filter-only"
+assert_success output git perf audit --filter "^perf_" -d 10
+assert_contains "$output" "perf_cpu" "Should audit perf_cpu"
+assert_contains "$output" "perf_memory" "Should audit perf_memory"
+assert_not_contains "$output" "bench_"
+assert_not_contains "$output" "test_"
 
-echo "Test 2: Audit all measurements with 'bench_' prefix using filter-only"
-output=$(git perf audit --filter "^bench_" -d 10 2>&1)
-assert_output_contains "$output" "bench_throughput" "Should audit bench_throughput"
-assert_output_contains "$output" "bench_latency" "Should audit bench_latency"
-if echo "$output" | grep -q "perf_"; then
-  echo "FAIL: perf_ measurements should not be audited"
-  exit 1
-fi
-echo "PASS: Filter-only successfully audited bench_* measurements"
+test_section "Audit all measurements with 'bench_' prefix using filter-only"
+assert_success output git perf audit --filter "^bench_" -d 10
+assert_contains "$output" "bench_throughput" "Should audit bench_throughput"
+assert_contains "$output" "bench_latency" "Should audit bench_latency"
+assert_not_contains "$output" "perf_"
 
-echo "Test 3: Audit with unanchored pattern (matches substring)"
-output=$(git perf audit --filter "through" -d 10 2>&1)
-assert_output_contains "$output" "bench_throughput" "Should match measurements containing 'through'"
-echo "PASS: Unanchored pattern works correctly"
+test_section "Audit with unanchored pattern (matches substring)"
+assert_success output git perf audit --filter "through" -d 10
+assert_contains "$output" "bench_throughput" "Should match measurements containing 'through'"
 
-echo "Test 4: Error when neither -m nor --filter provided"
-if output=$(git perf audit -d 10 2>&1); then
-  echo "FAIL: Should error when neither -m nor --filter provided"
-  exit 1
-fi
-assert_output_contains "$output" "required arguments" "Should indicate missing required arguments"
-echo "PASS: Correctly errors when both -m and --filter are missing"
+test_section "Error when neither -m nor --filter provided"
+assert_failure output git perf audit -d 10
+assert_contains "$output" "required arguments" "Should indicate missing required arguments"
 
-echo "All filter-only tests passed successfully"
+test_stats
 exit 0

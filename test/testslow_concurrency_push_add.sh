@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export TEST_TRACE=0
+
 export GIT_TRACE=1
 export RUST_LOG=trace
 export RUST_BACKTRACE=1
@@ -30,9 +32,6 @@ CONCURRENT_PRUNERS=2
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
-
-# Disable set -x from the common.sh inclusion
-set +x
 
 cd "$(mktemp -d)"
 root=$(pwd)
@@ -254,4 +253,5 @@ else
     exit_code=1
 fi
 
-exit  $exit_code
+test_stats
+exit $exit_code

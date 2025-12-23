@@ -1,13 +1,12 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-## Check git perf prune functionality
+test_section "Setup test repository"
 
 # Refuse to run on a shallow clone
 pushd "$(mktemp -d)"
@@ -24,24 +23,28 @@ create_commit
 git push
 popd
 
+test_section "Test prune refuses to run on shallow clone"
+
 pushd "$(mktemp -d)"
 git init
 git remote add origin "${repo}"
 git fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 --update-head-ok origin master:master
-output=$(git perf prune 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "shallow" "No warning for 'shallow' clone"
+assert_failure output git perf prune
+assert_contains "$output" "shallow" "No warning for 'shallow' clone"
 popd
 
-# Test running git perf prune outside of a git repository
+test_section "Test running git perf prune outside of a git repository"
+
 pushd "$(mktemp -d)"
-output=$(git perf prune 2>&1 1>/dev/null) && exit 1
+assert_failure output git perf prune
 # Check for either expected error message
 if [[ $output != *'not a git repository'* ]]; then
-  assert_output_contains "$output" "fatal" "Expected error for running outside a git repo"
+  assert_contains "$output" "fatal" "Expected error for running outside a git repo"
 fi
 popd
 
-# Normal operations on main repo
+test_section "Normal prune operations on main repo"
+
 pushd "$(mktemp -d)"
 git init
 git remote add origin "${repo}"
@@ -55,26 +58,21 @@ git perf push
 git perf prune
 
 nr_notes=$(git notes --ref=refs/notes/perf-v3 list | wc -l)
-if [[ $nr_notes -ne 1 ]]; then
-  echo "Expected to have 1 note but found '$nr_notes' instead"
-  exit 1
-fi
+assert_equals "$nr_notes" "1" "Expected to have 1 note after initial prune"
 
 git reset --hard HEAD~1
 git push --force origin master:master
 
 nr_notes=$(git notes --ref=refs/notes/perf-v3 list | wc -l)
-if [[ $nr_notes -ne 1 ]]; then
-  echo "Expected to have 1 note but found '$nr_notes' instead"
-  exit 1
-fi
+assert_equals "$nr_notes" "1" "Expected to still have 1 note before gc"
+
 git reflog expire --expire-unreachable=now --all
 git prune --expire=now
 git perf prune
 nr_notes=$(git notes --ref=refs/notes/perf-v3 list | wc -l)
-if [[ $nr_notes -ne 0 ]]; then
-  echo "Expected to have no notes but found '$nr_notes' instead"
-  exit 1
-fi
+assert_equals "$nr_notes" "0" "Expected to have no notes after pruning unreachable commits"
 
 popd
+
+test_stats
+exit 0

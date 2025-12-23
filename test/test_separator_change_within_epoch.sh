@@ -1,13 +1,13 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-# Test case for issue #100: What happens if separators change inside the same epoch?
+test_section "Test case for issue #100: Separator changes within epoch"
+
 # This tests the scenario where measurements in earlier commits have a separator key,
 # but later commits (within the same epoch) don't have that key.
 
@@ -38,37 +38,33 @@ create_commit
 git perf add -m timer 4.0
 git perf add -m timer 3.9
 
-# Generate report with separator that exists in some commits but not others
+test_section "Generate report with separator that exists in some commits"
+
 # Current behavior: measurements without the separator key are silently excluded
 # Issue #100 asks: should there be a default bucket for measurements without the separator key?
-git perf report -o separated_result.html -s os
+assert_success git perf report -o separated_result.html -s os
 
 # Verify the report was created (it should succeed because at least some measurements have the 'os' key)
-if [[ ! -f "separated_result.html" ]]; then
-  echo "Expected HTML file 'separated_result.html' was not created"
-  exit 1
-fi
+assert_file_exists "separated_result.html" "Expected HTML file 'separated_result.html' was not created"
 
 # Check that separated report contains measurements with the separator
-separated_content=$(cat separated_result.html)
-assert_output_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
-assert_output_contains "$separated_content" "timer" "Separated HTML missing 'timer' measurement name"
+assert_success separated_content cat separated_result.html
+assert_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
+assert_contains "$separated_content" "timer" "Separated HTML missing 'timer' measurement name"
 
-# Verify that we can generate a report without the separator (should include all measurements)
-git perf report -o all_result.html
-if [[ ! -f "all_result.html" ]]; then
-  echo "Expected HTML file 'all_result.html' was not created"
-  exit 1
-fi
+test_section "Verify report without separator includes all measurements"
+
+assert_success git perf report -o all_result.html
+assert_file_exists "all_result.html" "Expected HTML file 'all_result.html' was not created"
 
 # Verify the unseparated report contains all measurements
-html_content=$(cat all_result.html)
-assert_output_contains "$html_content" "timer" "HTML file missing measurement name 'timer'"
+assert_success html_content cat all_result.html
+assert_contains "$html_content" "timer" "HTML file missing measurement name 'timer'"
 
-# Test the opposite scenario: separator key that doesn't exist in any measurements
-output=$(git perf report -s does-not-exist 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "invalid separator" "No error for separator key that doesn't exist in any measurements"
+test_section "Test separator key that doesn't exist in any measurements"
 
-echo "Test passed: Separator change within epoch behaves as documented"
-echo "Note: Measurements without the separator key are silently excluded from separated reports"
-echo "This is the behavior questioned in issue #100"
+assert_failure output git perf report -s does-not-exist
+assert_contains "$output" "invalid separator" "No error for separator key that doesn't exist in any measurements"
+
+test_stats
+exit 0

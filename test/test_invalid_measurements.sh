@@ -1,7 +1,6 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 
@@ -10,80 +9,67 @@ source "$script_dir/common.sh"
 
 epoch=42
 
-echo Add invalid measurements
+test_section "Add invalid measurements"
 
-echo Empty measurement
+test_section "Empty measurement"
 cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "\n"
-output=$(git perf report 2>&1 1>/dev/null)
-assert_output_contains "$output" "too few items" "Missing 'too few items' in output"
+assert_success output git perf report
+assert_contains "$output" "too few items" "Missing 'too few items' in output"
 
-echo Measurement with just date
+test_section "Measurement with just date"
 cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$(date +%s)"
-output=$(git perf report 2>&1 1>/dev/null)
-assert_output_contains "$output" "too few items" "Missing 'too few items' in output"
+assert_success output git perf report
+assert_contains "$output" "too few items" "Missing 'too few items' in output"
 
-echo Measurement without date
+test_section "Measurement without date"
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$RANDOMkey=value"
-output=$(git perf report 2>&1 1>/dev/null)
-assert_output_contains "$output" "skipping" "Missing 'skipping' in output"
+"${script_dir}/measure.sh" "$epochmyothermeasurement$RANDOMkey=value"
+assert_success output git perf report
+assert_contains "$output" "skipping" "Missing 'skipping' in output"
 
-echo Measurement without kvs
+test_section "Measurement without kvs"
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOM"
-output=$(git perf report 2>&1 1>/dev/null)
-if [[ -n ${output} ]]; then
-  echo "There should be no output in stderr but instead there is:"
-  echo "$output"
-  exit 1
-fi
+"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOM"
+assert_success output git perf report
+assert_equals "$output" "" "There should be no output in stderr"
 
-echo Measurement with invalid kvs
+test_section "Measurement with invalid kvs"
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMtestotherteststuff"
-output=$(git perf report 2>&1 1>/dev/null)
-if [[ -z ${output} ]]; then
-  echo "There should be output in stderr but instead it is empty"
-  exit 1
-fi
+"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMtestotherteststuff"
+assert_success output git perf report
+assert_not_equals "$output" "" "There should be output in stderr"
 
-echo Measurement valid but with too many separators
+test_section "Measurement valid but with too many separators"
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=value"
-output=$(git perf report 2>&1 1>/dev/null)
-if [[ -n ${output} ]]; then
-  echo "There should be no output in stderr but instead there is:"
-  echo "$output"
-  exit 1
-fi
+"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=value"
+assert_success output git perf report
+assert_equals "$output" "" "There should be no output in stderr"
 
-echo Duplicate kvs
+test_section "Duplicate kvs"
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=valuekey=valuekey=value"
-output=$(git perf report 2>&1 1>/dev/null)
-assert_output_contains "$output" "Duplicate entries for key key with same value" "Expected warning about 'Duplicate entries for key key with same value' in the output"
+"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=valuekey=valuekey=value"
+assert_success output git perf report
+assert_contains "$output" "Duplicate entries for key key with same value" "Expected warning about 'Duplicate entries for key key with same value' in the output"
 
 # Verify warning is only printed once
 warning_count=$(echo "$output" | grep -c "Duplicate entries for key key with same value")
-if [[ $warning_count -ne 1 ]]; then
-  echo "Expected warning to appear exactly once, but found $warning_count occurrences"
-  echo "Output:"
-  echo "$output"
-  exit 1
-fi
+assert_equals "$warning_count" "1" "Expected warning to appear exactly once"
 
-echo Conflicting kvs
+test_section "Conflicting kvs"
 cd_temp_repo
 git perf add -m echo 0.5
-"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value2"
-output=$(git perf report 2>&1 1>/dev/null)
-assert_output_contains "$output" "Conflicting values" "Expected warning about 'Conflicting values' in the output"
+"${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=valuekey=value2"
+assert_success output git perf report
+assert_contains "$output" "Conflicting values" "Expected warning about 'Conflicting values' in the output"
+
+test_stats
+exit 0
