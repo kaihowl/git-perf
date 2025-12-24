@@ -53,16 +53,15 @@ source "$script_dir/common.sh"
 
 test_section "Basic functionality tests"
 
+# Setup (regular commands, not assertions)
 cd_temp_repo
 
-# Assert command succeeds
+# Actual test expectations (use assertions)
 assert_success git perf --version
-
-# Assert command fails
 assert_failure git perf invalid-command
 
 # Capture output and validate
-assert_success output git perf list
+assert_success_with_output output git perf list
 assert_contains "$output" "expected-string"
 
 # Show statistics at end
@@ -78,7 +77,7 @@ exit 0
 
 Test Statistics:
   Sections: 1
-  Assertions Passed: 4
+  Assertions Passed: 3
   Assertions Failed: 0
 ```
 
@@ -226,17 +225,15 @@ assert_not_matches "$output" "^ERROR:"
 #### assert_success
 
 ```bash
-assert_success [output_var] command args...
+assert_success command args...
 ```
 
-**Examples:**
+Verifies a command succeeds (exit code 0). Does not capture output.
+
+**Example:**
 ```bash
 # Just verify command succeeds
 assert_success git perf --version
-
-# Capture output for later validation
-assert_success output git perf list
-assert_contains "$output" "build_time"
 ```
 
 **Failure output:**
@@ -248,20 +245,33 @@ ERROR: Command should succeed but failed with exit code 2
        Error: No measurements found for 'nonexistent'
 ```
 
+#### assert_success_with_output
+
+```bash
+assert_success_with_output output_var command args...
+```
+
+Verifies a command succeeds AND captures its output (stdout + stderr) into the specified variable.
+
+**Example:**
+```bash
+# Capture output for later validation
+assert_success_with_output output git perf list
+assert_contains "$output" "build_time"
+```
+
 #### assert_failure
 
 ```bash
-assert_failure [output_var] command args...
+assert_failure command args...
 ```
 
-**Examples:**
+Verifies a command fails (non-zero exit code). Does not capture output.
+
+**Example:**
 ```bash
 # Just verify command fails
 assert_failure git perf invalid-command
-
-# Capture error message for validation
-assert_failure error_msg git perf audit -m nonexistent
-assert_contains "$error_msg" "No measurements found"
 ```
 
 **Failure output:**
@@ -271,6 +281,21 @@ ERROR: Command should fail but succeeded
        Command: git perf audit -m timer -d 1.9999
        Output:
        Audit passed for measurement 'timer'
+```
+
+#### assert_failure_with_output
+
+```bash
+assert_failure_with_output output_var command args...
+```
+
+Verifies a command fails AND captures its output (stdout + stderr) into the specified variable.
+
+**Example:**
+```bash
+# Capture error message for validation
+assert_failure_with_output error_msg git perf audit -m nonexistent
+assert_contains "$error_msg" "No measurements found"
 ```
 
 ### Boolean Condition Assertions
@@ -401,7 +426,7 @@ fi
 
 **NEW:**
 ```bash
-assert_success output git perf config --list
+assert_success_with_output output git perf config --list
 assert_contains "$output" "build_time"
 ```
 
@@ -422,7 +447,7 @@ output=$(git perf config --list --measurement build_time)
 
 **NEW:**
 ```bash
-assert_success output git perf config --list --measurement build_time
+assert_success_with_output output git perf config --list --measurement build_time
 assert_not_contains "$output" "test_time"
 ```
 
@@ -481,7 +506,7 @@ echo "$output" | grep -q "No epoch configured"
 
 **NEW:**
 ```bash
-assert_failure output git perf config --list --validate
+assert_failure_with_output output git perf config --list --validate
 assert_contains "$output" "No epoch configured"
 ```
 
@@ -527,6 +552,64 @@ assert_file_exists ".gitperfconfig" "Config file should exist"
 ```
 
 **Why better:** Clearer intent, consistent with other assertions.
+
+---
+
+### When to Use Assertions vs Regular Commands
+
+**IMPORTANT:** Only use assertion functions for actual test expectations. Do NOT use them for test setup or preparation commands.
+
+**Why?** Each assertion:
+- Increments the pass/fail counter
+- Appears in test statistics
+- Adds noise to test output when used for setup
+
+**Use assertions for:**
+- ✅ Verifying expected behavior (the actual test)
+- ✅ Validating output contains expected strings
+- ✅ Checking command success/failure as the test goal
+
+**Use regular commands for:**
+- ❌ Setting up test environment
+- ❌ Creating test data
+- ❌ Navigating directories
+- ❌ Initializing state
+
+**Example - GOOD:**
+```bash
+# Setup (regular commands)
+cd_temp_repo
+git perf add timer 100
+
+# Actual test expectations (assertions)
+assert_success_with_output output git perf list
+assert_contains "$output" "timer"
+```
+
+**Example - BAD:**
+```bash
+# DON'T do this - clutters output with setup noise
+assert_success cd_temp_repo
+assert_success git perf add timer 100
+assert_success_with_output output git perf list
+assert_contains "$output" "timer"
+```
+
+**Output difference:**
+
+Good approach shows:
+```
+Test Statistics:
+  Assertions Passed: 2
+```
+
+Bad approach shows:
+```
+Test Statistics:
+  Assertions Passed: 4  # Misleading - only 2 are actual tests
+```
+
+**Rule of thumb:** If the command failing is a setup problem (not a test failure), don't use an assertion.
 
 ---
 
@@ -643,13 +726,14 @@ After migrating a test:
 
 ## Best Practices
 
-1. **Always add `TEST_TRACE=0`** to migrated tests for clean output
-2. **Use `test_section()`** to organize tests into logical groups
-3. **Provide custom messages** for important assertions
-4. **Capture output when needed** - use output variable with assert_success/failure
-5. **Call `test_stats`** at end of test for assertion counts
-6. **Prefer specific assertions** - use `assert_contains` over `assert_true` with grep
-7. **Keep tests focused** - one assertion per logical check
+1. **Use assertions only for test expectations** - NOT for setup commands (see "When to Use Assertions vs Regular Commands")
+2. **Always add `TEST_TRACE=0`** to migrated tests for clean output
+3. **Use `test_section()`** to organize tests into logical groups
+4. **Provide custom messages** for important assertions
+5. **Use `_with_output` variants when you need to capture** - `assert_success_with_output` or `assert_failure_with_output`
+6. **Call `test_stats`** at end of test for assertion counts
+7. **Prefer specific assertions** - use `assert_contains` over `assert_true` with grep
+8. **Keep tests focused** - one assertion per logical check
 
 ## FAQ
 
@@ -697,6 +781,6 @@ The functions are defined in `test/common.sh` and designed for tests, but techni
 ## See Also
 
 - **[test/test_framework_example.sh](../test/test_framework_example.sh)** - Comprehensive examples
-- **[test/test_audit_basic.sh](../test/test_audit_basic.sh)** - Real-world migration example
+- **[test/test_audit_basic.sh](../test/test_audit_basic.sh)** - ✅ Fully migrated real-world example (14 assertions, 3 sections)
 - **[test/common.sh](../test/common.sh)** - Framework implementation
 - **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Testing requirements for contributors
