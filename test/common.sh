@@ -92,17 +92,44 @@ _TEST_FAIL_COUNT=0
 _test_fail() {
   _TEST_FAIL_COUNT=$((_TEST_FAIL_COUNT + 1))
 
-  # Get caller information for better context
-  local caller_line="${BASH_LINENO[1]}"
-  local caller_file="${BASH_SOURCE[2]}"
-  local test_name=$(basename "$caller_file" .sh)
-
   # Disable set -x temporarily for clean error output
   local xtrace_enabled=0
   if [[ "$-" =~ x ]]; then
     xtrace_enabled=1
     set +x
   fi
+
+  # Build full call stack for better debugging
+  local stack_depth=${#BASH_LINENO[@]}
+  local current_file="${BASH_SOURCE[0]}"
+  local caller_line=""
+  local caller_file=""
+
+  # Find the first frame in the call stack where the file is different from common.sh
+  # This handles cases where assertions are called from other common.sh functions
+  for ((i=1; i<stack_depth; i++)); do
+    local frame_file="${BASH_SOURCE[i]}"
+
+    # Stop if we run out of stack
+    if [[ -z "$frame_file" ]]; then
+      break
+    fi
+
+    # Found a file different from common.sh
+    if [[ "$frame_file" != "$current_file" ]]; then
+      caller_file="$frame_file"
+      caller_line="${BASH_LINENO[i-1]}"
+      break
+    fi
+  done
+
+  # Fallback if we didn't find anything (shouldn't happen in normal usage)
+  if [[ -z "$caller_file" ]]; then
+    caller_file="${BASH_SOURCE[1]}"
+    caller_line="${BASH_LINENO[0]}"
+  fi
+
+  local test_name=$(basename "$caller_file" .sh)
 
   echo "" >&2
   echo "FAIL: $test_name:$caller_line" >&2
@@ -113,6 +140,23 @@ _test_fail() {
   while [[ $# -gt 0 ]]; do
     echo "       $1" >&2
     shift
+  done
+
+  # Print full call stack
+  echo "" >&2
+  echo "Call stack:" >&2
+  for ((i=1; i<stack_depth; i++)); do
+    local frame_line="${BASH_LINENO[i]}"
+    local frame_func="${FUNCNAME[i]}"
+    local frame_file="${BASH_SOURCE[i+1]}"
+
+    # Stop if we run out of stack
+    if [[ -z "$frame_file" ]]; then
+      break
+    fi
+
+    local frame_name=$(basename "$frame_file")
+    echo "  [$i] $frame_name:$frame_line in $frame_func()" >&2
   done
 
   echo "" >&2
