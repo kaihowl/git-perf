@@ -329,6 +329,7 @@ impl CsvMeasurementRow {
 /// For HTML reports, contains the plot div + script for template replacement.
 /// For CSV reports, this is typically empty (CSV accumulates all data internally).
 struct SectionOutput {
+    #[allow(dead_code)]
     section_id: String,
     placeholder: String, // For HTML template replacement (e.g., "{{SECTION[id]}}")
     content: Vec<u8>,    // Section-specific content (plot HTML or empty for CSV)
@@ -391,6 +392,7 @@ struct PlotlyReporter {
     // See: https://github.com/kaihowl/git-perf/issues/339
     size: usize,
     template: Option<String>,
+    #[allow(dead_code)]
     metadata: Option<ReportMetadata>,
 
     // Per-section state (reset on begin_section)
@@ -402,6 +404,7 @@ struct PlotlyReporter {
 }
 
 impl PlotlyReporter {
+    #[allow(dead_code)]
     fn new() -> PlotlyReporter {
         let config = Configuration::default().responsive(true).fill_frame(false);
         let mut plot = Plot::new();
@@ -1570,13 +1573,10 @@ fn prepare_sections_and_metadata(
 ///
 /// Calls reporter.begin_section(), filters measurements, processes groups,
 /// and returns the section output via reporter.end_section().
-#[allow(clippy::too_many_arguments)]
 fn process_section<'a>(
     reporter: &mut dyn Reporter<'a>,
     commits: &'a [Commit],
     section: &SectionConfig,
-    global_show_epochs: bool,
-    global_show_changes: bool,
 ) -> Result<SectionOutput> {
     reporter.begin_section(&section.id, &section.placeholder);
 
@@ -1622,10 +1622,6 @@ fn process_section<'a>(
             content: Vec::new(),
         });
     }
-
-    // Merge section and global flags
-    let show_epochs = section.show_epochs || global_show_epochs;
-    let show_changes = section.show_changes || global_show_changes;
 
     // Process measurement groups (same logic as current generate_single_section_report)
     for measurement_name in unique_measurement_names {
@@ -1682,8 +1678,8 @@ fn process_section<'a>(
                 measurement_name,
                 &group_value,
                 section.aggregate_by,
-                show_epochs,
-                show_changes,
+                section.show_epochs,
+                section.show_changes,
             );
         }
     }
@@ -1746,9 +1742,7 @@ pub fn report(
 
     let section_outputs = sections
         .iter()
-        .map(|section| {
-            process_section(&mut *reporter, &commits, section, show_epochs, show_changes)
-        })
+        .map(|section| process_section(&mut *reporter, &commits, section))
         .collect::<Result<Vec<SectionOutput>>>()?;
 
     // Check if any section found measurements
@@ -1766,11 +1760,11 @@ pub fn report(
     // For multi-section templates (>1 section), allow empty sections (just log warnings)
     // For single-section reports, bail if no measurements found
     let is_multi_section = sections.len() > 1;
-    if !is_multi_section {
-        if (output_format == OutputFormat::Html && !has_measurements)
-            || (output_format == OutputFormat::Csv && report_bytes.is_empty()) {
-            bail!("No performance measurements found.");
-        }
+    if !is_multi_section
+        && ((output_format == OutputFormat::Html && !has_measurements)
+            || (output_format == OutputFormat::Csv && report_bytes.is_empty()))
+    {
+        bail!("No performance measurements found.");
     }
 
     // Write output
