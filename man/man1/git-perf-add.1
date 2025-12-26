@@ -4,7 +4,7 @@
 .SH NAME
 add \- Add single measurement
 .SH SYNOPSIS
-\fBadd\fR <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIVALUE\fR> 
+\fBadd\fR <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-\-commit\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIVALUE\fR> 
 .SH DESCRIPTION
 Add single measurement
 .SH OPTIONS
@@ -14,6 +14,9 @@ Name of the measurement
 .TP
 \fB\-k\fR, \fB\-\-key\-value\fR \fI<KEY_VALUE>\fR
 Key\-value pairs separated by \*(Aq=\*(Aq
+.TP
+\fB\-\-commit\fR \fI<COMMIT>\fR
+Target commit for measurement (default: HEAD)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
