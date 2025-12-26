@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -26,8 +26,8 @@ agg_output=$(git perf report -m timer -a mean -o - | grep -v '^[[:space:]]*$')
 num_lines=$(echo "$agg_output" | grep -v '^[[:space:]]*$' | wc -l)
 
 if [[ "$num_lines" -ne 3 ]]; then
-  echo "Expected 3 lines (1 header + 2 summarized), got: $num_lines"
-  echo "Output: $agg_output"
+  test_section "Expected 3 lines (1 header + 2 summarized), got: $num_lines"
+  test_section "Output: $agg_output"
   exit 1
 fi
 
@@ -43,8 +43,8 @@ fi
 # Commit 2: mean of [3.0, 4.0] = 3.5
 # Normalize whitespace for reliable matching
 agg_normalized=$(echo "$agg_output" | tr -s '[:space:]' ' ')
-assert_output_contains "$agg_normalized" " 1.5" "CSV missing aggregated mean value 1.5 (mean of 1.0, 2.0)"
-assert_output_contains "$agg_normalized" " 3.5" "CSV missing aggregated mean value 3.5 (mean of 3.0, 4.0)"
+assert_contains "$agg_normalized" " 1.5" "CSV missing aggregated mean value 1.5 (mean of 1.0, 2.0)"
+assert_contains "$agg_normalized" " 3.5" "CSV missing aggregated mean value 3.5 (mean of 3.0, 4.0)"
 
-echo "CSV aggregated report produced correct number of summarized lines and correct mean values."
+test_section "CSV aggregated report produced correct number of summarized lines and correct mean values."
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -27,8 +27,8 @@ done
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
 
 if [[ 2 -ne $ref_count ]]; then
-  echo "Expected the symbolic write-ref and the target write ref to be added after the initial add(s)"
-  echo "Current refs:"
+  test_section "Expected the symbolic write-ref and the target write ref to be added after the initial add(s)"
+  test_section "Current refs:"
   git for-each-ref '**/notes/perf-*'
   exit 1
 fi
@@ -37,8 +37,8 @@ git perf report
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
 
 if [[ 2 -ne $ref_count ]]; then
-  echo "Expected the symbolic write-ref and the target write ref to be present after the report"
-  echo "Current refs:"
+  test_section "Expected the symbolic write-ref and the target write ref to be present after the report"
+  test_section "Current refs:"
   git for-each-ref '**/notes/perf-*'
   exit 1
 fi
@@ -47,8 +47,8 @@ git perf push
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
 
 if [[ 1 -ne $ref_count ]]; then
-  echo "Expected only the permanent git perf ref to be present after the first push"
-  echo "Current refs:"
+  test_section "Expected only the permanent git perf ref to be present after the first push"
+  test_section "Current refs:"
   git for-each-ref '**/notes/perf-*'
   exit 1
 fi

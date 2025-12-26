@@ -1,20 +1,19 @@
 #!/bin/bash
 
-set -e
 
 # Statistical integration test for dispersion method functionality
 # This test verifies that audit with different dispersion methods produces different results
 
-echo "Testing dispersion method statistical differences with actual git repository..."
+test_section "Testing dispersion method statistical differences with actual git repository..."
 
 # Use the existing test infrastructure
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-echo "Using test infrastructure from: $script_dir"
+test_section "Using test infrastructure from: $script_dir"
 
-echo "Using git-perf from: $(which git-perf)"
+test_section "Using git-perf from: $(which git-perf)"
 
 # Create a temporary repository with multiple commits
 cd_temp_repo
@@ -23,12 +22,12 @@ cd_temp_repo
 TEMP_DIR=$(pwd)
 
 echo "✅ Created temporary repository with 4 commits"
-echo "Repository location: $TEMP_DIR"
+test_section "Repository location: $TEMP_DIR"
 
 # Add performance measurements across different commits
 # We'll create data that should show different z-scores with stddev vs MAD
 
-echo "Adding baseline performance measurements..."
+test_section "Adding baseline performance measurements..."
 
 # Add measurements to different commits to form the tail
 # First commit: Add baseline measurements (normal performance)
@@ -56,11 +55,11 @@ echo "   Total: 4 measurements"
 # Now test that audit with different dispersion methods produces different results
 
 echo ""
-echo "Running audit with stddev method..."
-AUDIT_STDDEV=$(git perf audit -m build_time --dispersion-method stddev 2>&1 || true)
+test_section "Running audit with stddev method..."
+assert_failure_with_output AUDIT_STDDEV git perf audit -m build_time --dispersion-method stddev
 
-echo "Running audit with MAD method..."
-AUDIT_MAD=$(git perf audit -m build_time --dispersion-method mad 2>&1 || true)
+test_section "Running audit with MAD method..."
+assert_failure_with_output AUDIT_MAD git perf audit -m build_time --dispersion-method mad
 
 echo ""
 echo "=== Audit Output with stddev ==="
@@ -84,17 +83,9 @@ fi
 echo "✅ Both audit methods produced output"
 
 # Verify that both methods show the correct method name in output
-if ! echo "$AUDIT_STDDEV" | grep -q "z-score (stddev):"; then
-    echo "❌ stddev audit output doesn't show 'z-score (stddev):'"
-    echo "Output: $AUDIT_STDDEV"
-    exit 1
-fi
+assert_contains "$AUDIT_STDDEV" "z-score (stddev):"
 
-if ! echo "$AUDIT_MAD" | grep -q "z-score (mad):"; then
-    echo "❌ MAD audit output doesn't show 'z-score (mad):'"
-    echo "Output: $AUDIT_MAD"
-    exit 1
-fi
+assert_contains "$AUDIT_MAD" "z-score (mad):"
 
 echo "✅ Both methods show correct method names in output"
 
@@ -103,15 +94,15 @@ Z_SCORE_STDDEV=$(echo "$AUDIT_STDDEV" | grep "z-score (stddev):" | sed 's/.*z-sc
 Z_SCORE_MAD=$(echo "$AUDIT_MAD" | grep "z-score (mad):" | sed 's/.*z-score (mad):[[:space:]]*↓[[:space:]]*\([0-9.]*\).*/\1/')
 
 echo ""
-echo "Extracted z-score (stddev): $Z_SCORE_STDDEV"
-echo "Extracted z-score (mad): $Z_SCORE_MAD"
+test_section "Extracted z-score (stddev): $Z_SCORE_STDDEV"
+test_section "Extracted z-score (mad): $Z_SCORE_MAD"
 
 # Verify that z-scores are different (this is the key test)
 if [ "$Z_SCORE_STDDEV" = "$Z_SCORE_MAD" ]; then
     echo "❌ Z-scores are identical with stddev ($Z_SCORE_STDDEV) and MAD ($Z_SCORE_MAD)"
-    echo "This suggests the dispersion methods are not working correctly"
+    test_section "This suggests the dispersion methods are not working correctly"
     echo ""
-    echo "Expected behavior:"
+    test_section "Expected behavior:"
     echo "- With outlier data (200ms), MAD should be more sensitive to outliers at HEAD"
     echo "- MAD should produce a higher z-score than stddev"
     echo "- This is because MAD is more robust and less affected by extreme values in the tail"

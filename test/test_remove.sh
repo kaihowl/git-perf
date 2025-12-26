@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -74,7 +74,7 @@ git perf push
 
 # Note: --older-than uses <= (inclusive), so measurements at exactly 7 days will be removed
 # These tests will become flaky if run at exactly the 7 day boundary
-echo "Remove measurements on commits older than 7 days"
+test_section "Remove measurements on commits older than 7 days"
 git perf remove --older-than 7d || bash -i
 num_measurements=$(git perf report -o - | wc -l)
 # Nothing should have been removed (1 measurement + header = 2 lines)
@@ -83,7 +83,7 @@ num_measurements=$(git perf report -o - | wc -l)
 # --- 14 days ago
 export FAKETIME='-14d'
 
-echo "Add a commit with a newer measurement"
+test_section "Add a commit with a newer measurement"
 create_commit
 git perf add -m test-measure-two 20.0
 num_measurements=$(git perf report -o - | wc -l)
@@ -100,7 +100,7 @@ prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 git for-each-ref
-echo "Remove older than 7 days measurements"
+test_section "Remove older than 7 days measurements"
 git perf remove --older-than 7d
 num_measurements=$(git perf report -o - | wc -l)
 # One measurement should still be there (plus header = 2 lines)
@@ -109,8 +109,8 @@ num_measurements=$(git perf report -o - | wc -l)
 git perf report -o - | grep '20\.0'
 
 if git_objects_contain test-measure-one; then
-  echo "Unexpectedly still found test-measure-one in the git objects"
-  echo "This should have been already pruned"
+  test_section "Unexpectedly still found test-measure-one in the git objects"
+  test_section "This should have been already pruned"
   git_object_show_roots test-measure-one
   git log refs/notes/perf-v3 --oneline
   exit 1
@@ -119,7 +119,7 @@ fi
 if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; then
   echo "The number of objects now ($cur_objects + $cur_in_pack)
   is not less than previously ($prev_objects + $prev_in_pack)"
-  echo "Drop compaction has not worked"
+  test_section "Drop compaction has not worked"
   exit 1
 fi
 
@@ -132,7 +132,7 @@ git prune --expire=now
 prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
-echo "Remove older than 7 days measurements"
+test_section "Remove older than 7 days measurements"
 git perf remove --older-than 7d
 
 num_measurements=$(git perf report -o - | wc -l)
@@ -145,16 +145,16 @@ cur_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 cur_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 if git_objects_contain test-measure-one; then
-  echo "Unexpectedly still found test-measure-one in the git objects"
-  echo "This should have been already pruned"
+  test_section "Unexpectedly still found test-measure-one in the git objects"
+  test_section "This should have been already pruned"
   git_object_show_roots test-measure-one
   git log refs/notes/perf-v3 --oneline
   exit 1
 fi
 
 if git_objects_contain test-measure-two; then
-  echo "Unexpectedly still found test-measure-two in the git objects"
-  echo "This should have been already pruned"
+  test_section "Unexpectedly still found test-measure-two in the git objects"
+  test_section "This should have been already pruned"
   git_object_show_roots test-measure-two
   exit 1
 fi
@@ -162,11 +162,11 @@ fi
 if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; then
   echo "The number of objects now ($cur_objects + $cur_in_pack)
   is not less than previously ($prev_objects + $prev_in_pack)"
-  echo "Drop compaction has not worked"
+  test_section "Drop compaction has not worked"
   exit 1
 fi
 
-echo "Add a commit with a newer measurement"
+test_section "Add a commit with a newer measurement"
 create_commit
 git perf add -m test-measure-three 30.0
 
@@ -180,12 +180,13 @@ num_measurements=$(git perf report -o - | wc -l)
 # Verify that temporary write branches are cleaned up after push
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
 if [[ 1 -ne $ref_count ]]; then
-  echo "Expected only the permanent git perf ref after push, but found ${ref_count} refs"
-  echo "Current refs:"
+  test_section "Expected only the permanent git perf ref after push, but found ${ref_count} refs"
+  test_section "Current refs:"
   git for-each-ref '**/notes/perf-*'
   exit 1
 fi
 
 popd
 
+test_stats
 exit 0

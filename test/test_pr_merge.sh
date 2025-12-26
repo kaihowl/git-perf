@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -18,7 +18,7 @@ git perf add -m timer 1
 create_commit
 git perf add -m timer 5
 # Base test: Expect this to fail
-git perf audit -m timer && exit 1
+assert_failure git perf audit -m timer
 # Reset main branch
 git reset --hard HEAD~1
 # branch off steady master branch
@@ -37,6 +37,7 @@ git perf add -m timer 1
 # This would not fail if the flaky measurement from the feature branch is considered.
 create_commit
 git perf add -m timer 2
-git perf audit -m timer && exit 1
+assert_failure git perf audit -m timer
 
+test_stats
 exit 0

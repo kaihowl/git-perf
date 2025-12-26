@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -20,8 +20,8 @@ min_relative_deviation = 10.0
 EOF
 
 # Debug: Check if config file exists and has correct content
-echo "Current directory: $(pwd)"
-echo "Config file content:"
+test_section "Current directory: $(pwd)"
+test_section "Config file content:"
 cat .gitperfconfig
 
 # Create some commits with measurements that have very low variance
@@ -38,7 +38,7 @@ create_commit
 git perf add -m build_time 1050
 
 # This should show the threshold note if the relative deviation is below 10%
-echo "Testing audit with high z-score but low relative deviation:"
+test_section "Testing audit with high z-score but low relative deviation:"
 git perf audit -m build_time
 
-echo "All detailed threshold tests completed!"
+test_section "All detailed threshold tests completed!"

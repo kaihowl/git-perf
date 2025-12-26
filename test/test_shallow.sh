@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -38,10 +38,10 @@ pushd shallow_clone
 git perf pull
 git perf report -n 2
 git perf audit -n 2 -m test-measure
-output=$(git perf report -n 3 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
-output=$(git perf audit -n 3 -m test-measure 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
+assert_failure_with_output output git perf report -n 3
+assert_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
+assert_failure_with_output output git perf audit -n 3 -m test-measure
+assert_contains "$output" "shallow clone" "Missing warning for 'shallow clone'"
 
 popd
 
@@ -91,7 +91,7 @@ git checkout local-ref
 git perf pull
 
 # Must fail as this expects more history
-output=$(git perf report -n 11 2>&1 1>/dev/null) && exit 1
+assert_failure_with_output output git perf report -n 11
 if [[ ${output} != *'shallow clone'* ]]; then
   echo "Missing warning for 'shallow clone'"
   echo "$output"
@@ -103,4 +103,5 @@ fi
 # out and we end up with fewer than 10 commits when following the first parent.
 git perf report -n 10
 
+test_stats
 exit 0

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -9,17 +9,13 @@ source "$script_dir/common.sh"
 
 echo Missing arguments
 cd_temp_repo
-output=$(git perf measure -m test-measure 2>&1 1>/dev/null) && exit 1
+assert_failure_with_output output git perf measure -m test-measure
 re=".*following (required )?arguments.*"
-if [[ ! ${output} =~ $re ]]; then
-  echo "Missing 'following arguments' in output:"
-  echo "Output: '$output'"
-  exit 1
-fi
+assert_matches "$output" "$re"
 
 echo Non-existing command
 cd_temp_repo
-git perf measure -m test-measure -- does-not-exist && exit 1
+assert_failure git perf measure -m test-measure -- does-not-exist
 
 echo Valid command, repeated measurements
 cd_temp_repo
@@ -34,12 +30,12 @@ git perf measure -m test-measure -- bash -c 'sleep 0.1'
 # Skip header row (first line) and get the timestamp from first data row
 val=$(git perf report -o - | tail -n +2 | cut -f4 | head -n 1)
 if [[ 1 -eq "$(echo "${val} < 10^(9-1)" | bc)" ]]; then
-    echo "Measure is not in nanosecond precision"
-    echo "0.1 seconds of sleep + fork + etc. overhead is currently $val"
+    test_section "Measure is not in nanosecond precision"
+    test_section "0.1 seconds of sleep + fork + etc. overhead is currently $val"
     exit 1
 fi
 
-echo "Measurement with padding spaces (argparse)"
+test_section "Measurement with padding spaces (argparse)"
 cd_temp_repo
 git perf add -m test-measure  0.5
 # Skip header row and get value (field 5) from first data row
@@ -49,14 +45,11 @@ if [[ $val != 0.5 ]]; then
   exit 1
 fi
 
-echo "Measurement with padding spaces (quoted)"
+test_section "Measurement with padding spaces (quoted)"
 cd_temp_repo
-output=$(git perf add -m test-measure " 0.5 " 2>&1 1>/dev/null) && exit 1
+assert_failure_with_output output git perf add -m test-measure " 0.5 "
 re=".*invalid float.*"
-if [[ ! ${output} =~ re ]]; then
-  echo "Error message does not mention problem with float literal value"
-  echo "Output: '$output'"
-  exit 1
-fi
+assert_matches "$output" "re"
 
+test_stats
 exit 0

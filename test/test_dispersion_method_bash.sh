@@ -1,20 +1,19 @@
 #!/bin/bash
 
-set -e
 
 # Integration test for dispersion method functionality
 # This test verifies that the CLI options work correctly and help text is displayed
 
-echo "Testing dispersion method CLI integration..."
+test_section "Testing dispersion method CLI integration..."
 
 # Use the full path to the built git-perf binary to avoid PATH issues
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 GIT_PERF_BINARY="$(cd "$script_dir/.." && pwd)/target/debug/git-perf"
 
-echo "Using git-perf from: $GIT_PERF_BINARY"
+test_section "Using git-perf from: $GIT_PERF_BINARY"
 
 # Test 1: Verify CLI help shows the new option
-echo "Test 1: CLI help shows dispersion method option"
+test_section "Test 1: CLI help shows dispersion method option"
 if ! "$GIT_PERF_BINARY" audit --help | grep -q "dispersion-method"; then
     echo "❌ --dispersion-method option not found in help"
     exit 1
@@ -22,7 +21,7 @@ fi
 echo "✅ --dispersion-method option found in help"
 
 # Test 2: Verify help text explains the default behavior
-echo "Test 2: Help text explains default behavior"
+test_section "Test 2: Help text explains default behavior"
 HELP_OUTPUT=$("$GIT_PERF_BINARY" audit --help)
 
 # Normalize the text by removing extra whitespace and line breaks
@@ -37,7 +36,7 @@ else
 fi
 
 # Test 3: Verify both values are accepted
-echo "Test 3: Both dispersion method values are accepted"
+test_section "Test 3: Both dispersion method values are accepted"
 if ! "$GIT_PERF_BINARY" audit --help | grep -q "possible values: stddev, mad"; then
     echo "❌ mad not shown as possible value in help"
     exit 1
@@ -45,18 +44,18 @@ fi
 echo "✅ mad shown as possible value in help"
 
 # Test 4: Test short option -D works
-echo "Short option -D works"
+test_section "Short option -D works"
 if ! "$GIT_PERF_BINARY" audit --help | grep -q "D, --dispersion-method"; then
-    echo "Short option -D not found in help"
+    test_section "Short option -D not found in help"
     exit 1
 fi
 
 # Test 5: Verify invalid values are rejected
-echo "Invalid values are rejected"
+test_section "Invalid values are rejected"
 if "$GIT_PERF_BINARY" audit --measurement test --dispersion-method invalid 2>&1 | grep -q "invalid value"; then
-    echo "Invalid dispersion method correctly rejected"
+    test_section "Invalid dispersion method correctly rejected"
 else
-    echo "Invalid dispersion method not rejected"
+    test_section "Invalid dispersion method not rejected"
     exit 1
 fi
 
@@ -79,20 +78,20 @@ else
 fi
 
 # Test 8: Verify default behavior (no option specified)
-echo "Default behavior works"
+test_section "Default behavior works"
 if "$GIT_PERF_BINARY" audit --measurement test --help > /dev/null 2>&1; then
-    echo "Default behavior works"
+    test_section "Default behavior works"
 else
     echo "Default behavior doesn't work"
     exit 1
 fi
 
 # Test 9: Verify that both options produce different help output (indicating they're parsed correctly)
-echo "Different dispersion methods produce different help output"
+test_section "Different dispersion methods produce different help output"
 HELP_STDDEV=$("$GIT_PERF_BINARY" audit --measurement test --dispersion-method stddev --help 2>&1)
 HELP_MAD=$("$GIT_PERF_BINARY" audit --measurement test --dispersion-method mad --help 2>&1)
 
 # The help should be the same since it's just the help text, but the option should be parsed
-echo "Both dispersion method options parsed successfully"
+test_section "Both dispersion method options parsed successfully"
 
 echo "All dispersion method CLI integration tests passed!" 

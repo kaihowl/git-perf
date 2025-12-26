@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -29,12 +29,13 @@ git checkout HEAD~1
 git perf add -m timer 4 -k myselector=test
 git checkout master
 git perf add -m timer 4
-git perf audit -m timer -s myselector=test && exit 1
+assert_failure git perf audit -m timer -s myselector=test
 git perf add -m timer 4 -k otherselector=test
-git perf audit -m timer -s myselector=test && exit 1
+assert_failure git perf audit -m timer -s myselector=test
 git perf add -m timer 4 -k myselector=other
-git perf audit -m timer -s myselector=test && exit 1
+assert_failure git perf audit -m timer -s myselector=test
 git perf add -m timer 4 -k myselector=test
 git perf audit -m timer -s myselector=test
 
+test_stats
 exit 0

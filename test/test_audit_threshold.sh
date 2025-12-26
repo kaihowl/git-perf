@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -67,4 +67,4 @@ git perf add -m memory_usage 107
 # (107/105 - 1) * 100% = 1.9% < 5%, so it should pass
 git perf audit -m memory_usage
 
-echo "All threshold tests completed successfully!"
+test_section "All threshold tests completed successfully!"

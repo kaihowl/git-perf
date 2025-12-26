@@ -1,13 +1,13 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-echo "Test audit with --filter argument"
+test_section "Test audit with --filter argument"
 
 # Setup: Create a repo with multiple measurement types
 cd_empty_repo
@@ -41,54 +41,54 @@ git perf add -m bench_memory 230
 git perf add -m test_unit 56
 git perf add -m timer 13
 
-echo "Test 1: Filter with regex pattern matching bench_* measurements"
+test_section "Test 1: Filter with regex pattern matching bench_* measurements"
 # Test pure filter behavior without requiring -m
 output=$(git perf audit --filter "bench_.*" -d 10 2>&1)
-assert_output_contains "$output" "bench_cpu" "Should audit bench_cpu"
-assert_output_contains "$output" "bench_memory" "Should audit bench_memory"
+assert_contains "$output" "bench_cpu" "Should audit bench_cpu"
+assert_contains "$output" "bench_memory" "Should audit bench_memory"
 if echo "$output" | grep -q "test_unit"; then
-  echo "FAIL: test_unit should not be audited with bench_.* filter"
+  test_section "FAIL: test_unit should not be audited with bench_.* filter"
   exit 1
 fi
 if echo "$output" | grep -q "'timer'"; then
-  echo "FAIL: timer should not be audited with bench_.* filter"
+  test_section "FAIL: timer should not be audited with bench_.* filter"
   exit 1
 fi
-echo "PASS: Filter correctly matched bench_* measurements"
+test_section "PASS: Filter correctly matched bench_* measurements"
 
-echo "Test 2: Combine -m and --filter (OR behavior)"
+test_section "Test 2: Combine -m and --filter (OR behavior)"
 output=$(git perf audit -m timer --filter "bench_cpu" -d 10 2>&1)
-assert_output_contains "$output" "timer" "Should audit explicit measurement 'timer'"
-assert_output_contains "$output" "bench_cpu" "Should audit filtered measurement 'bench_cpu'"
+assert_contains "$output" "timer" "Should audit explicit measurement 'timer'"
+assert_contains "$output" "bench_cpu" "Should audit filtered measurement 'bench_cpu'"
 if echo "$output" | grep -q "bench_memory"; then
-  echo "FAIL: bench_memory should not be audited (not in -m or filter)"
+  test_section "FAIL: bench_memory should not be audited (not in -m or filter)"
   exit 1
 fi
 if echo "$output" | grep -q "test_unit"; then
-  echo "FAIL: test_unit should not be audited (not in -m or filter)"
+  test_section "FAIL: test_unit should not be audited (not in -m or filter)"
   exit 1
 fi
-echo "PASS: Combined -m and --filter work with OR behavior"
+test_section "PASS: Combined -m and --filter work with OR behavior"
 
-echo "Test 3: Filter matches no measurements (should error)"
+test_section "Test 3: Filter matches no measurements (should error)"
 if output=$(git perf audit --filter "nonexistent.*" -d 10 2>&1); then
-  echo "FAIL: Should fail when filter matches no measurements"
-  echo "Output: $output"
+  test_section "FAIL: Should fail when filter matches no measurements"
+  test_section "Output: $output"
   exit 1
 fi
-assert_output_contains "$output" "No measurements found matching the provided patterns" "Should error with appropriate message"
-echo "PASS: Correctly errors when filter matches nothing"
+assert_contains "$output" "No measurements found matching the provided patterns" "Should error with appropriate message"
+test_section "PASS: Correctly errors when filter matches nothing"
 
-echo "Test 4: Invalid regex pattern (should error)"
+test_section "Test 4: Invalid regex pattern (should error)"
 if output=$(git perf audit --filter "[invalid" -d 10 2>&1); then
-  echo "FAIL: Should fail with invalid regex pattern"
-  echo "Output: $output"
+  test_section "FAIL: Should fail with invalid regex pattern"
+  test_section "Output: $output"
   exit 1
 fi
-assert_output_contains "$output" "Invalid regex pattern" "Should error about invalid regex"
-echo "PASS: Correctly errors on invalid regex"
+assert_contains "$output" "Invalid regex pattern" "Should error about invalid regex"
+test_section "PASS: Correctly errors on invalid regex"
 
-echo "Test 5: Filter with selectors"
+test_section "Test 5: Filter with selectors"
 # Add measurements with selectors
 cd_empty_repo
 create_commit
@@ -112,14 +112,14 @@ git perf add -m bench_cpu 165 -k os=mac
 git perf add -m test_unit 56 -k os=linux
 
 output=$(git perf audit --filter "bench_.*" -s os=linux -d 10 2>&1)
-assert_output_contains "$output" "bench_cpu" "Should audit bench_cpu with os=linux"
+assert_contains "$output" "bench_cpu" "Should audit bench_cpu with os=linux"
 if echo "$output" | grep -q "test_unit"; then
-  echo "FAIL: test_unit should not match bench_.* filter"
+  test_section "FAIL: test_unit should not match bench_.* filter"
   exit 1
 fi
-echo "PASS: Filter works correctly with selectors"
+test_section "PASS: Filter works correctly with selectors"
 
-echo "Test 6: Multiple filter patterns (OR behavior)"
+test_section "Test 6: Multiple filter patterns (OR behavior)"
 cd_empty_repo
 create_commit
 git perf add -m bench_cpu 100
@@ -142,15 +142,15 @@ git perf add -m test_unit 56
 git perf add -m other_metric 28
 
 output=$(git perf audit --filter "bench_.*" --filter "test_.*" -d 10 2>&1)
-assert_output_contains "$output" "bench_cpu" "Should audit bench_cpu"
-assert_output_contains "$output" "test_unit" "Should audit test_unit"
+assert_contains "$output" "bench_cpu" "Should audit bench_cpu"
+assert_contains "$output" "test_unit" "Should audit test_unit"
 if echo "$output" | grep -q "other_metric"; then
-  echo "FAIL: other_metric should not match filters"
+  test_section "FAIL: other_metric should not match filters"
   exit 1
 fi
-echo "PASS: Multiple filter patterns work with OR behavior"
+test_section "PASS: Multiple filter patterns work with OR behavior"
 
-echo "Test 7: Filter with strict sigma to verify actual audit logic runs"
+test_section "Test 7: Filter with strict sigma to verify actual audit logic runs"
 cd_empty_repo
 create_commit
 git perf add -m bench_fast 10
@@ -167,15 +167,15 @@ git perf add -m bench_fast 100
 
 # Should fail with low sigma
 if output=$(git perf audit --filter "bench_.*" -d 0.5 2>&1); then
-  echo "FAIL: Audit should fail with outlier value and strict sigma"
-  echo "Output: $output"
+  test_section "FAIL: Audit should fail with outlier value and strict sigma"
+  test_section "Output: $output"
   exit 1
 fi
-assert_output_contains "$output" "❌ 'bench_fast'" "Should show failure for bench_fast"
-assert_output_contains "$output" "differs significantly" "Should indicate significant difference"
-echo "PASS: Filter + audit logic correctly detects outliers"
+assert_contains "$output" "❌ 'bench_fast'" "Should show failure for bench_fast"
+assert_contains "$output" "differs significantly" "Should indicate significant difference"
+test_section "PASS: Filter + audit logic correctly detects outliers"
 
-echo "Test 8: Filter combined with explicit measurement (overlapping)"
+test_section "Test 8: Filter combined with explicit measurement (overlapping)"
 cd_empty_repo
 create_commit
 git perf add -m my_benchmark 100
@@ -191,13 +191,14 @@ git perf add -m my_benchmark 106
 
 # Both -m and --filter specify the same measurement (dedup behavior)
 output=$(git perf audit -m my_benchmark --filter "my_.*" -d 10 2>&1)
-assert_output_contains "$output" "✅ 'my_benchmark'" "Should successfully audit measurement"
+assert_contains "$output" "✅ 'my_benchmark'" "Should successfully audit measurement"
 # Should only appear once in output (not duplicated)
 if [ "$(echo "$output" | grep -c "'my_benchmark'")" -gt 2 ]; then
-  echo "FAIL: Measurement should not be duplicated when specified in both -m and --filter"
+  test_section "FAIL: Measurement should not be duplicated when specified in both -m and --filter"
   exit 1
 fi
-echo "PASS: Overlapping -m and --filter deduplicate correctly"
+test_section "PASS: Overlapping -m and --filter deduplicate correctly"
 
-echo "All audit filter tests passed successfully"
+test_section "All audit filter tests passed successfully"
+test_stats
 exit 0

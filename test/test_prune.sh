@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -28,16 +28,16 @@ pushd "$(mktemp -d)"
 git init
 git remote add origin "${repo}"
 git fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 --update-head-ok origin master:master
-output=$(git perf prune 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "shallow" "No warning for 'shallow' clone"
+assert_failure_with_output output git perf prune
+assert_contains "$output" "shallow" "No warning for 'shallow' clone"
 popd
 
 # Test running git perf prune outside of a git repository
 pushd "$(mktemp -d)"
-output=$(git perf prune 2>&1 1>/dev/null) && exit 1
+assert_failure_with_output output git perf prune
 # Check for either expected error message
 if [[ $output != *'not a git repository'* ]]; then
-  assert_output_contains "$output" "fatal" "Expected error for running outside a git repo"
+  assert_contains "$output" "fatal" "Expected error for running outside a git repo"
 fi
 popd
 

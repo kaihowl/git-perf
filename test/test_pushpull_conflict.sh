@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -euxo pipefail
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -93,7 +94,7 @@ git push
 git perf push
 popd
 
-echo "In the second working copy, pull (without perf), add commit with perf, publish commit and perf"
+test_section "In the second working copy, pull (without perf), add commit with perf, publish commit and perf"
 pushd repo2
 git pull
 create_commit
@@ -119,4 +120,5 @@ num_measurements=$(git perf report -o - | wc -l)
 popd
 
 
+test_stats
 exit 0

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -30,4 +30,5 @@ grep -q '\[measurement.metric3\]' .gitperfconfig
 # Test that we can still use a single -m flag (backwards compatibility)
 git perf bump-epoch -m metric1
 
+test_stats
 exit 0
