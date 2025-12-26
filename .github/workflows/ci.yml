@@ -270,6 +270,7 @@ jobs:
           size-use-disk-size: 'true'
           show-epochs: 'true'
           show-changes: 'true'
+          template: '.git-perf/templates/dashboard-example.html'
 
   release-binary-size:
     name: release-binary-size

@@ -1004,19 +1004,30 @@ This index is preserved by `keep_files: true` when reports are deployed to `/per
 - [ ] Write tests for template substitution
 - [ ] Document template creation guide
 
-#### Phase 2b: Multi-Configuration Templates (Weeks 6-7)
-- [ ] Design and implement `{{SECTION[...]}}` placeholder parser
-- [ ] Create `SectionConfig` struct and parsing logic
-- [ ] Implement multi-section report generation pipeline
-- [ ] Add support for section-specific parameters (filter, aggregate-by, separate-by, depth, title)
-- [ ] Implement CLI argument override behavior (ignore CLI when sections present)
-- [ ] Add `key-value-filter` parameter parsing
-- [ ] Refactor reporting.rs to support reusable report generation for sections
-- [ ] Write unit tests for section parsing and configuration
-- [ ] Write integration tests for multi-section reports
-- [ ] Document dashboard template syntax and usage
-- [ ] Create example dashboard templates (test overview, benchmark comparison, memory analysis)
-- [ ] Add examples showing multiple dashboard templates in one repository
+#### Phase 2b: Multi-Configuration Templates ✅ **COMPLETE**
+- [x] Design and implement `{{SECTION[...]}}` placeholder parser
+- [x] Create `SectionConfig` struct and parsing logic
+- [x] Implement multi-section report generation pipeline
+- [x] Add support for section-specific parameters (filter, aggregate-by, separate-by, depth, title, show-epochs, show-changes)
+- [x] Implement CLI argument override behavior (ignore CLI when sections present)
+- [x] Add `key-value-filter` parameter parsing
+- [x] Refactor reporting.rs to support reusable report generation for sections
+- [x] Write unit tests for section parsing and configuration
+- [x] Write integration tests for multi-section reports
+- [x] Document dashboard template syntax and usage
+- [x] Create example dashboard templates (test overview, benchmark comparison, memory analysis)
+- [x] Add examples showing multiple dashboard templates in one repository
+- [x] Integrate with change point detection and epoch visualization from master
+
+**Implementation Details:**
+- Multi-section dashboard templates allow comprehensive performance reports with multiple independent sections
+- Each section supports independent filtering, aggregation, visualization, and depth control
+- Fully integrated with change point detection and epoch visualization features
+- Per-section control via `show-epochs` and `show-changes` parameters (OR'd with global CLI flags)
+- 20+ unit tests, comprehensive documentation in `docs/dashboard-templates.md`
+- Example templates: `performance-overview.html`, `simple-dashboard.html`, `dashboard-example.html`
+- Implementation in `git_perf/src/reporting.rs` (~500 lines added)
+- Backward compatible with simple templates
 
 ### Phase 3: Index Generation (Weeks 5-6)
 - [ ] Implement `generate-index` subcommand
