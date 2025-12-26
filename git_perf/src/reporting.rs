@@ -1760,10 +1760,7 @@ pub fn report(
     // For multi-section templates (>1 section), allow empty sections (just log warnings)
     // For single-section reports, bail if no measurements found
     let is_multi_section = sections.len() > 1;
-    if !is_multi_section
-        && ((output_format == OutputFormat::Html && !has_measurements)
-            || (output_format == OutputFormat::Csv && report_bytes.is_empty()))
-    {
+    if !is_multi_section && !has_measurements {
         bail!("No performance measurements found.");
     }
 
