@@ -1281,31 +1281,37 @@ fn add_trace_for_measurement_group<'a>(
     }
 }
 
-/// Add change point and epoch boundary annotations to a reporter.
+/// Prepared data for change point and epoch detection visualization
+struct PreparedDetectionData {
+    /// Reversed commit indices (newest on right)
+    indices: Vec<usize>,
+    /// Reversed measurement values
+    values: Vec<f64>,
+    /// Reversed epoch numbers
+    epochs: Vec<u32>,
+    /// Reversed commit SHAs
+    commit_shas: Vec<String>,
+    /// Y-axis minimum with padding
+    y_min: f64,
+    /// Y-axis maximum with padding
+    y_max: f64,
+}
+
+/// Prepares common data needed for both epoch and change point detection
 ///
-/// This function handles:
-/// - Data reversal for plotly's reversed axis display
-/// - Epoch transition detection and visualization
-/// - Change point detection with configurable config
-/// - Adding visualization traces via the Reporter trait
+/// This helper extracts the shared data preparation logic:
+/// - Validates that values are not empty
+/// - Calculates y-axis bounds with 10% padding
+/// - Reverses all data for display (newest commits on right)
 ///
-/// Data is always reversed because plotly doesn't support reversed axes natively,
-/// so we manually reverse the data to display newest commits on the right.
-/// This ensures change point direction matches visual interpretation.
-///
-/// # Arguments
-/// * `reporter` - Mutable reference to any Reporter implementation
-/// * `params` - Detection parameters (indices, values, epochs, etc.)
-fn add_change_point_and_epoch_traces(
-    reporter: &mut dyn Reporter,
-    params: ChangePointDetectionParams,
-) {
+/// Returns None if values are empty, otherwise Some(PreparedDetectionData)
+fn prepare_detection_data(params: &ChangePointDetectionParams) -> Option<PreparedDetectionData> {
     if params.values.is_empty() {
-        return;
+        return None;
     }
 
     log::debug!(
-        "Change point detection for {}: {} measurements, indices {:?}, epochs {:?}",
+        "Preparing detection data for {}: {} measurements, indices {:?}, epochs {:?}",
         params.measurement_name,
         params.values.len(),
         params.commit_indices,
@@ -1325,54 +1331,101 @@ fn add_change_point_and_epoch_traces(
     // Reversal is needed because plotly doesn't support reversed axes natively,
     // so we manually reverse the data to display newest commits on the right.
     // This ensures change point direction matches visual interpretation.
-    let indices: Vec<usize> = params.commit_indices.iter().rev().copied().collect();
-    let vals: Vec<f64> = params.values.iter().rev().copied().collect();
-    let eps: Vec<u32> = params.epochs.iter().rev().copied().collect();
-    let shas: Vec<String> = params.commit_shas.iter().rev().cloned().collect();
+    Some(PreparedDetectionData {
+        indices: params.commit_indices.iter().rev().copied().collect(),
+        values: params.values.iter().rev().copied().collect(),
+        epochs: params.epochs.iter().rev().copied().collect(),
+        commit_shas: params.commit_shas.iter().rev().cloned().collect(),
+        y_min,
+        y_max,
+    })
+}
 
-    // Add epoch boundary traces if requested
+/// Adds epoch boundary traces to the report
+///
+/// Detects transitions between epochs and adds vertical lines to mark boundaries.
+fn add_epoch_traces(
+    reporter: &mut dyn Reporter,
+    params: &ChangePointDetectionParams,
+    prepared: &PreparedDetectionData,
+) {
+    let transitions = crate::change_point::detect_epoch_transitions(&prepared.epochs);
+    log::debug!(
+        "Epoch transitions for {}: {:?}",
+        params.measurement_name,
+        transitions
+    );
+    reporter.add_epoch_boundaries(
+        &transitions,
+        &prepared.indices,
+        params.measurement_name,
+        params.group_values,
+        prepared.y_min,
+        prepared.y_max,
+    );
+}
+
+/// Adds change point detection traces to the report
+///
+/// Runs PELT algorithm to detect performance regime changes and adds
+/// annotations to the report.
+fn add_change_point_traces(
+    reporter: &mut dyn Reporter,
+    params: &ChangePointDetectionParams,
+    prepared: &PreparedDetectionData,
+) {
+    let config = crate::config::change_point_config(params.measurement_name);
+    let raw_cps = crate::change_point::detect_change_points(&prepared.values, &config);
+    log::debug!(
+        "Raw change points for {}: {:?}",
+        params.measurement_name,
+        raw_cps
+    );
+
+    let enriched_cps = crate::change_point::enrich_change_points(
+        &raw_cps,
+        &prepared.values,
+        &prepared.commit_shas,
+        &config,
+    );
+    log::debug!(
+        "Enriched change points for {}: {:?}",
+        params.measurement_name,
+        enriched_cps
+    );
+
+    reporter.add_change_points(
+        &enriched_cps,
+        &prepared.values,
+        &prepared.indices,
+        params.measurement_name,
+        params.group_values,
+    );
+}
+
+/// Orchestrates epoch and change point trace addition based on configuration
+///
+/// This is the main entry point that:
+/// 1. Prepares common data once
+/// 2. Delegates to specialized functions based on show_epochs and show_changes flags
+///
+/// # Arguments
+/// * `reporter` - Mutable reference to any Reporter implementation
+/// * `params` - Detection parameters (indices, values, epochs, etc.)
+fn add_change_point_and_epoch_traces(
+    reporter: &mut dyn Reporter,
+    params: ChangePointDetectionParams,
+) {
+    let Some(prepared) = prepare_detection_data(&params) else {
+        return;
+    };
+
     if params.show_epochs {
-        let transitions = crate::change_point::detect_epoch_transitions(&eps);
-        log::debug!(
-            "Epoch transitions for {}: {:?}",
-            params.measurement_name,
-            transitions
-        );
-        reporter.add_epoch_boundaries(
-            &transitions,
-            &indices,
-            params.measurement_name,
-            params.group_values,
-            y_min,
-            y_max,
-        );
+        add_epoch_traces(reporter, &params, &prepared);
     }
 
-    // Add change point traces if requested
     if params.show_changes {
-        let config = crate::config::change_point_config(params.measurement_name);
-        let raw_cps = crate::change_point::detect_change_points(&vals, &config);
-        log::debug!(
-            "Raw change points for {}: {:?}",
-            params.measurement_name,
-            raw_cps
-        );
-
-        let enriched_cps =
-            crate::change_point::enrich_change_points(&raw_cps, &vals, &shas, &config);
-        log::debug!(
-            "Enriched change points for {}: {:?}",
-            params.measurement_name,
-            enriched_cps
-        );
-
-        reporter.add_change_points(
-            &enriched_cps,
-            &vals,
-            &indices,
-            params.measurement_name,
-            params.group_values,
-        );
+        add_change_point_traces(reporter, &params, &prepared);
     }
 }
 
