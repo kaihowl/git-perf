@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -46,18 +46,18 @@ pushd "$repo2"
 git perf add -m echo 0.5
 
 output=$(git perf push 2>&1 1>/dev/null)
-assert_output_contains "$output" "retrying" "Output is missing 'retrying'"
+assert_contains "$output" "retrying" "Output is missing 'retrying'"
 
 popd
 
-echo "Check number of measurements from myworkrepo"
+test_section "Check number of measurements from myworkrepo"
 pushd "$myworkrepo"
 
 git perf pull
 num_measurements=$(git perf report -o -  | wc -l)
 # CSV now includes header row, so 2 measurements + 1 header = 3 lines
 if [[ $num_measurements -ne 3 ]]; then
-  echo "Expected two measurements (3 lines with header), but have $num_measurements lines:"
+  test_section "Expected two measurements (3 lines with header), but have $num_measurements lines:"
   git perf report -o -
   exit 1
 fi
@@ -65,4 +65,5 @@ fi
 popd
 
 
+test_stats
 exit 0

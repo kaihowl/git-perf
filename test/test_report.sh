@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -43,17 +43,17 @@ for html_file in all_result.html separated_result.html single_result.html separa
   fi
 
   html_content=$(cat "$html_file")
-  assert_output_contains "$html_content" "timer" "HTML file '$html_file' missing measurement name 'timer'"
+  assert_contains "$html_content" "timer" "HTML file '$html_file' missing measurement name 'timer'"
 done
 
 # Verify separated output contains OS labels
 separated_content=$(cat separated_result.html)
-assert_output_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
-assert_output_contains "$separated_content" "mac" "Separated HTML missing 'mac' group label"
+assert_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
+assert_contains "$separated_content" "mac" "Separated HTML missing 'mac' group label"
 
 # Verify timer2 only appears in all_result (not filtered out)
 all_content=$(cat all_result.html)
-assert_output_contains "$all_content" "timer2" "All results HTML missing 'timer2' measurement"
+assert_contains "$all_content" "timer2" "All results HTML missing 'timer2' measurement"
 
 # Verify timer2 is absent from filtered reports
 single_content=$(cat single_result.html)
@@ -67,9 +67,9 @@ if grep -q "timer2" <<< "$separated_single_content"; then
   exit 1
 fi
 
-output=$(git perf report -m timer-does-not-exist 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "no performance measurements" "No warning for missing measurements"
+assert_failure_with_output output git perf report -m timer-does-not-exist
+assert_contains "$output" "no performance measurements" "No warning for missing measurements"
 
-output=$(git perf report -s does-not-exist 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "invalid separator" "No warning for invalid separator 'does-not-exist'"
+assert_failure_with_output output git perf report -s does-not-exist
+assert_contains "$output" "invalid separator" "No warning for invalid separator 'does-not-exist'"
 

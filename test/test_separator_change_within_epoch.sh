@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -51,8 +51,8 @@ fi
 
 # Check that separated report contains measurements with the separator
 separated_content=$(cat separated_result.html)
-assert_output_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
-assert_output_contains "$separated_content" "timer" "Separated HTML missing 'timer' measurement name"
+assert_contains "$separated_content" "ubuntu" "Separated HTML missing 'ubuntu' group label"
+assert_contains "$separated_content" "timer" "Separated HTML missing 'timer' measurement name"
 
 # Verify that we can generate a report without the separator (should include all measurements)
 git perf report -o all_result.html
@@ -63,12 +63,12 @@ fi
 
 # Verify the unseparated report contains all measurements
 html_content=$(cat all_result.html)
-assert_output_contains "$html_content" "timer" "HTML file missing measurement name 'timer'"
+assert_contains "$html_content" "timer" "HTML file missing measurement name 'timer'"
 
 # Test the opposite scenario: separator key that doesn't exist in any measurements
-output=$(git perf report -s does-not-exist 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "invalid separator" "No error for separator key that doesn't exist in any measurements"
+assert_failure_with_output output git perf report -s does-not-exist
+assert_contains "$output" "invalid separator" "No error for separator key that doesn't exist in any measurements"
 
-echo "Test passed: Separator change within epoch behaves as documented"
-echo "Note: Measurements without the separator key are silently excluded from separated reports"
-echo "This is the behavior questioned in issue #100"
+test_section "Test passed: Separator change within epoch behaves as documented"
+test_section "Note: Measurements without the separator key are silently excluded from separated reports"
+test_section "This is the behavior questioned in issue #100"

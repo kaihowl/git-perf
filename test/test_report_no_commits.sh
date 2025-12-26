@@ -1,13 +1,13 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-echo "Test error message when no commits exist in cloned repository"
+test_section "Test error message when no commits exist in cloned repository"
 
 cd "$(mktemp -d)"
 
@@ -23,10 +23,11 @@ git clone "file://$orig" test_repo
 cd test_repo
 
 # Try to run report on empty repository - should fail with helpful message
-output=$(git perf report 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "No commits found in repository" "Missing 'No commits found in repository' in output"
-assert_output_contains "$output" "Ensure commits exist and were pushed to the remote" "Missing guidance about pushing to remote in output"
+assert_failure_with_output output git perf report
+assert_contains "$output" "No commits found in repository" "Missing 'No commits found in repository' in output"
+assert_contains "$output" "Ensure commits exist and were pushed to the remote" "Missing guidance about pushing to remote in output"
 
-echo "Test passed: Correct error message shown for repository with no commits"
+test_section "Test passed: Correct error message shown for repository with no commits"
 
+test_stats
 exit 0

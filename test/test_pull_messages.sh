@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -10,8 +10,8 @@ source "$script_dir/common.sh"
 echo Pull in repo without a remote
 cd_empty_repo
 
-output="$(git perf pull 2>&1 1>/dev/null)" && exit 1
-assert_output_contains "$output" "No upstream found" "Missing 'No upstream found' from output"
+assert_failure output="$(git perf pull 2>&1 1>/dev/null)"
+assert_contains "$output" "No upstream found" "Missing 'No upstream found' from output"
 
 echo Pull from remote without measurements
 
@@ -35,8 +35,8 @@ git commit -m 'first commit'
 
 git push
 
-output="$(git perf pull 2>&1 1>/dev/null)" && exit 1
-assert_output_contains "$output" "Remote repository is empty or has never been pushed to" "Missing 'Remote repository is empty or has never been pushed to' in output"
+assert_failure output="$(git perf pull 2>&1 1>/dev/null)"
+assert_contains "$output" "Remote repository is empty or has never been pushed to" "Missing 'Remote repository is empty or has never been pushed to' in output"
 
 cd "$root"
 git clone "$orig" repo1
@@ -48,4 +48,4 @@ git perf add -m test-measure 12
 git perf push
 
 output=$(git perf pull 2>/dev/null) || exit 1
-assert_output_contains "$output" "Already up to date" "Missing 'Already up to date' in output"
+assert_contains "$output" "Already up to date" "Missing 'Already up to date' in output"

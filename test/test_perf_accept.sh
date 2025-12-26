@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -15,7 +15,7 @@ create_commit
 git perf add -m test 4 -k os=ubuntu
 create_commit
 git perf add -m test 5000 -k os=ubuntu
-git perf audit -m test -s os=ubuntu && exit 1
+assert_failure git perf audit -m test -s os=ubuntu
 # Accept regression on this platform
 git perf bump-epoch -m test
 git add .gitperfconfig
@@ -35,7 +35,7 @@ create_commit
 git perf add -m test 3 -k os=ubuntu
 create_commit
 git perf add -m test 10 -k os=ubuntu
-git perf audit -m test -s os=ubuntu && exit 1
+assert_failure git perf audit -m test -s os=ubuntu
 git perf bump-epoch -m someother
 git add .gitperfconfig
 git commit --amend --no-edit
@@ -56,7 +56,7 @@ create_commit
 git checkout master
 git merge --no-ff -
 git perf add -m test 10000
-git perf audit -m test && exit 1
+assert_failure git perf audit -m test
 # Undo merge, back to feature branch, bump epoch
 git reset --hard HEAD~1
 git checkout feature
@@ -88,12 +88,12 @@ git checkout master
 create_commit
 git rev-parse HEAD
 git perf add -m test 10000
-git perf audit -m test && exit 1
+assert_failure git perf audit -m test
 # Go to feature branch
 git checkout feature
 git merge --no-ff -
 git perf add -m test 10000
-git perf audit -m test && exit 1
+assert_failure git perf audit -m test
 # Undo merge
 git reset --hard HEAD~1
 # Back to master branch and bump epoch
@@ -120,7 +120,7 @@ git checkout -b feature
 create_commit
 create_commit
 git perf add -m test 10000
-git perf audit -m test && exit 1
+assert_failure git perf audit -m test
 git perf bump-epoch -m test
 git add .gitperfconfig
 git commit --amend --no-edit
@@ -132,6 +132,7 @@ git perf add -m test 10000
 git commit --amend --no-edit
 # On main branch
 # This has to result in a conflict
-git merge --no-ff - && exit 1
+assert_failure git merge --no-ff -
 
+test_stats
 exit 0

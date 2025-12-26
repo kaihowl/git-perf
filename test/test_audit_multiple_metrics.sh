@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -e
-set -x
+# Disable verbose tracing for cleaner output
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -10,9 +10,9 @@ source "$script_dir/common.sh"
 echo Test that audit fails with no -m
 cd_temp_repo
 if git perf audit 2>&1 | grep -q 'required'; then
-  echo 'PASS: audit fails with no -m as required.'
+  test_section "PASS: audit fails with no -m as required."
 else
-  echo 'FAIL: audit did not fail as required when no -m is given.'
+  test_section "FAIL: audit did not fail as required when no -m is given."
   exit 1
 fi
 
@@ -48,13 +48,13 @@ create_commit
 git perf add -m timer 10
 git perf add -m memory 130
 if output=$(git perf audit -m timer -m memory -d 2 2>&1); then
-  echo "FAIL: audit did not fail when one metric is outside the acceptable range"
+  test_section "FAIL: audit did not fail when one metric is outside the acceptable range"
   echo "$output"
   exit 1
 fi
 echo "$output" | grep -q "❌ 'timer'" || exit 1
 echo "$output" | grep -q "One or more measurements failed audit" || exit 1
-echo "PASS: audit failed when one metric is outside the acceptable range"
+test_section "PASS: audit failed when one metric is outside the acceptable range"
 
 # Test that multiple failing metrics are all reported
 git reset --hard HEAD~1
@@ -62,14 +62,14 @@ create_commit
 git perf add -m timer 15  # This will also be outside the acceptable range
 git perf add -m memory 200  # This will also be outside the acceptable range
 if output=$(git perf audit -m timer -m memory -d 2 2>&1); then
-  echo "FAIL: audit did not fail when multiple metrics are outside the acceptable range"
+  test_section "FAIL: audit did not fail when multiple metrics are outside the acceptable range"
   echo "$output"
   exit 1
 fi
 echo "$output" | grep -q "❌ 'timer'" || exit 1
 echo "$output" | grep -q "❌ 'memory'" || exit 1
 echo "$output" | grep -q "One or more measurements failed audit" || exit 1
-echo "PASS: audit failed when multiple metrics are outside the acceptable range"
+test_section "PASS: audit failed when multiple metrics are outside the acceptable range"
 
 # Test with only one metric (backward compatibility)
 cd_temp_repo
@@ -91,4 +91,5 @@ git checkout master
 git perf audit -m timer -m memory -m cpu -d 4
 
 echo Multiple metrics audit tests completed successfully
+test_stats
 exit 0 
