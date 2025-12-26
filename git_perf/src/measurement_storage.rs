@@ -11,7 +11,7 @@ use crate::{
     config,
     data::MeasurementData,
     defaults,
-    git::git_interop::add_note_line,
+    git::git_interop::{add_note_line, resolve_committish},
     serialization::{serialize_multiple, serialize_single, DELIMITER},
 };
 
@@ -21,6 +21,10 @@ pub fn add_multiple_to_commit(
     values: &[f64],
     key_values: &[(String, String)],
 ) -> Result<()> {
+    // Validate commit exists
+    let resolved_commit =
+        resolve_committish(commit).context(format!("Failed to resolve commit '{}'", commit))?;
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("Failed to get system time")?;
@@ -43,7 +47,7 @@ pub fn add_multiple_to_commit(
 
     let serialized = serialize_multiple(&mds);
 
-    add_note_line(commit, &serialized)?;
+    add_note_line(&resolved_commit, &serialized)?;
 
     Ok(())
 }
@@ -64,6 +68,10 @@ pub fn add_to_commit(
     value: f64,
     key_values: &[(String, String)],
 ) -> Result<()> {
+    // Validate commit exists
+    let resolved_commit =
+        resolve_committish(commit).context(format!("Failed to resolve commit '{}'", commit))?;
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("Failed to get system time")?;
@@ -81,7 +89,7 @@ pub fn add_to_commit(
 
     let serialized = serialize_single(&md, DELIMITER);
 
-    add_note_line(commit, &serialized)?;
+    add_note_line(&resolved_commit, &serialized)?;
 
     Ok(())
 }

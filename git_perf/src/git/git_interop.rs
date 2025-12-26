@@ -832,9 +832,9 @@ pub fn walk_commits_from(
     // update local read branch
     let temp_ref = update_read_branch()?;
 
-    // Resolve the starting commit to ensure it exists
-    let resolved_commit = git_rev_parse(start_commit)
-        .map_err(|e| anyhow!(e).context(format!("Failed to resolve commit '{}'", start_commit)))?;
+    // Resolve and validate the starting commit to ensure it exists
+    let resolved_commit = resolve_committish(start_commit)
+        .context(format!("Failed to resolve commit '{}'", start_commit))?;
 
     let output = capture_git_output(
         &[

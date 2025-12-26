@@ -176,8 +176,12 @@ fn read_input(file: Option<&str>) -> Result<String> {
 /// This is similar to `measurement_storage::add_multiple` but handles
 /// measurements with different names and metadata.
 fn store_measurements(commit: &str, measurements: &[MeasurementData]) -> Result<()> {
+    // Validate commit exists
+    let resolved_commit = crate::git::git_interop::resolve_committish(commit)
+        .context(format!("Failed to resolve commit '{}'", commit))?;
+
     let serialized = serialize_multiple(measurements);
-    crate::git::git_interop::add_note_line(commit, &serialized)?;
+    crate::git::git_interop::add_note_line(&resolved_commit, &serialized)?;
     Ok(())
 }
 
