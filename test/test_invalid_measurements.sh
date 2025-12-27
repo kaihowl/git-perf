@@ -52,8 +52,8 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOMkey=value"
 assert_success_with_output output git perf report
-# Expect a warning about too few items due to empty separators creating invalid structure
-assert_contains "$output" "skipping" "Expected warning about invalid measurement structure"
+# Valid measurement with extra empty separator fields - these are ignored
+assert_equals "$output" "" "There should be no output in stderr"
 
 test_section "Duplicate kvs"
 cd_temp_repo
