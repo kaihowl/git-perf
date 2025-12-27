@@ -307,23 +307,20 @@ assert_output_contains "$report_output" "test::test_fast" "Measurements should b
 # Clean up
 rm junit13.xml
 
-# Test 14: Import error with invalid committish
-# DISABLED: Currently the implementation doesn't properly validate committish
-# See issue with git rev-parse not failing on invalid commits
-# echo "Test 14: Import error with invalid committish"
-# cd_temp_repo
-#
-# # Create JUnit XML file
-# create_junit_xml "junit14.xml"
-#
-# # Try to import to invalid commit
-# output=$(git perf import --commit nonexistent_commit junit junit14.xml 2>&1) && exit 1
-#
-# # Should fail with resolution error
-# assert_output_contains "$output" "Failed to resolve commit" "Error should mention failed commit resolution"
-#
-# # Clean up
-# rm junit14.xml
+echo "Test 14: Import error with invalid committish"
+cd_temp_repo
+
+# Create JUnit XML file
+create_junit_xml "junit14.xml"
+
+# Try to import to invalid commit
+output=$(git perf import --commit nonexistent_commit junit junit14.xml 2>&1) && exit 1
+
+# Should fail with resolution error
+assert_output_contains "$output" "Failed to resolve commit" "Error should mention failed commit resolution"
+
+# Clean up
+rm junit14.xml
 
 echo "All committish import tests passed!"
 exit 0
