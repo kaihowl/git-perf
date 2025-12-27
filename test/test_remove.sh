@@ -116,6 +116,11 @@ if git_objects_contain test-measure-one; then
   exit 1
 fi
 
+git reflog expire --expire=all --all
+git prune --expire=now
+cur_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
+cur_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
+
 if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; then
   echo "The number of objects now ($cur_objects + $cur_in_pack)
   is not less than previously ($prev_objects + $prev_in_pack)"
