@@ -169,7 +169,7 @@ jobs:
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
 
     - name: Archive report
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         include-hidden-files: true
@@ -314,7 +314,7 @@ jobs:
         ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable
 
     - name: Upload size artifact
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: release-binary-size
         path: metrics/release_binary_size.txt
