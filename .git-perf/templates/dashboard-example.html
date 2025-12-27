@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}} - Performance Dashboard</title>
+    {{PLOTLY_HEAD}}
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: #f5f5f5;
+        }
+        header {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .report-section {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .report-section h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            font-size: 1.3em;
+        }
+        .metadata {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .metadata p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        nav a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: 500;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.85em;
+        }
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            header {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .report-section {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .report-section h2 {
+                font-size: 1.5em;
+            }
+            .metadata {
+                padding: 15px;
+                margin-bottom: 20px;
+            }
+            .metadata p {
+                font-size: 1em;
+            }
+        }
+        {{CUSTOM_CSS}}
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/index.html">Home</a>
+            <a href="/docs/">Documentation</a>
+            <a href="/perf/">All Reports</a>
+        </nav>
+        <h1>{{TITLE}}</h1>
+        <div class="metadata">
+            <p><strong>Generated:</strong> {{TIMESTAMP}}</p>
+            <p><strong>Commit Range:</strong> {{COMMIT_RANGE}}</p>
+            <p><strong>Commits Analyzed:</strong> {{DEPTH}}</p>
+        </div>
+    </header>
+
+    <main>
+        <!-- Section 1: Add Benchmark -->
+        <section class="report-section">
+            <h2>🚀 Add Benchmark Performance</h2>
+            <p>Median performance for add operations with change point detection and epoch boundaries.</p>
+            {{SECTION[add-benchmark]
+                measurement-filter: ^(add-benchmark)$
+                aggregate-by: median
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Section 2: Report Benchmark -->
+        <section class="report-section">
+            <h2>📊 Report Benchmark Performance</h2>
+            <p>Median performance for report generation with change point detection and epoch boundaries.</p>
+            {{SECTION[report-benchmark]
+                measurement-filter: ^(report-benchmark)$
+                aggregate-by: median
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Section 3: Report Generation Performance -->
+        <section class="report-section">
+            <h2>⚙️ Report Generation Time</h2>
+            <p>Report generation performance showing execution duration.</p>
+            {{SECTION[report-time]
+                measurement-filter: ^(report)$
+                aggregate-by: median
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Section 4: Release Binary Size -->
+        <section class="report-section">
+            <h2>💾 Release Binary Size</h2>
+            <p>Binary size tracking with change point detection and epoch boundaries.</p>
+            {{SECTION[binary-size]
+                measurement-filter: ^(release-binary-size)$
+                aggregate-by: max
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Section 5: Report Size -->
+        <section class="report-section">
+            <h2>📄 Report Size</h2>
+            <p>Generated report size tracking with change point detection and epoch boundaries.</p>
+            {{SECTION[report-size]
+                measurement-filter: ^(report-size|report-size-benchmark)$
+                aggregate-by: mean
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Audit Results (if any) -->
+        {{AUDIT_SECTION}}
+    </main>
+
+    <footer>
+        <p>Generated by <a href="https://github.com/kaihowl/git-perf">git-perf</a></p>
+    </footer>
+</body>
+</html>

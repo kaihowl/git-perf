@@ -21,7 +21,8 @@ pub struct MeasurementData {
     pub key_values: HashMap<String, String>,
 }
 
-#[derive(Debug, PartialEq)]
+// TODO double check CLONE addition
+#[derive(Debug, PartialEq, Clone)]
 pub struct Commit {
     pub commit: String,
     pub measurements: Vec<MeasurementData>,

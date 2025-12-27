@@ -15,26 +15,27 @@ min_relative_deviation = 10.0
 unit = "ns"
 
 [measurement."release-binary-size"]
-epoch = "b2c72c42"
+epoch = "3a1aff1"
 unit = "bytes"
+min_relative_deviation = 10.0
 min_measurements = 10
 
 [measurement."report-benchmark"]
-epoch = "e1b4d14"
+epoch = "36b8efc"
 unit = "ns"
 sigma = 3
 aggregate_by = "median"
 min_measurements = 10
 
 [measurement."add-benchmark"]
-epoch = "e1b4d14"
+epoch = "d1f2833"
 unit = "ns"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 10
 
 [measurement."report-size-benchmark"]
-epoch = "e1b4d14"
+epoch = "b276871"
 unit = "bytes"
 min_relative_deviation = 10.0
 sigma = 3.5

@@ -4,7 +4,7 @@
 .SH NAME
 measure \- Measure the runtime of the supplied command (in nanoseconds)
 .SH SYNOPSIS
-\fBmeasure\fR [\fB\-n\fR|\fB\-\-repetitions\fR] <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fICOMMAND\fR> 
+\fBmeasure\fR [\fB\-n\fR|\fB\-\-repetitions\fR] <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-\-commit\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fICOMMAND\fR> 
 .SH DESCRIPTION
 Measure the runtime of the supplied command (in nanoseconds)
 .SH OPTIONS
@@ -17,6 +17,9 @@ Name of the measurement
 .TP
 \fB\-k\fR, \fB\-\-key\-value\fR \fI<KEY_VALUE>\fR
 Key\-value pairs separated by \*(Aq=\*(Aq
+.TP
+\fB\-\-commit\fR \fI<COMMIT>\fR
+Target commit for measurement (default: HEAD)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

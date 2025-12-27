@@ -161,6 +161,41 @@ git log --show-notes=refs/notes/perf-v3 --oneline -1
 git notes --ref=refs/notes/perf-v3 show <commit-sha>
 ```
 
+### Adding Measurements to Non-HEAD Commits
+
+By default, measurements are added to the current HEAD commit. However, you can target specific commits using the `--commit` flag or positional arguments:
+
+**Write Operations** (use `--commit` flag):
+```bash
+# Add measurement to a specific commit
+git perf add 100.5 -m build_time --commit abc123
+
+# Measure at a specific commit
+git perf measure -m test_time --commit HEAD~5 -- cargo test
+
+# Import results to a specific commit
+git perf import junit results.xml --commit v1.0.0
+```
+
+**Read Operations** (use positional argument):
+```bash
+# Generate report from a specific commit
+git perf report HEAD~10 -o report.html
+
+# Audit measurements at a specific commit
+git perf audit v2.0.0 -m critical_test
+```
+
+**Supported commit formats**: Full/short SHA, relative refs (`HEAD~5`), branch names, tag names, and symbolic refs.
+
+**Common use cases**:
+- **Backfilling historical data**: Import past CI results without changing HEAD
+- **Multi-branch development**: Add measurements to feature branches without switching
+- **Release tracking**: Measure performance at specific release points
+- **Historical analysis**: Audit past commits to find when regressions were introduced
+
+See the [Non-HEAD Measurements Guide](./docs/non-head-measurements.md) for detailed examples and best practices.
+
 ## ⚠️ Important Notes
 
 - **Experimental Status**: This tool is experimental and under active development

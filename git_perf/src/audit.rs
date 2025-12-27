@@ -124,6 +124,7 @@ fn discover_matching_measurements(
 
 #[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
+    start_commit: &str,
     max_count: usize,
     min_count: Option<u16>,
     selectors: &[(String, String)],
@@ -145,7 +146,7 @@ pub fn audit_multiple(
     // Phase 1: Walk commits ONCE (optimization: scan commits only once)
     // Collect into Vec so we can reuse the data for multiple measurements
     let all_commits: Vec<Result<Commit>> =
-        measurement_retrieval::walk_commits(max_count)?.collect();
+        measurement_retrieval::walk_commits_from(start_commit, max_count)?.collect();
 
     // Phase 2: Discover all measurements that match the combined patterns from the commit data
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
@@ -561,6 +562,7 @@ mod test {
         // Tests the case where no patterns are provided (empty list)
         // With no patterns, it should succeed (nothing to audit)
         let result = audit_multiple(
+            "HEAD",
             100,
             Some(1),
             &[],

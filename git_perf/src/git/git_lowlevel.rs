@@ -164,6 +164,39 @@ pub(super) fn git_rev_parse(reference: &str) -> Result<String, GitError> {
         .map(|s| s.stdout.trim().to_owned())
 }
 
+/// Resolves a committish reference to a full SHA-1 hash and verifies the commit exists.
+///
+/// This function takes any valid Git committish (commit hash, branch name, tag, or
+/// relative reference like `HEAD~3`) and resolves it to the full 40-character SHA-1
+/// hash of the underlying commit object. It also validates that the commit object
+/// actually exists in the repository.
+///
+/// # Arguments
+///
+/// * `committish` - A Git committish reference (e.g., "HEAD", "main", "a1b2c3d", "HEAD~3")
+///
+/// # Returns
+///
+/// * `Ok(String)` - The full SHA-1 hash of the resolved commit
+/// * `Err` - If the committish cannot be resolved or the commit does not exist
+///
+/// # Examples
+///
+/// ```no_run
+/// # use git_perf::git::git_lowlevel::resolve_committish;
+/// let sha = resolve_committish("HEAD").unwrap();
+/// assert_eq!(sha.len(), 40); // Full SHA-1 hash
+/// ```
+pub fn resolve_committish(committish: &str) -> Result<String> {
+    let resolved = git_rev_parse(committish).map_err(|e| anyhow!(e))?;
+
+    // Verify the resolved commit actually exists using git cat-file
+    capture_git_output(&["cat-file", "-e", &resolved], &None)
+        .map_err(|e| anyhow!("Commit '{}' does not exist: {}", committish, e))?;
+
+    Ok(resolved)
+}
+
 pub(super) fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
     capture_git_output(&["symbolic-ref", "-q", reference], &None)
         .ok()
