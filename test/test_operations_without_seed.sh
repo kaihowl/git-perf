@@ -32,7 +32,7 @@ if git perf remove --older-than '7d' > /dev/null 2>&1; then
     true
 else
     # Operation failed - check for expected error messages
-    assert_failure output git perf remove --older-than '7d'
+    assert_failure_with_output output git perf remove --older-than '7d'
     # Either of these messages is acceptable
     if [[ $output != *'No performance measurements found'* ]] && [[ $output != *'This repo does not have any measurements'* ]]; then
         # If neither expected message is present, we still accept it as implementation-specific
@@ -48,7 +48,7 @@ if git perf prune > /dev/null 2>&1; then
     true
 else
     # Operation failed - check for expected error messages
-    assert_failure output git perf prune
+    assert_failure_with_output output git perf prune
     # Either of these messages is acceptable
     if [[ $output != *'No performance measurements found'* ]] && [[ $output != *'This repo does not have any measurements'* ]]; then
         # If neither expected message is present, we still accept it as implementation-specific
@@ -61,7 +61,7 @@ test_section "Testing report operation without seed measurements"
 # Test report operation without any measurements (should handle gracefully)
 if git perf report -o - > /dev/null 2>&1; then
     # Operation succeeded - verify it returns empty or minimal output
-    assert_success output git perf report -o -
+    assert_success_with_output output git perf report -o -
     report_lines=$(echo "$output" | wc -l)
     # Empty result is acceptable (0 or 1 line with only whitespace)
     if [[ $report_lines -eq 0 ]] || [[ $report_lines -eq 1 && -z "$(echo "$output" | tr -d '[:space:]')" ]]; then
@@ -69,7 +69,7 @@ if git perf report -o - > /dev/null 2>&1; then
     fi
 else
     # Operation failed - check for expected error message
-    assert_failure output git perf report -o -
+    assert_failure_with_output output git perf report -o -
     # This message is acceptable
     if [[ $output != *'No performance measurements found'* ]]; then
         # Other error messages are also acceptable for this edge case
