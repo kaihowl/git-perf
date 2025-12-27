@@ -73,7 +73,7 @@ jobs:
         echo ""
 
         # Run the slow bash test using cargo nextest with the scale factor
-        if cargo nextest run run_slow_bash_tests_with_binary --lib --test bash_tests; then
+        if cargo nextest run --no-fail-fast run_slow_bash_tests_with_binary --lib --test bash_tests; then
             echo ""
             echo "================================================"
             echo "🎉 SUCCESS: Slow tests passed with scale factor $ITERATION_SCALE_FACTOR!"
