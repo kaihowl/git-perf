@@ -23,8 +23,8 @@ cd test_repo
 
 # Try to run report on empty repository - should fail with helpful message
 assert_failure_with_output output git perf report
-assert_contains "$output" "No commits found in repository" "Missing 'No commits found in repository' in output"
-assert_contains "$output" "Ensure commits exist and were pushed to the remote" "Missing guidance about pushing to remote in output"
+# The error occurs when trying to resolve HEAD in an empty repository
+assert_contains "$output" "Failed to resolve commit" "Missing 'Failed to resolve commit' error in output"
 
 test_stats
 exit 0

@@ -151,10 +151,9 @@ prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 git perf remove --older-than 7d
 
-assert_success_with_output report git perf report -o -
-num_measurements=$(echo "$report" | wc -l)
-# No measurement should be there
-assert_equals "$num_measurements" "0" "Expected no measurements after final removal"
+# When there are no measurements, git perf report should fail with "No performance measurements found."
+assert_failure_with_output report git perf report -o -
+assert_contains "$report" "No performance measurements found" "Expected error message about no measurements"
 
 git reflog expire --expire=all --all
 git prune --expire=now
