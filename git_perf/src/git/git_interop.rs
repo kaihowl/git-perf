@@ -869,7 +869,7 @@ fn update_read_branch() -> Result<TempRef> {
 ///
 /// Returns a vector of tuples, where each tuple contains:
 /// - The commit SHA-1 hash (String)
-/// - A vector of raw note lines associated with that commit (Vec<String>)
+/// - A vector of raw note lines associated with that commit (`Vec<String>`)
 ///
 /// # Errors
 ///

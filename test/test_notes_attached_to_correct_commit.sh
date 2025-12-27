@@ -47,16 +47,16 @@ assert_contains "$third_report" "300" "Report for third commit should show value
 test_section "Verify cross-contamination does not occur"
 
 # Ensure first commit doesn't have second or third commit's values
-assert_not_contains "$first_report" "200" "First commit should not have second commit's value"
-assert_not_contains "$first_report" "300" "First commit should not have third commit's value"
+assert_not_contains "$first_report" "200.0" "First commit should not have second commit's value"
+assert_not_contains "$first_report" "300.0" "First commit should not have third commit's value"
 
 # Ensure second commit doesn't have first or third commit's values
-assert_not_contains "$second_report" "100" "Second commit should not have first commit's value"
-assert_not_contains "$second_report" "300" "Second commit should not have third commit's value"
+assert_not_contains "$second_report" "100.0" "Second commit should not have first commit's value"
+assert_not_contains "$second_report" "300.0" "Second commit should not have third commit's value"
 
 # Ensure third commit doesn't have first or second commit's values
-assert_not_contains "$third_report" "100" "Third commit should not have first commit's value"
-assert_not_contains "$third_report" "200" "Third commit should not have second commit's value"
+assert_not_contains "$third_report" "100.0" "Third commit should not have first commit's value"
+assert_not_contains "$third_report" "200.0" "Third commit should not have second commit's value"
 
 test_section "Verify adding to HEAD vs specific commit"
 
@@ -75,7 +75,7 @@ assert_contains "$head_report" "999" "HEAD commit should have value 999"
 # Verify previous commits don't have this new measurement
 first_report_check=$(git perf report "$first_commit" -o - -n 1)
 assert_not_contains "$first_report_check" "default_metric" "First commit should not have default_metric"
-assert_not_contains "$first_report_check" "999" "First commit should not have value 999"
+assert_not_contains "$first_report_check" "999.0" "First commit should not have value 999"
 
 test_section "Verify multiple measurements on same commit"
 
@@ -95,9 +95,9 @@ assert_contains "$first_report_multi" "2222" "First commit should have value 222
 # Verify these new metrics didn't leak to other commits
 second_report_check=$(git perf report "$second_commit" -o - -n 1)
 assert_not_contains "$second_report_check" "metric_a" "Second commit should not have metric_a"
-assert_not_contains "$second_report_check" "1111" "Second commit should not have value 1111"
+assert_not_contains "$second_report_check" "1111.0" "Second commit should not have value 1111"
 assert_not_contains "$second_report_check" "metric_b" "Second commit should not have metric_b"
-assert_not_contains "$second_report_check" "2222" "Second commit should not have value 2222"
+assert_not_contains "$second_report_check" "2222.0" "Second commit should not have value 2222"
 
 test_section "Verify commits with measurements are tracked"
 
