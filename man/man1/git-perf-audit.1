@@ -4,7 +4,7 @@
 .SH NAME
 audit \- For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison
 .SH SYNOPSIS
-\fBaudit\fR [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-s\fR|\fB\-\-selectors\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-\-min\-measurements\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-d\fR|\fB\-\-sigma\fR] [\fB\-D\fR|\fB\-\-dispersion\-method\fR] [\fB\-\-no\-change\-point\-warning\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBaudit\fR [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-s\fR|\fB\-\-selectors\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-\-min\-measurements\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-d\fR|\fB\-\-sigma\fR] [\fB\-D\fR|\fB\-\-dispersion\-method\fR] [\fB\-\-no\-change\-point\-warning\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fICOMMIT\fR] 
 .SH DESCRIPTION
 For given measurements, check perfomance deviations of the HEAD commit against `<n>` previous commits. Group previous results and aggregate their results before comparison.
 .PP
@@ -82,3 +82,6 @@ Suppress warning when change points are detected in the current epoch. By defaul
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+[\fICOMMIT\fR]
+Target commit to audit (default: HEAD)

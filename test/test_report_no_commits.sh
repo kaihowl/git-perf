@@ -24,8 +24,8 @@ cd test_repo
 
 # Try to run report on empty repository - should fail with helpful message
 output=$(git perf report 2>&1 1>/dev/null) && exit 1
-assert_output_contains "$output" "No commits found in repository" "Missing 'No commits found in repository' in output"
-assert_output_contains "$output" "Ensure commits exist and were pushed to the remote" "Missing guidance about pushing to remote in output"
+assert_output_contains "$output" "Failed to resolve commit 'HEAD'" "Missing 'Failed to resolve commit' in output"
+assert_output_contains "$output" "Missing HEAD" "Missing 'Missing HEAD' in output"
 
 echo "Test passed: Correct error message shown for repository with no commits"
 

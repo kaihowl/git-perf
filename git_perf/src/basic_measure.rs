@@ -2,9 +2,10 @@ use std::{process, time::Instant};
 
 use anyhow::{bail, Context, Result};
 
-use crate::measurement_storage::{self};
+use crate::measurement_storage;
 
 pub fn measure(
+    commit: &str,
     measurement: &str,
     repetitions: u16,
     command: &[String],
@@ -29,7 +30,7 @@ pub fn measure(
         }
         let duration = start.elapsed();
         let duration_usec = duration.as_nanos() as f64;
-        measurement_storage::add(measurement, duration_usec, key_values)?;
+        measurement_storage::add_to_commit(commit, measurement, duration_usec, key_values)?;
     }
     Ok(())
 }
