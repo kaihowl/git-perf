@@ -100,7 +100,6 @@ docs/
 ├── README.md (this file)                  # Documentation index
 ├── INTEGRATION_TUTORIAL.md                # End-to-end GitHub Actions setup
 ├── importing-measurements.md              # Test and benchmark import guide
-├── non-head-measurements.md               # Guide for adding measurements to specific commits
 ├── manpage.md                             # CLI reference (auto-generated)
 ├── example_config.toml                    # Configuration template
 └── plans/                                 # Feature design documents (internal)
