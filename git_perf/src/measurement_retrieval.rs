@@ -76,8 +76,11 @@ where
 
 // Copying all measurements is currently necessary due to deserialization from git notes.
 // Optimizing this would require a change in the storage or deserialization model.
-pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Commit>>> {
-    let vec = git_interop::walk_commits(num_commits)?;
+pub fn walk_commits_from(
+    start_commit: &str,
+    num_commits: usize,
+) -> Result<impl Iterator<Item = Result<Commit>>> {
+    let vec = git_interop::walk_commits_from(start_commit, num_commits)?;
     Ok(vec
         .into_iter()
         .take(num_commits)
@@ -89,4 +92,8 @@ pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Co
             })
         }))
     // When this fails it is due to a shallow clone.
+}
+
+pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Commit>>> {
+    walk_commits_from("HEAD", num_commits)
 }

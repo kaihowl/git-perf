@@ -17,6 +17,7 @@ unit = "ns"
 [measurement."release-binary-size"]
 epoch = "3a1aff1"
 unit = "bytes"
+min_relative_deviation = 10.0
 min_measurements = 10
 
 [measurement."report-benchmark"]

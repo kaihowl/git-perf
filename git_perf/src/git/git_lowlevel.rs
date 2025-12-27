@@ -164,6 +164,18 @@ pub(super) fn git_rev_parse(reference: &str) -> Result<String, GitError> {
         .map(|s| s.stdout.trim().to_owned())
 }
 
+/// Resolve a committish (commit, branch, tag, HEAD~3, etc.) to a full SHA-1 hash
+/// and validate that the commit object actually exists in the repository
+pub fn resolve_committish(committish: &str) -> Result<String> {
+    let resolved = git_rev_parse(committish).map_err(|e| anyhow!(e))?;
+
+    // Verify the resolved commit actually exists using git cat-file
+    capture_git_output(&["cat-file", "-e", &resolved], &None)
+        .map_err(|e| anyhow!("Commit '{}' does not exist: {}", committish, e))?;
+
+    Ok(resolved)
+}
+
 pub(super) fn git_rev_parse_symbolic_ref(reference: &str) -> Option<String> {
     capture_git_output(&["symbolic-ref", "-q", reference], &None)
         .ok()

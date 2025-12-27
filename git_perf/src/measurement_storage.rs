@@ -11,15 +11,20 @@ use crate::{
     config,
     data::MeasurementData,
     defaults,
-    git::git_interop::add_note_line_to_head,
+    git::git_interop::{add_note_line, resolve_committish},
     serialization::{serialize_multiple, serialize_single, DELIMITER},
 };
 
-pub fn add_multiple(
+pub fn add_multiple_to_commit(
+    commit: &str,
     measurement: &str,
     values: &[f64],
     key_values: &[(String, String)],
 ) -> Result<()> {
+    // Validate commit exists
+    let resolved_commit =
+        resolve_committish(commit).context(format!("Failed to resolve commit '{}'", commit))?;
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("Failed to get system time")?;
@@ -42,12 +47,31 @@ pub fn add_multiple(
 
     let serialized = serialize_multiple(&mds);
 
-    add_note_line_to_head(&serialized)?;
+    add_note_line(&resolved_commit, &serialized)?;
 
     Ok(())
 }
 
-pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<()> {
+pub fn add_multiple(
+    measurement: &str,
+    values: &[f64],
+    key_values: &[(String, String)],
+) -> Result<()> {
+    let head =
+        crate::git::git_interop::get_head_revision().context("Failed to get HEAD revision")?;
+    add_multiple_to_commit(&head, measurement, values, key_values)
+}
+
+pub fn add_to_commit(
+    commit: &str,
+    measurement: &str,
+    value: f64,
+    key_values: &[(String, String)],
+) -> Result<()> {
+    // Validate commit exists
+    let resolved_commit =
+        resolve_committish(commit).context(format!("Failed to resolve commit '{}'", commit))?;
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("Failed to get system time")?;
@@ -65,9 +89,15 @@ pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Re
 
     let serialized = serialize_single(&md, DELIMITER);
 
-    add_note_line_to_head(&serialized)?;
+    add_note_line(&resolved_commit, &serialized)?;
 
     Ok(())
+}
+
+pub fn add(measurement: &str, value: f64, key_values: &[(String, String)]) -> Result<()> {
+    let head =
+        crate::git::git_interop::get_head_revision().context("Failed to get HEAD revision")?;
+    add_to_commit(&head, measurement, value, key_values)
 }
 
 pub fn remove_measurements_from_commits(

@@ -4,7 +4,7 @@
 .SH NAME
 report \- Create an HTML performance report
 .SH SYNOPSIS
-\fBreport\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-s\fR|\fB\-\-separate\-by\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-t\fR|\fB\-\-template\fR] [\fB\-c\fR|\fB\-\-custom\-css\fR] [\fB\-\-title\fR] [\fB\-\-show\-epochs\fR] [\fB\-\-show\-changes\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBreport\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-m\fR|\fB\-\-measurement\fR] [\fB\-k\fR|\fB\-\-key\-value\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-s\fR|\fB\-\-separate\-by\fR] [\fB\-a\fR|\fB\-\-aggregate\-by\fR] [\fB\-t\fR|\fB\-\-template\fR] [\fB\-c\fR|\fB\-\-custom\-css\fR] [\fB\-\-title\fR] [\fB\-\-show\-epochs\fR] [\fB\-\-show\-changes\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fICOMMIT\fR] 
 .SH DESCRIPTION
 Create an HTML performance report
 .SH OPTIONS
@@ -51,3 +51,6 @@ Detect and show change points in the report (hidden by default, toggleable via l
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
+.TP
+[\fICOMMIT\fR]
+Target commit to start report from (default: HEAD)

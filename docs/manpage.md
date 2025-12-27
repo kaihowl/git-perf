@@ -62,6 +62,7 @@ Measure the runtime of the supplied command (in nanoseconds)
   Default value: `1`
 * `-m`, `--measurement <NAME>` — Name of the measurement
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '='
+* `--commit <COMMIT>` — Target commit for measurement (default: HEAD)
 
 
 
@@ -79,6 +80,7 @@ Add single measurement
 
 * `-m`, `--measurement <NAME>` — Name of the measurement
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '='
+* `--commit <COMMIT>` — Target commit for measurement (default: HEAD)
 
 
 
@@ -128,6 +130,7 @@ Tests: `test::<test_name>` Benchmarks: `bench::<benchmark_id>::<statistic>` (mea
 
 ###### **Options:**
 
+* `--commit <COMMIT>` — Target commit for measurements (default: HEAD)
 * `-p`, `--prefix <PREFIX>` — Optional prefix to prepend to measurement names
 * `-m`, `--metadata <METADATA>` — Key-value pairs separated by '=' to add as metadata to all measurements
 * `-f`, `--filter <FILTER>` — Regex filter to select specific tests/benchmarks
@@ -160,7 +163,11 @@ Pull performance results from remote
 
 Create an HTML performance report
 
-**Usage:** `git-perf report [OPTIONS]`
+**Usage:** `git-perf report [OPTIONS] [COMMIT]`
+
+###### **Arguments:**
+
+* `<COMMIT>` — Target commit to start report from (default: HEAD)
 
 ###### **Options:**
 
@@ -220,7 +227,11 @@ When the relative deviation is below the threshold, the audit passes even if the
 
 The sparkline visualization shows the range of measurements relative to the tail median (historical measurements only).
 
-**Usage:** `git-perf audit [OPTIONS]`
+**Usage:** `git-perf audit [OPTIONS] [COMMIT]`
+
+###### **Arguments:**
+
+* `<COMMIT>` — Target commit to audit (default: HEAD)
 
 ###### **Options:**
 

@@ -4,7 +4,7 @@
 .SH NAME
 import \- Import measurements from test runners and benchmarks
 .SH SYNOPSIS
-\fBimport\fR [\fB\-p\fR|\fB\-\-prefix\fR] [\fB\-m\fR|\fB\-\-metadata\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-\-dry\-run\fR] [\fB\-v\fR|\fB\-\-verbose\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIFORMAT\fR> [\fIFILE\fR] 
+\fBimport\fR [\fB\-\-commit\fR] [\fB\-p\fR|\fB\-\-prefix\fR] [\fB\-m\fR|\fB\-\-metadata\fR] [\fB\-f\fR|\fB\-\-filter\fR] [\fB\-\-dry\-run\fR] [\fB\-v\fR|\fB\-\-verbose\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fIFORMAT\fR> [\fIFILE\fR] 
 .SH DESCRIPTION
 Import measurements from test runners and benchmarks
 .PP
@@ -34,6 +34,9 @@ Tests: `test::<test_name>` Benchmarks: `bench::<benchmark_id>::<statistic>` (mea
 .PP
 # Import benchmarks cargo criterion \-\-message\-format json > bench.json git\-perf import criterion\-json bench.json ```
 .SH OPTIONS
+.TP
+\fB\-\-commit\fR \fI<COMMIT>\fR
+Target commit for measurements (default: HEAD)
 .TP
 \fB\-p\fR, \fB\-\-prefix\fR \fI<PREFIX>\fR
 Optional prefix to prepend to measurement names
