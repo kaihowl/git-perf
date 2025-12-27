@@ -71,7 +71,36 @@ fn default_backoff() -> ExponentialBackoff {
         .build()
 }
 
-/// Add a note line to a specific commit
+/// Appends a note line to a specific commit with exponential backoff retry logic.
+///
+/// This function adds a single line to the git notes associated with the specified
+/// commit in the performance notes ref (`refs/notes/perf-v3`). The operation is
+/// retried with exponential backoff to handle transient failures such as concurrent
+/// write conflicts or filesystem locks.
+///
+/// # Arguments
+///
+/// * `commit` - The commit hash (or committish reference) to add the note to
+/// * `line` - The text content to append to the commit's notes
+///
+/// # Returns
+///
+/// * `Ok(())` - The note line was successfully added
+/// * `Err` - If the operation fails permanently or times out after retries
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The commit does not exist
+/// - The operation times out after exhausting retry attempts
+/// - A permanent failure occurs (e.g., invalid commit reference)
+///
+/// # Examples
+///
+/// ```no_run
+/// # use git_perf::git::git_interop::add_note_line;
+/// add_note_line("HEAD", "benchmark_result=1.23s").unwrap();
+/// ```
 pub fn add_note_line(commit: &str, line: &str) -> Result<()> {
     let op = || -> Result<(), ::backoff::Error<GitError>> {
         raw_add_note_line(commit, line).map_err(map_git_error_for_backoff)
@@ -824,7 +853,45 @@ fn update_read_branch() -> Result<TempRef> {
     Ok(temp_ref)
 }
 
-/// Walk commits starting from a specific commit
+/// Retrieves raw git notes data for commits starting from a specific commit.
+///
+/// This function performs a low-level git log operation to extract commit hashes
+/// and their associated raw note lines from the performance notes ref. It updates
+/// the local read branch, resolves the starting commit, and traverses up to
+/// `num_commits` following the first-parent ancestry chain.
+///
+/// # Arguments
+///
+/// * `start_commit` - The committish reference to start walking from (e.g., "HEAD", "main", commit hash)
+/// * `num_commits` - Maximum number of commits to retrieve
+///
+/// # Returns
+///
+/// Returns a vector of tuples, where each tuple contains:
+/// - The commit SHA-1 hash (String)
+/// - A vector of raw note lines associated with that commit (Vec<String>)
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The starting commit cannot be resolved or does not exist
+/// - Git log operation fails
+/// - The repository is a shallow clone (issues a warning but may still succeed)
+///
+/// # Warnings
+///
+/// If a shallow clone is detected (grafted commits), a warning is issued as this
+/// may result in incomplete history traversal.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use git_perf::git::git_interop::walk_commits_from;
+/// let commits = walk_commits_from("HEAD", 5).unwrap();
+/// for (commit_hash, note_lines) in commits {
+///     println!("Commit: {}, Notes: {} lines", commit_hash, note_lines.len());
+/// }
+/// ```
 pub fn walk_commits_from(
     start_commit: &str,
     num_commits: usize,

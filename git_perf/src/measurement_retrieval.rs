@@ -74,8 +74,44 @@ where
     }
 }
 
-// Copying all measurements is currently necessary due to deserialization from git notes.
-// Optimizing this would require a change in the storage or deserialization model.
+/// Walks through commit history starting from a specific commit, retrieving performance measurements.
+///
+/// This function traverses the Git commit history beginning at the specified commit
+/// and returns an iterator of commits with their associated performance measurements
+/// deserialized from git notes. The iterator yields up to `num_commits` commits,
+/// following the first-parent ancestry chain.
+///
+/// # Arguments
+///
+/// * `start_commit` - The committish reference to start walking from (e.g., "HEAD", "main", commit hash)
+/// * `num_commits` - Maximum number of commits to retrieve
+///
+/// # Returns
+///
+/// Returns an iterator that yields `Result<Commit>` for each commit in the history.
+/// Each successful `Commit` contains the commit hash and its deserialized performance measurements.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The starting commit cannot be resolved
+/// - The repository is a shallow clone (full history required)
+/// - Git operations fail during commit traversal
+///
+/// # Notes
+///
+/// Measurements are copied during deserialization. This is necessary due to the current
+/// storage model but could be optimized with architectural changes.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use git_perf::measurement_retrieval::walk_commits_from;
+/// for commit_result in walk_commits_from("HEAD", 10).unwrap() {
+///     let commit = commit_result.unwrap();
+///     println!("Commit: {}", commit.commit);
+/// }
+/// ```
 pub fn walk_commits_from(
     start_commit: &str,
     num_commits: usize,
