@@ -1800,16 +1800,20 @@ pub fn report(
         .map(|section| process_section(&mut *reporter, &commits, section))
         .collect::<Result<Vec<SectionOutput>>>()?;
 
-    // Check if any section found measurements
+    // Check if any section found measurements (before finalize consumes section_outputs)
     // For HTML: check if any section has non-empty content
-    // For CSV: report_bytes will be empty if no measurements
-    let has_measurements = match output_format {
-        OutputFormat::Html => section_outputs.iter().any(|s| !s.content.is_empty()),
-        OutputFormat::Csv => !section_outputs.is_empty(), // Will check after finalize
-    };
+    // For CSV: section outputs are always empty, will check report_bytes after finalize
+    let has_measurements_from_sections = section_outputs.iter().any(|s| !s.content.is_empty());
 
     // Finalize report
     let report_bytes = reporter.finalize(section_outputs, &metadata);
+
+    // Determine if any measurements were found
+    // For CSV, check if finalized report is non-empty (CSV returns empty Vec if no measurements)
+    let has_measurements = match output_format {
+        OutputFormat::Html => has_measurements_from_sections,
+        OutputFormat::Csv => !report_bytes.is_empty(),
+    };
 
     // Check if any measurements were found
     // For multi-section templates (>1 section), allow empty sections (just log warnings)
