@@ -37,7 +37,8 @@ cd_temp_repo
 git perf add -m echo 0.5
 "${script_dir}/measure.sh" "$epochmyothermeasurement$(date +%s)$RANDOM"
 assert_success_with_output output git perf report
-assert_equals "$output" "" "There should be no output in stderr"
+# Expect a warning about too few items being skipped
+assert_contains "$output" "skipping" "Expected warning about skipping record with too few items"
 
 test_section "Measurement with invalid kvs"
 cd_temp_repo
