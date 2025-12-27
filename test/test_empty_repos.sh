@@ -29,7 +29,7 @@ git clone "$orig" myworkrepo
 cd myworkrepo
 
 assert_failure_with_output output git perf audit -m non-existent
-assert_contains "$output" "No commit at HEAD" "Missing 'No Commit at HEAD' in output"
+assert_contains "$output" "Failed to resolve commit 'HEAD'" "Missing 'Failed to resolve commit' in output"
 
 touch a
 git add a
