@@ -28,12 +28,6 @@ Detailed guides for specific use cases:
   - JUnit XML format (pytest, Jest, cargo-nextest, JUnit, and more)
   - Criterion JSON format (Rust benchmarks)
   - Cross-language examples and best practices
-- **[Non-HEAD Measurements](./non-head-measurements.md)** - Add measurements to specific commits
-  - Using `--commit` flag for write operations
-  - Targeting specific commits, branches, and tags
-  - Historical data backfilling
-  - Branch comparison without switching
-  - Technical details and best practices
 
 ## Reference Documentation
 
