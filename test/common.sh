@@ -15,7 +15,10 @@ shopt -s nocasematch
 
 # ANSI color codes for test output
 # Set TEST_COLORS=0 to disable colored output
-if [[ "${TEST_COLORS:-1}" == "1" ]] && [[ -t 2 ]]; then
+# Colors are enabled if:
+# - TEST_COLORS is not explicitly set to 0, AND
+# - Either stderr is a TTY OR we're running in CI (GitHub Actions, GitLab CI, etc.)
+if [[ "${TEST_COLORS:-1}" == "1" ]] && { [[ -t 2 ]] || [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; }; then
   # Red for errors and failures
   COLOR_RED='\033[0;31m'
   COLOR_RED_BOLD='\033[1;31m'
