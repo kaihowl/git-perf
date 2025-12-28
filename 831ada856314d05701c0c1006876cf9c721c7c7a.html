@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Measurements - Performance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+        <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+        
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: #f5f5f5;
+        }
+        header {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .report-section {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .report-section h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            font-size: 1.3em;
+        }
+        .metadata {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .metadata p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        nav a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: 500;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.85em;
+        }
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            header {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .report-section {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .report-section h2 {
+                font-size: 1.5em;
+            }
+            .metadata {
+                padding: 15px;
+                margin-bottom: 20px;
+            }
+            .metadata p {
+                font-size: 1em;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/index.html">Home</a>
+            <a href="/docs/">Documentation</a>
+            <a href="/perf/">All Reports</a>
+        </nav>
+        <h1>Performance Measurements</h1>
+        <div class="metadata">
+            <p><strong>Generated:</strong> 2025-12-28 18:48:20 UTC</p>
+            <p><strong>Commit Range:</strong> 37de7df..831ada8</p>
+            <p><strong>Commits Analyzed:</strong> 40</p>
+        </div>
+    </header>
+
+    <main>
+        <!-- Section 1: Add Benchmark -->
+        <section class="report-section">
+            <h2>🚀 Add Benchmark Performance</h2>
+            <p>Median performance for add operations with change point detection and epoch boundaries.</p>
+            <div id="ySJPzcFe2FywbSfdV09f" class="plotly-graph-div" style="height:100%; width:100%;"></div>
+<script type="text/javascript">
+    Plotly.newPlot("ySJPzcFe2FywbSfdV09f", {"data":[{"type":"scatter","name":"add-benchmark (ns)","x":[39,38,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],"y":[22160574.5,22458753.5,22047086.0,21389260.5,19207470.5,19048187.5,19267091.0,19130450.0,19643875.0,19186243.5,19405614.0,19316848.0,16927298.5,19343529.0,19014941.0,20229642.5,19747601.5,16672041.0,20291632.0,18959376.0,17018183.0,19464720.5,19247625.0,18875326.0,16619881.5,19480944.0,19536432.5,18676047.0,18923627.5,17641510.0,18019558.0,17634557.5,17986002.0,179558347.5,153002491.0,177105410.5,179843411.0,154879633.0,154524820.0]},{"type":"scatter","name":"add-benchmark (ns) (Epochs)","visible":"legendonly","showlegend":true,"legendgroup":"add-benchmark_epochs","mode":"lines","x":[6,6,null,34,34,null],"y":[14957893.35,197827752.10000002,null,14957893.35,197827752.10000002,null],"hovertext":["Epoch 0→236670228","Epoch 0→236670228","","Epoch 236670228→220145715","Epoch 236670228→220145715",""],"line":{"width":2.0,"dash":"dash","color":"gray"}},{"type":"scatter","name":"add-benchmark (ns) (Change Points)","showlegend":true,"legendgroup":"add-benchmark_change_points","mode":"markers","x":[6],"y":[17986002.0],"hovertext":["✓ Improvement: -88.5%\u003cbr\u003eCommit: d994dade\u003cbr\u003eConfidence: 92.0%"],"marker":{"size":12,"color":["rgba(40, 167, 69, 0.8)"]}}],"layout":{"title":{"text":"Performance Measurements"},"legend":{"orientation":"h","groupclick":"toggleitem"},"xaxis":{"tickvals":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0],"ticktext":["37de7d","766a3f","687ebd","3c7593","b35b16","7b9c80","d994da","f1e0d3","6e825f","072d69","0eefcf","1c5f64","f24e8a","63a3de","67f73e","33cbfe","981586","823d2f","6d2556","504695","11640b","bc8edc","f716c9","08a235","f0ba9b","bf8d8b","5d9109","3d33b7","a17785","6d0911","e416df","b001f7","1b82b7","4cb226","819a0a","ac3daf","30193e","3fac49","d36135","831ada"],"tickfont":{"family":"monospace"},"tickangle":45.0},"yaxis":{"title":{"text":"Value (ns)"}}},"config":{"fillFrame":false,"responsive":true},"frames":null});
+</script>
+        </section>
+
+        <!-- Section 2: Report Benchmark -->
+        <section class="report-section">
+            <h2>📊 Report Benchmark Performance</h2>
+            <p>Median performance for report generation with change point detection and epoch boundaries.</p>
+            <div id="hhlHooO1xp6XyJdR26wi" class="plotly-graph-div" style="height:100%; width:100%;"></div>
+<script type="text/javascript">
+    Plotly.newPlot("hhlHooO1xp6XyJdR26wi", {"data":[{"type":"scatter","name":"report-benchmark (ns)","x":[39,38,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],"y":[28611801.5,28733874.0,28055589.5,27398349.0,25447315.0,23636835.0,23990913.0,23716592.5,24208553.0,23974700.5,24152559.0,24101693.5,21110125.0,24172498.5,23770480.0,24883572.0,24301380.0,21065764.5,25258256.5,23594876.0,21207315.0,24274621.0,23956915.0,23574352.0,20910431.5,24539860.0,24411668.5,23045811.5,23553558.0,21282821.0,21560858.5,21055118.0,21711777.0,42679171.5,36820635.0,42305416.0,42938380.5,36775209.0,33638027.0]},{"type":"scatter","name":"report-benchmark (ns) (Epochs)","visible":"legendonly","showlegend":true,"legendgroup":"report-benchmark_epochs","mode":"lines","x":[6,6,null,34,34,null],"y":[18819388.35,47232218.550000004,null,18819388.35,47232218.550000004,null],"hovertext":["Epoch 0→236670228","Epoch 0→236670228","","Epoch 236670228→57380604","Epoch 236670228→57380604",""],"line":{"width":2.0,"dash":"dash","color":"gray"}},{"type":"scatter","name":"report-benchmark (ns) (Change Points)","showlegend":true,"legendgroup":"report-benchmark_change_points","mode":"markers","x":[6],"y":[21711777.0],"hovertext":["✓ Improvement: -40.5%\u003cbr\u003eCommit: d994dade\u003cbr\u003eConfidence: 80.6%"],"marker":{"size":12,"color":["rgba(40, 167, 69, 0.8)"]}}],"layout":{"title":{"text":"Performance Measurements"},"legend":{"orientation":"h","groupclick":"toggleitem"},"xaxis":{"tickvals":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0],"ticktext":["37de7d","766a3f","687ebd","3c7593","b35b16","7b9c80","d994da","f1e0d3","6e825f","072d69","0eefcf","1c5f64","f24e8a","63a3de","67f73e","33cbfe","981586","823d2f","6d2556","504695","11640b","bc8edc","f716c9","08a235","f0ba9b","bf8d8b","5d9109","3d33b7","a17785","6d0911","e416df","b001f7","1b82b7","4cb226","819a0a","ac3daf","30193e","3fac49","d36135","831ada"],"tickfont":{"family":"monospace"},"tickangle":45.0},"yaxis":{"title":{"text":"Value (ns)"}}},"config":{"fillFrame":false,"responsive":true},"frames":null});
+</script>
+        </section>
+
+        <!-- Section 3: Report Generation Performance -->
+        <section class="report-section">
+            <h2>⚙️ Report Generation Time</h2>
+            <p>Report generation performance showing execution duration.</p>
+            <div id="jhS5W3gMIIqOIlvUs6YB" class="plotly-graph-div" style="height:100%; width:100%;"></div>
+<script type="text/javascript">
+    Plotly.newPlot("jhS5W3gMIIqOIlvUs6YB", {"data":[{"type":"scatter","name":"report (ns)","x":[39,38,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],"y":[28525464.5,28920956.0,28162523.5,27450165.5,25424946.0,23584655.5,23840648.5,23943216.5,24475883.0,24011140.0,23919616.0,24262554.0,21318698.5,24275176.0,23561385.5,25048523.0,24457786.0,21122319.0,25224336.0,23444098.5,21603132.0,24181275.5,23976467.0,23619245.5,21339417.0,23979534.0,24582519.0,23101585.5,23492529.5,21257005.0,21457620.5,21003058.5,21908511.5,42915853.5,36609097.5,42243966.0,42669927.0,37107615.5,33766375.5]},{"type":"scatter","name":"report (ns) (Change Points)","showlegend":true,"legendgroup":"report_change_points","mode":"markers","x":[6],"y":[21908511.5],"hovertext":["✓ Improvement: -40.4%\u003cbr\u003eCommit: d994dade\u003cbr\u003eConfidence: 80.5%"],"marker":{"size":12,"color":["rgba(40, 167, 69, 0.8)"]}}],"layout":{"title":{"text":"Performance Measurements"},"legend":{"orientation":"h","groupclick":"toggleitem"},"xaxis":{"tickvals":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0],"ticktext":["37de7d","766a3f","687ebd","3c7593","b35b16","7b9c80","d994da","f1e0d3","6e825f","072d69","0eefcf","1c5f64","f24e8a","63a3de","67f73e","33cbfe","981586","823d2f","6d2556","504695","11640b","bc8edc","f716c9","08a235","f0ba9b","bf8d8b","5d9109","3d33b7","a17785","6d0911","e416df","b001f7","1b82b7","4cb226","819a0a","ac3daf","30193e","3fac49","d36135","831ada"],"tickfont":{"family":"monospace"},"tickangle":45.0},"yaxis":{"title":{"text":"Value (ns)"}}},"config":{"fillFrame":false,"responsive":true},"frames":null});
+</script>
+        </section>
+
+        <!-- Section 4: Release Binary Size -->
+        <section class="report-section">
+            <h2>💾 Release Binary Size</h2>
+            <p>Binary size tracking with change point detection and epoch boundaries.</p>
+            <div id="JliVAOREMp1clpFHWFZ5" class="plotly-graph-div" style="height:100%; width:100%;"></div>
+<script type="text/javascript">
+    Plotly.newPlot("JliVAOREMp1clpFHWFZ5", {"data":[{"type":"scatter","name":"release-binary-size (bytes)","x":[39,38,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],"y":[8040448.0,8040496.0,8040496.0,8040496.0,8007408.0,7967256.0,8109144.0,8109144.0,8109144.0,8109144.0,8109144.0,8109144.0,8109144.0,8109144.0,8109144.0,8109112.0,8108376.0,8108376.0,8108376.0,8108376.0,7696024.0,7845016.0,7845016.0,7845016.0,7845016.0,7844920.0,7832952.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7739040.0,7680112.0]},{"type":"scatter","name":"release-binary-size (bytes) (Epochs)","visible":"legendonly","showlegend":true,"legendgroup":"release-binary-size_epochs","mode":"lines","x":[19,19,null,34,34,null],"y":[6912100.8,8920058.4,null,6912100.8,8920058.4,null],"hovertext":["Epoch 208219357→2999397442","Epoch 208219357→2999397442","","Epoch 2999397442→60927985","Epoch 2999397442→60927985",""],"line":{"width":2.0,"dash":"dash","color":"gray"}}],"layout":{"title":{"text":"Performance Measurements"},"legend":{"orientation":"h","groupclick":"toggleitem"},"xaxis":{"tickvals":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0],"ticktext":["37de7d","766a3f","687ebd","3c7593","b35b16","7b9c80","d994da","f1e0d3","6e825f","072d69","0eefcf","1c5f64","f24e8a","63a3de","67f73e","33cbfe","981586","823d2f","6d2556","504695","11640b","bc8edc","f716c9","08a235","f0ba9b","bf8d8b","5d9109","3d33b7","a17785","6d0911","e416df","b001f7","1b82b7","4cb226","819a0a","ac3daf","30193e","3fac49","d36135","831ada"],"tickfont":{"family":"monospace"},"tickangle":45.0},"yaxis":{"title":{"text":"Value (bytes)"}}},"config":{"fillFrame":false,"responsive":true},"frames":null});
+</script>
+        </section>
+
+        <!-- Section 5: Report Size -->
+        <section class="report-section">
+            <h2>📄 Report Size</h2>
+            <p>Generated report size tracking with change point detection and epoch boundaries.</p>
+            <div id="2Cahqm09pBCAqyU2zoZn" class="plotly-graph-div" style="height:100%; width:100%;"></div>
+<script type="text/javascript">
+    Plotly.newPlot("2Cahqm09pBCAqyU2zoZn", {"data":[{"type":"scatter","name":"report-size-benchmark (bytes)","x":[39,38,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],"y":[1886.0,1886.0,1886.0,1886.0,1886.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,3115.0,3115.0,3115.0,3115.0,3115.0,3114.0]},{"type":"scatter","name":"report-size-benchmark (bytes) (Epochs)","visible":"legendonly","showlegend":true,"legendgroup":"report-size-benchmark_epochs","mode":"lines","x":[6,6,null,34,34,null],"y":[1697.4,3426.5000000000005,null,1697.4,3426.5000000000005,null],"hovertext":["Epoch 0→236670228","Epoch 0→236670228","","Epoch 236670228→187132017","Epoch 236670228→187132017",""],"line":{"width":2.0,"dash":"dash","color":"gray"}},{"type":"scatter","name":"report-size-benchmark (bytes) (Change Points)","showlegend":true,"legendgroup":"report-size-benchmark_change_points","mode":"markers","x":[6],"y":[1948.0],"hovertext":["✓ Improvement: -37.8%\u003cbr\u003eCommit: d994dade\u003cbr\u003eConfidence: 77.3%"],"marker":{"size":12,"color":["rgba(40, 167, 69, 0.8)"]}},{"type":"scatter","name":"report-size (bytes)","x":[39,38,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],"y":[1886.0,1886.0,1886.0,1886.0,1886.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,1948.0,3115.0,3115.0,3115.0,3115.0,3115.0,3114.0]},{"type":"scatter","name":"report-size (bytes) (Change Points)","showlegend":true,"legendgroup":"report-size_change_points","mode":"markers","x":[6],"y":[1948.0],"hovertext":["✓ Improvement: -37.8%\u003cbr\u003eCommit: d994dade\u003cbr\u003eConfidence: 77.3%"],"marker":{"size":12,"color":["rgba(40, 167, 69, 0.8)"]}}],"layout":{"title":{"text":"Performance Measurements"},"legend":{"orientation":"h","groupclick":"toggleitem"},"xaxis":{"tickvals":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0],"ticktext":["37de7d","766a3f","687ebd","3c7593","b35b16","7b9c80","d994da","f1e0d3","6e825f","072d69","0eefcf","1c5f64","f24e8a","63a3de","67f73e","33cbfe","981586","823d2f","6d2556","504695","11640b","bc8edc","f716c9","08a235","f0ba9b","bf8d8b","5d9109","3d33b7","a17785","6d0911","e416df","b001f7","1b82b7","4cb226","819a0a","ac3daf","30193e","3fac49","d36135","831ada"],"tickfont":{"family":"monospace"},"tickangle":45.0},"yaxis":{"title":{"text":"Value (bytes)"}}},"config":{"fillFrame":false,"responsive":true},"frames":null});
+</script>
+        </section>
+
+        <!-- Audit Results (if any) -->
+        
+    </main>
+
+    <footer>
+        <p>Generated by <a href="https://github.com/kaihowl/git-perf">git-perf</a></p>
+    </footer>
+</body>
+</html>
