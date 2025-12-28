@@ -16,8 +16,12 @@ mod test {
         // Run the bash test script with the updated PATH and hermetic git environment
         // These environment variables ensure tests don't use system/global git config
         // which could have commit signing or other settings that interfere with tests
+        //
+        // We use `bash -c` with `exec 2>&1` to redirect stderr to stdout, which allows
+        // the output streams to be naturally interleaved as they would appear in a terminal
+        let script_path = bash_file.display().to_string();
         let output = Command::new("bash")
-            .args([bash_file])
+            .args(["-c", &format!("exec 2>&1; bash {}", script_path)])
             .env("PATH", new_path)
             .env("GIT_CONFIG_NOSYSTEM", "true")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -34,8 +38,8 @@ mod test {
             .output()
             .expect("Failed to run bash test");
 
-        println!("{}", String::from_utf8_lossy(&output.stdout));
-        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        // Print the interleaved output (stderr was redirected to stdout)
+        print!("{}", String::from_utf8_lossy(&output.stdout));
         assert!(output.status.success(), "Bash test script failed");
     }
 
