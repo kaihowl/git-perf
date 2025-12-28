@@ -155,7 +155,10 @@ git perf add -m my_benchmark 106
 assert_success_with_output output git perf audit -m my_benchmark --filter "my_.*" -d 10
 assert_contains "$output" "✅ 'my_benchmark'" "Should successfully audit measurement"
 # Should only appear once in output (not duplicated)
-assert_true '[[ $(echo "$output" | grep -c "'"'"'my_benchmark'"'"'") -le 2 ]]' "Measurement should not be duplicated"
+if [ "$(echo "$output" | grep -c "'my_benchmark'")" -gt 2 ]; then
+  echo "FAIL: Measurement should not be duplicated when specified in both -m and --filter"
+  assert_true false
+fi
 
 test_stats
 exit 0
