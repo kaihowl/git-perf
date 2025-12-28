@@ -13,6 +13,29 @@ export RUST_BACKTRACE=1
 
 shopt -s nocasematch
 
+# ANSI color codes for test output
+# Set TEST_COLORS=0 to disable colored output
+# Colors are enabled if:
+# - TEST_COLORS is not explicitly set to 0, AND
+# - Either stderr is a TTY OR we're running in CI (GitHub Actions, GitLab CI, etc.)
+if [[ "${TEST_COLORS:-1}" == "1" ]] && { [[ -t 2 ]] || [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; }; then
+  # Red for errors and failures
+  COLOR_RED='\033[0;31m'
+  COLOR_RED_BOLD='\033[1;31m'
+  # Green for successes
+  COLOR_GREEN='\033[0;32m'
+  # Yellow for warnings
+  COLOR_YELLOW='\033[0;33m'
+  # Reset to default
+  COLOR_RESET='\033[0m'
+else
+  COLOR_RED=''
+  COLOR_RED_BOLD=''
+  COLOR_GREEN=''
+  COLOR_YELLOW=''
+  COLOR_RESET=''
+fi
+
 # Hermetic git environment - ignore system and global git config
 # This prevents issues with commit signing and other global git settings
 export GIT_CONFIG_NOSYSTEM=true
@@ -132,13 +155,13 @@ _test_fail() {
   local test_name=$(basename "$caller_file" .sh)
 
   echo "" >&2
-  echo "FAIL: $test_name:$caller_line" >&2
-  echo "ERROR: $1" >&2
+  echo -e "${COLOR_RED_BOLD}FAIL: $test_name:$caller_line${COLOR_RESET}" >&2
+  echo -e "${COLOR_RED}ERROR: $1${COLOR_RESET}" >&2
   shift
 
   # Print additional context lines
   while [[ $# -gt 0 ]]; do
-    echo "       $1" >&2
+    echo -e "${COLOR_RED}       $1${COLOR_RESET}" >&2
     shift
   done
 
@@ -420,7 +443,7 @@ test_pass() {
     set +x
   fi
 
-  echo "PASS: $message"
+  echo -e "${COLOR_GREEN}PASS: $message${COLOR_RESET}"
 
   # Re-enable set -x if it was on
   if [[ $xtrace_enabled -eq 1 ]]; then
