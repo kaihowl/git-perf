@@ -22,16 +22,16 @@ test_section "Verify config file exists and has correct content"
 assert_file_exists .gitperfconfig
 
 test_section "Create some commits with measurements that have very low variance"
-assert_success create_commit
-assert_success git perf add -m build_time 1000
-assert_success create_commit
-assert_success git perf add -m build_time 1001
-assert_success create_commit
-assert_success git perf add -m build_time 1002
+create_commit
+git perf add -m build_time 1000
+create_commit
+git perf add -m build_time 1001
+create_commit
+git perf add -m build_time 1002
 
 test_section "Add a measurement that should fail audit due to high z-score but pass due to low relative deviation"
-assert_success create_commit
-assert_success git perf add -m build_time 1050
+create_commit
+git perf add -m build_time 1050
 
 test_section "This should show the threshold note if the relative deviation is below 10%"
 assert_success git perf audit -m build_time

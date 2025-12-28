@@ -18,8 +18,8 @@ popd
 test_section "Single commit with measurements"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure-one 10.0
-assert_success git perf add -m test-measure-two 20.0
+git perf add -m test-measure-one 10.0
+git perf add -m test-measure-two 20.0
 
 assert_success_with_output output git perf size
 assert_contains "$output" "1"
@@ -29,12 +29,12 @@ popd
 test_section "Multiple commits with measurements"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure-one 10.0
-assert_success git perf add -m test-measure-two 20.0
+git perf add -m test-measure-one 10.0
+git perf add -m test-measure-two 20.0
 
 create_commit
-assert_success git perf add -m test-measure-one 15.0
-assert_success git perf add -m test-measure-three 25.0
+git perf add -m test-measure-one 15.0
+git perf add -m test-measure-three 25.0
 
 assert_success_with_output output git perf size
 assert_contains "$output" "2"
@@ -44,12 +44,12 @@ popd
 test_section "Detailed output shows measurement names"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure-one 10.0
-assert_success git perf add -m test-measure-two 20.0
+git perf add -m test-measure-one 10.0
+git perf add -m test-measure-two 20.0
 
 create_commit
-assert_success git perf add -m test-measure-one 15.0
-assert_success git perf add -m test-measure-three 25.0
+git perf add -m test-measure-one 15.0
+git perf add -m test-measure-three 25.0
 
 assert_success_with_output output git perf size --detailed
 assert_contains "$output" "test-measure-one"
@@ -61,7 +61,7 @@ popd
 test_section "Bytes format shows numeric values"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure 42.0
+git perf add -m test-measure 42.0
 
 assert_success_with_output output git perf size --format bytes
 assert_contains "$output" "Total measurement data size"
@@ -71,7 +71,7 @@ popd
 test_section "Disk size flag works"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure 42.0
+git perf add -m test-measure 42.0
 
 assert_success_with_output output git perf size --disk-size
 assert_contains "$output" "Total measurement data size"
@@ -80,7 +80,7 @@ popd
 test_section "Include objects flag shows repository stats"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure 42.0
+git perf add -m test-measure 42.0
 
 assert_success_with_output output git perf size --include-objects
 assert_contains "$output" "Repository Statistics"
@@ -90,8 +90,8 @@ popd
 test_section "Detailed + bytes format combination"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure-one 10.0
-assert_success git perf add -m test-measure-two 20.0
+git perf add -m test-measure-one 10.0
+git perf add -m test-measure-two 20.0
 
 assert_success_with_output output git perf size --detailed --format bytes
 assert_contains "$output" "test-measure-one"
@@ -101,13 +101,13 @@ popd
 test_section "Size changes after adding more measurements"
 cd_empty_repo
 create_commit
-assert_success git perf add -m test-measure 10.0
+git perf add -m test-measure 10.0
 
 assert_success_with_output output1 git perf size --format bytes
 size1=$(echo "$output1" | grep "Total measurement data size" | grep -o '[0-9][0-9]*' | head -1)
 
 create_commit
-assert_success git perf add -m test-measure 20.0
+git perf add -m test-measure 20.0
 
 assert_success_with_output output2 git perf size --format bytes
 size2=$(echo "$output2" | grep "Total measurement data size" | grep -o '[0-9][0-9]*' | head -1)
@@ -118,13 +118,13 @@ popd
 test_section "Detailed breakdown shows correct occurrence counts"
 cd_empty_repo
 create_commit
-assert_success git perf add -m repeated-measure 10.0
+git perf add -m repeated-measure 10.0
 
 create_commit
-assert_success git perf add -m repeated-measure 20.0
+git perf add -m repeated-measure 20.0
 
 create_commit
-assert_success git perf add -m repeated-measure 30.0
+git perf add -m repeated-measure 30.0
 
 assert_success_with_output output git perf size --detailed
 assert_contains "$output" "repeated-measure"

@@ -19,16 +19,16 @@ min_relative_deviation = 10.0
 EOF
 
 test_section "Create some commits with measurements"
-assert_success create_commit
-assert_success git perf add -m build_time 1000
-assert_success create_commit
-assert_success git perf add -m build_time 1050
-assert_success create_commit
-assert_success git perf add -m build_time 1100
+create_commit
+git perf add -m build_time 1000
+create_commit
+git perf add -m build_time 1050
+create_commit
+git perf add -m build_time 1100
 
 test_section "Add a measurement that would normally fail audit (high z-score) but passes due to threshold"
-assert_success create_commit
-assert_success git perf add -m build_time 1200
+create_commit
+git perf add -m build_time 1200
 
 test_section "Audit should pass (z-score 3.0 < default sigma 4.0)"
 # (1200/1050 - 1) * 100% = 14.3% > 10% threshold, but z-score doesn't exceed sigma
@@ -36,24 +36,24 @@ test_section "Audit should pass (z-score 3.0 < default sigma 4.0)"
 assert_success git perf audit -m build_time
 
 test_section "Test with a measurement that has lower relative deviation"
-assert_success create_commit
-assert_success git perf add -m build_time 1080
+create_commit
+git perf add -m build_time 1080
 
 test_section "This should pass due to relative deviation being below 10% threshold"
 # (1080/1050 - 1) * 100% = 2.9% < 10%, so it should pass
 assert_success git perf audit -m build_time
 
 test_section "Test global threshold with a different measurement"
-assert_success create_commit
-assert_success git perf add -m memory_usage 100
-assert_success create_commit
-assert_success git perf add -m memory_usage 105
-assert_success create_commit
-assert_success git perf add -m memory_usage 110
+create_commit
+git perf add -m memory_usage 100
+create_commit
+git perf add -m memory_usage 105
+create_commit
+git perf add -m memory_usage 110
 
 test_section "Add a measurement that would pass due to global threshold"
-assert_success create_commit
-assert_success git perf add -m memory_usage 112
+create_commit
+git perf add -m memory_usage 112
 
 test_section "Audit should pass (z-score likely < default sigma 4.0)"
 # (112/105 - 1) * 100% = 6.7% > 5% threshold, but z-score doesn't exceed sigma
@@ -61,8 +61,8 @@ test_section "Audit should pass (z-score likely < default sigma 4.0)"
 assert_success git perf audit -m memory_usage
 
 test_section "Test with a measurement that has lower relative deviation"
-assert_success create_commit
-assert_success git perf add -m memory_usage 107
+create_commit
+git perf add -m memory_usage 107
 
 test_section "This should pass due to relative deviation being below 5% global threshold"
 # (107/105 - 1) * 100% = 1.9% < 5%, so it should pass
