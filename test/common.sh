@@ -303,8 +303,11 @@ assert_success_with_output() {
   local _cmd_output
   local exit_code
 
+  set +e
   _cmd_output=$("$@" 2>&1)
   exit_code=$?
+  set -e
+
   eval "$output_var=\$_cmd_output"
 
   if [[ $exit_code -ne 0 ]]; then
