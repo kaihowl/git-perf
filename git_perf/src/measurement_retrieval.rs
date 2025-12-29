@@ -120,10 +120,13 @@ pub fn walk_commits_from(
     Ok(vec
         .into_iter()
         .take(num_commits)
-        .map(|(commit_id, lines)| -> Result<Commit> {
-            let measurements = crate::serialization::deserialize(&lines.join("\n"));
+        .map(|commit_data| -> Result<Commit> {
+            let measurements =
+                crate::serialization::deserialize(&commit_data.note_lines.join("\n"));
             Ok(Commit {
-                commit: commit_id,
+                commit: commit_data.sha,
+                title: commit_data.title,
+                author: commit_data.author,
                 measurements,
             })
         }))

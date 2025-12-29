@@ -25,6 +25,8 @@ pub struct MeasurementData {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Commit {
     pub commit: String,
+    pub title: String,
+    pub author: String,
     pub measurements: Vec<MeasurementData>,
 }
 

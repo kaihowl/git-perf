@@ -41,6 +41,21 @@ pub use super::git_lowlevel::get_repository_root;
 
 pub use super::git_lowlevel::resolve_committish;
 
+/// Represents a commit with its associated git-notes data and metadata.
+///
+/// This structure is returned by `walk_commits_from` and contains:
+/// - The commit SHA
+/// - Commit title (subject line)
+/// - Author name
+/// - Raw note lines for deserialization
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommitWithNotes {
+    pub sha: String,
+    pub title: String,
+    pub author: String,
+    pub note_lines: Vec<String>,
+}
+
 /// Check if the current repository is a shallow clone
 pub fn is_shallow_repository() -> Result<bool> {
     super::git_lowlevel::is_shallow_repo()
@@ -867,9 +882,11 @@ fn update_read_branch() -> Result<TempRef> {
 ///
 /// # Returns
 ///
-/// Returns a vector of tuples, where each tuple contains:
-/// - The commit SHA-1 hash (String)
-/// - A vector of raw note lines associated with that commit (`Vec<String>`)
+/// Returns a vector of `CommitWithNotes`, where each entry contains:
+/// - The commit SHA-1 hash
+/// - The commit title (subject line)
+/// - The commit author name
+/// - A vector of raw note lines associated with that commit
 ///
 /// # Errors
 ///
@@ -877,6 +894,7 @@ fn update_read_branch() -> Result<TempRef> {
 /// - The starting commit cannot be resolved or does not exist
 /// - Git log operation fails
 /// - The repository is a shallow clone (issues a warning but may still succeed)
+/// - Git log output format is invalid
 ///
 /// # Warnings
 ///
@@ -888,14 +906,11 @@ fn update_read_branch() -> Result<TempRef> {
 /// ```no_run
 /// # use git_perf::git::git_interop::walk_commits_from;
 /// let commits = walk_commits_from("HEAD", 5).unwrap();
-/// for (commit_hash, note_lines) in commits {
-///     println!("Commit: {}, Notes: {} lines", commit_hash, note_lines.len());
+/// for commit in commits {
+///     println!("Commit: {} by {}: {}", commit.sha, commit.author, commit.title);
 /// }
 /// ```
-pub fn walk_commits_from(
-    start_commit: &str,
-    num_commits: usize,
-) -> Result<Vec<(String, Vec<String>)>> {
+pub fn walk_commits_from(start_commit: &str, num_commits: usize) -> Result<Vec<CommitWithNotes>> {
     // update local read branch
     let temp_ref = update_read_branch()?;
 
@@ -912,7 +927,7 @@ pub fn walk_commits_from(
             "-n",
             num_commits.to_string().as_str(),
             "--first-parent",
-            "--pretty=--,%H,%D%n%N",
+            "--pretty=--,%H,%s,%an,%D%n%N",
             "--decorate=full",
             format!("--notes={}", temp_ref.ref_name).as_str(),
             &resolved_commit,
@@ -921,25 +936,46 @@ pub fn walk_commits_from(
     )
     .context(format!("Failed to retrieve commits from {}", start_commit))?;
 
-    let mut commits: Vec<(String, Vec<String>)> = Vec::new();
+    let mut commits: Vec<CommitWithNotes> = Vec::new();
     let mut detected_shallow = false;
-    let mut current_commit: Option<String> = None;
+    let mut current_commit_sha: Option<String> = None;
 
     for l in output.stdout.lines() {
         if l.starts_with("--") {
-            let info = l.split(',').collect_vec();
-            let commit_hash = info
-                .get(1)
-                .expect("No commit header found before measurement line in git log output");
-            detected_shallow |= info[2..].contains(&"grafted");
-            current_commit = Some(commit_hash.to_string());
-            commits.push((commit_hash.to_string(), Vec::new()));
-        } else if let Some(commit_hash) = current_commit.as_ref() {
-            if let Some(last) = commits.last_mut() {
-                last.1.push(l.to_string());
+            // Parse format: --,<sha>,<title>,<author>,<decorations>
+            let parts: Vec<&str> = l.splitn(5, ',').collect();
+            if parts.len() < 5 {
+                bail!(
+                    "Invalid git log format: expected 5 fields, got {}",
+                    parts.len()
+                );
+            }
+
+            let sha = parts[1].to_string();
+            let title = if parts[2].is_empty() {
+                "[no subject]".to_string()
             } else {
-                // Should not happen, but just in case
-                commits.push((commit_hash.to_string(), vec![l.to_string()]));
+                parts[2].to_string()
+            };
+            let author = if parts[3].is_empty() {
+                "[unknown]".to_string()
+            } else {
+                parts[3].to_string()
+            };
+            let decorations = parts[4];
+
+            detected_shallow |= decorations.contains("grafted");
+            current_commit_sha = Some(sha.clone());
+
+            commits.push(CommitWithNotes {
+                sha,
+                title,
+                author,
+                note_lines: Vec::new(),
+            });
+        } else if current_commit_sha.is_some() {
+            if let Some(last) = commits.last_mut() {
+                last.note_lines.push(l.to_string());
             }
         }
     }
@@ -952,7 +988,7 @@ pub fn walk_commits_from(
 }
 
 /// Walk commits starting from HEAD (convenience wrapper)
-pub fn walk_commits(num_commits: usize) -> Result<Vec<(String, Vec<String>)>> {
+pub fn walk_commits(num_commits: usize) -> Result<Vec<CommitWithNotes>> {
     walk_commits_from("HEAD", num_commits)
 }
 
@@ -1256,10 +1292,10 @@ mod test {
         assert!(!commits.is_empty(), "Should have commits");
 
         // Check that HEAD commit has notes
-        let (_, notes) = &commits[0];
-        assert!(!notes.is_empty(), "HEAD should have notes");
+        let commit_with_notes = &commits[0];
+        assert!(!commit_with_notes.note_lines.is_empty(), "HEAD should have notes");
         assert!(
-            notes.iter().any(|n| n.contains("test:")),
+            commit_with_notes.note_lines.iter().any(|n| n.contains("test:")),
             "Notes should contain our test data"
         );
     }

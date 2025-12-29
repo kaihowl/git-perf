@@ -247,6 +247,8 @@ fn audit_with_commits(
     let commits_iter = commits.iter().map(|r| match r {
         Ok(commit) => Ok(Commit {
             commit: commit.commit.clone(),
+            title: commit.title.clone(),
+            author: commit.author.clone(),
             measurements: commit.measurements.clone(),
         }),
         Err(e) => Err(anyhow::anyhow!("{}", e)),
@@ -1340,6 +1342,8 @@ dispersion_method = "mad"
         let commits = vec![
             Ok(Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![
                     MeasurementData {
                         epoch: 0,
@@ -1378,6 +1382,8 @@ dispersion_method = "mad"
             }),
             Ok(Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![
                     MeasurementData {
                         epoch: 0,
@@ -1505,6 +1511,8 @@ dispersion_method = "mad"
         // Create mock commits
         let commits = vec![Ok(Commit {
             commit: "abc123".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![
                 MeasurementData {
                     epoch: 0,

@@ -711,6 +711,36 @@ impl PlotlyReporter {
 
         self.current_plot.add_trace(trace);
     }
+
+    /// Prepare hover text for data points based on commit indices
+    ///
+    /// For each commit index in the provided indexed data, creates a hover text string
+    /// containing the short commit hash, author name, and commit title.
+    ///
+    /// # Arguments
+    /// * `indices` - Iterator of commit indices to generate hover text for
+    ///
+    /// # Returns
+    /// Vector of hover text strings in HTML format, one per index
+    fn prepare_hover_text(&self, indices: impl Iterator<Item = usize>) -> Vec<String> {
+        indices
+            .map(|idx| {
+                // Handle reversed commits (size - 1 - idx)
+                let commit_idx = self.size.saturating_sub(1).saturating_sub(idx);
+                if let Some(commit) = self.all_commits.get(commit_idx) {
+                    format!(
+                        "Commit: {}<br>Author: {}<br>Title: {}",
+                        &commit.commit[..7.min(commit.commit.len())],
+                        commit.author,
+                        commit.title
+                    )
+                } else {
+                    // Fallback if commit not found
+                    format!("Commit index: {}", idx)
+                }
+            })
+            .collect()
+    }
 }
 
 impl<'a> Reporter<'a> for PlotlyReporter {
@@ -834,6 +864,9 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         measurement_name: &str,
         group_values: &[String],
     ) {
+        // Extract indices for hover text before consuming indexed_measurements
+        let indices: Vec<usize> = indexed_measurements.iter().map(|(i, _)| *i).collect();
+
         let (x, y) = self.convert_to_x_y(
             indexed_measurements
                 .into_iter()
@@ -847,7 +880,10 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         let measurement_display = format_measurement_with_unit(measurement_name);
 
-        let trace = plotly::BoxPlot::new_xy(x, y);
+        // Prepare hover text with commit metadata
+        let hover_texts = self.prepare_hover_text(indices.into_iter());
+
+        let trace = plotly::BoxPlot::new_xy(x, y).hover_text_array(hover_texts);
 
         let trace = if !group_values.is_empty() {
             // Join group values with "/" for display (only at display time)
@@ -870,6 +906,9 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         measurement_name: &str,
         group_values: &[String],
     ) {
+        // Extract indices for hover text before consuming indexed_measurements
+        let indices: Vec<usize> = indexed_measurements.iter().map(|(i, _)| *i).collect();
+
         let (x, y) = self.convert_to_x_y(
             indexed_measurements
                 .into_iter()
@@ -883,7 +922,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         let measurement_display = format_measurement_with_unit(measurement_name);
 
-        let trace = plotly::Scatter::new(x, y).name(&measurement_display);
+        // Prepare hover text with commit metadata
+        let hover_texts = self.prepare_hover_text(indices.into_iter());
+
+        let trace = plotly::Scatter::new(x, y)
+            .name(&measurement_display)
+            .hover_text_array(hover_texts)
+            .hover_info(plotly::common::HoverInfo::Text);
 
         let trace = if !group_values.is_empty() {
             // Join group values with "/" for display (only at display time)
@@ -1950,10 +1995,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc1234567890".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def0987654321".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -1972,6 +2021,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "abc1234567890".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
 
@@ -2049,10 +2100,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2121,6 +2176,8 @@ mod tests {
         // Add commits
         let commits = vec![Commit {
             commit: "abc123".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2157,6 +2214,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "abc123def456".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2186,6 +2245,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "commit123".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2226,10 +2287,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "commit1".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "commit2".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2271,6 +2336,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "hash1".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2301,6 +2368,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "abc".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2328,14 +2397,20 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "ghi789".to_string(),
+                title: "test: commit 3".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2400,10 +2475,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2445,6 +2524,8 @@ mod tests {
         let commits: Vec<Commit> = (0..5)
             .map(|i| Commit {
                 commit: format!("sha{:06}", i),
+                title: format!("test: commit {}", i),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             })
             .collect();
@@ -2517,10 +2598,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123def".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "xyz789abc".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];

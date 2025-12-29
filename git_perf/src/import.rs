@@ -242,7 +242,7 @@ mod tests {
 
         // Get initial notes count before import
         let commits_before = walk_commits(1).unwrap();
-        let notes_before = commits_before[0].1.len();
+        let notes_before = commits_before[0].note_lines.len();
 
         let result = handle_import(ImportOptions {
             commit: "HEAD".to_string(),
@@ -259,7 +259,7 @@ mod tests {
 
         // Verify no new measurements were stored (dry run)
         let commits_after = walk_commits(1).unwrap();
-        let notes_after = commits_after[0].1.len();
+        let notes_after = commits_after[0].note_lines.len();
 
         assert_eq!(
             notes_after, notes_before,
@@ -292,7 +292,7 @@ mod tests {
 
         // Verify measurements were stored
         let commits = walk_commits(1).unwrap();
-        let notes = &commits[0].1;
+        let notes = &commits[0].note_lines;
 
         // Should have 2 measurements (passed and failed tests with durations)
         // Skipped test has no time attribute so it's not imported
@@ -343,7 +343,7 @@ mod tests {
         assert!(result.is_ok(), "Import with prefix should succeed");
 
         let commits = walk_commits(1).unwrap();
-        let notes_text = commits[0].1.join("\n");
+        let notes_text = commits[0].note_lines.join("\n");
 
         assert!(
             notes_text.contains("ci::test::test_passed"),
@@ -377,7 +377,7 @@ mod tests {
         assert!(result.is_ok(), "Import with metadata should succeed");
 
         let commits = walk_commits(1).unwrap();
-        let notes_text = commits[0].1.join("\n");
+        let notes_text = commits[0].note_lines.join("\n");
 
         // Metadata should be included in the stored measurements
         assert!(
@@ -414,7 +414,7 @@ mod tests {
         assert!(result.is_ok(), "Import with filter should succeed");
 
         let commits = walk_commits(1).unwrap();
-        let notes_text = commits[0].1.join("\n");
+        let notes_text = commits[0].note_lines.join("\n");
 
         assert!(
             notes_text.contains("test::test_passed"),
@@ -453,7 +453,7 @@ mod tests {
         );
 
         let commits = walk_commits(1).unwrap();
-        let notes_text = commits[0].1.join("\n");
+        let notes_text = commits[0].note_lines.join("\n");
 
         // Should have multiple statistics per benchmark
         assert!(
@@ -518,7 +518,7 @@ mod tests {
 
         // Get initial notes count before import
         let commits_before = walk_commits(1).unwrap();
-        let notes_before = commits_before[0].1.len();
+        let notes_before = commits_before[0].note_lines.len();
 
         let result = handle_import(ImportOptions {
             commit: "HEAD".to_string(),
@@ -536,7 +536,7 @@ mod tests {
 
         // Verify no new measurements were added
         let commits_after = walk_commits(1).unwrap();
-        let notes_after = commits_after[0].1.len();
+        let notes_after = commits_after[0].note_lines.len();
 
         assert_eq!(
             notes_after, notes_before,
@@ -615,7 +615,7 @@ mod tests {
 
         // Verify measurements were stored
         let commits = walk_commits(1).unwrap();
-        let notes = &commits[0].1;
+        let notes = &commits[0].note_lines;
 
         assert!(
             notes.len() >= 2,
