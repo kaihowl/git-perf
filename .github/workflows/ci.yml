@@ -41,7 +41,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v6
       with:
-        fetch-depth: 40
+        fetch-depth: 50
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -257,11 +257,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 40
+          fetch-depth: 50
 
       - uses: ./.github/actions/report
         with:
-          depth: 40
+          depth: 50
           additional-args: '-s rust'
           audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable"'
           git-perf-version: 'branch'
