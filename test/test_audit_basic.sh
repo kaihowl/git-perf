@@ -27,7 +27,6 @@ assert_success git perf audit -m timer -d 2
 assert_failure git perf audit -m timer -d 1.9999
 assert_failure git perf audit -m timer -d 1
 
-
 test_section "Initial measurements with too few data points"
 cd_empty_repo
 # mean: 15, std: 5
@@ -49,7 +48,6 @@ assert_failure git perf audit -m timer -d 2
 assert_success git perf audit -m timer -d 2 --min-measurements 10
 assert_success git perf audit -m timer -d 2 --min-measurements 4
 assert_failure git perf audit -m timer -d 2 --min-measurements 3
-
 
 test_section "Stable measurements with zero stddev"
 cd_empty_repo

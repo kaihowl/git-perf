@@ -1,7 +1,6 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
@@ -48,6 +47,8 @@ else
   export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
 fi
 
+test_section "Setup repository with measurements"
+
 cd "$(mktemp -d)"
 
 mkdir orig
@@ -59,36 +60,42 @@ popd
 git clone "$orig" my-first-checkout
 pushd my-first-checkout
 
+test_section "Add measurement 28 days ago"
+
 # --- 28 days ago
 export FAKETIME='-28d'
 
-echo Add measurement on commit in the past
 create_commit
 git perf add -m test-measure-one 10.0
-num_measurements=$(git perf report -o - | wc -l)
+assert_success_with_output report git perf report -o -
+num_measurements=$(echo "$report" | wc -l)
 # Exactly one measurement should be present (plus header row = 2 lines)
-[[ ${num_measurements} -eq 2 ]] || exit 1
+assert_equals "$num_measurements" "2" "Expected 1 measurement plus header"
 
 # Only published measurements can be expired
 git perf push
 
+test_section "Test remove with 7 day threshold (should keep measurement)"
+
 # Note: --older-than uses <= (inclusive), so measurements at exactly 7 days will be removed
 # These tests will become flaky if run at exactly the 7 day boundary
-echo "Remove measurements on commits older than 7 days"
-git perf remove --older-than 7d || bash -i
-num_measurements=$(git perf report -o - | wc -l)
+git perf remove --older-than 7d
+assert_success_with_output report git perf report -o -
+num_measurements=$(echo "$report" | wc -l)
 # Nothing should have been removed (1 measurement + header = 2 lines)
-[[ ${num_measurements} -eq 2 ]] || exit 1
+assert_equals "$num_measurements" "2" "Expected 1 measurement still present"
+
+test_section "Add newer measurement 14 days ago"
 
 # --- 14 days ago
 export FAKETIME='-14d'
 
-echo "Add a commit with a newer measurement"
 create_commit
 git perf add -m test-measure-two 20.0
-num_measurements=$(git perf report -o - | wc -l)
+assert_success_with_output report git perf report -o -
+num_measurements=$(echo "$report" | wc -l)
 # Two measurements should be there (plus header = 3 lines)
-[[ ${num_measurements} -eq 3 ]] || exit 1
+assert_equals "$num_measurements" "3" "Expected 2 measurements plus header"
 
 # Only published measurements can be expired
 git perf push
@@ -100,13 +107,16 @@ prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
 git for-each-ref
-echo "Remove older than 7 days measurements"
+
+test_section "Remove measurements older than 7 days"
+
 git perf remove --older-than 7d
-num_measurements=$(git perf report -o - | wc -l)
+assert_success_with_output report git perf report -o -
+num_measurements=$(echo "$report" | wc -l)
 # One measurement should still be there (plus header = 2 lines)
-[[ ${num_measurements} -eq 2 ]] || exit 1
+assert_equals "$num_measurements" "2" "Expected 1 measurement after removal"
 # The measurement should be 20.0
-git perf report -o - | grep '20\.0'
+assert_contains "$report" "20.0" "Expected to find the 20.0 measurement"
 
 if git_objects_contain test-measure-one; then
   echo "Unexpectedly still found test-measure-one in the git objects"
@@ -116,12 +126,19 @@ if git_objects_contain test-measure-one; then
   exit 1
 fi
 
+git reflog expire --expire=all --all
+git prune --expire=now
+cur_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
+cur_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
+
 if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; then
   echo "The number of objects now ($cur_objects + $cur_in_pack)
   is not less than previously ($prev_objects + $prev_in_pack)"
   echo "Drop compaction has not worked"
   exit 1
 fi
+
+test_section "Remove all remaining measurements (7 days ago)"
 
 # -- 7 days ago
 export FAKETIME='-7d'
@@ -132,12 +149,11 @@ git prune --expire=now
 prev_objects=$(git count-objects -v | awk '/count:/ { print $2 }')
 prev_in_pack=$(git count-objects -v | awk '/in-pack:/ { print $2 }')
 
-echo "Remove older than 7 days measurements"
 git perf remove --older-than 7d
 
-num_measurements=$(git perf report -o - | wc -l)
-# No measurement should be there
-[[ ${num_measurements} -eq 0 ]] || exit 1
+# When there are no measurements, git perf report should fail with "No performance measurements found."
+assert_failure_with_output report git perf report -o -
+assert_contains "$report" "No performance measurements found" "Expected error message about no measurements"
 
 git reflog expire --expire=all --all
 git prune --expire=now
@@ -166,26 +182,24 @@ if ! [[ $((cur_objects + cur_in_pack)) -lt $((prev_objects + prev_in_pack)) ]]; 
   exit 1
 fi
 
-echo "Add a commit with a newer measurement"
+test_section "Add new measurement and verify cleanup"
+
 create_commit
 git perf add -m test-measure-three 30.0
 
 git push
 git perf push
 
-num_measurements=$(git perf report -o - | wc -l)
+assert_success_with_output report git perf report -o -
+num_measurements=$(echo "$report" | wc -l)
 # One measurement should be there (plus header = 2 lines)
-[[ ${num_measurements} -eq 2 ]] || exit 1
+assert_equals "$num_measurements" "2" "Expected 1 measurement after adding new one"
 
 # Verify that temporary write branches are cleaned up after push
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
-if [[ 1 -ne $ref_count ]]; then
-  echo "Expected only the permanent git perf ref after push, but found ${ref_count} refs"
-  echo "Current refs:"
-  git for-each-ref '**/notes/perf-*'
-  exit 1
-fi
+assert_equals "$ref_count" "1" "Expected only the permanent git perf ref after push"
 
 popd
 
+test_stats
 exit 0

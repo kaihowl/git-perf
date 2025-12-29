@@ -1,16 +1,12 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-## Test git-perf operations without seed measurements
-# This test verifies that operations handle gracefully the absence of any measurements
-
-echo "Testing operations without seed measurements..."
+test_section "Setup repository without seed measurements"
 
 # Create a fresh repository environment without seed measurement
 cd "$(mktemp -d)"
@@ -27,55 +23,61 @@ pushd work_noseed > /dev/null
 git commit --allow-empty -m 'test commit without seed' > /dev/null 2>&1
 git push > /dev/null 2>&1
 
-echo "Testing remove operation without seed measurements..."
-# Test remove operation without any measurements (should handle gracefully)
-output=$(git perf remove --older-than '7d' 2>&1 1>/dev/null) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]]; then
-    echo "SUCCESS: Remove operation handled empty measurement set gracefully"
+test_section "Testing remove operation without seed measurements"
+
+# Test remove operation without any measurements (should handle gracefully or fail with expected message)
+# Note: We use a compound test here since either success or specific error is acceptable
+if git perf remove --older-than '7d' > /dev/null 2>&1; then
+    # Operation succeeded - that's acceptable behavior
+    true
 else
-    # Check if output contains expected error messages
-    if [[ ${output} == *'No performance measurements found'* ]] || [[ ${output} == *'This repo does not have any measurements'* ]]; then
-        echo "SUCCESS: Remove operation correctly reported no measurements available"
-    else
-        echo "INFO: Remove operation failed on empty measurement set with: $output"
-        # This might be expected behavior - some operations may fail without measurements
+    # Operation failed - check for expected error messages
+    assert_failure_with_output output git perf remove --older-than '7d'
+    # Either of these messages is acceptable
+    if [[ $output != *'No performance measurements found'* ]] && [[ $output != *'This repo does not have any measurements'* ]]; then
+        # If neither expected message is present, we still accept it as implementation-specific
+        true
     fi
 fi
 
-echo "Testing prune operation without seed measurements..."
-# Test prune operation without any measurements (should handle gracefully)
-output=$(git perf prune 2>&1 1>/dev/null) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]]; then
-    echo "SUCCESS: Prune operation handled empty measurement set gracefully"
+test_section "Testing prune operation without seed measurements"
+
+# Test prune operation without any measurements (should handle gracefully or fail with expected message)
+if git perf prune > /dev/null 2>&1; then
+    # Operation succeeded - that's acceptable behavior
+    true
 else
-    # Check if output contains expected error messages
-    if [[ ${output} == *'No performance measurements found'* ]] || [[ ${output} == *'This repo does not have any measurements'* ]]; then
-        echo "SUCCESS: Prune operation correctly reported no measurements available"
-    else
-        echo "INFO: Prune operation failed on empty measurement set with: $output"
-        # This might be expected behavior - some operations may fail without measurements
+    # Operation failed - check for expected error messages
+    assert_failure_with_output output git perf prune
+    # Either of these messages is acceptable
+    if [[ $output != *'No performance measurements found'* ]] && [[ $output != *'This repo does not have any measurements'* ]]; then
+        # If neither expected message is present, we still accept it as implementation-specific
+        true
     fi
 fi
 
-echo "Testing report operation without seed measurements..."
+test_section "Testing report operation without seed measurements"
+
 # Test report operation without any measurements (should handle gracefully)
-output=$(git perf report -o - 2>&1) && exit_code=0 || exit_code=$?
-if [[ $exit_code -eq 0 ]]; then
+if git perf report -o - > /dev/null 2>&1; then
+    # Operation succeeded - verify it returns empty or minimal output
+    assert_success_with_output output git perf report -o -
     report_lines=$(echo "$output" | wc -l)
+    # Empty result is acceptable (0 or 1 line with only whitespace)
     if [[ $report_lines -eq 0 ]] || [[ $report_lines -eq 1 && -z "$(echo "$output" | tr -d '[:space:]')" ]]; then
-        echo "SUCCESS: Report operation correctly returned empty result for no measurements"
-    else
-        echo "INFO: Report operation returned $report_lines lines for empty measurement set"
+        true
     fi
 else
-    # Check if output contains expected error message
-    if [[ ${output} == *'No performance measurements found'* ]]; then
-        echo "SUCCESS: Report operation correctly reported no measurements available"
-    else
-        echo "INFO: Report operation failed on empty measurement set with: $output"
+    # Operation failed - check for expected error message
+    assert_failure_with_output output git perf report -o -
+    # This message is acceptable
+    if [[ $output != *'No performance measurements found'* ]]; then
+        # Other error messages are also acceptable for this edge case
+        true
     fi
 fi
 
 popd > /dev/null  # exit work_noseed
 
-echo "All operations without seed measurements tested successfully"
+test_stats
+exit 0

@@ -1,33 +1,29 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
 
-## Check git perf list-commits functionality
+test_section "Check git perf list-commits functionality"
 
-# Test with empty repository (no measurements)
+test_section "Test with empty repository (no measurements)"
 cd_empty_repo
-output=$(git perf list-commits)
-if [ -n "$output" ]; then
-  echo "Expected empty output for repository without measurements"
-  exit 1
-fi
+assert_success_with_output output git perf list-commits
+assert_equals "$output" "" "Expected empty output for repository without measurements"
 popd
 
-# Test with single measurement
+test_section "Test with single measurement"
 cd_empty_repo
 create_commit
 current_commit=$(git rev-parse HEAD)
 git perf add -m test 1.0
-output=$(git perf list-commits)
-assert_output_contains "$output" "$current_commit" "Expected current commit in list-commits output"
+assert_success_with_output output git perf list-commits
+assert_contains "$output" "$current_commit" "Expected current commit in list-commits output"
 popd
 
-# Test with multiple measurements
+test_section "Test with multiple measurements"
 cd_empty_repo
 create_commit
 first_commit=$(git rev-parse HEAD)
@@ -37,19 +33,16 @@ create_commit
 second_commit=$(git rev-parse HEAD)
 git perf add -m test 2.0
 
-output=$(git perf list-commits)
-assert_output_contains "$output" "$first_commit" "Expected first commit in list-commits output"
-assert_output_contains "$output" "$second_commit" "Expected second commit in list-commits output"
+assert_success_with_output output git perf list-commits
+assert_contains "$output" "$first_commit" "Expected first commit in list-commits output"
+assert_contains "$output" "$second_commit" "Expected second commit in list-commits output"
 
 # Verify output is one commit per line
 line_count=$(echo "$output" | wc -l)
-if [ "$line_count" -ne 2 ]; then
-  echo "Expected 2 lines of output, got $line_count"
-  exit 1
-fi
+assert_equals "$line_count" "2" "Expected 2 lines of output"
 popd
 
-# Test after removing measurements (requires remote for publish/remove)
+test_section "Test after removing measurements (requires remote for publish/remove)"
 pushd "$(mktemp -d)"
 mkdir bare_repo
 pushd bare_repo
@@ -66,8 +59,8 @@ git perf add -m test 1.0
 git perf push
 
 # Verify measurement was added
-output=$(git perf list-commits)
-assert_output_contains "$output" "$current_commit" "Expected commit to have measurement before removal"
+assert_success_with_output output git perf list-commits
+assert_contains "$output" "$current_commit" "Expected commit to have measurement before removal"
 
 # Wait a moment to ensure timestamp difference
 sleep 2
@@ -76,13 +69,10 @@ sleep 2
 git perf remove --older-than 0d
 
 # Verify measurement was removed
-output=$(git perf list-commits)
-if [ -n "$output" ]; then
-  echo "Expected empty output after removing all measurements"
-  echo "Got: $output"
-  exit 1
-fi
+assert_success_with_output output git perf list-commits
+assert_equals "$output" "" "Expected empty output after removing all measurements"
 popd
 popd
 
-echo "All tests passed!"
+test_stats
+exit 0

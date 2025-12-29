@@ -1,11 +1,12 @@
 #!/bin/bash
 
-set -e
-set -x
+export TEST_TRACE=0
 
 script_dir=$(unset CDPATH; cd "$(dirname "$0")" > /dev/null; pwd -P)
 # shellcheck source=test/common.sh
 source "$script_dir/common.sh"
+
+test_section "Setup repository and add measurements"
 
 cd "$(mktemp -d)"
 
@@ -24,32 +25,25 @@ for _i in $(seq 1 10); do
   git perf add -m test-measure 10
 done
 
-ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
+test_section "Verify temporary refs after add operations"
 
-if [[ 2 -ne $ref_count ]]; then
-  echo "Expected the symbolic write-ref and the target write ref to be added after the initial add(s)"
-  echo "Current refs:"
-  git for-each-ref '**/notes/perf-*'
-  exit 1
-fi
+ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
+assert_equals "$ref_count" "2" "Expected the symbolic write-ref and the target write ref after initial add(s)"
+
+test_section "Verify temporary refs persist after report"
 
 git perf report
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
+assert_equals "$ref_count" "2" "Expected the symbolic write-ref and the target write ref to be present after report"
 
-if [[ 2 -ne $ref_count ]]; then
-  echo "Expected the symbolic write-ref and the target write ref to be present after the report"
-  echo "Current refs:"
-  git for-each-ref '**/notes/perf-*'
-  exit 1
-fi
+test_section "Verify temporary refs cleaned up after push"
 
 git perf push
 ref_count=$(git for-each-ref '**/notes/perf-*' | wc -l)
+assert_equals "$ref_count" "1" "Expected only the permanent git perf ref after first push"
 
-if [[ 1 -ne $ref_count ]]; then
-  echo "Expected only the permanent git perf ref to be present after the first push"
-  echo "Current refs:"
-  git for-each-ref '**/notes/perf-*'
-  exit 1
-fi
+popd
+
+test_stats
+exit 0
 
