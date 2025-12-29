@@ -34,15 +34,15 @@ test_section "Verify measurements are retrievable from correct commits"
 # Verify measurements can be reported from each commit (-n 1 limits to just that commit)
 first_report=$(git perf report "$first_commit" -o - -n 1)
 assert_contains "$first_report" "test_metric" "Report for first commit should show test_metric"
-assert_contains "$first_report" "100" "Report for first commit should show value 100"
+assert_matches "$first_report" "100\.0[[:space:]]*($|\n)" "Report for first commit should show value 100"
 
 second_report=$(git perf report "$second_commit" -o - -n 1)
 assert_contains "$second_report" "test_metric" "Report for second commit should show test_metric"
-assert_contains "$second_report" "200" "Report for second commit should show value 200"
+assert_matches "$second_report" "200\.0[[:space:]]*($|\n)" "Report for second commit should show value 200"
 
 third_report=$(git perf report "$third_commit" -o - -n 1)
 assert_contains "$third_report" "test_metric" "Report for third commit should show test_metric"
-assert_contains "$third_report" "300" "Report for third commit should show value 300"
+assert_matches "$third_report" "300\.0[[:space:]]*($|\n)" "Report for third commit should show value 300"
 
 test_section "Verify cross-contamination does not occur"
 
