@@ -62,6 +62,10 @@ inputs:
     description: 'Path to custom report template (relative to repo root). If empty, uses no template.'
     required: false
     default: ''
+  skip-install:
+    description: 'Skip installation of git-perf (assumes already installed). For internal workflows only.'
+    required: false
+    default: 'false'
 
 outputs:
   report-url:
@@ -96,14 +100,8 @@ runs:
           echo "✓ Using root directory (no subdirectory specified)"
         fi
 
-    - name: Install git-perf (from branch - internal testing)
-      if: ${{ inputs.git-perf-version == 'branch' }}
-      uses: ./.github/actions/install
-      with:
-        release: 'branch'
-
-    - name: Install git-perf (from release - external usage)
-      if: ${{ inputs.git-perf-version != 'branch' }}
+    - name: Install git-perf (from release version)
+      if: ${{ inputs.skip-install != 'true' }}
       shell: bash
       run: |
         latest=""

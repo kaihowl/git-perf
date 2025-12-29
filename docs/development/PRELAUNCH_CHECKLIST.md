@@ -42,9 +42,11 @@ This checklist covers items to review and complete before publicly announcing th
 - [x] License file (MIT)
 
 ### GitHub Actions Integration
-- [x] Install action (`.github/actions/install/action.yml`)
+- [x] Report action (`.github/actions/report/action.yml`)
+  - Includes automatic installation of git-perf from releases
+  - Supports `skip-install` parameter for internal workflows
+- [x] Cleanup action (`.github/actions/cleanup/action.yml`)
 - [x] Used in CI workflows
-- [x] Supports both `latest` and `branch` installation
 
 ## ⚠️ Known Gaps - High Priority
 

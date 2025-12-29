@@ -259,12 +259,22 @@ jobs:
         with:
           fetch-depth: 40
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Install git-perf from branch
+        run: |
+          cargo install --path git_perf
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
       - uses: ./.github/actions/report
         with:
           depth: 40
           additional-args: '-s rust'
           audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable"'
-          git-perf-version: 'branch'
+          skip-install: 'true'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
           size-use-disk-size: 'true'

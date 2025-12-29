@@ -41,14 +41,8 @@ runs:
         git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
 
-    - name: Install git-perf (from branch - internal testing)
-      if: ${{ inputs.git-perf-version == 'branch' }}
-      uses: ./.github/actions/install
-      with:
-        release: 'branch'
-
-    - name: Install git-perf (from release - external usage)
-      if: ${{ inputs.git-perf-version != 'skip' && inputs.git-perf-version != 'branch' }}
+    - name: Install git-perf (from release version)
+      if: ${{ inputs.git-perf-version != 'skip' }}
       shell: bash
       run: |
         latest=""

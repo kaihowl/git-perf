@@ -220,7 +220,6 @@ Test the cleanup before running it:
 
 ## See Also
 
-- [git-perf Install Action](../install/README.md)
 - [git-perf Report Action](../report/README.md)
 - [git-perf Documentation](https://github.com/kaihowl/git-perf)
-- [Integration Tutorial](../../../docs/INTEGRATION_TUTORIAL.md) *(coming soon)*
+- [Integration Tutorial](../../../docs/INTEGRATION_TUTORIAL.md)

@@ -84,11 +84,11 @@ Resources for contributors and developers:
 
 Reusable GitHub Actions for CI/CD integration:
 
-- **[Install Action](../.github/actions/install/)** - Install git-perf in workflows
 - **[Report Action](../.github/actions/report/)** - Generate and publish performance reports
   - Automatic PR comments with results
   - GitHub Pages integration
   - Audit integration
+  - Includes automatic installation of git-perf
 - **[Cleanup Action](../.github/actions/cleanup/)** - Remove old measurements and reports
   - Configurable retention periods
   - Dry-run support
