@@ -34,15 +34,15 @@ test_section "Verify measurements are retrievable from correct commits"
 # Verify measurements can be reported from each commit (-n 1 limits to just that commit)
 first_report=$(git perf report "$first_commit" -o - -n 1)
 assert_contains "$first_report" "test_metric" "Report for first commit should show test_metric"
-assert_matches "$first_report" "100\.0[[:space:]]*($|\n)" "Report for first commit should show value 100"
+assert_matches "$first_report" $'[[:space:]]100\\.0[[:space:]]' "Report for first commit should show value 100"
 
 second_report=$(git perf report "$second_commit" -o - -n 1)
 assert_contains "$second_report" "test_metric" "Report for second commit should show test_metric"
-assert_matches "$second_report" "200\.0[[:space:]]*($|\n)" "Report for second commit should show value 200"
+assert_matches "$second_report" $'[[:space:]]200\\.0[[:space:]]' "Report for second commit should show value 200"
 
 third_report=$(git perf report "$third_commit" -o - -n 1)
 assert_contains "$third_report" "test_metric" "Report for third commit should show test_metric"
-assert_matches "$third_report" "300\.0[[:space:]]*($|\n)" "Report for third commit should show value 300"
+assert_matches "$third_report" $'[[:space:]]300\\.0[[:space:]]' "Report for third commit should show value 300"
 
 test_section "Verify cross-contamination does not occur"
 
@@ -70,7 +70,7 @@ git perf add -m default_metric 999
 # Verify the measurement is on HEAD
 head_report=$(git perf report "$head_commit" -o - -n 1)
 assert_contains "$head_report" "default_metric" "HEAD commit should have default_metric"
-assert_contains "$head_report" "999" "HEAD commit should have value 999"
+assert_matches "$head_report" $'[[:space:]]999\\.0[[:space:]]' "HEAD commit should have value 999"
 
 # Verify previous commits don't have this new measurement
 first_report_check=$(git perf report "$first_commit" -o - -n 1)
@@ -86,11 +86,11 @@ git perf add -m metric_b 2222 --commit "$first_commit"
 # Verify all measurements are on the same commit via report command
 first_report_multi=$(git perf report "$first_commit" -o - -n 1)
 assert_contains "$first_report_multi" "test_metric" "First commit should still have test_metric"
-assert_contains "$first_report_multi" "100" "First commit should still have value 100"
+assert_matches "$first_report_multi" $'[[:space:]]100\\.0[[:space:]]' "First commit should still have value 100"
 assert_contains "$first_report_multi" "metric_a" "First commit should have metric_a"
-assert_contains "$first_report_multi" "1111" "First commit should have value 1111"
+assert_matches "$first_report_multi" $'[[:space:]]1111\\.0[[:space:]]' "First commit should have value 1111"
 assert_contains "$first_report_multi" "metric_b" "First commit should have metric_b"
-assert_contains "$first_report_multi" "2222" "First commit should have value 2222"
+assert_matches "$first_report_multi" $'[[:space:]]2222\\.0[[:space:]]' "First commit should have value 2222"
 
 # Verify these new metrics didn't leak to other commits
 second_report_check=$(git perf report "$second_commit" -o - -n 1)
