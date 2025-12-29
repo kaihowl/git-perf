@@ -1293,9 +1293,15 @@ mod test {
 
         // Check that HEAD commit has notes
         let commit_with_notes = &commits[0];
-        assert!(!commit_with_notes.note_lines.is_empty(), "HEAD should have notes");
         assert!(
-            commit_with_notes.note_lines.iter().any(|n| n.contains("test:")),
+            !commit_with_notes.note_lines.is_empty(),
+            "HEAD should have notes"
+        );
+        assert!(
+            commit_with_notes
+                .note_lines
+                .iter()
+                .any(|n| n.contains("test:")),
             "Notes should contain our test data"
         );
     }
