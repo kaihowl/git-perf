@@ -469,6 +469,8 @@ fn audit_with_data(
 
 #[cfg(test)]
 mod test {
+    use crate::test_helpers::with_isolated_test_setup;
+
     use super::*;
 
     #[test]
@@ -561,23 +563,25 @@ mod test {
         // This test exercises the actual production audit_multiple function
         // Tests the case where no patterns are provided (empty list)
         // With no patterns, it should succeed (nothing to audit)
-        let result = audit_multiple(
-            "HEAD",
-            100,
-            Some(1),
-            &[],
-            Some(ReductionFunc::Mean),
-            Some(2.0),
-            Some(DispersionMethod::StandardDeviation),
-            &[], // Empty combined_patterns
-            false,
-        );
+        with_isolated_test_setup(|_git_dir, _home_path| {
+            let result = audit_multiple(
+                "HEAD",
+                100,
+                Some(1),
+                &[],
+                Some(ReductionFunc::Mean),
+                Some(2.0),
+                Some(DispersionMethod::StandardDeviation),
+                &[], // Empty combined_patterns
+                false,
+            );
 
-        // Should succeed when no measurements need to be audited
-        assert!(
-            result.is_ok(),
-            "audit_multiple should succeed with empty pattern list"
-        );
+            // Should succeed when no measurements need to be audited
+            assert!(
+                result.is_ok(),
+                "audit_multiple should succeed with empty pattern list"
+            );
+        });
     }
 
     // MUTATION TESTING COVERAGE TESTS - Exercise actual production code paths
