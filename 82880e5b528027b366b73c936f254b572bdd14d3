@@ -66,3 +66,5 @@
 57380604report-benchmark1767026772.484802221264075.0os=ubuntu-22.04rust=stable
 
 57380604report-benchmark1767026772.519786621252532.0rust=stableos=ubuntu-22.04
+
+187132017report-size-benchmark1767026772.538519111614.0rust=stableos=ubuntu-22.04
