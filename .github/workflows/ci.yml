@@ -274,7 +274,7 @@ jobs:
           depth: 40
           additional-args: '-s rust'
           audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable"'
-          skip-install: 'true'
+          git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
           size-use-disk-size: 'true'

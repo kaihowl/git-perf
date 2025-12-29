@@ -88,7 +88,6 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
 | `show-changes` | Whether to detect and display change points in the report | No | `false` |
 | `template` | Path to custom report template (relative to repo root). Empty for default single-plot report | No | `` |
-| `skip-install` | Skip installation of git-perf (assumes already installed). For internal workflows only. | No | `false` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
 
 ### Common Audit Arguments

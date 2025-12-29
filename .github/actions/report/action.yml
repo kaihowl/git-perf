@@ -24,7 +24,7 @@ inputs:
     required: false
     default: ''
   git-perf-version:
-    description: 'Version of git-perf to use (latest, or specific version)'
+    description: 'Version of git-perf to use (latest, specific version, or `skip` to use already installed version)'
     required: false
     default: 'latest'
   github-token:
@@ -62,10 +62,6 @@ inputs:
     description: 'Path to custom report template (relative to repo root). If empty, uses no template.'
     required: false
     default: ''
-  skip-install:
-    description: 'Skip installation of git-perf (assumes already installed). For internal workflows only.'
-    required: false
-    default: 'false'
 
 outputs:
   report-url:
@@ -101,7 +97,7 @@ runs:
         fi
 
     - name: Install git-perf (from release version)
-      if: ${{ inputs.skip-install != 'true' }}
+      if: ${{ inputs.git-perf-version != 'skip' }}
       shell: bash
       run: |
         latest=""
