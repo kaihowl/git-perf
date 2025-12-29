@@ -29,7 +29,7 @@ runs:
     - uses: actions/checkout@v6
       if: ${{ inputs.release == 'branch' }}
       with:
-        fetch-depth: 40
+        fetch-depth: 50
     - name: Install Rust
       if: ${{ inputs.release == 'branch' }}
       uses: dtolnay/rust-toolchain@master
