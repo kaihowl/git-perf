@@ -463,7 +463,7 @@ fn display_json(info: &ConfigInfo) -> Result<()> {
 mod tests {
     use super::*;
     use crate::test_helpers::{
-        hermetic_git_env, with_isolated_home, with_isolated_test_setup, write_gitperfconfig,
+        with_isolated_home, with_isolated_test_setup, write_gitperfconfig,
     };
     use std::env;
     use std::fs;
@@ -480,7 +480,6 @@ mod tests {
 
     #[test]
     fn test_find_system_config_xdg() {
-        hermetic_git_env();
         with_isolated_home(|home_path| {
             // Set XDG_CONFIG_HOME
             let xdg_config_dir = Path::new(home_path).join("xdg_config");
@@ -499,7 +498,6 @@ mod tests {
 
     #[test]
     fn test_find_system_config_home_fallback() {
-        hermetic_git_env();
         with_isolated_home(|home_path| {
             // Create config in HOME/.config
             let config_dir = Path::new(home_path).join(".config").join("git-perf");
@@ -514,7 +512,6 @@ mod tests {
 
     #[test]
     fn test_find_system_config_none() {
-        hermetic_git_env();
         with_isolated_home(|_home_path| {
             let result = find_system_config();
             assert_eq!(result, None);
@@ -824,7 +821,6 @@ epoch = 0x87654321
 
     #[test]
     fn test_config_info_serialization() {
-        hermetic_git_env();
         with_isolated_home(|home_path| {
             let config_info = ConfigInfo {
                 git_context: GitContext {

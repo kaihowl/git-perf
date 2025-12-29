@@ -1015,10 +1015,8 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helpers::{dir_with_repo, hermetic_git_env, init_repo, run_git_command};
-    use std::env::set_current_dir;
+    use crate::test_helpers::{run_git_command, with_isolated_cwd_git};
     use std::process::Command;
-    use tempfile::tempdir;
 
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
@@ -1044,67 +1042,58 @@ mod test {
 
     #[test]
     fn test_customheader_pull() {
-        let tempdir = dir_with_repo();
-        set_current_dir(tempdir.path()).expect("Failed to change dir");
+        with_isolated_cwd_git(|git_dir| {
+            let mut test_server = Server::run();
+            add_server_remote(test_server.url(""), "AUTHORIZATION: sometoken", git_dir);
 
-        let mut test_server = Server::run();
-        add_server_remote(
-            test_server.url(""),
-            "AUTHORIZATION: sometoken",
-            tempdir.path(),
-        );
+            test_server.expect(
+                Expectation::matching(request::headers(matchers::contains((
+                    AUTHORIZATION.as_str(),
+                    "sometoken",
+                ))))
+                .times(1..)
+                .respond_with(status_code(200)),
+            );
 
-        test_server.expect(
-            Expectation::matching(request::headers(matchers::contains((
-                AUTHORIZATION.as_str(),
-                "sometoken",
-            ))))
-            .times(1..)
-            .respond_with(status_code(200)),
-        );
+            // The pull operation will fail because the mock server doesn't provide a valid git
+            // response, but we verify that the authorization header was sent by checking that
+            // the server's expectations are met (httptest will panic on drop if not).
+            let _ = pull(None); // Ignore result - we only care that auth header was sent
 
-        // The pull operation will fail because the mock server doesn't provide a valid git
-        // response, but we verify that the authorization header was sent by checking that
-        // the server's expectations are met (httptest will panic on drop if not).
-        hermetic_git_env();
-        let _ = pull(None); // Ignore result - we only care that auth header was sent
-
-        // Explicitly verify server expectations were met
-        test_server.verify_and_clear();
+            // Explicitly verify server expectations were met
+            test_server.verify_and_clear();
+        });
     }
 
     #[test]
     fn test_customheader_push() {
-        let tempdir = dir_with_repo();
-        set_current_dir(tempdir.path()).expect("Failed to change dir");
+        with_isolated_cwd_git(|git_dir| {
+            let test_server = Server::run();
+            add_server_remote(
+                test_server.url(""),
+                "AUTHORIZATION: someothertoken",
+                git_dir,
+            );
 
-        let test_server = Server::run();
-        add_server_remote(
-            test_server.url(""),
-            "AUTHORIZATION: someothertoken",
-            tempdir.path(),
-        );
+            test_server.expect(
+                Expectation::matching(request::headers(matchers::contains((
+                    AUTHORIZATION.as_str(),
+                    "someothertoken",
+                ))))
+                .times(1..)
+                .respond_with(status_code(200)),
+            );
 
-        test_server.expect(
-            Expectation::matching(request::headers(matchers::contains((
-                AUTHORIZATION.as_str(),
-                "someothertoken",
-            ))))
-            .times(1..)
-            .respond_with(status_code(200)),
-        );
+            // Must add a single write as a push without pending local writes just succeeds
+            ensure_symbolic_write_ref_exists().expect("Failed to ensure symbolic write ref exists");
+            add_note_line_to_head("test note line").expect("Failed to add note line");
 
-        hermetic_git_env();
-
-        // Must add a single write as a push without pending local writes just succeeds
-        ensure_symbolic_write_ref_exists().expect("Failed to ensure symbolic write ref exists");
-        add_note_line_to_head("test note line").expect("Failed to add note line");
-
-        let error = push(None, None);
-        error
-            .as_ref()
-            .expect_err("We have no valid git http server setup -> should fail");
-        dbg!(&error);
+            let error = push(None, None);
+            error
+                .as_ref()
+                .expect_err("We have no valid git http server setup -> should fail");
+            dbg!(&error);
+        });
     }
 
     #[test]
@@ -1127,59 +1116,51 @@ mod test {
 
     #[test]
     fn test_empty_or_never_pushed_remote_error_for_fetch() {
-        let tempdir = tempdir().unwrap();
-        init_repo(tempdir.path());
-        set_current_dir(tempdir.path()).expect("Failed to change dir");
-        // Add a dummy remote so the code can check for empty remote
-        let git_dir_url = format!("file://{}", tempdir.path().display());
-        run_git_command(&["remote", "add", "origin", &git_dir_url], tempdir.path());
+        with_isolated_cwd_git(|git_dir| {
+            // Add a dummy remote so the code can check for empty remote
+            let git_dir_url = format!("file://{}", git_dir.display());
+            run_git_command(&["remote", "add", "origin", &git_dir_url], git_dir);
 
-        // NOTE: GIT_TRACE is required for this test to function correctly
-        std::env::set_var("GIT_TRACE", "true");
+            // NOTE: GIT_TRACE is required for this test to function correctly
+            std::env::set_var("GIT_TRACE", "true");
 
-        // Do not add any notes/measurements or push anything
-        let result = super::fetch(Some(tempdir.path()));
-        match result {
-            Err(GitError::NoRemoteMeasurements { output }) => {
-                assert!(
-                    output.stderr.contains(GIT_PERF_REMOTE),
-                    "Expected output to contain {GIT_PERF_REMOTE}. Output: '{}'",
-                    output.stderr
-                )
+            // Do not add any notes/measurements or push anything
+            let result = super::fetch(Some(git_dir));
+            match result {
+                Err(GitError::NoRemoteMeasurements { output }) => {
+                    assert!(
+                        output.stderr.contains(GIT_PERF_REMOTE),
+                        "Expected output to contain {GIT_PERF_REMOTE}. Output: '{}'",
+                        output.stderr
+                    )
+                }
+                other => panic!("Expected NoRemoteMeasurements error, got: {:?}", other),
             }
-            other => panic!("Expected NoRemoteMeasurements error, got: {:?}", other),
-        }
+        });
     }
 
     #[test]
     fn test_empty_or_never_pushed_remote_error_for_push() {
-        let tempdir = tempdir().unwrap();
-        init_repo(tempdir.path());
-        set_current_dir(tempdir.path()).expect("Failed to change dir");
+        with_isolated_cwd_git(|git_dir| {
+            run_git_command(&["remote", "add", "origin", "invalid invalid"], git_dir);
 
-        hermetic_git_env();
+            // NOTE: GIT_TRACE is required for this test to function correctly
+            std::env::set_var("GIT_TRACE", "true");
 
-        run_git_command(
-            &["remote", "add", "origin", "invalid invalid"],
-            tempdir.path(),
-        );
+            add_note_line_to_head("test line, invalid measurement, does not matter").unwrap();
 
-        // NOTE: GIT_TRACE is required for this test to function correctly
-        std::env::set_var("GIT_TRACE", "true");
-
-        add_note_line_to_head("test line, invalid measurement, does not matter").unwrap();
-
-        let result = super::raw_push(Some(tempdir.path()), None);
-        match result {
-            Err(GitError::RefFailedToPush { output }) => {
-                assert!(
-                    output.stderr.contains(GIT_PERF_REMOTE),
-                    "Expected output to contain {GIT_PERF_REMOTE}, got: {}",
-                    output.stderr
-                )
+            let result = super::raw_push(Some(git_dir), None);
+            match result {
+                Err(GitError::RefFailedToPush { output }) => {
+                    assert!(
+                        output.stderr.contains(GIT_PERF_REMOTE),
+                        "Expected output to contain {GIT_PERF_REMOTE}, got: {}",
+                        output.stderr
+                    )
+                }
+                other => panic!("Expected RefFailedToPush error, got: {:?}", other),
             }
-            other => panic!("Expected RefFailedToPush error, got: {:?}", other),
-        }
+        });
     }
 
     /// Test that new_symbolic_write_ref returns valid, non-empty reference names
@@ -1188,80 +1169,76 @@ mod test {
     /// - Could return Ok("xyzzy".into()) - arbitrary invalid string
     #[test]
     fn test_new_symbolic_write_ref_returns_valid_ref() {
-        let tempdir = dir_with_repo();
-        set_current_dir(tempdir.path()).unwrap();
-        hermetic_git_env();
+        with_isolated_cwd_git(|_git_dir| {
+            // Test the private function directly since we're in the same module
+            let result = new_symbolic_write_ref();
+            assert!(
+                result.is_ok(),
+                "Should create symbolic write ref: {:?}",
+                result
+            );
 
-        // Test the private function directly since we're in the same module
-        let result = new_symbolic_write_ref();
-        assert!(
-            result.is_ok(),
-            "Should create symbolic write ref: {:?}",
-            result
-        );
+            let ref_name = result.unwrap();
 
-        let ref_name = result.unwrap();
+            // Mutation 1: Should not be empty string
+            assert!(
+                !ref_name.is_empty(),
+                "Reference name should not be empty, got: '{}'",
+                ref_name
+            );
 
-        // Mutation 1: Should not be empty string
-        assert!(
-            !ref_name.is_empty(),
-            "Reference name should not be empty, got: '{}'",
-            ref_name
-        );
+            // Mutation 2: Should not be arbitrary string like "xyzzy"
+            assert!(
+                ref_name.starts_with(REFS_NOTES_WRITE_TARGET_PREFIX),
+                "Reference should start with {}, got: {}",
+                REFS_NOTES_WRITE_TARGET_PREFIX,
+                ref_name
+            );
 
-        // Mutation 2: Should not be arbitrary string like "xyzzy"
-        assert!(
-            ref_name.starts_with(REFS_NOTES_WRITE_TARGET_PREFIX),
-            "Reference should start with {}, got: {}",
-            REFS_NOTES_WRITE_TARGET_PREFIX,
-            ref_name
-        );
-
-        // Should have a hex suffix
-        let suffix = ref_name
-            .strip_prefix(REFS_NOTES_WRITE_TARGET_PREFIX)
-            .expect("Should have prefix");
-        assert!(
-            !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_hexdigit()),
-            "Suffix should be non-empty hex string, got: {}",
-            suffix
-        );
+            // Should have a hex suffix
+            let suffix = ref_name
+                .strip_prefix(REFS_NOTES_WRITE_TARGET_PREFIX)
+                .expect("Should have prefix");
+            assert!(
+                !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_hexdigit()),
+                "Suffix should be non-empty hex string, got: {}",
+                suffix
+            );
+        });
     }
 
     /// Test that notes can be added successfully via add_note_line_to_head
     /// Verifies end-to-end note operations work correctly
     #[test]
     fn test_add_and_retrieve_notes() {
-        let tempdir = dir_with_repo();
-        set_current_dir(tempdir.path()).unwrap();
-        hermetic_git_env();
+        with_isolated_cwd_git(|_git_dir| {
+            // Add first note - this calls ensure_symbolic_write_ref_exists -> new_symbolic_write_ref
+            let result = add_note_line_to_head("test: 100");
+            assert!(
+                result.is_ok(),
+                "Should add note (requires valid ref from new_symbolic_write_ref): {:?}",
+                result
+            );
 
-        // Add first note - this calls ensure_symbolic_write_ref_exists -> new_symbolic_write_ref
-        let result = add_note_line_to_head("test: 100");
-        assert!(
-            result.is_ok(),
-            "Should add note (requires valid ref from new_symbolic_write_ref): {:?}",
-            result
-        );
+            // Add second note to ensure ref operations continue to work
+            let result2 = add_note_line_to_head("test: 200");
+            assert!(result2.is_ok(), "Should add second note: {:?}", result2);
 
-        // Add second note to ensure ref operations continue to work
-        let result2 = add_note_line_to_head("test: 200");
-        assert!(result2.is_ok(), "Should add second note: {:?}", result2);
+            // Verify notes were actually added by walking commits
+            let commits = walk_commits(10);
+            assert!(commits.is_ok(), "Should walk commits: {:?}", commits);
 
-        // Verify notes were actually added by walking commits
-        let commits = walk_commits(10);
-        assert!(commits.is_ok(), "Should walk commits: {:?}", commits);
+            let commits = commits.unwrap();
+            assert!(!commits.is_empty(), "Should have commits");
 
-        let commits = commits.unwrap();
-        assert!(!commits.is_empty(), "Should have commits");
-
-        // Check that HEAD commit has notes
-        let (_, notes) = &commits[0];
-        assert!(!notes.is_empty(), "HEAD should have notes");
-        assert!(
-            notes.iter().any(|n| n.contains("test:")),
-            "Notes should contain our test data"
-        );
+            // Check that HEAD commit has notes
+            let (_, notes) = &commits[0];
+            assert!(!notes.is_empty(), "HEAD should have notes");
+            assert!(
+                notes.iter().any(|n| n.contains("test:")),
+                "Notes should contain our test data"
+            );
+        });
     }
 
     /// Test walk_commits with shallow repository containing multiple grafted commits
@@ -1269,84 +1246,82 @@ mod test {
     /// The XOR operator would toggle instead of OR, failing with multiple grafts
     #[test]
     fn test_walk_commits_shallow_repo_detection() {
-        let tempdir = dir_with_repo();
-        hermetic_git_env();
+        use std::env::set_current_dir;
 
-        // Create multiple commits
-        set_current_dir(tempdir.path()).unwrap();
-        for i in 2..=5 {
-            run_git_command(
-                &["commit", "--allow-empty", "-m", &format!("Commit {}", i)],
-                tempdir.path(),
+        with_isolated_cwd_git(|git_dir| {
+            // Create multiple commits
+            for i in 2..=5 {
+                run_git_command(
+                    &["commit", "--allow-empty", "-m", &format!("Commit {}", i)],
+                    git_dir,
+                );
+            }
+
+            // Create a shallow clone (depth 2) which will have grafted commits
+            let shallow_dir = git_dir.join("shallow");
+            let output = Command::new("git")
+                .args([
+                    "clone",
+                    "--depth",
+                    "2",
+                    git_dir.to_str().unwrap(),
+                    shallow_dir.to_str().unwrap(),
+                ])
+                .output()
+                .unwrap();
+
+            assert!(
+                output.status.success(),
+                "Shallow clone failed: {}",
+                String::from_utf8_lossy(&output.stderr)
             );
-        }
 
-        // Create a shallow clone (depth 2) which will have grafted commits
-        let shallow_dir = tempdir.path().join("shallow");
-        let output = Command::new("git")
-            .args([
-                "clone",
-                "--depth",
-                "2",
-                tempdir.path().to_str().unwrap(),
-                shallow_dir.to_str().unwrap(),
-            ])
-            .output()
-            .unwrap();
+            // Change to shallow clone directory
+            set_current_dir(&shallow_dir).unwrap();
 
-        assert!(
-            output.status.success(),
-            "Shallow clone failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+            // Add a note to enable walk_commits
+            add_note_line_to_head("test: 100").expect("Should add note");
 
-        set_current_dir(&shallow_dir).unwrap();
-        hermetic_git_env();
+            // Walk commits - should detect as shallow
+            let result = walk_commits(10);
+            assert!(result.is_ok(), "walk_commits should succeed: {:?}", result);
 
-        // Add a note to enable walk_commits
-        add_note_line_to_head("test: 100").expect("Should add note");
+            let commits = result.unwrap();
 
-        // Walk commits - should detect as shallow
-        let result = walk_commits(10);
-        assert!(result.is_ok(), "walk_commits should succeed: {:?}", result);
+            // In a shallow repo, git log --boundary shows grafted markers
+            // The |= operator correctly sets detected_shallow to true
+            // The ^= mutant would toggle the flag, potentially giving wrong result
 
-        let commits = result.unwrap();
-
-        // In a shallow repo, git log --boundary shows grafted markers
-        // The |= operator correctly sets detected_shallow to true
-        // The ^= mutant would toggle the flag, potentially giving wrong result
-
-        // Verify we got commits (the function works)
-        assert!(
-            !commits.is_empty(),
-            "Should have found commits in shallow repo"
-        );
+            // Verify we got commits (the function works)
+            assert!(
+                !commits.is_empty(),
+                "Should have found commits in shallow repo"
+            );
+        });
     }
 
     /// Test walk_commits correctly identifies normal (non-shallow) repos
     #[test]
     fn test_walk_commits_normal_repo_not_shallow() {
-        let tempdir = dir_with_repo();
-        set_current_dir(tempdir.path()).unwrap();
-        hermetic_git_env();
+        with_isolated_cwd_git(|git_dir| {
+            // Create a few commits
+            for i in 2..=3 {
+                run_git_command(
+                    &["commit", "--allow-empty", "-m", &format!("Commit {}", i)],
+                    git_dir,
+                );
+            }
 
-        // Create a few commits
-        for i in 2..=3 {
-            run_git_command(
-                &["commit", "--allow-empty", "-m", &format!("Commit {}", i)],
-                tempdir.path(),
-            );
-        }
+            // Add a note to enable walk_commits
+            add_note_line_to_head("test: 100").expect("Should add note");
 
-        // Add a note to enable walk_commits
-        add_note_line_to_head("test: 100").expect("Should add note");
+            let result = walk_commits(10);
+            assert!(result.is_ok(), "walk_commits should succeed");
 
-        let result = walk_commits(10);
-        assert!(result.is_ok(), "walk_commits should succeed");
+            let commits = result.unwrap();
 
-        let commits = result.unwrap();
-
-        // Should have commits
-        assert!(!commits.is_empty(), "Should have found commits");
+            // Should have commits
+            assert!(!commits.is_empty(), "Should have found commits");
+        });
     }
 }
