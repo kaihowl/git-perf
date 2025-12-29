@@ -24,7 +24,7 @@ inputs:
     required: false
     default: ''
   git-perf-version:
-    description: 'Version of git-perf to use (latest, specific version, or `skip` to use already installed version)'
+    description: 'Version of git-perf to use (latest, a specific version, or `skip` to use already installed version)'
     required: false
     default: 'latest'
   github-token:

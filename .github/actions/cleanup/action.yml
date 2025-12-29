@@ -20,7 +20,7 @@ inputs:
     required: false
     default: 'true'
   git-perf-version:
-    description: 'Version of git-perf to use (latest, or specific version)'
+    description: 'Version of git-perf to use (latest, a specific version, or `skip` to use already installed version)'
     required: false
     default: 'latest'
   dry-run:
