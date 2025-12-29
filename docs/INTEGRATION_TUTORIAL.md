@@ -157,9 +157,9 @@ jobs:
 
       # Install git-perf
       - name: Install git-perf
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf "https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh" | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        uses: kaihowl/git-perf/.github/actions/install@master
+        with:
+          release: latest
 
       # Configure git identity (required for git-perf to commit measurements)
       - name: Configure git identity
@@ -244,9 +244,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install git-perf
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf "https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh" | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        uses: kaihowl/git-perf/.github/actions/install@master
+        with:
+          release: latest
 
       - name: Configure git identity
         run: |
@@ -850,10 +850,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install git-perf
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf "https://github.com/kaihowl/git-perf/releases/latest/download/git-perf-installer.sh" | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - uses: kaihowl/git-perf/.github/actions/install@master
 
       - name: Build and measure
         run: |
@@ -1026,6 +1023,7 @@ This complete workflow ensures you **never accidentally ship performance regress
 - **[FAQ](../README.md#frequently-asked-questions)** - Common questions and troubleshooting
 
 **GitHub Actions:**
+- **[Install Action](../.github/actions/install/README.md)** - Install git-perf in workflows
 - **[Report Action](../.github/actions/report/README.md)** - Generate and publish reports
 - **[Cleanup Action](../.github/actions/cleanup/README.md)** - Manage measurement retention
 

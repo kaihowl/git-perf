@@ -1,0 +1,43 @@
+name: 'Install git-perf'
+description: 'Install git-perf binary'
+inputs:
+  release:
+    description: 'release to install (`latest`, a version number, or `branch`)'
+    required: false
+    default: 'latest'
+runs:
+  using: "composite"
+  steps:
+    - id: install-release
+      name: Install released version
+      if: ${{ inputs.release != 'branch' }}
+      run: |
+        latest=""
+        version=""
+        if [ ${{ inputs.release }} = latest ]; then
+          latest="latest/"
+        else
+          version=${{ inputs.release }}/
+        fi
+        download_url=https://github.com/kaihowl/git-perf/releases/${latest}download/${version}git-perf-installer.sh 
+        echo "Downloading $download_url"
+        curl --proto '=https' --tlsv1.2 -LsSf "$download_url" | sh
+        export PATH=$HOME/.cargo/bin:$PATH
+        git-perf --help
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      shell: bash
+    - uses: actions/checkout@v6
+      if: ${{ inputs.release == 'branch' }}
+      with:
+        fetch-depth: 40
+    - name: Install Rust
+      if: ${{ inputs.release == 'branch' }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+    - name: install-branch
+      if: ${{ inputs.release == 'branch' }}
+      shell: bash
+      run: |
+        cargo install --path git_perf
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
