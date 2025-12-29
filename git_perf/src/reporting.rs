@@ -2647,14 +2647,17 @@ mod tests {
         let mut reporter = PlotlyReporter::new();
 
         // Create commits with distinct identifiable data
+        // Order passed add_commits is in walk_commits_from order:
+        // The first commit is the youngest commit.
+        // Later commits are older commits.
         let commits = vec![
             Commit {
-                commit: "aaaaaaa1111111111111111111111111111111".to_string(),
-                title: "first commit (oldest)".to_string(),
-                author: "Author A".to_string(),
+                commit: "ccccccc3333333333333333333333333333333".to_string(),
+                title: "third commit (newest)".to_string(),
+                author: "Author C".to_string(),
                 measurements: vec![MeasurementData {
                     name: "test_metric".to_string(),
-                    val: 100.0,
+                    val: 300.0,
                     epoch: 0,
                     timestamp: 0.0,
                     key_values: std::collections::HashMap::new(),
@@ -2673,12 +2676,12 @@ mod tests {
                 }],
             },
             Commit {
-                commit: "ccccccc3333333333333333333333333333333".to_string(),
-                title: "third commit (newest)".to_string(),
-                author: "Author C".to_string(),
+                commit: "aaaaaaa1111111111111111111111111111111".to_string(),
+                title: "first commit (oldest)".to_string(),
+                author: "Author A".to_string(),
                 measurements: vec![MeasurementData {
                     name: "test_metric".to_string(),
-                    val: 300.0,
+                    val: 100.0,
                     epoch: 0,
                     timestamp: 0.0,
                     key_values: std::collections::HashMap::new(),
@@ -2735,8 +2738,8 @@ mod tests {
         // the hover text at position i corresponds to the correct commit for x-coordinate x[i]
         //
         // Expected alignment:
-        // - x=0 (newest, leftmost): y=300.0, hover contains ccccccc/Author C/third commit
-        // - x=2 (oldest, rightmost): y=100.0, hover contains aaaaaaa/Author A/first commit
+        // - x=0 (oldest, rightmost): y=100.0, hover contains aaaaaaa/Author A/first commit
+        // - x=2 (oldest, leftmost): y=300.0, hover contains ccccccc/Author C/third commit
         for i in 0..x_array.len() {
             let x = x_array[i].as_u64().expect("x value should be a number") as usize;
             let y = y_array[i].as_f64().expect("y value should be a number");
@@ -2745,39 +2748,39 @@ mod tests {
                 .expect("hover text should be a string");
 
             if x == 0 {
-                // Leftmost position - should show newest commit (index 2)
-                assert_eq!(y, 300.0, "x=0 should have y=300.0 (newest commit value)");
-                assert!(
-                    hover.contains("ccccccc"),
-                    "x=0 hover should contain newest commit hash 'ccccccc', but got: {}",
-                    hover
-                );
-                assert!(
-                    hover.contains("Author C"),
-                    "x=0 hover should contain newest commit author 'Author C', but got: {}",
-                    hover
-                );
-                assert!(
-                    hover.contains("third commit"),
-                    "x=0 hover should contain newest commit title 'third commit', but got: {}",
-                    hover
-                );
-            } else if x == 2 {
-                // Rightmost position - should show oldest commit (index 0)
-                assert_eq!(y, 100.0, "x=2 should have y=100.0 (oldest commit value)");
+                // Leftmost position - should show oldest commit (index 0)
+                assert_eq!(y, 100.0, "x=0 should have y=100.0 (oldest commit value)");
                 assert!(
                     hover.contains("aaaaaaa"),
-                    "x=2 hover should contain oldest commit hash 'aaaaaaa', but got: {}",
+                    "x=0 hover should contain oldest commit hash 'aaaaaaa', but got: {}",
                     hover
                 );
                 assert!(
                     hover.contains("Author A"),
-                    "x=2 hover should contain oldest commit author 'Author A', but got: {}",
+                    "x=0 hover should contain oldest commit author 'Author A', but got: {}",
                     hover
                 );
                 assert!(
                     hover.contains("first commit"),
-                    "x=2 hover should contain oldest commit title 'first commit', but got: {}",
+                    "x=0 hover should contain oldest commit title 'first commit', but got: {}",
+                    hover
+                );
+            } else if x == 2 {
+                // Rightmost position - should show newest commit (index 2)
+                assert_eq!(y, 300.0, "x=2 should have y=300.0 (newest commit value)");
+                assert!(
+                    hover.contains("ccccccc"),
+                    "x=2 hover should contain newest commit hash 'ccccccc', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("Author C"),
+                    "x=2 hover should contain newest commit author 'Author C', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("third commit"),
+                    "x=2 hover should contain newest commit title 'third commit', but got: {}",
                     hover
                 );
             } else {
