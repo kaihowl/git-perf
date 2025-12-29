@@ -79,7 +79,7 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `report-name` | Name of the report file (without .html). If empty, uses branch name or commit SHA | No | `` |
 | `additional-args` | Additional arguments to git-perf report invocation | No | `` |
 | `audit-args` | Additional arguments to git-perf audit (e.g., `-m <measurement> -d <threshold>`) | No | `` |
-| `git-perf-version` | Version of git-perf to use (latest, or specific version) | No | `latest` |
+| `git-perf-version` | Version of git-perf to use (latest, specific version, or `skip` to use already installed version) | No | `latest` |
 | `comment-on-pr` | Whether to comment on the PR with the report URL (only for pull_request events) | No | `true` |
 | `show-size` | Whether to show measurement storage size in output | No | `false` |
 | `size-use-disk-size` | Whether to use disk-size (compressed) instead of logical size | No | `true` |

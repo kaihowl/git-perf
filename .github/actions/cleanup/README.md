@@ -82,7 +82,7 @@ jobs:
 | `retention-days` | Number of days to retain measurements | No | `90` |
 | `backup` | Create backup of measurements before removal | No | `true` |
 | `cleanup-reports` | Also cleanup orphaned reports on gh-pages branch | No | `true` |
-| `git-perf-version` | Version of git-perf to use (latest, a specific version, or 'skip' to use already installed version) | No | `latest` |
+| `git-perf-version` | Version of git-perf to use (latest, a specific version, or `skip` to use already installed version) | No | `latest` |
 | `dry-run` | Perform dry-run without making actual changes | No | `false` |
 | `reports-subdirectory` | Subdirectory within gh-pages containing reports (must match report action) | No | `` |
 
