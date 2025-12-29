@@ -2700,39 +2700,148 @@ mod tests {
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
 
-        // Verify the hover text contains the correct commit metadata
-        // The oldest commit (index 0) should have hover text with "Author A" and "first commit"
-        assert!(
-            html.contains("Author A") && html.contains("first commit"),
-            "Hover text should include Author A and first commit title"
-        );
+        // Extract and parse Plotly JSON data to verify positional alignment
+        let json_str = extract_plotly_data_array(&html)
+            .expect("Failed to extract Plotly config object from HTML");
 
-        // The newest commit (index 2) should have hover text with "Author C" and "third commit"
-        assert!(
-            html.contains("Author C") && html.contains("third commit"),
-            "Hover text should include Author C and third commit title"
-        );
+        let plotly_config: serde_json::Value =
+            serde_json::from_str(&json_str).expect("Failed to parse Plotly JSON config");
 
-        // Verify hover text includes short commit hashes
-        assert!(
-            html.contains("aaaaaaa") && html.contains("ccccccc"),
-            "Hover text should include short commit hashes"
-        );
+        // Access the "data" field which contains the array of traces
+        let plotly_data = plotly_config["data"]
+            .as_array()
+            .expect("Config should have 'data' field as array");
 
-        // The x-axis should be reversed (newest on left), verify tick labels
-        // X-axis ticks are set up with commits.iter().rev(), so:
-        // - x=0 should show ccccccc (newest)
-        // - x=1 should show bbbbbbb (middle)
-        // - x=2 should show aaaaaaa (oldest)
-        // Since all commits are added to the reporter, all should appear on x-axis
-        assert!(
-            html.contains("ccccccc"),
-            "X-axis should contain newest commit hash"
-        );
-        assert!(
-            html.contains("aaaaaaa"),
-            "X-axis should contain oldest commit hash"
-        );
+        // Get the first trace (should be the box plot trace)
+        let trace = plotly_data.get(0).expect("Should have at least one trace");
+
+        // Extract x, y, and hover text arrays
+        let x_array = trace["x"].as_array().expect("Trace should have x array");
+        let y_array = trace["y"].as_array().expect("Trace should have y array");
+
+        // Try both "text" and "hovertext" field names
+        let hover_array = trace
+            .get("text")
+            .or_else(|| trace.get("hovertext"))
+            .and_then(|v| v.as_array())
+            .expect("Trace should have text or hovertext array");
+
+        // Verify we have 2 data points
+        assert_eq!(x_array.len(), 2, "Should have 2 x values");
+        assert_eq!(y_array.len(), 2, "Should have 2 y values");
+        assert_eq!(hover_array.len(), 2, "Should have 2 hover texts");
+
+        // Verify positional alignment: for each data point, check that
+        // the hover text at position i corresponds to the correct commit for x-coordinate x[i]
+        //
+        // Expected alignment:
+        // - x=0 (newest, leftmost): y=300.0, hover contains ccccccc/Author C/third commit
+        // - x=2 (oldest, rightmost): y=100.0, hover contains aaaaaaa/Author A/first commit
+        for i in 0..x_array.len() {
+            let x = x_array[i].as_u64().expect("x value should be a number") as usize;
+            let y = y_array[i].as_f64().expect("y value should be a number");
+            let hover = hover_array[i]
+                .as_str()
+                .expect("hover text should be a string");
+
+            if x == 0 {
+                // Leftmost position - should show newest commit (index 2)
+                assert_eq!(y, 300.0, "x=0 should have y=300.0 (newest commit value)");
+                assert!(
+                    hover.contains("ccccccc"),
+                    "x=0 hover should contain newest commit hash 'ccccccc', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("Author C"),
+                    "x=0 hover should contain newest commit author 'Author C', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("third commit"),
+                    "x=0 hover should contain newest commit title 'third commit', but got: {}",
+                    hover
+                );
+            } else if x == 2 {
+                // Rightmost position - should show oldest commit (index 0)
+                assert_eq!(y, 100.0, "x=2 should have y=100.0 (oldest commit value)");
+                assert!(
+                    hover.contains("aaaaaaa"),
+                    "x=2 hover should contain oldest commit hash 'aaaaaaa', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("Author A"),
+                    "x=2 hover should contain oldest commit author 'Author A', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("first commit"),
+                    "x=2 hover should contain oldest commit title 'first commit', but got: {}",
+                    hover
+                );
+            } else {
+                panic!("Unexpected x value: {}", x);
+            }
+        }
+    }
+
+    /// Helper function to extract Plotly data array from HTML
+    ///
+    /// Finds the `Plotly.newPlot(...)` call and extracts the data array.
+    /// The call format is: Plotly.newPlot("id", {"data":[...]})
+    /// This function extracts the entire config object (second parameter).
+    fn extract_plotly_data_array(html: &str) -> Result<String, String> {
+        // Find "Plotly.newPlot("
+        let start_pattern = "Plotly.newPlot(";
+        let start = html
+            .find(start_pattern)
+            .ok_or_else(|| "Could not find Plotly.newPlot call in HTML".to_string())?;
+
+        // Skip past the div id argument (first comma)
+        let after_start = start + start_pattern.len();
+        let first_comma_offset = html[after_start..]
+            .find(',')
+            .ok_or_else(|| "Could not find first comma after Plotly.newPlot".to_string())?;
+        let obj_start_pos = after_start + first_comma_offset + 1;
+
+        // Find the opening brace of the config object
+        let remaining = &html[obj_start_pos..];
+        let trimmed = remaining.trim_start();
+        let brace_offset = remaining.len() - trimmed.len();
+
+        if !trimmed.starts_with('{') {
+            return Err(format!(
+                "Expected config object to start with '{{', but found: {}",
+                &trimmed[..20.min(trimmed.len())]
+            ));
+        }
+
+        let obj_begin = obj_start_pos + brace_offset;
+
+        // Count braces to find matching close brace
+        let mut depth = 0;
+        let mut end = obj_begin;
+
+        for (i, ch) in html[obj_begin..].chars().enumerate() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = obj_begin + i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if depth != 0 {
+            return Err("Unmatched braces in config object".to_string());
+        }
+
+        Ok(html[obj_begin..end].to_string())
     }
 
     #[test]
