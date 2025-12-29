@@ -718,16 +718,20 @@ impl PlotlyReporter {
     /// containing the short commit hash, author name, and commit title.
     ///
     /// # Arguments
-    /// * `indices` - Iterator of commit indices to generate hover text for
+    /// * `indices` - Iterator of original commit indices (before reversal by convert_to_x_y)
     ///
     /// # Returns
-    /// Vector of hover text strings in HTML format, one per index
+    /// Vector of hover text strings in HTML format, one per index in the same order
+    ///
+    /// # Note
+    /// The hover text array order matches the input data order. The indices are used
+    /// directly to look up commits in all_commits (they are NOT reversed here - that
+    /// only happens to the x-axis values in convert_to_x_y).
     fn prepare_hover_text(&self, indices: impl Iterator<Item = usize>) -> Vec<String> {
         indices
             .map(|idx| {
-                // Handle reversed commits (size - 1 - idx)
-                let commit_idx = self.size.saturating_sub(1).saturating_sub(idx);
-                if let Some(commit) = self.all_commits.get(commit_idx) {
+                // Use idx directly to look up the commit
+                if let Some(commit) = self.all_commits.get(idx) {
                     format!(
                         "Commit: {}<br>Author: {}<br>Title: {}",
                         &commit.commit[..7.min(commit.commit.len())],
@@ -2634,6 +2638,101 @@ mod tests {
         // Hover text should contain percentage and short SHA
         assert!(html.contains("+23.5%"));
         assert!(html.contains("xyz789"));
+    }
+
+    #[test]
+    fn test_hover_text_matches_x_axis() {
+        use crate::data::{Commit, MeasurementData};
+
+        let mut reporter = PlotlyReporter::new();
+
+        // Create commits with distinct identifiable data
+        let commits = vec![
+            Commit {
+                commit: "aaaaaaa1111111111111111111111111111111".to_string(),
+                title: "first commit (oldest)".to_string(),
+                author: "Author A".to_string(),
+                measurements: vec![MeasurementData {
+                    name: "test_metric".to_string(),
+                    val: 100.0,
+                    epoch: 0,
+                    timestamp: 0.0,
+                    key_values: std::collections::HashMap::new(),
+                }],
+            },
+            Commit {
+                commit: "bbbbbbb2222222222222222222222222222222".to_string(),
+                title: "second commit (middle)".to_string(),
+                author: "Author B".to_string(),
+                measurements: vec![MeasurementData {
+                    name: "test_metric".to_string(),
+                    val: 200.0,
+                    epoch: 0,
+                    timestamp: 0.0,
+                    key_values: std::collections::HashMap::new(),
+                }],
+            },
+            Commit {
+                commit: "ccccccc3333333333333333333333333333333".to_string(),
+                title: "third commit (newest)".to_string(),
+                author: "Author C".to_string(),
+                measurements: vec![MeasurementData {
+                    name: "test_metric".to_string(),
+                    val: 300.0,
+                    epoch: 0,
+                    timestamp: 0.0,
+                    key_values: std::collections::HashMap::new(),
+                }],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        reporter.begin_section("test_section", "{{PLACEHOLDER}}");
+
+        // Add measurements at indices 0 (oldest) and 2 (newest)
+        let indexed_measurements = vec![
+            (0, &commits[0].measurements[0]),
+            (2, &commits[2].measurements[0]),
+        ];
+
+        reporter.add_trace(indexed_measurements, "test_metric", &[]);
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+
+        // Verify the hover text contains the correct commit metadata
+        // The oldest commit (index 0) should have hover text with "Author A" and "first commit"
+        assert!(
+            html.contains("Author A") && html.contains("first commit"),
+            "Hover text should include Author A and first commit title"
+        );
+
+        // The newest commit (index 2) should have hover text with "Author C" and "third commit"
+        assert!(
+            html.contains("Author C") && html.contains("third commit"),
+            "Hover text should include Author C and third commit title"
+        );
+
+        // Verify hover text includes short commit hashes
+        assert!(
+            html.contains("aaaaaaa") && html.contains("ccccccc"),
+            "Hover text should include short commit hashes"
+        );
+
+        // The x-axis should be reversed (newest on left), verify tick labels
+        // X-axis ticks are set up with commits.iter().rev(), so:
+        // - x=0 should show ccccccc (newest)
+        // - x=1 should show bbbbbbb (middle)
+        // - x=2 should show aaaaaaa (oldest)
+        // Since all commits are added to the reporter, all should appear on x-axis
+        assert!(
+            html.contains("ccccccc"),
+            "X-axis should contain newest commit hash"
+        );
+        assert!(
+            html.contains("aaaaaaa"),
+            "X-axis should contain oldest commit hash"
+        );
     }
 
     #[test]
