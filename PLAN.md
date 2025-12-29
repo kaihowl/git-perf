@@ -32,38 +32,26 @@ Extend the `walk_commits` function to capture and store commit title and author 
    - No hover information available
    - Plotly trace customization not yet using `customdata` or `hovertemplate`
 
-## Design Decision: Efficient String Storage
+## Design Decision: Simple String Storage
 
-### Problem
-Each measurement is associated with a commit, but commit metadata (title, author) is identical for all measurements within the same commit. Naively storing strings on each measurement would duplicate data unnecessarily.
-
-### Solution: String Interning Pattern
-
-Use Rust's `Arc<str>` (Atomic Reference Counted string) to share immutable string data:
+### Data Structure
+Commit metadata (title, author) will be stored directly on the `Commit` struct using plain `String` fields:
 
 ```rust
-use std::sync::Arc;
-
 pub struct Commit {
     pub commit: String,
-    pub title: Arc<str>,      // Shared immutable string
-    pub author: Arc<str>,     // Shared immutable string
+    pub title: String,      // Commit subject line
+    pub author: String,     // Author name
     pub measurements: Vec<MeasurementData>,
 }
 ```
 
-**Benefits:**
-- **Zero-copy sharing**: All measurements reference the same string allocation
-- **Memory efficient**: Single allocation per commit, regardless of measurement count
-- **Thread-safe**: `Arc` is thread-safe (important for concurrent reporting)
-- **Cheap cloning**: Cloning only increments reference count (no data copy)
-- **Immutable**: Strings cannot be modified, ensuring data integrity
-
-**Alternative considered and rejected:**
-- `Rc<str>` - Not thread-safe, incompatible with parallel processing
-- `&'static str` - Requires leaked memory or compile-time strings
-- `String` per measurement - Wastes memory through duplication
-- Indexes into lookup table - Complex, error-prone, no performance benefit
+**Rationale:**
+- Each `Commit` in the array is already a separate entity - no duplication occurs
+- Title and author are stored once per commit, not per measurement
+- Measurements live inside their parent `Commit`, sharing the same data structure
+- Using plain `String` is simpler and more idiomatic than `Arc<str>` when no sharing is needed
+- No performance or memory disadvantage compared to `Arc<str>` in this architecture
 
 ## Implementation Steps
 
@@ -185,20 +173,18 @@ pub struct Commit {
 
 **New:**
 ```rust
-use std::sync::Arc;
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct Commit {
     pub commit: String,
-    pub title: Arc<str>,
-    pub author: Arc<str>,
+    pub title: String,
+    pub author: String,
     pub measurements: Vec<MeasurementData>,
 }
 ```
 
-**Update `PartialEq` implementation:**
-- Automatic `PartialEq` derivation works correctly with `Arc<str>` (compares contents)
-- No custom implementation needed
+**Notes:**
+- No special imports needed - plain `String` fields
+- Automatic `PartialEq` and `Clone` derivations work as expected
 
 ### Step 5: Update High-Level API (measurement_retrieval.rs)
 
@@ -229,8 +215,8 @@ pub fn walk_commits_from(
         let measurements = deserialize_measurements(&commit_data.note_lines)?;
         Ok(Commit {
             commit: commit_data.sha,
-            title: Arc::from(commit_data.title.as_str()),
-            author: Arc::from(commit_data.author.as_str()),
+            title: commit_data.title,
+            author: commit_data.author,
             measurements,
         })
     }))
@@ -294,8 +280,8 @@ Title: test(bash_tests): make assertions specific
      ```rust
      let commit = Commit {
          commit: "abc123".to_string(),
-         title: Arc::from("test: example commit"),
-         author: Arc::from("Test Author"),
+         title: "test: example commit".to_string(),
+         author: "Test Author".to_string(),
          measurements: vec![],
      };
      ```
@@ -321,11 +307,11 @@ Title: test(bash_tests): make assertions specific
 
 2. **CLAUDE.md** (architecture section):
    - Update data structure documentation
-   - Note the use of `Arc<str>` for efficient string storage
+   - Note the addition of title and author fields to `Commit` struct
 
 3. **Code comments**:
    - Add doc comments to `CommitWithNotes` struct
-   - Document the Arc string interning pattern
+   - Document the purpose of title and author fields
 
 ## Testing Strategy
 
@@ -339,7 +325,7 @@ Title: test(bash_tests): make assertions specific
 ### Integration Tests
 - Verify metadata propagates through the full pipeline:
   - Low-level git interop → high-level API → reporting
-- Test that `Arc<str>` cloning works correctly (reference counting)
+- Test that `Commit` cloning works correctly with all fields
 
 ### Manual Testing
 1. Generate report with `git-perf report --html`
@@ -348,8 +334,8 @@ Title: test(bash_tests): make assertions specific
 4. Verify tooltip shows: commit hash (short), author name, commit title
 
 ### Performance Testing
-- Benchmark memory usage with/without Arc (should be significantly lower)
 - Verify no performance regression in report generation
+- Confirm memory usage is reasonable with additional fields
 
 ## Rollback Plan
 
@@ -362,11 +348,10 @@ If issues arise:
 ## Success Criteria
 
 - [ ] Commit title and author captured from git log
-- [ ] Data stored efficiently using `Arc<str>` pattern
+- [ ] Data stored using simple `String` fields on `Commit` struct
 - [ ] Hover tooltips display commit metadata in HTML reports
 - [ ] All tests pass (unit, integration, bash)
 - [ ] No performance regression
-- [ ] Memory usage reduced compared to naive string duplication
 - [ ] Code formatted with `cargo fmt`
 - [ ] No warnings from `cargo clippy`
 - [ ] Documentation updated
@@ -405,4 +390,3 @@ If issues arise:
 - **Issue #526**: "Hover over git hash shows details of commit"
 - **Git log formats**: `man git-log` (search for "PRETTY FORMATS")
 - **Plotly hover docs**: https://plotly.com/javascript/hover-text-and-formatting/
-- **Rust Arc docs**: https://doc.rust-lang.org/std/sync/struct.Arc.html
