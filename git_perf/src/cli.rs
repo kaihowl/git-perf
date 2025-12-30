@@ -122,6 +122,7 @@ pub fn handle_calls() -> Result<()> {
             measurement,
             report_history,
             selectors,
+            separate_by,
             min_measurements,
             aggregate_by,
             sigma,
@@ -161,6 +162,7 @@ pub fn handle_calls() -> Result<()> {
                 sigma,
                 dispersion_method.map(crate::stats::DispersionMethod::from),
                 &combined_patterns,
+                &separate_by,
                 no_change_point_warning,
             )
         }
