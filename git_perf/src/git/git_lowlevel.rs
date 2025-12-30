@@ -265,19 +265,18 @@ pub fn get_repository_root() -> Result<String, String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helpers::dir_with_repo;
-    use std::env::set_current_dir;
+    use crate::test_helpers::with_isolated_cwd_git;
 
     #[test]
     fn test_get_head_revision() {
-        let repo_dir = dir_with_repo();
-        set_current_dir(repo_dir.path()).expect("Failed to change dir");
-        let revision = internal_get_head_revision().unwrap();
-        assert!(
-            &revision.chars().all(|c| c.is_ascii_alphanumeric()),
-            "'{}' contained non alphanumeric or non ASCII characters",
-            &revision
-        )
+        with_isolated_cwd_git(|_git_dir| {
+            let revision = internal_get_head_revision().unwrap();
+            assert!(
+                &revision.chars().all(|c| c.is_ascii_alphanumeric()),
+                "'{}' contained non alphanumeric or non ASCII characters",
+                &revision
+            )
+        });
     }
 
     #[test]

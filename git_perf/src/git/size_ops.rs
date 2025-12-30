@@ -259,199 +259,194 @@ pub fn get_repo_stats() -> Result<RepoStats> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::dir_with_repo;
+    use crate::test_helpers::with_isolated_cwd_git;
 
     #[test]
     fn test_get_repo_stats_basic() {
         // Test that get_repo_stats works and returns proper values
-        let temp_dir = dir_with_repo();
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        with_isolated_cwd_git(|_git_dir| {
+            let stats = get_repo_stats().unwrap();
 
-        let stats = get_repo_stats().unwrap();
+            // Should have some objects after initial commit
+            assert!(stats.loose_objects > 0 || stats.packed_objects > 0);
 
-        // Should have some objects after initial commit
-        assert!(stats.loose_objects > 0 || stats.packed_objects > 0);
-
-        // Sizes should be multiples of 1024 (tests * 1024 conversion)
-        if stats.loose_size > 0 {
-            assert_eq!(
-                stats.loose_size % 1024,
-                0,
-                "loose_size should be multiple of 1024"
-            );
-        }
-        if stats.pack_size > 0 {
-            assert_eq!(
-                stats.pack_size % 1024,
-                0,
-                "pack_size should be multiple of 1024"
-            );
-        }
+            // Sizes should be multiples of 1024 (tests * 1024 conversion)
+            if stats.loose_size > 0 {
+                assert_eq!(
+                    stats.loose_size % 1024,
+                    0,
+                    "loose_size should be multiple of 1024"
+                );
+            }
+            if stats.pack_size > 0 {
+                assert_eq!(
+                    stats.pack_size % 1024,
+                    0,
+                    "pack_size should be multiple of 1024"
+                );
+            }
+        });
     }
 
     #[test]
     fn test_get_notes_size_empty_repo() {
         // Test with a repo that has no notes - exercises the empty case
-        let temp_dir = dir_with_repo();
-        std::env::set_current_dir(temp_dir.path()).unwrap();
-
-        let result = get_notes_size(false, false).unwrap();
-        assert_eq!(result.total_bytes, 0);
-        assert_eq!(result.note_count, 0);
-        assert!(result.by_measurement.is_none());
+        with_isolated_cwd_git(|_git_dir| {
+            let result = get_notes_size(false, false).unwrap();
+            assert_eq!(result.total_bytes, 0);
+            assert_eq!(result.note_count, 0);
+            assert!(result.by_measurement.is_none());
+        });
     }
 
     #[test]
     fn test_get_repo_stats_conversion_factors() {
         // Test that the * 1024 conversion is correctly applied
-        let temp_dir = dir_with_repo();
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        with_isolated_cwd_git(|_git_dir| {
+            let stats = get_repo_stats().unwrap();
 
-        let stats = get_repo_stats().unwrap();
-
-        // Test that loose_size and pack_size are properly converted from KiB to bytes
-        // Both should be multiples of 1024
-        assert_eq!(
-            stats.loose_size % 1024,
-            0,
-            "loose_size must be multiple of 1024 (bytes conversion from KiB)"
-        );
-        assert_eq!(
-            stats.pack_size % 1024,
-            0,
-            "pack_size must be multiple of 1024 (bytes conversion from KiB)"
-        );
-
-        // If there are loose objects, the size should be reasonable (not zero, not absurdly large)
-        if stats.loose_objects > 0 {
-            assert!(
-                stats.loose_size > 0,
-                "loose_size should be > 0 if loose_objects > 0"
+            // Test that loose_size and pack_size are properly converted from KiB to bytes
+            // Both should be multiples of 1024
+            assert_eq!(
+                stats.loose_size % 1024,
+                0,
+                "loose_size must be multiple of 1024 (bytes conversion from KiB)"
             );
-            assert!(
-                stats.loose_size < 1_000_000_000,
-                "loose_size should be reasonable"
+            assert_eq!(
+                stats.pack_size % 1024,
+                0,
+                "pack_size must be multiple of 1024 (bytes conversion from KiB)"
             );
-        }
+
+            // If there are loose objects, the size should be reasonable (not zero, not absurdly large)
+            if stats.loose_objects > 0 {
+                assert!(
+                    stats.loose_size > 0,
+                    "loose_size should be > 0 if loose_objects > 0"
+                );
+                assert!(
+                    stats.loose_size < 1_000_000_000,
+                    "loose_size should be reasonable"
+                );
+            }
+        });
     }
 
     #[test]
     fn test_get_repo_stats_field_assignments() {
         // Test that all fields are properly assigned from git output
-        let temp_dir = dir_with_repo();
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        with_isolated_cwd_git(|_git_dir| {
+            let stats = get_repo_stats().unwrap();
 
-        let stats = get_repo_stats().unwrap();
+            // Verify that fields are assigned (not just defaulted to 0)
+            // After creating a repo with an initial commit, we should have objects
+            let total_objects = stats.loose_objects + stats.packed_objects;
+            assert!(
+                total_objects > 0,
+                "Should have at least one object from initial commit"
+            );
 
-        // Verify that fields are assigned (not just defaulted to 0)
-        // After creating a repo with an initial commit, we should have objects
-        let total_objects = stats.loose_objects + stats.packed_objects;
-        assert!(
-            total_objects > 0,
-            "Should have at least one object from initial commit"
-        );
+            // Verify the match arms are working by checking expected field types
+            // loose_objects should be count
+            // loose_size should be size * 1024
+            // packed_objects should be in-pack
+            // pack_size should be size-pack * 1024
 
-        // Verify the match arms are working by checking expected field types
-        // loose_objects should be count
-        // loose_size should be size * 1024
-        // packed_objects should be in-pack
-        // pack_size should be size-pack * 1024
-
-        // Verify fields are properly typed as u64 (not negative types)
-        // The fact that we can do arithmetic on them proves the match arms worked
-        let _sum = stats.loose_objects + stats.loose_size + stats.packed_objects + stats.pack_size;
-        assert!(
-            _sum >= stats.loose_objects,
-            "Arithmetic should work on u64 fields"
-        );
+            // Verify fields are properly typed as u64 (not negative types)
+            // The fact that we can do arithmetic on them proves the match arms worked
+            let _sum =
+                stats.loose_objects + stats.loose_size + stats.packed_objects + stats.pack_size;
+            assert!(
+                _sum >= stats.loose_objects,
+                "Arithmetic should work on u64 fields"
+            );
+        });
     }
 
     #[test]
     fn test_get_notes_size_with_measurements() {
         use crate::measurement_storage;
-        use crate::test_helpers::hermetic_git_env;
 
         // Test the full flow: add measurements -> get size with detailed breakdown
-        let temp_dir = dir_with_repo();
-        std::env::set_current_dir(temp_dir.path()).unwrap();
-        hermetic_git_env();
+        with_isolated_cwd_git(|_git_dir| {
+            // Add measurements using the public API
+            measurement_storage::add("test_metric_1", 42.0, &[]).unwrap();
+            measurement_storage::add("test_metric_2", 100.0, &[]).unwrap();
+            measurement_storage::add("test_metric_1", 84.0, &[]).unwrap();
 
-        // Add measurements using the public API
-        measurement_storage::add("test_metric_1", 42.0, &[]).unwrap();
-        measurement_storage::add("test_metric_2", 100.0, &[]).unwrap();
-        measurement_storage::add("test_metric_1", 84.0, &[]).unwrap();
+            // Get size information with detailed breakdown
+            let result = get_notes_size(true, false).unwrap();
 
-        // Get size information with detailed breakdown
-        let result = get_notes_size(true, false).unwrap();
+            // Should have measurements now
+            assert!(
+                result.total_bytes > 0,
+                "total_bytes should be > 0 after adding measurements"
+            );
+            assert_eq!(
+                result.note_count, 1,
+                "Should have 1 note (all measurements on HEAD)"
+            );
 
-        // Should have measurements now
-        assert!(
-            result.total_bytes > 0,
-            "total_bytes should be > 0 after adding measurements"
-        );
-        assert_eq!(
-            result.note_count, 1,
-            "Should have 1 note (all measurements on HEAD)"
-        );
+            // Verify detailed breakdown
+            let by_measurement = result
+                .by_measurement
+                .expect("Should have detailed breakdown");
 
-        // Verify detailed breakdown
-        let by_measurement = result
-            .by_measurement
-            .expect("Should have detailed breakdown");
+            // Should have entries for both metrics
+            assert!(
+                by_measurement.contains_key("test_metric_1"),
+                "Should have test_metric_1 in breakdown"
+            );
+            assert!(
+                by_measurement.contains_key("test_metric_2"),
+                "Should have test_metric_2 in breakdown"
+            );
 
-        // Should have entries for both metrics
-        assert!(
-            by_measurement.contains_key("test_metric_1"),
-            "Should have test_metric_1 in breakdown"
-        );
-        assert!(
-            by_measurement.contains_key("test_metric_2"),
-            "Should have test_metric_2 in breakdown"
-        );
+            // Test metric 1 should have count of 2
+            let metric1_info = &by_measurement["test_metric_1"];
+            assert_eq!(
+                metric1_info.count, 2,
+                "test_metric_1 should have 2 occurrences"
+            );
+            assert!(
+                metric1_info.total_bytes > 0,
+                "test_metric_1 should have non-zero size"
+            );
 
-        // Test metric 1 should have count of 2
-        let metric1_info = &by_measurement["test_metric_1"];
-        assert_eq!(
-            metric1_info.count, 2,
-            "test_metric_1 should have 2 occurrences"
-        );
-        assert!(
-            metric1_info.total_bytes > 0,
-            "test_metric_1 should have non-zero size"
-        );
+            // Test metric 2 should have count of 1
+            let metric2_info = &by_measurement["test_metric_2"];
+            assert_eq!(
+                metric2_info.count, 1,
+                "test_metric_2 should have 1 occurrence"
+            );
+            assert!(
+                metric2_info.total_bytes > 0,
+                "test_metric_2 should have non-zero size"
+            );
 
-        // Test metric 2 should have count of 1
-        let metric2_info = &by_measurement["test_metric_2"];
-        assert_eq!(
-            metric2_info.count, 1,
-            "test_metric_2 should have 1 occurrence"
-        );
-        assert!(
-            metric2_info.total_bytes > 0,
-            "test_metric_2 should have non-zero size"
-        );
+            // Verify that the size is distributed correctly (note_size / num_measurements)
+            // In this case, 3 measurements total, so each should get roughly 1/3 of note size
+            let total_from_breakdown: u64 =
+                by_measurement.values().map(|info| info.total_bytes).sum();
 
-        // Verify that the size is distributed correctly (note_size / num_measurements)
-        // In this case, 3 measurements total, so each should get roughly 1/3 of note size
-        let total_from_breakdown: u64 = by_measurement.values().map(|info| info.total_bytes).sum();
+            // The total from breakdown may not exactly equal total_bytes due to integer division
+            // For example: 121 / 3 = 40 per measurement, 40 * 3 = 120 (loses 1 byte)
+            // So we verify it's within the number of measurements
+            let num_measurements = 3u64;
+            assert!(
+                result.total_bytes.abs_diff(total_from_breakdown) < num_measurements,
+                "Sum of breakdown ({}) should be within {} bytes of total_bytes ({}) due to integer division",
+                total_from_breakdown,
+                num_measurements,
+                result.total_bytes
+            );
 
-        // The total from breakdown may not exactly equal total_bytes due to integer division
-        // For example: 121 / 3 = 40 per measurement, 40 * 3 = 120 (loses 1 byte)
-        // So we verify it's within the number of measurements
-        let num_measurements = 3u64;
-        assert!(
-            result.total_bytes.abs_diff(total_from_breakdown) < num_measurements,
-            "Sum of breakdown ({}) should be within {} bytes of total_bytes ({}) due to integer division",
-            total_from_breakdown,
-            num_measurements,
-            result.total_bytes
-        );
-
-        // Since we have 3 measurements, each gets result.total_bytes / 3
-        let expected_per_measurement = result.total_bytes / num_measurements;
-        assert!(
-            metric1_info.total_bytes >= expected_per_measurement,
-            "test_metric_1 appears twice, should have at least 1/3 of total (appears 2/3 times)"
-        );
+            // Since we have 3 measurements, each gets result.total_bytes / 3
+            let expected_per_measurement = result.total_bytes / num_measurements;
+            assert!(
+                metric1_info.total_bytes >= expected_per_measurement,
+                "test_metric_1 appears twice, should have at least 1/3 of total (appears 2/3 times)"
+            );
+        });
     }
 }
