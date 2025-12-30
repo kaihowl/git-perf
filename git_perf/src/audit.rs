@@ -335,8 +335,8 @@ pub fn audit_multiple(
         }
     }
 
-    // Print summary if we have groups
-    if !separate_by.is_empty() && total_groups > 0 {
+    // Print summary if grouping is active
+    if !separate_by.is_empty() {
         if failed {
             println!(
                 "Overall: FAILED ({}/{} groups passed)",

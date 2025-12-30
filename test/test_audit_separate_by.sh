@@ -105,5 +105,21 @@ git perf add -m timer 20
 assert_failure_with_output output git perf audit -m timer -S os
 assert_contains "$output" "no measurements have all required keys"
 
+test_section "Audit without separate-by: no summary line printed"
+
+cd_empty_repo
+
+# Create stable measurements without any key-value pairs
+create_commit
+git perf add -m timer 10
+create_commit
+git perf add -m timer 10
+create_commit
+git perf add -m timer 10
+
+# Without -S flag, no "Overall:" summary should appear in the output
+assert_success_with_output output git perf audit -m timer
+assert_not_contains "$output" "Overall:"
+
 test_stats
 exit 0
