@@ -462,9 +462,7 @@ fn display_json(info: &ConfigInfo) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{
-        with_isolated_home, with_isolated_test_setup, write_gitperfconfig,
-    };
+    use crate::test_helpers::{with_isolated_home, with_isolated_test_setup, write_gitperfconfig};
     use std::env;
     use std::fs;
     use std::path::Path;
