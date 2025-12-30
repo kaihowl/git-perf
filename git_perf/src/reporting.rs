@@ -711,6 +711,40 @@ impl PlotlyReporter {
 
         self.current_plot.add_trace(trace);
     }
+
+    /// Prepare hover text for data points based on commit indices
+    ///
+    /// For each commit index in the provided indexed data, creates a hover text string
+    /// containing the short commit hash, author name, and commit title.
+    ///
+    /// # Arguments
+    /// * `indices` - Iterator of original commit indices (before reversal by convert_to_x_y)
+    ///
+    /// # Returns
+    /// Vector of hover text strings in HTML format, one per index in the same order
+    ///
+    /// # Note
+    /// The hover text array order matches the input data order. The indices are used
+    /// directly to look up commits in all_commits (they are NOT reversed here - that
+    /// only happens to the x-axis values in convert_to_x_y).
+    fn prepare_hover_text(&self, indices: impl Iterator<Item = usize>) -> Vec<String> {
+        indices
+            .map(|idx| {
+                // Use idx directly to look up the commit
+                if let Some(commit) = self.all_commits.get(idx) {
+                    format!(
+                        "Commit: {}<br>Author: {}<br>Title: {}",
+                        &commit.commit[..7.min(commit.commit.len())],
+                        commit.author,
+                        commit.title
+                    )
+                } else {
+                    // Fallback if commit not found
+                    format!("Commit index: {}", idx)
+                }
+            })
+            .collect()
+    }
 }
 
 impl<'a> Reporter<'a> for PlotlyReporter {
@@ -834,6 +868,9 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         measurement_name: &str,
         group_values: &[String],
     ) {
+        // Extract indices for hover text before consuming indexed_measurements
+        let indices: Vec<usize> = indexed_measurements.iter().map(|(i, _)| *i).collect();
+
         let (x, y) = self.convert_to_x_y(
             indexed_measurements
                 .into_iter()
@@ -847,7 +884,10 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         let measurement_display = format_measurement_with_unit(measurement_name);
 
-        let trace = plotly::BoxPlot::new_xy(x, y);
+        // Prepare hover text with commit metadata
+        let hover_texts = self.prepare_hover_text(indices.into_iter());
+
+        let trace = plotly::BoxPlot::new_xy(x, y).hover_text_array(hover_texts);
 
         let trace = if !group_values.is_empty() {
             // Join group values with "/" for display (only at display time)
@@ -870,6 +910,9 @@ impl<'a> Reporter<'a> for PlotlyReporter {
         measurement_name: &str,
         group_values: &[String],
     ) {
+        // Extract indices for hover text before consuming indexed_measurements
+        let indices: Vec<usize> = indexed_measurements.iter().map(|(i, _)| *i).collect();
+
         let (x, y) = self.convert_to_x_y(
             indexed_measurements
                 .into_iter()
@@ -883,7 +926,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
         let measurement_display = format_measurement_with_unit(measurement_name);
 
-        let trace = plotly::Scatter::new(x, y).name(&measurement_display);
+        // Prepare hover text with commit metadata
+        let hover_texts = self.prepare_hover_text(indices.into_iter());
+
+        let trace = plotly::Scatter::new(x, y)
+            .name(&measurement_display)
+            .hover_text_array(hover_texts)
+            .hover_info(plotly::common::HoverInfo::Text);
 
         let trace = if !group_values.is_empty() {
             // Join group values with "/" for display (only at display time)
@@ -1950,10 +1999,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc1234567890".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def0987654321".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -1972,6 +2025,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "abc1234567890".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
 
@@ -2049,10 +2104,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2121,6 +2180,8 @@ mod tests {
         // Add commits
         let commits = vec![Commit {
             commit: "abc123".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2157,6 +2218,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "abc123def456".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2186,6 +2249,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "commit123".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2226,10 +2291,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "commit1".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "commit2".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2271,6 +2340,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "hash1".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2301,6 +2372,8 @@ mod tests {
 
         let commits = vec![Commit {
             commit: "abc".to_string(),
+            title: "test: commit".to_string(),
+            author: "Test Author".to_string(),
             measurements: vec![],
         }];
         reporter.add_commits(&commits);
@@ -2328,14 +2401,20 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "ghi789".to_string(),
+                title: "test: commit 3".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2400,10 +2479,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "def456".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2445,6 +2528,8 @@ mod tests {
         let commits: Vec<Commit> = (0..5)
             .map(|i| Commit {
                 commit: format!("sha{:06}", i),
+                title: format!("test: commit {}", i),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             })
             .collect();
@@ -2517,10 +2602,14 @@ mod tests {
         let commits = vec![
             Commit {
                 commit: "abc123def".to_string(),
+                title: "test: commit 1".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
             Commit {
                 commit: "xyz789abc".to_string(),
+                title: "test: commit 2".to_string(),
+                author: "Test Author".to_string(),
                 measurements: vec![],
             },
         ];
@@ -2549,6 +2638,213 @@ mod tests {
         // Hover text should contain percentage and short SHA
         assert!(html.contains("+23.5%"));
         assert!(html.contains("xyz789"));
+    }
+
+    #[test]
+    fn test_hover_text_matches_x_axis() {
+        use crate::data::{Commit, MeasurementData};
+
+        let mut reporter = PlotlyReporter::new();
+
+        // Create commits with distinct identifiable data
+        // Order passed add_commits is in walk_commits_from order:
+        // The first commit is the youngest commit.
+        // Later commits are older commits.
+        let commits = vec![
+            Commit {
+                commit: "ccccccc3333333333333333333333333333333".to_string(),
+                title: "third commit (newest)".to_string(),
+                author: "Author C".to_string(),
+                measurements: vec![MeasurementData {
+                    name: "test_metric".to_string(),
+                    val: 300.0,
+                    epoch: 0,
+                    timestamp: 0.0,
+                    key_values: std::collections::HashMap::new(),
+                }],
+            },
+            Commit {
+                commit: "bbbbbbb2222222222222222222222222222222".to_string(),
+                title: "second commit (middle)".to_string(),
+                author: "Author B".to_string(),
+                measurements: vec![MeasurementData {
+                    name: "test_metric".to_string(),
+                    val: 200.0,
+                    epoch: 0,
+                    timestamp: 0.0,
+                    key_values: std::collections::HashMap::new(),
+                }],
+            },
+            Commit {
+                commit: "aaaaaaa1111111111111111111111111111111".to_string(),
+                title: "first commit (oldest)".to_string(),
+                author: "Author A".to_string(),
+                measurements: vec![MeasurementData {
+                    name: "test_metric".to_string(),
+                    val: 100.0,
+                    epoch: 0,
+                    timestamp: 0.0,
+                    key_values: std::collections::HashMap::new(),
+                }],
+            },
+        ];
+        reporter.add_commits(&commits);
+
+        reporter.begin_section("test_section", "{{PLACEHOLDER}}");
+
+        // Add measurements at indices 0 (oldest) and 2 (newest)
+        let indexed_measurements = vec![
+            (0, &commits[0].measurements[0]),
+            (2, &commits[2].measurements[0]),
+        ];
+
+        reporter.add_trace(indexed_measurements, "test_metric", &[]);
+
+        let bytes = reporter.as_bytes();
+        let html = String::from_utf8_lossy(&bytes);
+
+        // Extract and parse Plotly JSON data to verify positional alignment
+        let json_str = extract_plotly_data_array(&html)
+            .expect("Failed to extract Plotly config object from HTML");
+
+        let plotly_config: serde_json::Value =
+            serde_json::from_str(&json_str).expect("Failed to parse Plotly JSON config");
+
+        // Access the "data" field which contains the array of traces
+        let plotly_data = plotly_config["data"]
+            .as_array()
+            .expect("Config should have 'data' field as array");
+
+        // Get the first trace (should be the box plot trace)
+        let trace = plotly_data.get(0).expect("Should have at least one trace");
+
+        // Extract x, y, and hover text arrays
+        let x_array = trace["x"].as_array().expect("Trace should have x array");
+        let y_array = trace["y"].as_array().expect("Trace should have y array");
+
+        // Try both "text" and "hovertext" field names
+        let hover_array = trace
+            .get("text")
+            .or_else(|| trace.get("hovertext"))
+            .and_then(|v| v.as_array())
+            .expect("Trace should have text or hovertext array");
+
+        // Verify we have 2 data points
+        assert_eq!(x_array.len(), 2, "Should have 2 x values");
+        assert_eq!(y_array.len(), 2, "Should have 2 y values");
+        assert_eq!(hover_array.len(), 2, "Should have 2 hover texts");
+
+        // Verify positional alignment: for each data point, check that
+        // the hover text at position i corresponds to the correct commit for x-coordinate x[i]
+        //
+        // Expected alignment:
+        // - x=0 (oldest, rightmost): y=100.0, hover contains aaaaaaa/Author A/first commit
+        // - x=2 (oldest, leftmost): y=300.0, hover contains ccccccc/Author C/third commit
+        for i in 0..x_array.len() {
+            let x = x_array[i].as_u64().expect("x value should be a number") as usize;
+            let y = y_array[i].as_f64().expect("y value should be a number");
+            let hover = hover_array[i]
+                .as_str()
+                .expect("hover text should be a string");
+
+            if x == 0 {
+                // Leftmost position - should show oldest commit (index 0)
+                assert_eq!(y, 100.0, "x=0 should have y=100.0 (oldest commit value)");
+                assert!(
+                    hover.contains("aaaaaaa"),
+                    "x=0 hover should contain oldest commit hash 'aaaaaaa', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("Author A"),
+                    "x=0 hover should contain oldest commit author 'Author A', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("first commit"),
+                    "x=0 hover should contain oldest commit title 'first commit', but got: {}",
+                    hover
+                );
+            } else if x == 2 {
+                // Rightmost position - should show newest commit (index 2)
+                assert_eq!(y, 300.0, "x=2 should have y=300.0 (newest commit value)");
+                assert!(
+                    hover.contains("ccccccc"),
+                    "x=2 hover should contain newest commit hash 'ccccccc', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("Author C"),
+                    "x=2 hover should contain newest commit author 'Author C', but got: {}",
+                    hover
+                );
+                assert!(
+                    hover.contains("third commit"),
+                    "x=2 hover should contain newest commit title 'third commit', but got: {}",
+                    hover
+                );
+            } else {
+                panic!("Unexpected x value: {}", x);
+            }
+        }
+    }
+
+    /// Helper function to extract Plotly data array from HTML
+    ///
+    /// Finds the `Plotly.newPlot(...)` call and extracts the data array.
+    /// The call format is: Plotly.newPlot("id", {"data":[...]})
+    /// This function extracts the entire config object (second parameter).
+    fn extract_plotly_data_array(html: &str) -> Result<String, String> {
+        // Find "Plotly.newPlot("
+        let start_pattern = "Plotly.newPlot(";
+        let start = html
+            .find(start_pattern)
+            .ok_or_else(|| "Could not find Plotly.newPlot call in HTML".to_string())?;
+
+        // Skip past the div id argument (first comma)
+        let after_start = start + start_pattern.len();
+        let first_comma_offset = html[after_start..]
+            .find(',')
+            .ok_or_else(|| "Could not find first comma after Plotly.newPlot".to_string())?;
+        let obj_start_pos = after_start + first_comma_offset + 1;
+
+        // Find the opening brace of the config object
+        let remaining = &html[obj_start_pos..];
+        let trimmed = remaining.trim_start();
+        let brace_offset = remaining.len() - trimmed.len();
+
+        if !trimmed.starts_with('{') {
+            return Err(format!(
+                "Expected config object to start with '{{', but found: {}",
+                &trimmed[..20.min(trimmed.len())]
+            ));
+        }
+
+        let obj_begin = obj_start_pos + brace_offset;
+
+        // Count braces to find matching close brace
+        let mut depth = 0;
+        let mut end = obj_begin;
+
+        for (i, ch) in html[obj_begin..].chars().enumerate() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = obj_begin + i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if depth != 0 {
+            return Err("Unmatched braces in config object".to_string());
+        }
+
+        Ok(html[obj_begin..end].to_string())
     }
 
     #[test]
