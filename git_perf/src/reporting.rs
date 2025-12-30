@@ -2716,7 +2716,7 @@ mod tests {
             .expect("Config should have 'data' field as array");
 
         // Get the first trace (should be the box plot trace)
-        let trace = plotly_data.get(0).expect("Should have at least one trace");
+        let trace = plotly_data.first().expect("Should have at least one trace");
 
         // Extract x, y, and hover text arrays
         let x_array = trace["x"].as_array().expect("Trace should have x array");
