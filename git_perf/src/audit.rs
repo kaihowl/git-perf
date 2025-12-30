@@ -702,6 +702,7 @@ mod test {
                 Some(2.0),
                 Some(DispersionMethod::StandardDeviation),
                 &[], // Empty combined_patterns
+                &[], // Empty separate_by
                 false,
             );
 
