@@ -116,7 +116,7 @@ num_measurements=$(echo "$report" | wc -l)
 # One measurement should still be there (plus header = 2 lines)
 assert_equals "$num_measurements" "2" "Expected 1 measurement after removal"
 # The measurement should be 20.0
-assert_contains "$report" "20.0" "Expected to find the 20.0 measurement"
+assert_matches "$report" $'[[:space:]]20\\.0[[:space:]]' "Expected to find the 20.0 measurement"
 
 if git_objects_contain test-measure-one; then
   echo "Unexpectedly still found test-measure-one in the git objects"
