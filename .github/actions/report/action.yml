@@ -24,7 +24,7 @@ inputs:
     required: false
     default: ''
   git-perf-version:
-    description: 'Version of git-perf to use (latest, or specific version)'
+    description: 'Version of git-perf to use (latest, a specific version, or `skip` to use already installed version)'
     required: false
     default: 'latest'
   github-token:
@@ -96,14 +96,8 @@ runs:
           echo "✓ Using root directory (no subdirectory specified)"
         fi
 
-    - name: Install git-perf (from branch - internal testing)
-      if: ${{ inputs.git-perf-version == 'branch' }}
-      uses: ./.github/actions/install
-      with:
-        release: 'branch'
-
-    - name: Install git-perf (from release - external usage)
-      if: ${{ inputs.git-perf-version != 'branch' }}
+    - name: Install git-perf (from release version)
+      if: ${{ inputs.git-perf-version != 'skip' }}
       shell: bash
       run: |
         latest=""
