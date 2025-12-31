@@ -37,11 +37,9 @@ pub fn reset_measurements(dry_run: bool, force: bool) -> Result<()> {
     display_reset_plan(&plan)?;
 
     // 4. Get confirmation unless force or dry-run
-    if !dry_run && !force {
-        if !confirm_reset()? {
-            println!("Reset cancelled.");
-            return Ok(());
-        }
+    if !dry_run && !force && !confirm_reset()? {
+        println!("Reset cancelled.");
+        return Ok(());
     }
 
     // 5. Execute reset (unless dry-run)

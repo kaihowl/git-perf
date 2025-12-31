@@ -618,7 +618,7 @@ fn consolidate_write_branches_into(
     Ok(refs)
 }
 
-pub(crate) fn remove_reference(ref_name: &str) -> Result<(), GitError> {
+fn remove_reference(ref_name: &str) -> Result<(), GitError> {
     git_update_ref(unindent(
         format!(
             r#"
@@ -806,7 +806,7 @@ pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
     Ok(ReadBranchGuard { temp_ref })
 }
 
-pub(crate) fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
+fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
 
