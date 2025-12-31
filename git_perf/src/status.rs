@@ -53,7 +53,8 @@ fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     let _pending_guard = create_consolidated_pending_read_branch()?;
 
     // Walk all commits to find measurements
-    let commits = walk_commits(usize::MAX)?;
+    // Use a large but reasonable number instead of usize::MAX to avoid overflow issues
+    let commits = walk_commits(1_000_000)?;
 
     let mut commit_count = 0;
     let mut all_measurement_names = HashSet::new();
@@ -114,7 +115,7 @@ fn create_consolidated_pending_read_branch() -> Result<PendingReadBranchGuard> {
 
     // Create or update the ref to point to empty
     let status = Command::new("git")
-        .args(&["update-ref", &temp_ref.ref_name, EMPTY_OID])
+        .args(["update-ref", &temp_ref.ref_name, EMPTY_OID])
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .status()?;
@@ -158,7 +159,7 @@ struct PendingReadBranchGuard {
 /// Reconcile a branch with another ref using git notes merge
 fn reconcile_branch_with(target: &str, oid: &str) -> Result<()> {
     let status = Command::new("git")
-        .args(&[
+        .args([
             "notes",
             "--ref",
             target,

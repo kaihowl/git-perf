@@ -87,7 +87,8 @@ fn plan_reset() -> Result<ResetPlan> {
 fn count_all_pending_measurements() -> Result<(usize, usize)> {
     // Create consolidated pending branch same way as status does
     let _guard = create_consolidated_pending_read_branch()?;
-    let commits = walk_commits(usize::MAX)?;
+    // Use a large but reasonable number instead of usize::MAX to avoid overflow issues
+    let commits = walk_commits(1_000_000)?;
 
     let mut total_measurements = 0;
     let mut commit_count = 0;
@@ -120,7 +121,7 @@ fn create_consolidated_pending_read_branch() -> Result<PendingReadBranchGuard> {
 
     // Create or update the ref to point to empty
     let status = Command::new("git")
-        .args(&["update-ref", &temp_ref.ref_name, EMPTY_OID])
+        .args(["update-ref", &temp_ref.ref_name, EMPTY_OID])
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .status()?;
@@ -164,7 +165,7 @@ struct PendingReadBranchGuard {
 /// Reconcile a branch with another ref using git notes merge
 fn reconcile_branch_with(target: &str, oid: &str) -> Result<()> {
     let status = Command::new("git")
-        .args(&[
+        .args([
             "notes",
             "--ref",
             target,
@@ -209,7 +210,7 @@ fn create_new_write_ref() -> Result<String> {
 
     // Update the symbolic ref to point to the new write ref
     let status = Command::new("git")
-        .args(&["symbolic-ref", REFS_NOTES_WRITE_SYMBOLIC_REF, &new_ref])
+        .args(["symbolic-ref", REFS_NOTES_WRITE_SYMBOLIC_REF, &new_ref])
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .status()?;
