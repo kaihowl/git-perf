@@ -13,8 +13,10 @@ use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push}
 use crate::import::{handle_import, ImportOptions};
 use crate::measurement_storage::{add_to_commit as add, remove_measurements_from_commits};
 use crate::reporting::report;
+use crate::reset;
 use crate::size;
 use crate::stats::ReductionFunc;
+use crate::status;
 use git_perf_cli_types::{Cli, Commands};
 
 pub fn handle_calls() -> Result<()> {
@@ -171,6 +173,8 @@ pub fn handle_calls() -> Result<()> {
             Ok(())
         }
         Commands::Prune {} => prune(),
+        Commands::Status { detailed } => status::show_status(detailed),
+        Commands::Reset { dry_run, force } => reset::reset_measurements(dry_run, force),
         Commands::Remove {
             older_than,
             no_prune,

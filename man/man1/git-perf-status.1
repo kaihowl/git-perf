@@ -1,0 +1,22 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH status 1  "status " 
+.SH NAME
+status \- Show pending measurements that haven\*(Aqt been pushed
+.SH SYNOPSIS
+\fBstatus\fR [\fB\-d\fR|\fB\-\-detailed\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Show pending measurements that haven\*(Aqt been pushed
+.PP
+Lists local measurements that exist in write branches but haven\*(Aqt been pushed to the remote repository. Similar to `git status` for tracking which changes are pending.
+.PP
+Pending measurements are those created with `add`, `measure`, or `import` that haven\*(Aqt been published via `push`. These can be safely discarded with the `reset` command.
+.PP
+Examples: git perf status                    # Show summary of pending measurements git perf status \-\-detailed         # Show per\-commit breakdown
+.SH OPTIONS
+.TP
+\fB\-d\fR, \fB\-\-detailed\fR
+Show detailed per\-commit breakdown
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)

@@ -207,7 +207,7 @@ fn ensure_remote_exists() -> Result<(), GitError> {
 }
 
 /// Creates a temporary reference name by combining a prefix with a random suffix.
-fn create_temp_ref_name(prefix: &str) -> String {
+pub(crate) fn create_temp_ref_name(prefix: &str) -> String {
     let suffix = random_suffix();
     format!("{prefix}{suffix}")
 }
@@ -618,7 +618,7 @@ fn consolidate_write_branches_into(
     Ok(refs)
 }
 
-fn remove_reference(ref_name: &str) -> Result<(), GitError> {
+pub(crate) fn remove_reference(ref_name: &str) -> Result<(), GitError> {
     git_update_ref(unindent(
         format!(
             r#"
@@ -806,7 +806,7 @@ pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
     Ok(ReadBranchGuard { temp_ref })
 }
 
-fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
+pub(crate) fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
 
@@ -1046,6 +1046,18 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+/// Get all write refs and return their names and OIDs
+pub(crate) fn get_write_refs() -> Result<Vec<(String, String)>> {
+    let refs = get_refs(vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")])
+        .map_err(|e| anyhow!("{:?}", e))?;
+    Ok(refs.into_iter().map(|r| (r.refname, r.oid)).collect())
+}
+
+/// Delete a git reference (wrapper that converts GitError to anyhow::Error)
+pub(crate) fn delete_reference(ref_name: &str) -> Result<()> {
+    remove_reference(ref_name).map_err(|e| anyhow!("{:?}", e))
 }
 
 #[cfg(test)]
