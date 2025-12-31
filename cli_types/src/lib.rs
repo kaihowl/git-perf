@@ -542,6 +542,39 @@ pub enum Commands {
         #[arg(short, long, requires = "list")]
         measurement: Option<String>,
     },
+
+    /// Generate an index page listing all performance reports
+    ///
+    /// Scans the gh-pages branch (or specified subdirectory) for HTML reports
+    /// and generates an index page with categorized links. Reports are classified
+    /// as branch reports (e.g., main.html), commit reports (40-character SHA), or
+    /// custom reports (other names).
+    ///
+    /// Examples:
+    ///   git perf generate-index -o perf/index.html
+    ///   git perf generate-index --subdirectory perf --title "Performance Reports"
+    ///   git perf generate-index --template .git-perf/index-template.html
+    GenerateIndex {
+        /// Output path for the index HTML file
+        #[arg(short, long, default_value = "index.html")]
+        output: PathBuf,
+
+        /// Subdirectory within gh-pages containing reports (e.g., "perf", "reports")
+        #[arg(short, long)]
+        subdirectory: Option<String>,
+
+        /// Custom title for the index page
+        #[arg(short = 't', long, default_value = "Performance Reports")]
+        title: String,
+
+        /// Path to custom HTML template file for the index page
+        #[arg(long)]
+        template: Option<PathBuf>,
+
+        /// Git branch containing the reports (default: gh-pages)
+        #[arg(short, long, default_value = "gh-pages")]
+        branch: String,
+    },
 }
 
 fn parse_key_value(s: &str) -> Result<(String, String)> {

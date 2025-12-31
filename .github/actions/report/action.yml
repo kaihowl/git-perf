@@ -62,6 +62,14 @@ inputs:
     description: 'Path to custom report template (relative to repo root). If empty, uses no template.'
     required: false
     default: ''
+  generate-index:
+    description: 'Whether to generate an index page listing all reports'
+    required: false
+    default: 'false'
+  index-title:
+    description: 'Title for the generated index page'
+    required: false
+    default: 'Performance Reports'
 
 outputs:
   report-url:
@@ -208,6 +216,28 @@ runs:
           echo "=== Detailed Breakdown (Logical) ==="
         fi
         git perf size $SIZE_FLAGS --detailed || true
+
+    - name: Generate reports index
+      if: ${{ inputs.generate-index == 'true' }}
+      shell: bash
+      run: |
+        # Generate index page listing all reports
+        echo "Generating reports index..."
+
+        # Fetch gh-pages branch to access existing reports
+        git fetch origin gh-pages:gh-pages 2>/dev/null || echo "No gh-pages branch yet"
+
+        # Build subdirectory flag
+        SUBDIR_FLAG=""
+        if [ -n "${{ inputs.reports-subdirectory }}" ]; then
+          SUBDIR_FLAG="--subdirectory ${{ inputs.reports-subdirectory }}"
+        fi
+
+        # Generate index in the reports directory (will be published with the report)
+        git perf generate-index \
+          --output reports/index.html \
+          --title "${{ inputs.index-title }}" \
+          $SUBDIR_FLAG || echo "Index generation failed, continuing without index"
 
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
