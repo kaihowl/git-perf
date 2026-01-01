@@ -107,8 +107,25 @@ fn display_status(status: &PendingStatus, detailed: bool) -> Result<()> {
     }
 
     println!("Pending measurements:");
-    println!("  {} commit(s) with measurements", status.commit_count);
-    println!("  {} unique measurement(s)", status.measurement_names.len());
+    let commit_word = if status.commit_count == 1 {
+        "commit"
+    } else {
+        "commits"
+    };
+    println!(
+        "  {} {} with measurements",
+        status.commit_count, commit_word
+    );
+    let measurement_word = if status.measurement_names.len() == 1 {
+        "measurement"
+    } else {
+        "measurements"
+    };
+    println!(
+        "  {} unique {}",
+        status.measurement_names.len(),
+        measurement_word
+    );
     println!();
 
     if !status.measurement_names.is_empty() {
@@ -130,9 +147,14 @@ fn display_status(status: &PendingStatus, detailed: bool) -> Result<()> {
                 } else {
                     &commit_info.commit
                 };
+                let meas_word = if commit_info.count == 1 {
+                    "measurement"
+                } else {
+                    "measurements"
+                };
                 println!(
-                    "  {} ({} measurement(s)) - {}",
-                    short_sha, commit_info.count, commit_info.title
+                    "  {} ({} {}) - {}",
+                    short_sha, commit_info.count, meas_word, commit_info.title
                 );
                 for name in &commit_info.measurement_names {
                     println!("    - {}", name);

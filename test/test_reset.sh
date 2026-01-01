@@ -35,7 +35,7 @@ git perf add -m measure2 200.0
 git perf add -m measure3 300.0
 
 output=$(git perf status)
-assert_output_contains "$output" "2 commit(s)" "Expected 2 commits with measurements"
+assert_output_contains "$output" "2 commits" "Expected 2 commits with measurements"
 
 # Reset should clear all
 git perf reset --force

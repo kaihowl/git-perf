@@ -51,9 +51,15 @@ pub fn reset_measurements(dry_run: bool, force: bool) -> Result<()> {
     } else {
         execute_reset(&plan)?;
         println!();
+        let ref_word = if plan.refs_to_delete.len() == 1 {
+            "ref"
+        } else {
+            "refs"
+        };
         println!(
-            "Reset complete. {} write ref(s) deleted.",
-            plan.refs_to_delete.len()
+            "Reset complete. {} write {} deleted.",
+            plan.refs_to_delete.len(),
+            ref_word
         );
     }
 
@@ -133,9 +139,24 @@ fn execute_reset(plan: &ResetPlan) -> Result<()> {
 /// Display what will be reset
 fn display_reset_plan(plan: &ResetPlan) -> Result<()> {
     println!("Will reset:");
-    println!("  {} write ref(s)", plan.refs_to_delete.len());
-    println!("  {} measurement(s)", plan.measurement_count);
-    println!("  {} commit(s) with measurements", plan.commit_count);
+    let ref_word = if plan.refs_to_delete.len() == 1 {
+        "ref"
+    } else {
+        "refs"
+    };
+    println!("  {} write {}", plan.refs_to_delete.len(), ref_word);
+    let measurement_word = if plan.measurement_count == 1 {
+        "measurement"
+    } else {
+        "measurements"
+    };
+    println!("  {} {}", plan.measurement_count, measurement_word);
+    let commit_word = if plan.commit_count == 1 {
+        "commit"
+    } else {
+        "commits"
+    };
+    println!("  {} {} with measurements", plan.commit_count, commit_word);
 
     Ok(())
 }
