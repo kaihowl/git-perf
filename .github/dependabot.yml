@@ -12,6 +12,9 @@ updates:
       github-actions:
         patterns:
         - "*"
+    exclude-paths:
+      # Ignore cargo-dist generated workflow
+      - ".github/workflows/release.yml"
 
   - package-ecosystem: "rust-toolchain"
     directory: "/"
