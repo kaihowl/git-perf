@@ -269,7 +269,7 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
 
 /// Merges notes from one branch into a target using the cat_sort_uniq strategy.
 /// This is used to consolidate measurements from multiple write refs.
-pub(crate) fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
+fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
     _ = capture_git_output(
         &[
             "notes",
@@ -589,7 +589,7 @@ fn new_symbolic_write_ref() -> Result<String, GitError> {
 /// Creates a new write ref and updates the symbolic ref to point to it (public wrapper).
 /// This is used to ensure concurrent writes go to a new location, preventing
 /// race conditions during operations like reset or push.
-pub(crate) fn create_new_write_ref() -> Result<String> {
+pub fn create_new_write_ref() -> Result<String> {
     new_symbolic_write_ref().map_err(|e| anyhow!("{:?}", e))
 }
 
@@ -823,7 +823,7 @@ pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
 /// This is used by status and reset commands to see only local pending measurements.
 /// The returned guard must be kept alive for as long as the reference is needed.
 /// The temporary reference is automatically cleaned up when the guard is dropped.
-pub(crate) fn create_consolidated_pending_read_branch() -> Result<ReadBranchGuard> {
+pub fn create_consolidated_pending_read_branch() -> Result<ReadBranchGuard> {
     let temp_ref = update_pending_read_branch()?;
     Ok(ReadBranchGuard { temp_ref })
 }
@@ -1087,14 +1087,14 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
 }
 
 /// Get all write refs and return their names and OIDs
-pub(crate) fn get_write_refs() -> Result<Vec<(String, String)>> {
+pub fn get_write_refs() -> Result<Vec<(String, String)>> {
     let refs = get_refs(vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")])
         .map_err(|e| anyhow!("{:?}", e))?;
     Ok(refs.into_iter().map(|r| (r.refname, r.oid)).collect())
 }
 
 /// Delete a git reference (wrapper that converts GitError to anyhow::Error)
-pub(crate) fn delete_reference(ref_name: &str) -> Result<()> {
+pub fn delete_reference(ref_name: &str) -> Result<()> {
     remove_reference(ref_name).map_err(|e| anyhow!("{:?}", e))
 }
 
