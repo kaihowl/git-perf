@@ -207,7 +207,7 @@ fn ensure_remote_exists() -> Result<(), GitError> {
 }
 
 /// Creates a temporary reference name by combining a prefix with a random suffix.
-pub(crate) fn create_temp_ref_name(prefix: &str) -> String {
+fn create_temp_ref_name(prefix: &str) -> String {
     let suffix = random_suffix();
     format!("{prefix}{suffix}")
 }
@@ -267,7 +267,9 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
     Ok(())
 }
 
-fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
+/// Merges notes from one branch into a target using the cat_sort_uniq strategy.
+/// This is used to consolidate measurements from multiple write refs.
+pub(crate) fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
     _ = capture_git_output(
         &[
             "notes",
@@ -570,6 +572,10 @@ fn remove_measurements_from_reference(
     Ok(())
 }
 
+/// Creates a new write ref and updates the symbolic ref to point to it.
+/// This is used to ensure concurrent writes go to a new location, preventing
+/// race conditions during operations like reset or push.
+/// Internal version that returns GitError.
 fn new_symbolic_write_ref() -> Result<String, GitError> {
     let target = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
 
@@ -578,6 +584,13 @@ fn new_symbolic_write_ref() -> Result<String, GitError> {
     // that go to the old target will still be merged during consolidation
     git_symbolic_ref_create_or_update(REFS_NOTES_WRITE_SYMBOLIC_REF, &target)?;
     Ok(target)
+}
+
+/// Creates a new write ref and updates the symbolic ref to point to it (public wrapper).
+/// This is used to ensure concurrent writes go to a new location, preventing
+/// race conditions during operations like reset or push.
+pub(crate) fn create_new_write_ref() -> Result<String> {
+    new_symbolic_write_ref().map_err(|e| anyhow!("{:?}", e))
 }
 
 const EMPTY_OID: &str = "0000000000000000000000000000000000000000";
@@ -806,6 +819,15 @@ pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
     Ok(ReadBranchGuard { temp_ref })
 }
 
+/// Creates a temporary read branch that consolidates ONLY pending writes (excludes remote).
+/// This is used by status and reset commands to see only local pending measurements.
+/// The returned guard must be kept alive for as long as the reference is needed.
+/// The temporary reference is automatically cleaned up when the guard is dropped.
+pub(crate) fn create_consolidated_pending_read_branch() -> Result<ReadBranchGuard> {
+    let temp_ref = update_pending_read_branch()?;
+    Ok(ReadBranchGuard { temp_ref })
+}
+
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
@@ -864,6 +886,22 @@ fn update_read_branch() -> Result<TempRef> {
 
     consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)
         .map_err(|e| anyhow!("Failed to consolidate write branches: {:?}", e))?;
+
+    Ok(temp_ref)
+}
+
+fn update_pending_read_branch() -> Result<TempRef> {
+    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)
+        .map_err(|e| anyhow!("Failed to create temporary ref: {:?}", e))?;
+    // Create a read branch from ONLY the pending write branches (not the remote).
+    // Start with empty tree and merge in all write refs.
+    let refs = get_refs(vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")])
+        .map_err(|e| anyhow!("Failed to get write refs: {:?}", e))?;
+
+    for reference in &refs {
+        reconcile_branch_with(&temp_ref.ref_name, &reference.oid)
+            .map_err(|e| anyhow!("Failed to merge write ref: {:?}", e))?;
+    }
 
     Ok(temp_ref)
 }

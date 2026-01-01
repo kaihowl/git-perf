@@ -1,10 +1,7 @@
-use crate::git::git_interop::{
-    create_temp_ref_name, delete_reference, get_write_refs, walk_commits,
-};
+use crate::git::git_interop::{create_consolidated_pending_read_branch, walk_commits};
 use crate::serialization::deserialize;
 use anyhow::Result;
 use std::collections::HashSet;
-use std::process::{Command, Stdio};
 
 /// Information about pending measurements
 #[derive(Debug)]
@@ -49,7 +46,7 @@ pub fn show_status(detailed: bool) -> Result<()> {
 /// Gather information about pending measurements
 fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     // Create a consolidated read branch that includes pending writes
-    // but not the remote branch
+    // but not the remote branch - using git module function
     let _pending_guard = create_consolidated_pending_read_branch()?;
 
     // Walk all commits to find measurements
@@ -99,83 +96,6 @@ fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
         measurement_names: all_measurement_names,
         per_commit,
     })
-}
-
-/// Create a read branch with ONLY pending writes (exclude remote)
-fn create_consolidated_pending_read_branch() -> Result<PendingReadBranchGuard> {
-    use crate::git::git_definitions::REFS_NOTES_READ_PREFIX;
-
-    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
-
-    // Consolidate only write branches (not remote)
-    let refs = get_write_refs()?;
-
-    // Start with an empty tree
-    const EMPTY_OID: &str = "0000000000000000000000000000000000000000";
-
-    // Create or update the ref to point to empty
-    let status = Command::new("git")
-        .args(["update-ref", &temp_ref.ref_name, EMPTY_OID])
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .status()?;
-
-    if !status.success() {
-        anyhow::bail!("Failed to create temporary ref");
-    }
-
-    // Merge in all write refs
-    for (_, oid) in &refs {
-        reconcile_branch_with(&temp_ref.ref_name, oid)?;
-    }
-
-    Ok(PendingReadBranchGuard { temp_ref })
-}
-
-/// Temporary reference for reading pending measurements
-struct TempRef {
-    ref_name: String,
-}
-
-impl TempRef {
-    fn new(prefix: &str) -> Result<Self> {
-        let ref_name = create_temp_ref_name(prefix);
-        Ok(TempRef { ref_name })
-    }
-}
-
-impl Drop for TempRef {
-    fn drop(&mut self) {
-        let _ = delete_reference(&self.ref_name);
-    }
-}
-
-/// Guard for the pending read branch
-struct PendingReadBranchGuard {
-    #[allow(dead_code)]
-    temp_ref: TempRef,
-}
-
-/// Reconcile a branch with another ref using git notes merge
-fn reconcile_branch_with(target: &str, oid: &str) -> Result<()> {
-    let status = Command::new("git")
-        .args([
-            "notes",
-            "--ref",
-            target,
-            "merge",
-            "--strategy=cat_sort_uniq",
-            oid,
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .status()?;
-
-    if !status.success() {
-        anyhow::bail!("Failed to merge notes");
-    }
-
-    Ok(())
 }
 
 /// Display status information to stdout

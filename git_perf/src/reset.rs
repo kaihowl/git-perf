@@ -1,13 +1,10 @@
-use crate::git::git_definitions::{
-    REFS_NOTES_READ_PREFIX, REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_WRITE_TARGET_PREFIX,
-};
 use crate::git::git_interop::{
-    create_temp_ref_name, delete_reference, get_write_refs, walk_commits,
+    create_consolidated_pending_read_branch, create_new_write_ref, delete_reference,
+    get_write_refs, walk_commits,
 };
 use crate::serialization::deserialize;
 use anyhow::{Context, Result};
 use std::io::{self, Write};
-use std::process::{Command, Stdio};
 
 /// Information about what will be reset
 #[derive(Debug)]
@@ -24,25 +21,30 @@ pub struct ResetPlan {
 
 /// Reset (discard) pending measurements
 pub fn reset_measurements(dry_run: bool, force: bool) -> Result<()> {
-    // 1. Determine what would be reset
-    let plan = plan_reset()?;
+    // CRITICAL: Create a fresh write ref FIRST, before gathering refs to delete.
+    // This ensures that any concurrent measurements added during the reset operation
+    // will go to the new write ref and won't be accidentally deleted.
+    let new_write_ref = create_new_write_ref().context("Failed to create fresh write ref")?;
 
-    // 2. Check if there's anything to reset
+    // Now gather the refs to delete (this will NOT include the new write ref we just created)
+    let plan = plan_reset(&new_write_ref)?;
+
+    // Check if there's anything to reset
     if plan.refs_to_delete.is_empty() {
         println!("No pending measurements to reset.");
         return Ok(());
     }
 
-    // 3. Display plan
+    // Display plan
     display_reset_plan(&plan)?;
 
-    // 4. Get confirmation unless force or dry-run
+    // Get confirmation unless force or dry-run
     if !dry_run && !force && !confirm_reset()? {
         println!("Reset cancelled.");
         return Ok(());
     }
 
-    // 5. Execute reset (unless dry-run)
+    // Execute reset (unless dry-run)
     if dry_run {
         println!();
         println!("Dry run - no changes made.");
@@ -59,11 +61,20 @@ pub fn reset_measurements(dry_run: bool, force: bool) -> Result<()> {
 }
 
 /// Plan what will be reset
-fn plan_reset() -> Result<ResetPlan> {
+///
+/// The new_write_ref parameter is the ref we just created, which should NOT be deleted.
+fn plan_reset(new_write_ref: &str) -> Result<ResetPlan> {
     // Get all write refs
     let refs = get_write_refs()?;
 
-    if refs.is_empty() {
+    // Filter out the new write ref we just created
+    let refs_to_delete: Vec<String> = refs
+        .into_iter()
+        .map(|(refname, _)| refname)
+        .filter(|refname| refname != new_write_ref)
+        .collect();
+
+    if refs_to_delete.is_empty() {
         return Ok(ResetPlan {
             refs_to_delete: vec![],
             measurement_count: 0,
@@ -75,7 +86,7 @@ fn plan_reset() -> Result<ResetPlan> {
     let (measurement_count, commit_count) = count_all_pending_measurements()?;
 
     Ok(ResetPlan {
-        refs_to_delete: refs.into_iter().map(|(refname, _)| refname).collect(),
+        refs_to_delete,
         measurement_count,
         commit_count,
     })
@@ -83,7 +94,7 @@ fn plan_reset() -> Result<ResetPlan> {
 
 /// Count all pending measurements
 fn count_all_pending_measurements() -> Result<(usize, usize)> {
-    // Create consolidated pending branch same way as status does
+    // Create consolidated pending branch using git module function
     let _guard = create_consolidated_pending_read_branch()?;
     // Use a large but reasonable number instead of usize::MAX to avoid overflow issues
     let commits = walk_commits(1_000_000)?;
@@ -107,117 +118,16 @@ fn count_all_pending_measurements() -> Result<(usize, usize)> {
     Ok((total_measurements, commit_count))
 }
 
-/// Create a consolidated pending read branch (same as in status module)
-fn create_consolidated_pending_read_branch() -> Result<PendingReadBranchGuard> {
-    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)?;
-
-    // Consolidate only write branches (not remote)
-    let refs = get_write_refs()?;
-
-    // Start with an empty tree
-    const EMPTY_OID: &str = "0000000000000000000000000000000000000000";
-
-    // Create or update the ref to point to empty
-    let status = Command::new("git")
-        .args(["update-ref", &temp_ref.ref_name, EMPTY_OID])
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .status()?;
-
-    if !status.success() {
-        anyhow::bail!("Failed to create temporary ref");
-    }
-
-    // Merge in all write refs
-    for (_, oid) in &refs {
-        reconcile_branch_with(&temp_ref.ref_name, oid)?;
-    }
-
-    Ok(PendingReadBranchGuard { temp_ref })
-}
-
-/// Temporary reference for reading pending measurements
-struct TempRef {
-    ref_name: String,
-}
-
-impl TempRef {
-    fn new(prefix: &str) -> Result<Self> {
-        let ref_name = create_temp_ref_name(prefix);
-        Ok(TempRef { ref_name })
-    }
-}
-
-impl Drop for TempRef {
-    fn drop(&mut self) {
-        let _ = delete_reference(&self.ref_name);
-    }
-}
-
-/// Guard for the pending read branch
-struct PendingReadBranchGuard {
-    #[allow(dead_code)]
-    temp_ref: TempRef,
-}
-
-/// Reconcile a branch with another ref using git notes merge
-fn reconcile_branch_with(target: &str, oid: &str) -> Result<()> {
-    let status = Command::new("git")
-        .args([
-            "notes",
-            "--ref",
-            target,
-            "merge",
-            "--strategy=cat_sort_uniq",
-            oid,
-        ])
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .status()?;
-
-    if !status.success() {
-        anyhow::bail!("Failed to merge notes");
-    }
-
-    Ok(())
-}
-
 /// Execute the reset plan
 fn execute_reset(plan: &ResetPlan) -> Result<()> {
-    // According to the amendment in the issue comments, we should:
-    // 1. Create a new write ref (representing the reset state)
-    // 2. Delete all OTHER write refs
-
-    // Create new write ref
-    let new_write_ref = create_new_write_ref()?;
-
-    // Delete all other write refs
+    // Delete all the old write refs
+    // The new write ref was already created before planning, so it won't be in this list
     for ref_name in &plan.refs_to_delete {
-        if ref_name != &new_write_ref {
-            delete_reference(ref_name)
-                .with_context(|| format!("Failed to delete reference: {}", ref_name))?;
-        }
+        delete_reference(ref_name)
+            .with_context(|| format!("Failed to delete reference: {}", ref_name))?;
     }
 
     Ok(())
-}
-
-/// Create a new write ref for the reset operation
-fn create_new_write_ref() -> Result<String> {
-    let new_ref = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
-
-    // Update the symbolic ref to point to the new write ref
-    let status = Command::new("git")
-        .args(["symbolic-ref", REFS_NOTES_WRITE_SYMBOLIC_REF, &new_ref])
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .status()?;
-
-    if !status.success() {
-        anyhow::bail!("Failed to update symbolic ref");
-    }
-
-    Ok(new_ref)
 }
 
 /// Display what will be reset
