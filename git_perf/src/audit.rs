@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use itertools::Itertools;
-use log::error;
+use log::info;
 use sparklines::spark;
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -400,7 +400,7 @@ fn audit_with_data(
         let number_measurements = tail_summary.len;
         // MUTATION POINT: > vs < (Line 122)
         let plural_s = if number_measurements == 1 { "" } else { "s" };
-        error!("Only {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
+        info!("Only {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
 
         let mut skip_message = format!(
             "⏭️ '{measurement}'\nOnly {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
