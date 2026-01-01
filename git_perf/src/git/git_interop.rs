@@ -19,10 +19,11 @@ use rand::{rng, Rng};
 
 use crate::config;
 
+pub use super::git_definitions::REFS_NOTES_BRANCH;
 use super::git_definitions::{
-    GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_BRANCH,
-    REFS_NOTES_MERGE_BRANCH_PREFIX, REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX,
-    REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_WRITE_TARGET_PREFIX,
+    GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_MERGE_BRANCH_PREFIX,
+    REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX, REFS_NOTES_WRITE_SYMBOLIC_REF,
+    REFS_NOTES_WRITE_TARGET_PREFIX,
 };
 use super::git_lowlevel::{
     capture_git_output, get_git_perf_remote, git_rev_parse, git_rev_parse_symbolic_ref,
@@ -1028,6 +1029,86 @@ pub fn walk_commits_from(start_commit: &str, num_commits: usize) -> Result<Vec<C
 /// Walk commits starting from HEAD (convenience wrapper)
 pub fn walk_commits(num_commits: usize) -> Result<Vec<CommitWithNotes>> {
     walk_commits_from("HEAD", num_commits)
+}
+
+/// Get commits that have notes in a specific notes ref.
+/// This is much more efficient than walking all commits when you only need
+/// commits with measurements.
+///
+/// Returns a vector of commit SHAs that have notes in the specified ref.
+pub fn get_commits_with_notes(notes_ref: &str) -> Result<Vec<String>> {
+    let output = capture_git_output(&["notes", "--ref", notes_ref, "list"], &None)
+        .context(format!("Failed to list notes in {}", notes_ref))?;
+
+    // git notes list outputs lines in format: <note-sha> <commit-sha>
+    let commits: Vec<String> = output
+        .stdout
+        .lines()
+        .filter(|line| !line.is_empty())
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                Some(parts[1].to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(commits)
+}
+
+/// Get detailed commit information (SHA, title, author) for specific commits.
+/// This is more efficient than walking commits when you already know which commits you need.
+pub fn get_commit_details(commit_shas: &[String]) -> Result<Vec<CommitWithNotes>> {
+    if commit_shas.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut commits = Vec::new();
+
+    for sha in commit_shas {
+        let output =
+            capture_git_output(&["show", "--no-patch", "--format=%H%n%s%n%an", sha], &None)
+                .context(format!("Failed to get commit details for {}", sha))?;
+
+        let lines: Vec<&str> = output.stdout.lines().collect();
+        if lines.len() >= 3 {
+            commits.push(CommitWithNotes {
+                sha: lines[0].to_string(),
+                title: if lines[1].is_empty() {
+                    "[no subject]".to_string()
+                } else {
+                    lines[1].to_string()
+                },
+                author: if lines[2].is_empty() {
+                    "[unknown]".to_string()
+                } else {
+                    lines[2].to_string()
+                },
+                note_lines: Vec::new(), // Will be filled in by caller
+            });
+        }
+    }
+
+    Ok(commits)
+}
+
+/// Get the notes content for a specific commit from a notes ref.
+/// Returns the note lines as a vector of strings.
+pub fn get_notes_for_commit(notes_ref: &str, commit_sha: &str) -> Result<Vec<String>> {
+    let output = capture_git_output(&["notes", "--ref", notes_ref, "show", commit_sha], &None);
+
+    match output {
+        Ok(output) => {
+            let note_lines: Vec<String> = output.stdout.lines().map(|s| s.to_string()).collect();
+            Ok(note_lines)
+        }
+        Err(_) => {
+            // No notes for this commit is not an error
+            Ok(Vec::new())
+        }
+    }
 }
 
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {

@@ -1,7 +1,10 @@
-use crate::git::git_interop::{create_consolidated_pending_read_branch, walk_commits};
+use crate::git::git_interop::{
+    create_consolidated_pending_read_branch, get_commit_details, get_commits_with_notes,
+    get_notes_for_commit, REFS_NOTES_BRANCH,
+};
 use crate::serialization::deserialize;
 use anyhow::Result;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Information about pending measurements
 #[derive(Debug)]
@@ -47,47 +50,88 @@ pub fn show_status(detailed: bool) -> Result<()> {
 fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     // Create a consolidated read branch that includes pending writes
     // but not the remote branch - using git module function
-    let _pending_guard = create_consolidated_pending_read_branch()?;
+    let pending_guard = create_consolidated_pending_read_branch()?;
 
-    // Walk all commits to find measurements
-    // Use a large but reasonable number instead of usize::MAX to avoid overflow issues
-    let commits = walk_commits(1_000_000)?;
+    // Get the temporary ref name from the guard
+    let pending_ref = pending_guard.ref_name();
 
+    // Efficiently get commits that have notes in the pending branch
+    let pending_commits = get_commits_with_notes(pending_ref)?;
+
+    // Get commits that have notes in the remote branch (already pushed)
+    let remote_commits: HashSet<String> = get_commits_with_notes(REFS_NOTES_BRANCH)
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+
+    // Build a map of remote measurements for each commit
+    let mut remote_measurements: HashMap<String, HashSet<String>> = HashMap::new();
+    for commit_sha in &remote_commits {
+        let note_lines = get_notes_for_commit(REFS_NOTES_BRANCH, commit_sha)?;
+        if !note_lines.is_empty() {
+            let note_text = note_lines.join("\n");
+            let measurements = deserialize(&note_text);
+            let measurement_names: HashSet<String> =
+                measurements.iter().map(|m| m.name.clone()).collect();
+            remote_measurements.insert(commit_sha.clone(), measurement_names);
+        }
+    }
+
+    // Process pending commits to find truly pending measurements
     let mut commit_count = 0;
     let mut all_measurement_names = HashSet::new();
     let mut per_commit = if detailed { Some(Vec::new()) } else { None };
 
-    for commit_with_notes in commits {
-        if commit_with_notes.note_lines.is_empty() {
+    for commit_sha in &pending_commits {
+        let note_lines = get_notes_for_commit(pending_ref, commit_sha)?;
+        if note_lines.is_empty() {
             continue;
         }
 
         // Deserialize measurements from note
-        let note_text = commit_with_notes.note_lines.join("\n");
-        let measurements = deserialize(&note_text);
+        let note_text = note_lines.join("\n");
+        let pending_meas = deserialize(&note_text);
 
-        if measurements.is_empty() {
+        if pending_meas.is_empty() {
+            continue;
+        }
+
+        // Get measurement names from pending
+        let pending_names: HashSet<String> = pending_meas.iter().map(|m| m.name.clone()).collect();
+
+        // Check if this commit has measurements that are not in the remote
+        let truly_pending_names: Vec<String> =
+            if let Some(remote_names) = remote_measurements.get(commit_sha) {
+                // Find measurements that are in pending but not in remote
+                pending_names.difference(remote_names).cloned().collect()
+            } else {
+                // Commit not in remote at all, so all measurements are pending
+                pending_names.into_iter().collect()
+            };
+
+        if truly_pending_names.is_empty() {
             continue;
         }
 
         commit_count += 1;
 
         // Collect unique measurement names
-        let commit_measurement_names: Vec<String> =
-            measurements.iter().map(|m| m.name.clone()).collect();
-
-        for name in &commit_measurement_names {
+        for name in &truly_pending_names {
             all_measurement_names.insert(name.clone());
         }
 
         // Store per-commit details if requested
         if let Some(ref mut per_commit_vec) = per_commit {
-            per_commit_vec.push(CommitMeasurements {
-                commit: commit_with_notes.sha.clone(),
-                title: commit_with_notes.title.clone(),
-                measurement_names: commit_measurement_names,
-                count: measurements.len(),
-            });
+            // Get commit details (title, author)
+            let commit_details = get_commit_details(std::slice::from_ref(commit_sha))?;
+            if let Some(commit_info) = commit_details.first() {
+                per_commit_vec.push(CommitMeasurements {
+                    commit: commit_sha.clone(),
+                    title: commit_info.title.clone(),
+                    measurement_names: truly_pending_names.clone(),
+                    count: truly_pending_names.len(),
+                });
+            }
         }
     }
 
