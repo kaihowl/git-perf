@@ -675,11 +675,10 @@ impl PlotlyReporter {
                 ChangeDirection::Decrease => (IMPROVEMENT_COLOR, "✓ Improvement"),
             };
 
-            // Look up commit metadata (author and title) from all_commits
+            // Look up commit metadata (author and title) from all_commits using the changepoint index
             let (author, title) = self
                 .all_commits
-                .iter()
-                .find(|c| c.commit == cp.commit_sha)
+                .get(cp.index)
                 .map(|c| (c.author.as_str(), c.title.as_str()))
                 .unwrap_or(("Unknown", "Unknown"));
 
