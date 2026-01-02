@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.3](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.2...git-perf-v0.18.3) - 2026-01-02
+
+### Fixed
+
+- skipping audit due to missing history is info and not error ([#592](https://github.com/kaihowl/git-perf/pull/592))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group with 2 updates ([#596](https://github.com/kaihowl/git-perf/pull/596))
+
 ## [0.18.2](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.1...git-perf-v0.18.2) - 2025-12-30
 
 ### Added
