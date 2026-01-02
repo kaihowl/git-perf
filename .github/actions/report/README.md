@@ -20,7 +20,7 @@ A GitHub Action to generate and publish git-perf performance reports to GitHub P
 ### Basic Usage
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -28,7 +28,7 @@ A GitHub Action to generate and publish git-perf performance reports to GitHub P
 ### Advanced Usage
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     depth: 100
     report-name: 'my-custom-report'
@@ -45,7 +45,7 @@ The action automatically comments on PRs by default. To disable automatic commen
 
 ```yaml
 - id: perf-report
-  uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+  uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     audit-args: '-m build_time -d 2.0 --min-measurements 5'
     comment-on-pr: 'false'  # Disable automatic PR commenting
@@ -186,7 +186,7 @@ jobs:
         with:
           fetch-depth: 40
 
-      - uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+      - uses: kaihowl/git-perf/.github/actions/report@latest
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -194,7 +194,7 @@ jobs:
 ### Generate Report with Audit
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     depth: 100
     audit-args: '-m build_time -m test_duration -d 2.5 --min-measurements 10'
@@ -204,7 +204,7 @@ jobs:
 ### Using Specific git-perf Version
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     git-perf-version: 'v1.2.3'
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -213,7 +213,7 @@ jobs:
 ### Disable PR Comments
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     comment-on-pr: 'false'
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -226,7 +226,7 @@ The action supports deploying reports to a subdirectory within GitHub Pages, all
 ### Deploy to Subdirectory
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     reports-subdirectory: 'perf'
     preserve-existing: 'true'
@@ -238,7 +238,7 @@ This deploys reports to `https://user.github.io/repo/perf/` instead of the root.
 ### Enable Epoch and Change Point Detection
 
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     show-epochs: 'true'
     show-changes: 'true'
@@ -261,7 +261,7 @@ The action supports multi-section dashboard templates for comprehensive performa
 
 2. Use the template in your workflow:
    ```yaml
-   - uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+   - uses: kaihowl/git-perf/.github/actions/report@latest
      with:
        template: '.git-perf/templates/performance-overview.html'
        github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -302,7 +302,7 @@ jobs:
         with:
           fetch-depth: 100
 
-      - uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+      - uses: kaihowl/git-perf/.github/actions/report@latest
         with:
           reports-subdirectory: 'perf'
           preserve-existing: 'true'

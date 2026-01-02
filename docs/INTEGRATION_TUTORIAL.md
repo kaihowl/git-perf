@@ -157,7 +157,7 @@ jobs:
 
       # Install git-perf
       - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@v0.16.0
+        uses: kaihowl/git-perf/.github/actions/install@latest
         with:
           release: latest
 
@@ -244,7 +244,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@v0.16.0
+        uses: kaihowl/git-perf/.github/actions/install@latest
         with:
           release: latest
 
@@ -265,7 +265,7 @@ jobs:
         run: git perf push
 
       - name: Generate performance report
-        uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+        uses: kaihowl/git-perf/.github/actions/report@latest
         with:
           depth: 40
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -348,7 +348,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cleanup measurements and reports
-        uses: kaihowl/git-perf/.github/actions/cleanup@v0.16.0
+        uses: kaihowl/git-perf/.github/actions/cleanup@latest
         with:
           retention-days: 90
           cleanup-reports: true
@@ -400,7 +400,7 @@ Update your workflow to run audits and fail on regressions. You can also integra
 
 # Option 2: Integrate audit with report generation
 - name: Generate report with audit
-  uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+  uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     depth: 40
     audit-args: '-m build_time -m binary_size -d 4.0 --min-measurements 5'
@@ -850,7 +850,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: kaihowl/git-perf/.github/actions/install@v0.16.0
+      - uses: kaihowl/git-perf/.github/actions/install@latest
 
       - name: Build and measure
         run: |
@@ -866,7 +866,7 @@ jobs:
         run: git perf push
 
       - name: Generate report with audit
-        uses: kaihowl/git-perf/.github/actions/report@v0.16.0
+        uses: kaihowl/git-perf/.github/actions/report@latest
         with:
           depth: 40
           audit-args: '-m build_time -m binary_size -m test_duration -d 4.0 --min-measurements 5'
