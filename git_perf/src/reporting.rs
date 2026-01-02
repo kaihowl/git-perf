@@ -675,11 +675,21 @@ impl PlotlyReporter {
                 ChangeDirection::Decrease => (IMPROVEMENT_COLOR, "✓ Improvement"),
             };
 
+            // Look up commit metadata (author and title) from all_commits
+            let (author, title) = self
+                .all_commits
+                .iter()
+                .find(|c| c.commit == cp.commit_sha)
+                .map(|c| (c.author.as_str(), c.title.as_str()))
+                .unwrap_or(("Unknown", "Unknown"));
+
             let hover_text = format!(
-                "{}: {:+.1}%<br>Commit: {}<br>Confidence: {:.1}%",
+                "{}: {:+.1}%<br>Commit: {}<br>Author: {}<br>Title: {}<br>Confidence: {:.1}%",
                 symbol,
                 cp.magnitude_pct,
                 &cp.commit_sha[..8.min(cp.commit_sha.len())],
+                author,
+                title,
                 cp.confidence * 100.0
             );
 
@@ -2635,9 +2645,11 @@ mod tests {
 
         let bytes = reporter.as_bytes();
         let html = String::from_utf8_lossy(&bytes);
-        // Hover text should contain percentage and short SHA
+        // Hover text should contain percentage, short SHA, author, and title
         assert!(html.contains("+23.5%"));
         assert!(html.contains("xyz789"));
+        assert!(html.contains("Test Author"));
+        assert!(html.contains("test: commit 2"));
     }
 
     #[test]
