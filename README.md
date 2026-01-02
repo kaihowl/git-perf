@@ -824,7 +824,7 @@ This converts your shallow clone to a full clone, allowing all measurements to b
 Configure cleanup retention:
 ```yaml
 # In .github/workflows/cleanup-measurements.yml
-- uses: kaihowl/git-perf/.github/actions/cleanup@master
+- uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     retention-days: 90  # Days to retain measurements
 ```
@@ -875,7 +875,7 @@ Use the report action for automatic PR comments:
 
 ```yaml
 - name: Generate report with audit
-  uses: kaihowl/git-perf/.github/actions/report@master
+  uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     depth: 40
     audit-args: '-m build_time -m binary_size -d 4.0'
