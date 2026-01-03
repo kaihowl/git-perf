@@ -204,5 +204,18 @@ pub fn handle_calls() -> Result<()> {
                 anyhow::bail!("config command requires --list flag (try: git perf config --list)");
             }
         }
+        Commands::GenerateIndex {
+            output,
+            subdirectory,
+            title,
+            template,
+            branch,
+        } => crate::reporting::generate_index(
+            &branch,
+            subdirectory.as_deref(),
+            &output,
+            &title,
+            template.as_deref(),
+        ),
     }
 }
