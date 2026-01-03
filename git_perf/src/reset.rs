@@ -109,25 +109,37 @@ fn execute_reset(plan: &ResetPlan) -> Result<()> {
 
 /// Display what will be reset
 fn display_reset_plan(plan: &ResetPlan) -> Result<()> {
+    // Gather the full status to get measurement names
+    let status = gather_pending_status(false)?;
+
     println!("Will reset:");
-    let ref_word = if plan.refs_to_delete.len() == 1 {
-        "ref"
-    } else {
-        "refs"
-    };
-    println!("  {} write {}", plan.refs_to_delete.len(), ref_word);
-    let measurement_word = if plan.measurement_count == 1 {
-        "measurement"
-    } else {
-        "measurements"
-    };
-    println!("  {} {}", plan.measurement_count, measurement_word);
     let commit_word = if plan.commit_count == 1 {
         "commit"
     } else {
         "commits"
     };
     println!("  {} {} with measurements", plan.commit_count, commit_word);
+    let measurement_word = if status.measurement_names.len() == 1 {
+        "measurement"
+    } else {
+        "measurements"
+    };
+    println!(
+        "  {} unique {}",
+        status.measurement_names.len(),
+        measurement_word
+    );
+    println!();
+
+    if !status.measurement_names.is_empty() {
+        println!("Measurement names:");
+        let mut sorted_names: Vec<_> = status.measurement_names.iter().collect();
+        sorted_names.sort();
+        for name in sorted_names {
+            println!("  - {}", name);
+        }
+        println!();
+    }
 
     Ok(())
 }
