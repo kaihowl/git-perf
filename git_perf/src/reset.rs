@@ -1,8 +1,5 @@
-use crate::git::git_interop::{
-    create_consolidated_pending_read_branch, create_new_write_ref, delete_reference,
-    get_write_refs, walk_commits,
-};
-use crate::serialization::deserialize;
+use crate::git::git_interop::{create_new_write_ref, delete_reference, get_write_refs};
+use crate::status::gather_pending_status;
 use anyhow::{Context, Result};
 use std::io::{self, Write};
 
@@ -88,40 +85,14 @@ fn plan_reset(new_write_ref: &str) -> Result<ResetPlan> {
         });
     }
 
-    // Count measurements for display
-    let (measurement_count, commit_count) = count_all_pending_measurements()?;
+    // Count measurements for display using the existing status gathering logic
+    let status = gather_pending_status(false)?;
 
     Ok(ResetPlan {
         refs_to_delete,
-        measurement_count,
-        commit_count,
+        measurement_count: status.measurement_count,
+        commit_count: status.commit_count,
     })
-}
-
-/// Count all pending measurements
-fn count_all_pending_measurements() -> Result<(usize, usize)> {
-    // Create consolidated pending branch using git module function
-    let _guard = create_consolidated_pending_read_branch()?;
-    // Use a large but reasonable number instead of usize::MAX to avoid overflow issues
-    let commits = walk_commits(1_000_000)?;
-
-    let mut total_measurements = 0;
-    let mut commit_count = 0;
-
-    for commit_with_notes in commits {
-        if commit_with_notes.note_lines.is_empty() {
-            continue;
-        }
-
-        let note_text = commit_with_notes.note_lines.join("\n");
-        let measurements = deserialize(&note_text);
-        if !measurements.is_empty() {
-            total_measurements += measurements.len();
-            commit_count += 1;
-        }
-    }
-
-    Ok((total_measurements, commit_count))
 }
 
 /// Execute the reset plan

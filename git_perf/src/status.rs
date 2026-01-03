@@ -12,6 +12,9 @@ pub struct PendingStatus {
     /// Total number of commits with pending measurements
     pub commit_count: usize,
 
+    /// Total number of measurements across all commits
+    pub measurement_count: usize,
+
     /// Unique measurement names found in pending writes
     pub measurement_names: HashSet<String>,
 
@@ -47,7 +50,7 @@ pub fn show_status(detailed: bool) -> Result<()> {
 }
 
 /// Gather information about pending measurements
-fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
+pub fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     // Create a consolidated read branch that includes ONLY pending writes
     // (not the remote branch). After a successful push, the write refs are deleted,
     // so this branch only contains measurements that haven't been pushed yet.
@@ -61,6 +64,7 @@ fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     let pending_commits = get_commits_with_notes(pending_ref)?;
 
     let mut commit_count = 0;
+    let mut measurement_count = 0;
     let mut all_measurement_names = HashSet::new();
     let mut per_commit = if detailed { Some(Vec::new()) } else { None };
 
@@ -79,6 +83,7 @@ fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
         }
 
         commit_count += 1;
+        measurement_count += measurements.len();
 
         // Collect measurement names
         let measurement_names: Vec<String> = measurements.iter().map(|m| m.name.clone()).collect();
@@ -104,6 +109,7 @@ fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
 
     Ok(PendingStatus {
         commit_count,
+        measurement_count,
         measurement_names: all_measurement_names,
         per_commit,
     })
