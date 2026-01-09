@@ -21,13 +21,9 @@ export PATH="/usr/local/cargo/bin:$PATH"  # Add to shell profile
 ## Pull Request Requirements
 
 **MANDATORY for AI Agents**:
-```bash
-# ALWAYS use --title with Conventional Commits format
-gh pr create --title "type(scope): description" --body "..."
-
-# NEVER rely on auto-generated titles - they break CI
-gh pr create --body "..."  # FORBIDDEN
-```
+- Always explicitly specify the PR title using Conventional Commits format
+- Never rely on auto-generated titles - they break CI
+- Title must be provided when creating pull requests
 
 **Format**: `type(scope): lowercase description`
 
