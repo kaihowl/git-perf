@@ -16,6 +16,16 @@ cargo nextest run                      # Run full test suite including slow test
 ```bash
 cargo install cargo-nextest --locked
 export PATH="/usr/local/cargo/bin:$PATH"  # Add to shell profile
+
+# Install test dependencies
+# macOS:
+brew install libfaketime
+
+# Ubuntu/Debian:
+sudo apt-get install libfaketime
+
+# Verify IPv6 is available (required for some tests)
+cat /proc/net/if_inet6  # Should show IPv6 addresses
 ```
 
 ## Pull Request Requirements
@@ -49,11 +59,19 @@ refactor(git): simplify notes retrieval logic
 - **Criterion benchmarks**: `git_perf/benches/` (read.rs, add.rs, sample_ci_bench.rs)
 - **Mutation testing**: Configured in `.cargo/mutants.toml`
 
+**Test Prerequisites**:
+- **libfaketime**: Required for bash integration tests (see [Requirements](#requirements))
+- **IPv6 networking**: Required for HTTP custom header tests (see [Requirements](#requirements))
+- Tests will fail with clear error messages if dependencies are missing
+
 **Key test commands**:
 ```bash
 cargo nextest run -- --skip slow       # Skip slow tests (default)
 cargo nextest run                      # Full suite including slow tests
 ./test/run_tests.sh                   # Run all bash integration tests
+
+# Skip tests requiring special dependencies
+cargo nextest run -- --skip slow --skip test_customheader --skip test_remove
 ```
 
 ## Documentation Generation
@@ -139,6 +157,12 @@ Lower penalty values are better for detecting multiple regime changes in perform
 - **Git**: 2.43.0+ (version checked automatically)
 - **Rust**: Edition 2021
 - **nextest**: Required for test execution
+- **libfaketime**: Required for bash integration tests (simulates different timestamps)
+  - macOS: `brew install libfaketime`
+  - Ubuntu/Debian: `sudo apt-get install libfaketime`
+- **IPv6 networking**: Required for git HTTP custom header tests
+  - Tests use IPv6 localhost `[::1]` for mock HTTP servers
+  - Ensure IPv6 is enabled in your environment
 
 ## Build & Release
 
@@ -170,6 +194,34 @@ rustc --version && cargo fmt --version && cargo nextest --version
 
 **Issue**: Manpage validation fails in CI
 **Fix**: Run `./scripts/generate-manpages.sh` and commit the regenerated docs.
+
+**Issue**: Bash test `test_remove` fails with "LD_PRELOAD cannot be preloaded" error
+**Fix**: Install libfaketime library:
+```bash
+# Ubuntu/Debian
+sudo apt-get install libfaketime
+
+# macOS
+brew install libfaketime
+```
+The test uses faketime to simulate different timestamps for testing time-based measurement removal.
+
+**Issue**: Tests `test_customheader_pull` and `test_customheader_push` fail with IPv6 connection errors
+**Fix**: These tests require functional IPv6 networking. The mock HTTP server binds to `[::1]` (IPv6 localhost). Solutions:
+- **Enable IPv6 in your environment** (preferred for full compatibility):
+  ```bash
+  # Check if IPv6 is available
+  cat /proc/net/if_inet6
+
+  # Test IPv6 connectivity
+  curl -6 http://[::1]:8080
+  ```
+- **For Docker/containers**: Enable IPv6 in Docker daemon configuration
+- **Skip these tests** if IPv6 is unavailable:
+  ```bash
+  cargo nextest run -- --skip test_customheader
+  ```
+These tests verify that git correctly passes custom HTTP headers (e.g., authorization tokens) to remote servers.
 
 ## GitHub Templates
 
