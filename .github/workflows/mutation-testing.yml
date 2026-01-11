@@ -6,6 +6,10 @@ on:
     - cron: '0 3 * * 0'
   # Allow manual triggering
   workflow_dispatch:
+  # Run on PRs that modify this workflow file
+  pull_request:
+    paths:
+      - '.github/workflows/mutation-testing.yml'
 
 concurrency:
   group: weekly-mutation-testing
