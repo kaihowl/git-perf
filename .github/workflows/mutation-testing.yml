@@ -74,6 +74,17 @@ jobs:
       run: |
         set -euo pipefail
         cd git_perf
+
+        # On PRs, run a quick smoke test (test just one file to verify workflow works)
+        # On schedule, run full mutation testing
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "🔍 Running quick mutation test for PR validation (smoke test)"
+          mutants_args="--test-tool=nextest --output mutation-report.json --jobs 2 --timeout 20 --file src/config.rs"
+        else
+          echo "🔍 Running full mutation testing (scheduled run)"
+          mutants_args="--test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60"
+        fi
+
         # Run full mutation testing with nextest (no sharding - weekly comprehensive testing)
         # Exit codes: 0=success, 1=usage error, 2=missed mutants, 3=timeouts, 4=baseline fail, 5-6=diff issues, 70=internal error
         # Only fail hard on config/setup errors (1,4,5,6,70), accept missed mutants (2) and timeouts (3)
@@ -86,8 +97,8 @@ jobs:
         # Temporarily disable exit-on-error to capture exit code
         set +e
         echo "🚀 Starting mutation testing with command:"
-        echo "cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60"
-        cargo mutants --test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60
+        echo "cargo mutants $mutants_args"
+        cargo mutants $mutants_args
         exit_code=$?
         set -e
 
