@@ -18,6 +18,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf list-commits`↴](#git-perf-list-commits)
 * [`git-perf size`↴](#git-perf-size)
 * [`git-perf config`↴](#git-perf-config)
+* [`git-perf generate-index`↴](#git-perf-generate-index)
 
 ## `git-perf`
 
@@ -38,6 +39,7 @@ This document contains the help content for the `git-perf` command-line program.
 * `list-commits` — List all commits that have performance measurements
 * `size` — Estimate storage size of live performance measurements
 * `config` — Manage git-perf configuration
+* `generate-index` — Generate an index page listing all performance reports
 
 ###### **Options:**
 
@@ -369,6 +371,32 @@ Examples: git perf config --list                  # Show configuration summary g
 
 * `-v`, `--validate` — Validate configuration and report issues
 * `-m`, `--measurement <MEASUREMENT>` — Show specific measurement configuration only
+
+
+
+## `git-perf generate-index`
+
+Generate an index page listing all performance reports
+
+Scans the gh-pages branch (or specified subdirectory) for HTML reports and generates an index page with categorized links. Reports are classified as branch reports (e.g., main.html), commit reports (40-character SHA), or custom reports (other names).
+
+Examples: git perf generate-index -o perf/index.html git perf generate-index --subdirectory perf --title "Performance Reports" git perf generate-index --template .git-perf/index-template.html
+
+**Usage:** `git-perf generate-index [OPTIONS]`
+
+###### **Options:**
+
+* `-o`, `--output <OUTPUT>` — Output path for the index HTML file
+
+  Default value: `index.html`
+* `-s`, `--subdirectory <SUBDIRECTORY>` — Subdirectory within gh-pages containing reports (e.g., "perf", "reports")
+* `-t`, `--title <TITLE>` — Custom title for the index page
+
+  Default value: `Performance Reports`
+* `--template <TEMPLATE>` — Path to custom HTML template file for the index page
+* `-b`, `--branch <BRANCH>` — Git branch containing the reports (default: gh-pages)
+
+  Default value: `gh-pages`
 
 
 
