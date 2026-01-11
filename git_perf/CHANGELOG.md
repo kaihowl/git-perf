@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.4](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.3...git-perf-v0.18.4) - 2026-01-11
+
+### Added
+
+- *(reporting)* add commit author and title to change point hover text ([#599](https://github.com/kaihowl/git-perf/pull/599))
+
 ## [0.18.3](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.2...git-perf-v0.18.3) - 2026-01-02
 
 ### Fixed
