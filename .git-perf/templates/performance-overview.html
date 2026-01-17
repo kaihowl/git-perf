@@ -93,17 +93,17 @@
         </div>
 
         <div class="content">
-            <!-- Fibonacci Benchmarks Section -->
+            <!-- Fibonacci Benchmarks Section (Median) -->
             <div class="section">
                 <div class="section-header">
                     <span class="section-icon">🧮</span>
                     <div>
-                        <h2 class="section-title">Fibonacci Benchmarks <span class="badge">Statistical Metrics</span></h2>
-                        <p class="section-description">Mean, median, and variability metrics for recursive Fibonacci calculations</p>
+                        <h2 class="section-title">Fibonacci Benchmarks - Median <span class="badge">Statistical Metrics</span></h2>
+                        <p class="section-description">Median aggregation: Mean, median, and variability metrics for recursive Fibonacci calculations</p>
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION[fibonacci-stats]
+                    {{SECTION[fibonacci-stats-median]
                         measurement-filter: ^(bench::fibonacci_.*::(mean|median|mad))$
                         aggregate-by: median
                         depth: 40
@@ -113,17 +113,57 @@
                 </div>
             </div>
 
-            <!-- Timing Benchmarks Section -->
+            <!-- Fibonacci Benchmarks Section (Min) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">🧮</span>
+                    <div>
+                        <h2 class="section-title">Fibonacci Benchmarks - Min <span class="badge">Best Case</span></h2>
+                        <p class="section-description">Min aggregation: Best-case performance for recursive Fibonacci calculations</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[fibonacci-stats-min]
+                        measurement-filter: ^(bench::fibonacci_.*::(mean|median|mad))$
+                        aggregate-by: min
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Fibonacci Benchmarks Section (Raw) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">🧮</span>
+                    <div>
+                        <h2 class="section-title">Fibonacci Benchmarks - Raw Data <span class="badge">No Aggregation</span></h2>
+                        <p class="section-description">Raw measurements showing all data points and variability</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[fibonacci-stats-raw]
+                        measurement-filter: ^(bench::fibonacci_.*::(mean|median|mad))$
+                        aggregate-by: none
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Timing Benchmarks Section (Median) -->
             <div class="section">
                 <div class="section-header">
                     <span class="section-icon">⏱️</span>
                     <div>
-                        <h2 class="section-title">Timing Benchmarks <span class="badge">Nanoseconds</span></h2>
-                        <p class="section-description">Execution time measurements for core operations</p>
+                        <h2 class="section-title">Timing Benchmarks - Median <span class="badge">Nanoseconds</span></h2>
+                        <p class="section-description">Median aggregation: Execution time measurements for core operations</p>
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION[timing]
+                    {{SECTION[timing-median]
                         measurement-filter: ^(.*-benchmark|report|test-measure2)$
                         aggregate-by: median
                         depth: 40
@@ -133,17 +173,57 @@
                 </div>
             </div>
 
-            <!-- Size Measurements Section -->
+            <!-- Timing Benchmarks Section (Min) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">⏱️</span>
+                    <div>
+                        <h2 class="section-title">Timing Benchmarks - Min <span class="badge">Best Case</span></h2>
+                        <p class="section-description">Min aggregation: Best-case execution times for core operations</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[timing-min]
+                        measurement-filter: ^(.*-benchmark|report|test-measure2)$
+                        aggregate-by: min
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Timing Benchmarks Section (Raw) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">⏱️</span>
+                    <div>
+                        <h2 class="section-title">Timing Benchmarks - Raw Data <span class="badge">No Aggregation</span></h2>
+                        <p class="section-description">Raw measurements showing all timing data points and variability</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[timing-raw]
+                        measurement-filter: ^(.*-benchmark|report|test-measure2)$
+                        aggregate-by: none
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Size Measurements Section (Median) -->
             <div class="section">
                 <div class="section-header">
                     <span class="section-icon">📦</span>
                     <div>
-                        <h2 class="section-title">Size Measurements <span class="badge">Bytes</span></h2>
-                        <p class="section-description">Binary and output size tracking across commits</p>
+                        <h2 class="section-title">Size Measurements - Median <span class="badge">Bytes</span></h2>
+                        <p class="section-description">Median aggregation: Binary and output size tracking across commits</p>
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION[sizes]
+                    {{SECTION[sizes-median]
                         measurement-filter: ^.*-size.*$
                         aggregate-by: median
                         depth: 40
@@ -153,17 +233,57 @@
                 </div>
             </div>
 
-            <!-- Slope Analysis Section -->
+            <!-- Size Measurements Section (Min) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">📦</span>
+                    <div>
+                        <h2 class="section-title">Size Measurements - Min <span class="badge">Smallest</span></h2>
+                        <p class="section-description">Min aggregation: Smallest binary and output sizes across commits</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[sizes-min]
+                        measurement-filter: ^.*-size.*$
+                        aggregate-by: min
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Size Measurements Section (Raw) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">📦</span>
+                    <div>
+                        <h2 class="section-title">Size Measurements - Raw Data <span class="badge">No Aggregation</span></h2>
+                        <p class="section-description">Raw size measurements showing all data points</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[sizes-raw]
+                        measurement-filter: ^.*-size.*$
+                        aggregate-by: none
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Slope Analysis Section (Median) -->
             <div class="section">
                 <div class="section-header">
                     <span class="section-icon">📈</span>
                     <div>
-                        <h2 class="section-title">Trend Analysis <span class="badge">Slopes</span></h2>
-                        <p class="section-description">Performance trend slopes showing acceleration or deceleration</p>
+                        <h2 class="section-title">Trend Analysis - Median <span class="badge">Slopes</span></h2>
+                        <p class="section-description">Median aggregation: Performance trend slopes showing acceleration or deceleration</p>
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION[slopes]
+                    {{SECTION[slopes-median]
                         measurement-filter: ^.*::slope$
                         aggregate-by: median
                         depth: 40
@@ -173,19 +293,99 @@
                 </div>
             </div>
 
-            <!-- All Measurements Overview -->
+            <!-- Slope Analysis Section (Min) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">📈</span>
+                    <div>
+                        <h2 class="section-title">Trend Analysis - Min <span class="badge">Best Trends</span></h2>
+                        <p class="section-description">Min aggregation: Best-case performance trend slopes</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[slopes-min]
+                        measurement-filter: ^.*::slope$
+                        aggregate-by: min
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- Slope Analysis Section (Raw) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">📈</span>
+                    <div>
+                        <h2 class="section-title">Trend Analysis - Raw Data <span class="badge">No Aggregation</span></h2>
+                        <p class="section-description">Raw slope measurements showing all trend data points</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[slopes-raw]
+                        measurement-filter: ^.*::slope$
+                        aggregate-by: none
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- All Measurements Overview (Median) -->
             <div class="section">
                 <div class="section-header">
                     <span class="section-icon">🔍</span>
                     <div>
-                        <h2 class="section-title">Complete Overview <span class="badge">All Metrics</span></h2>
-                        <p class="section-description">Comprehensive view of all performance measurements</p>
+                        <h2 class="section-title">Complete Overview - Median <span class="badge">All Metrics</span></h2>
+                        <p class="section-description">Median aggregation: Comprehensive view of all performance measurements</p>
                     </div>
                 </div>
                 <div class="plot-container">
-                    {{SECTION[all]
+                    {{SECTION[all-median]
                         measurement-filter: ^.*$
                         aggregate-by: median
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- All Measurements Overview (Min) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">🔍</span>
+                    <div>
+                        <h2 class="section-title">Complete Overview - Min <span class="badge">Best Case</span></h2>
+                        <p class="section-description">Min aggregation: Best-case view of all performance measurements</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[all-min]
+                        measurement-filter: ^.*$
+                        aggregate-by: min
+                        depth: 40
+                        show-epochs: true
+                        show-changes: true
+                    }}
+                </div>
+            </div>
+
+            <!-- All Measurements Overview (Raw) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">🔍</span>
+                    <div>
+                        <h2 class="section-title">Complete Overview - Raw Data <span class="badge">No Aggregation</span></h2>
+                        <p class="section-description">Raw measurements showing all data points and complete variability</p>
+                    </div>
+                </div>
+                <div class="plot-container">
+                    {{SECTION[all-raw]
+                        measurement-filter: ^.*$
+                        aggregate-by: none
                         depth: 40
                         show-epochs: true
                         show-changes: true
@@ -196,6 +396,7 @@
 
         <div class="footer">
             <p>Generated by <strong>git-perf</strong> | Change points detected using PELT algorithm | Epoch boundaries mark significant periods</p>
+            <p>Each metric shown with three aggregation methods: Median (typical), Min (best-case), and Raw (all data points)</p>
         </div>
     </div>
 </body>
