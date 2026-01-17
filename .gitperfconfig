@@ -30,6 +30,7 @@ min_measurements = 10
 [measurement."add-benchmark"]
 epoch = "d1f2833"
 unit = "ns"
+dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 10
