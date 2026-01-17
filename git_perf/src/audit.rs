@@ -279,7 +279,15 @@ fn audit_with_commits(
         .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
         .try_collect()?;
 
-    audit_with_data(measurement, head, tail, min_count, sigma, dispersion_method)
+    audit_with_data(
+        measurement,
+        head,
+        tail,
+        min_count,
+        sigma,
+        dispersion_method,
+        summarize_by,
+    )
 }
 
 /// Core audit logic that can be tested with mock data
@@ -291,6 +299,7 @@ fn audit_with_data(
     min_count: u16,
     sigma: f64,
     dispersion_method: DispersionMethod,
+    summarize_by: ReductionFunc,
 ) -> Result<AuditResult> {
     // Note: CLI enforces min_count >= 2 via clap::value_parser!(u16).range(2..)
     // Tests may use lower values for edge case testing, but production code
@@ -364,13 +373,19 @@ fn audit_with_data(
             };
             summary.push_str(&format!("Head: {}\n", head_display));
         } else if total_measurements >= 2 {
-            // 2+ measurements: show z-score, head, tail, and sparkline
+            // 2+ measurements: show aggregation method, z-score, head, tail, and sparkline
             let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
             let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
             let z_score_display = format_z_score_display(z_score);
             let method_name = match dispersion_method {
                 DispersionMethod::StandardDeviation => "stddev",
                 DispersionMethod::MedianAbsoluteDeviation => "mad",
+            };
+            let aggregate_name = match summarize_by {
+                ReductionFunc::Min => "min",
+                ReductionFunc::Max => "max",
+                ReductionFunc::Median => "median",
+                ReductionFunc::Mean => "mean",
             };
 
             let head_display = StatsWithUnit {
@@ -382,6 +397,7 @@ fn audit_with_data(
                 unit: unit_str,
             };
 
+            summary.push_str(&format!("Aggregation: {aggregate_name}\n"));
             summary.push_str(&format!(
                 "z-score ({method_name}): {direction}{}\n",
                 z_score_display
@@ -599,6 +615,7 @@ mod test {
             3,                      // min_count = 3
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -614,6 +631,7 @@ mod test {
             3,                // min_count = 3
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -633,6 +651,7 @@ mod test {
             5,      // min_count > 0 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -648,6 +667,7 @@ mod test {
             5,          // min_count > 1 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -662,6 +682,7 @@ mod test {
             5,                // min_count > 2 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -683,6 +704,7 @@ mod test {
             5,      // min_count > 0 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -701,6 +723,7 @@ mod test {
             5,          // min_count > 1 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -727,6 +750,7 @@ mod test {
             5,                // min_count > 2 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -753,6 +777,7 @@ mod test {
             5,                // min_count > 2 to trigger skip
             2.0,
             DispersionMethod::MedianAbsoluteDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -771,6 +796,7 @@ mod test {
             2,
             10.0, // High sigma to avoid z-score failures
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -806,6 +832,7 @@ mod test {
             2,
             0.5, // Low sigma threshold
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -821,6 +848,7 @@ mod test {
             2,
             100.0, // Very high sigma threshold
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -842,6 +870,7 @@ mod test {
             2,
             0.1, // Very strict sigma
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -858,6 +887,7 @@ mod test {
             2,
             100.0, // Very lenient sigma
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -880,6 +910,7 @@ mod test {
             2,
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         let result_mad = audit_with_data(
@@ -889,6 +920,7 @@ mod test {
             2,
             2.0,
             DispersionMethod::MedianAbsoluteDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result_stddev.is_ok());
@@ -926,6 +958,7 @@ unit = "ms"
             2,
             10.0, // High sigma to ensure it passes
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1026,6 +1059,7 @@ min_relative_deviation = 10.0
             2,
             100.0, // Very high sigma threshold - won't be exceeded
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1049,6 +1083,7 @@ min_relative_deviation = 10.0
             2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1073,6 +1108,7 @@ min_relative_deviation = 10.0
             2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1595,6 +1631,7 @@ dispersion_method = "mad"
             2,      // min_count
             2.0,    // sigma
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         // Should succeed and skip (not crash with division by zero)
@@ -1621,6 +1658,7 @@ dispersion_method = "mad"
             2,                   // min_count
             2.0,                 // sigma
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         // Should succeed (not crash with division by zero)
@@ -1646,6 +1684,7 @@ dispersion_method = "mad"
             2,
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1662,6 +1701,7 @@ dispersion_method = "mad"
             2,
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1681,6 +1721,7 @@ dispersion_method = "mad"
             2,
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1701,6 +1742,7 @@ dispersion_method = "mad"
             2,      // min_count = 2 (minimum allowed by CLI)
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
@@ -1733,6 +1775,7 @@ dispersion_method = "mad"
             2,          // min_count = 2 (minimum allowed by CLI)
             2.0,
             DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
         );
 
         assert!(result.is_ok());
