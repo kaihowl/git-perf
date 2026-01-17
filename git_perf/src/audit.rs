@@ -68,7 +68,7 @@ pub(crate) fn resolve_audit_params(
 
     let summarize_by = cli_summarize_by
         .or_else(|| config::audit_aggregate_by(measurement).map(ReductionFunc::from))
-        .unwrap_or(ReductionFunc::Min);
+        .unwrap_or(ReductionFunc::Median);
 
     let sigma = cli_sigma
         .or_else(|| config::audit_sigma(measurement))
@@ -1325,8 +1325,8 @@ dispersion_method = "mad"
             );
             assert_eq!(
                 params.summarize_by,
-                ReductionFunc::Min,
-                "Should use default aggregate_by of Min"
+                ReductionFunc::Median,
+                "Should use default aggregate_by of Median"
             );
             assert_eq!(params.sigma, 4.0, "Should use default sigma of 4.0");
             assert_eq!(

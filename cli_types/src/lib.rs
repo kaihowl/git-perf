@@ -349,7 +349,7 @@ pub enum Commands {
     ///
     /// Built-in defaults:
     /// - `min_measurements`: 2
-    /// - `aggregate_by`: min
+    /// - `aggregate_by`: median
     /// - `sigma`: 4.0
     /// - `dispersion_method`: stddev
     ///
@@ -397,7 +397,7 @@ pub enum Commands {
         min_measurements: Option<u16>,
 
         /// What to aggregate the measurements in each group with.
-        /// If not specified, uses the value from .gitperfconfig file, or defaults to min.
+        /// If not specified, uses the value from .gitperfconfig file, or defaults to median.
         #[arg(short, long)]
         aggregate_by: Option<ReductionFunc>,
 

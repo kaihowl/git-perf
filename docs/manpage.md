@@ -221,7 +221,7 @@ All audit options follow the same precedence order: 1. CLI option (if specified)
 
 **Note:** When `--min-measurements` is specified on CLI, it applies to ALL measurements in the audit, overriding any per-measurement config values.
 
-Built-in defaults: - `min_measurements`: 2 - `aggregate_by`: min - `sigma`: 4.0 - `dispersion_method`: stddev
+Built-in defaults: - `min_measurements`: 2 - `aggregate_by`: median - `sigma`: 4.0 - `dispersion_method`: stddev
 
 When the relative deviation is below the threshold, the audit passes even if the z-score exceeds the sigma threshold. The relative deviation is calculated as: `|(head_value / tail_median - 1.0) * 100%|` where tail_median is the median of historical measurements (excluding HEAD).
 
@@ -242,7 +242,7 @@ The sparkline visualization shows the range of measurements relative to the tail
 * `-s`, `--selectors <SELECTORS>` — Key-value pair separated by "=" with no whitespaces to subselect measurements
 * `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). At least one of --measurement or --filter must be provided. If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Examples: -f "bench_.*" (prefix), -f ".*_x64$" (suffix), -f "^perf_" (anchored prefix)
 * `--min-measurements <MIN_MEASUREMENTS>` — Minimum number of historic measurements needed. If less, pass test and assume more measurements are needed. A minimum of two historic measurements are needed for proper evaluation of standard deviation. If specified on CLI, applies to ALL measurements (overrides config). If not specified, uses per-measurement config or defaults to 2
-* `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to min
+* `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with. If not specified, uses the value from .gitperfconfig file, or defaults to median
 
   Possible values: `min`, `max`, `median`, `mean`
 
