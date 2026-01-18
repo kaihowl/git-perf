@@ -113,8 +113,11 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          # Use the debug binary built earlier (avoid rebuilding)
-          export PATH="$PWD/target/debug:$PATH"
+          # Build release binary for stable performance measurements
+          cargo build --release -p git-perf
+
+          # Use the release binary for measurements
+          export PATH="$PWD/target/release:$PATH"
 
           # Run test-measure2 in main repo
           git perf measure -n 10 -m test-measure2 -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- sleep 1
@@ -142,8 +145,8 @@ jobs:
           # Return to main repo for measurements
           cd "$GITHUB_WORKSPACE"
 
-          # Measure add performance: 10 sequential adds on pre-populated repo
-          git perf measure -n 10 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf add -m inner-test-metric 123
+          # Measure add performance: 20 sequential adds on pre-populated repo (increased for stability)
+          git perf measure -n 20 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf add -m inner-test-metric 123
 
           # Measure report generation performance on fixed dataset
           git perf measure -n 10 -m report-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf report -n 10 -o "$TEMP_REPO/report.html"
