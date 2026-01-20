@@ -119,12 +119,28 @@ git commit -m "chore: add git-perf configuration"
 Verify your local setup is working correctly:
 
 ```bash
+# Check status of pending measurements
+git perf status
+
 # Check that measurements were recorded
 git perf report -o -
 
 # Generate and view a report
 git perf report -o test-report.html
 # Open test-report.html in your browser to verify the report displays correctly
+```
+
+**Expected output from `git perf status`:**
+```
+Pending measurements:
+  1 commit with measurements
+  1 unique measurement
+
+Measurement names:
+  - build_time
+
+(use "git perf reset" to discard pending measurements)
+(use "git perf push" to publish measurements)
 ```
 
 ## Step 3: Configure GitHub Actions
@@ -208,10 +224,11 @@ gh run view --log
 
 # Verify measurements were pushed
 git perf pull
+git perf status  # Should show "No pending measurements" after pull
 git perf report
 ```
 
-**Expected Result**: The workflow should complete successfully and push measurements to git-notes. The `git perf pull` command retrieves the measurements, and `git perf report` displays them.
+**Expected Result**: The workflow should complete successfully and push measurements to git-notes. The `git perf pull` command retrieves the measurements, `git perf status` should show no pending measurements (since they were already pushed by CI), and `git perf report` displays them.
 
 ## Step 4: Set Up Automatic Reporting
 

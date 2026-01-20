@@ -479,6 +479,51 @@ pub enum Commands {
     /// Will refuse to work if run on a shallow clone.
     Prune {},
 
+    /// Show pending measurements that haven't been pushed
+    ///
+    /// Lists local measurements that exist in write branches but haven't been
+    /// pushed to the remote repository. Similar to `git status` for tracking
+    /// which changes are pending.
+    ///
+    /// Pending measurements are those created with `add`, `measure`, or `import`
+    /// that haven't been published via `push`. These can be safely discarded
+    /// with the `reset` command.
+    ///
+    /// Examples:
+    ///   git perf status                    # Show summary of pending measurements
+    ///   git perf status --detailed         # Show per-commit breakdown
+    Status {
+        /// Show detailed per-commit breakdown
+        #[arg(short, long)]
+        detailed: bool,
+    },
+
+    /// Drop locally pending measurements that haven't been pushed
+    ///
+    /// Removes measurements from local write branches that haven't been pushed
+    /// to the remote repository. This is useful for discarding test or debug
+    /// measurements before publishing.
+    ///
+    /// IMPORTANT: This only affects local pending measurements. Measurements that
+    /// have been pushed to the remote are not affected. Use `remove` or `prune`
+    /// for managing published measurements.
+    ///
+    /// Removes ALL pending measurements.
+    ///
+    /// Examples:
+    ///   git perf reset                        # Remove all pending measurements
+    ///   git perf reset --dry-run              # Preview what would be reset
+    ///   git perf reset --force                # Skip confirmation prompt
+    Reset {
+        /// Preview what would be reset without actually resetting
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip confirmation prompt (dangerous)
+        #[arg(short, long)]
+        force: bool,
+    },
+
     /// List all commits that have performance measurements.
     ///
     /// Outputs one commit SHA-1 hash per line. This can be used to identify

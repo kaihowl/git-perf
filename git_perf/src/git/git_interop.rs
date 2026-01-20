@@ -19,10 +19,11 @@ use rand::{rng, Rng};
 
 use crate::config;
 
+pub use super::git_definitions::REFS_NOTES_BRANCH;
 use super::git_definitions::{
-    GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_BRANCH,
-    REFS_NOTES_MERGE_BRANCH_PREFIX, REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX,
-    REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_WRITE_TARGET_PREFIX,
+    GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_MERGE_BRANCH_PREFIX,
+    REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX, REFS_NOTES_WRITE_SYMBOLIC_REF,
+    REFS_NOTES_WRITE_TARGET_PREFIX,
 };
 use super::git_lowlevel::{
     capture_git_output, get_git_perf_remote, git_rev_parse, git_rev_parse_symbolic_ref,
@@ -267,6 +268,8 @@ fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
     Ok(())
 }
 
+/// Merges notes from one branch into a target using the cat_sort_uniq strategy.
+/// This is used to consolidate measurements from multiple write refs.
 fn reconcile_branch_with(target: &str, branch: &str) -> Result<(), GitError> {
     _ = capture_git_output(
         &[
@@ -570,6 +573,10 @@ fn remove_measurements_from_reference(
     Ok(())
 }
 
+/// Creates a new write ref and updates the symbolic ref to point to it.
+/// This is used to ensure concurrent writes go to a new location, preventing
+/// race conditions during operations like reset or push.
+/// Internal version that returns GitError.
 fn new_symbolic_write_ref() -> Result<String, GitError> {
     let target = create_temp_ref_name(REFS_NOTES_WRITE_TARGET_PREFIX);
 
@@ -578,6 +585,13 @@ fn new_symbolic_write_ref() -> Result<String, GitError> {
     // that go to the old target will still be merged during consolidation
     git_symbolic_ref_create_or_update(REFS_NOTES_WRITE_SYMBOLIC_REF, &target)?;
     Ok(target)
+}
+
+/// Creates a new write ref and updates the symbolic ref to point to it (public wrapper).
+/// This is used to ensure concurrent writes go to a new location, preventing
+/// race conditions during operations like reset or push.
+pub fn create_new_write_ref() -> Result<String> {
+    new_symbolic_write_ref().map_err(|e| anyhow!("{:?}", e))
 }
 
 const EMPTY_OID: &str = "0000000000000000000000000000000000000000";
@@ -806,6 +820,15 @@ pub fn create_consolidated_read_branch() -> Result<ReadBranchGuard> {
     Ok(ReadBranchGuard { temp_ref })
 }
 
+/// Creates a temporary read branch that consolidates ONLY pending writes (excludes remote).
+/// This is used by status and reset commands to see only local pending measurements.
+/// The returned guard must be kept alive for as long as the reference is needed.
+/// The temporary reference is automatically cleaned up when the guard is dropped.
+pub fn create_consolidated_pending_read_branch() -> Result<ReadBranchGuard> {
+    let temp_ref = update_pending_read_branch()?;
+    Ok(ReadBranchGuard { temp_ref })
+}
+
 fn get_refs(additional_args: Vec<String>) -> Result<Vec<Reference>, GitError> {
     let mut args = vec!["for-each-ref", "--format=%(refname)%00%(objectname)"];
     args.extend(additional_args.iter().map(|s| s.as_str()));
@@ -864,6 +887,22 @@ fn update_read_branch() -> Result<TempRef> {
 
     consolidate_write_branches_into(&current_upstream_oid, &temp_ref.ref_name, None)
         .map_err(|e| anyhow!("Failed to consolidate write branches: {:?}", e))?;
+
+    Ok(temp_ref)
+}
+
+fn update_pending_read_branch() -> Result<TempRef> {
+    let temp_ref = TempRef::new(REFS_NOTES_READ_PREFIX)
+        .map_err(|e| anyhow!("Failed to create temporary ref: {:?}", e))?;
+    // Create a read branch from ONLY the pending write branches (not the remote).
+    // Start with empty tree and merge in all write refs.
+    let refs = get_refs(vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")])
+        .map_err(|e| anyhow!("Failed to get write refs: {:?}", e))?;
+
+    for reference in &refs {
+        reconcile_branch_with(&temp_ref.ref_name, &reference.oid)
+            .map_err(|e| anyhow!("Failed to merge write ref: {:?}", e))?;
+    }
 
     Ok(temp_ref)
 }
@@ -992,6 +1031,86 @@ pub fn walk_commits(num_commits: usize) -> Result<Vec<CommitWithNotes>> {
     walk_commits_from("HEAD", num_commits)
 }
 
+/// Get commits that have notes in a specific notes ref.
+/// This is much more efficient than walking all commits when you only need
+/// commits with measurements.
+///
+/// Returns a vector of commit SHAs that have notes in the specified ref.
+pub fn get_commits_with_notes(notes_ref: &str) -> Result<Vec<String>> {
+    let output = capture_git_output(&["notes", "--ref", notes_ref, "list"], &None)
+        .context(format!("Failed to list notes in {}", notes_ref))?;
+
+    // git notes list outputs lines in format: <note-sha> <commit-sha>
+    let commits: Vec<String> = output
+        .stdout
+        .lines()
+        .filter(|line| !line.is_empty())
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                Some(parts[1].to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(commits)
+}
+
+/// Get detailed commit information (SHA, title, author) for specific commits.
+/// This is more efficient than walking commits when you already know which commits you need.
+pub fn get_commit_details(commit_shas: &[String]) -> Result<Vec<CommitWithNotes>> {
+    if commit_shas.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut commits = Vec::new();
+
+    for sha in commit_shas {
+        let output =
+            capture_git_output(&["show", "--no-patch", "--format=%H%n%s%n%an", sha], &None)
+                .context(format!("Failed to get commit details for {}", sha))?;
+
+        let lines: Vec<&str> = output.stdout.lines().collect();
+        if lines.len() >= 3 {
+            commits.push(CommitWithNotes {
+                sha: lines[0].to_string(),
+                title: if lines[1].is_empty() {
+                    "[no subject]".to_string()
+                } else {
+                    lines[1].to_string()
+                },
+                author: if lines[2].is_empty() {
+                    "[unknown]".to_string()
+                } else {
+                    lines[2].to_string()
+                },
+                note_lines: Vec::new(), // Will be filled in by caller
+            });
+        }
+    }
+
+    Ok(commits)
+}
+
+/// Get the notes content for a specific commit from a notes ref.
+/// Returns the note lines as a vector of strings.
+pub fn get_notes_for_commit(notes_ref: &str, commit_sha: &str) -> Result<Vec<String>> {
+    let output = capture_git_output(&["notes", "--ref", notes_ref, "show", commit_sha], &None);
+
+    match output {
+        Ok(output) => {
+            let note_lines: Vec<String> = output.stdout.lines().map(|s| s.to_string()).collect();
+            Ok(note_lines)
+        }
+        Err(_) => {
+            // No notes for this commit is not an error
+            Ok(Vec::new())
+        }
+    }
+}
+
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {
     pull_internal(work_dir)?;
     Ok(())
@@ -1046,6 +1165,18 @@ pub fn push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+/// Get all write refs and return their names and OIDs
+pub fn get_write_refs() -> Result<Vec<(String, String)>> {
+    let refs = get_refs(vec![format!("{REFS_NOTES_WRITE_TARGET_PREFIX}*")])
+        .map_err(|e| anyhow!("{:?}", e))?;
+    Ok(refs.into_iter().map(|r| (r.refname, r.oid)).collect())
+}
+
+/// Delete a git reference (wrapper that converts GitError to anyhow::Error)
+pub fn delete_reference(ref_name: &str) -> Result<()> {
+    remove_reference(ref_name).map_err(|e| anyhow!("{:?}", e))
 }
 
 #[cfg(test)]

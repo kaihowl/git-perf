@@ -1,0 +1,27 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH reset 1  "reset " 
+.SH NAME
+reset \- Drop locally pending measurements that haven\*(Aqt been pushed
+.SH SYNOPSIS
+\fBreset\fR [\fB\-\-dry\-run\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Drop locally pending measurements that haven\*(Aqt been pushed
+.PP
+Removes measurements from local write branches that haven\*(Aqt been pushed to the remote repository. This is useful for discarding test or debug measurements before publishing.
+.PP
+IMPORTANT: This only affects local pending measurements. Measurements that have been pushed to the remote are not affected. Use `remove` or `prune` for managing published measurements.
+.PP
+Removes ALL pending measurements.
+.PP
+Examples: git perf reset                        # Remove all pending measurements git perf reset \-\-dry\-run              # Preview what would be reset git perf reset \-\-force                # Skip confirmation prompt
+.SH OPTIONS
+.TP
+\fB\-\-dry\-run\fR
+Preview what would be reset without actually resetting
+.TP
+\fB\-f\fR, \fB\-\-force\fR
+Skip confirmation prompt (dangerous)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
