@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -28,6 +29,18 @@ impl FromStr for ReductionFunc {
                 s
             )),
         }
+    }
+}
+
+impl fmt::Display for ReductionFunc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            ReductionFunc::Min => "min",
+            ReductionFunc::Max => "max",
+            ReductionFunc::Median => "median",
+            ReductionFunc::Mean => "mean",
+        };
+        write!(f, "{}", s)
     }
 }
 

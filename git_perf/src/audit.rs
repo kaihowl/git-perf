@@ -381,12 +381,6 @@ fn audit_with_data(
                 DispersionMethod::StandardDeviation => "stddev",
                 DispersionMethod::MedianAbsoluteDeviation => "mad",
             };
-            let aggregate_name = match summarize_by {
-                ReductionFunc::Min => "min",
-                ReductionFunc::Max => "max",
-                ReductionFunc::Median => "median",
-                ReductionFunc::Mean => "mean",
-            };
 
             let head_display = StatsWithUnit {
                 stats: &head_summary,
@@ -397,7 +391,7 @@ fn audit_with_data(
                 unit: unit_str,
             };
 
-            summary.push_str(&format!("Aggregation: {aggregate_name}\n"));
+            summary.push_str(&format!("Aggregation: {summarize_by}\n"));
             summary.push_str(&format!(
                 "z-score ({method_name}): {direction}{}\n",
                 z_score_display
@@ -1796,5 +1790,98 @@ dispersion_method = "mad"
         assert!(audit_result.message.contains("Tail:"));
         assert!(audit_result.message.contains("z-score"));
         assert!(audit_result.message.contains("["));
+    }
+
+    #[test]
+    fn test_aggregation_method_display_min() {
+        // Test that the aggregation method is displayed correctly with ReductionFunc::Min
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0, 12.0],
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(audit_result.message.contains("Aggregation: min"));
+    }
+
+    #[test]
+    fn test_aggregation_method_display_max() {
+        // Test that the aggregation method is displayed correctly with ReductionFunc::Max
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0, 12.0],
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Max,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(audit_result.message.contains("Aggregation: max"));
+    }
+
+    #[test]
+    fn test_aggregation_method_display_median() {
+        // Test that the aggregation method is displayed correctly with ReductionFunc::Median
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0, 12.0],
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Median,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(audit_result.message.contains("Aggregation: median"));
+    }
+
+    #[test]
+    fn test_aggregation_method_display_mean() {
+        // Test that the aggregation method is displayed correctly with ReductionFunc::Mean
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![10.0, 11.0, 12.0],
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Mean,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(audit_result.message.contains("Aggregation: mean"));
+    }
+
+    #[test]
+    fn test_aggregation_method_not_shown_with_single_measurement() {
+        // Test that aggregation method is NOT shown when there's only 1 measurement
+        let result = audit_with_data(
+            "test_measurement",
+            15.0,
+            vec![], // No tail measurements, total = 1
+            2,
+            2.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Median,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // Should NOT show aggregation method (only 1 measurement total)
+        assert!(!audit_result.message.contains("Aggregation:"));
+        // But should show Head summary
+        assert!(audit_result.message.contains("Head:"));
     }
 }

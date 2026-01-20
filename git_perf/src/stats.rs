@@ -13,6 +13,18 @@ pub enum ReductionFunc {
     Mean,
 }
 
+impl Display for ReductionFunc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ReductionFunc::Min => "min",
+            ReductionFunc::Max => "max",
+            ReductionFunc::Median => "median",
+            ReductionFunc::Mean => "mean",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DispersionMethod {
     StandardDeviation,
