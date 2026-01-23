@@ -20,14 +20,6 @@ Extend `git-perf` to support more flexible commit range specifications, similar 
     --notes=<temp_ref> <resolved_commit>
   ```
 
-### Usage in dotfiles repository
-
-- **Script**: `/root/repo/script/ci.sh:68`
-  ```bash
-  git perf audit -n 40 -m nvim -m zsh -m ci -m test -m nix-closure-size \
-    -s "os=$os" --min-measurements 10
-  ```
-
 ### Key Files (in git-perf repo)
 
 #### Common Infrastructure
@@ -745,7 +737,6 @@ pub fn generate_multi_section_report_cached(
 4. **Regression tests**
    - Ensure existing `-n` behavior is unchanged
    - Verify all existing CI scripts still work
-   - Test with current dotfiles CI configuration
 
 ## Implementation Checklist
 
@@ -976,44 +967,17 @@ git perf report v1.0..v2.0 -t dashboard.html -o release-report.html
 git perf report --since="1 month ago" -t dashboard.html -o report.html
 ```
 
-## Migration Impact
-
-### dotfiles Repository
-
-The current usage in `/root/repo/script/ci.sh:68` will continue to work without changes:
-
-```bash
-# Existing (no changes required)
-git perf audit -n 40 -m nvim -m zsh -m ci -m test -m nix-closure-size \
-  -s "os=$os" --min-measurements 10
-
-# Could optionally be updated to use date-based filtering
-git perf audit --since="6 months ago" -m nvim -m zsh -m ci -m test \
-  -m nix-closure-size -s "os=$os" --min-measurements 10
-```
-
-### Benefits for dotfiles
-
-1. **Historical analysis**: Easily analyze performance trends over specific time periods
-2. **Release auditing**: Compare performance between tagged releases
-3. **Flexible CI**: Adjust audit scope based on time since last run
-4. **Better debugging**: Narrow down when performance regressions were introduced
-
 ## Dependencies
 
 - **git-perf repository**: `kaihowl/git-perf`
 - **Git version**: Requires git 1.7.0+ (for `--since`/`--until` support)
 - **No new external dependencies**: Uses existing git functionality
 
-## Timeline Considerations
+## Implementation Steps
 
-This is a feature enhancement to an external tool (`git-perf`), not this repository. Implementation steps:
-
-1. Fork or contribute to `kaihowl/git-perf`
-2. Implement changes following the phases above
-3. Submit pull request to upstream repository
-4. Update dotfiles to use new version once merged
-5. Optionally update CI scripts to leverage new features
+1. Implement changes following the phases above
+2. Submit pull request to repository
+3. Optionally update CI scripts to leverage new features
 
 ## Open Questions
 
@@ -1082,7 +1046,5 @@ This is a feature enhancement to an external tool (`git-perf`), not this reposit
 
 ## References
 
-- git-perf repository: `kaihowl/git-perf`
 - git log documentation: https://git-scm.com/docs/git-log
 - git revision range syntax: https://git-scm.com/docs/gitrevisions
-- Current usage in dotfiles: `/root/repo/script/ci.sh:68`, `/root/repo/common/perf.sh`
