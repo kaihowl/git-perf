@@ -1,0 +1,32 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH generate-index 1  "generate-index " 
+.SH NAME
+generate\-index \- Generate an index page listing all performance reports
+.SH SYNOPSIS
+\fBgenerate\-index\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-s\fR|\fB\-\-subdirectory\fR] [\fB\-t\fR|\fB\-\-title\fR] [\fB\-\-template\fR] [\fB\-b\fR|\fB\-\-branch\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Generate an index page listing all performance reports
+.PP
+Scans the gh\-pages branch (or specified subdirectory) for HTML reports and generates an index page with categorized links. Reports are classified as branch reports (e.g., main.html), commit reports (40\-character SHA), or custom reports (other names).
+.PP
+Examples: git perf generate\-index \-o perf/index.html git perf generate\-index \-\-subdirectory perf \-\-title "Performance Reports" git perf generate\-index \-\-template .git\-perf/index\-template.html
+.SH OPTIONS
+.TP
+\fB\-o\fR, \fB\-\-output\fR \fI<OUTPUT>\fR [default: index.html]
+Output path for the index HTML file
+.TP
+\fB\-s\fR, \fB\-\-subdirectory\fR \fI<SUBDIRECTORY>\fR
+Subdirectory within gh\-pages containing reports (e.g., "perf", "reports")
+.TP
+\fB\-t\fR, \fB\-\-title\fR \fI<TITLE>\fR [default: Performance Reports]
+Custom title for the index page
+.TP
+\fB\-\-template\fR \fI<TEMPLATE>\fR
+Path to custom HTML template file for the index page
+.TP
+\fB\-b\fR, \fB\-\-branch\fR \fI<BRANCH>\fR [default: gh\-pages]
+Git branch containing the reports (default: gh\-pages)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
