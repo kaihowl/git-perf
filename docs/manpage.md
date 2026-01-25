@@ -192,6 +192,7 @@ Create an HTML performance report
 * `--title <TITLE>` — Custom title for the report (overrides default)
 * `--show-epochs` — Show epoch boundary markers in the report (hidden by default, toggleable via legend)
 * `--show-changes` — Detect and show change points in the report (hidden by default, toggleable via legend)
+* `--all-reports-url <ALL_REPORTS_URL>` — URL to the index page listing all reports (for navigation link in generated reports)
 
 
 

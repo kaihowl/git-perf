@@ -295,6 +295,10 @@ pub enum Commands {
         /// Detect and show change points in the report (hidden by default, toggleable via legend)
         #[arg(long)]
         show_changes: bool,
+
+        /// URL to the index page listing all reports (for navigation link in generated reports)
+        #[arg(long)]
+        all_reports_url: Option<String>,
     },
 
     /// For given measurements, check perfomance deviations of the HEAD commit

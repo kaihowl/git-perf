@@ -91,6 +91,7 @@ pub fn handle_calls() -> Result<()> {
             title,
             show_epochs,
             show_changes,
+            all_reports_url,
         } => {
             let commit = commit.as_deref().unwrap_or("HEAD");
 
@@ -102,6 +103,7 @@ pub fn handle_calls() -> Result<()> {
                 template_path: template,
                 custom_css_path: custom_css,
                 title,
+                all_reports_url,
             };
 
             report(

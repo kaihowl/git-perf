@@ -173,7 +173,19 @@ runs:
           fi
         fi
 
-        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG $TEMPLATE_FLAG ${{ inputs.additional-args }}
+        # Build all-reports-url flag when generate-index is enabled
+        ALL_REPORTS_FLAG=""
+        if [ "${{ inputs.generate-index }}" = "true" ]; then
+          SUBDIR="${{ inputs.reports-subdirectory }}"
+          if [ -n "$SUBDIR" ]; then
+            ALL_REPORTS_FLAG="--all-reports-url /${SUBDIR}/index.html"
+          else
+            ALL_REPORTS_FLAG="--all-reports-url /index.html"
+          fi
+          echo "Using all-reports-url: $ALL_REPORTS_FLAG"
+        fi
+
+        git perf report -n ${{ inputs.depth }} -o reports/${{ steps.set-report-name.outputs.report-name }}.html $EPOCH_FLAG $CHANGES_FLAG $TEMPLATE_FLAG $ALL_REPORTS_FLAG ${{ inputs.additional-args }}
 
     - name: Run audit
       id: audit

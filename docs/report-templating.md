@@ -171,6 +171,7 @@ Each `{{SECTION[...]}}` block:
 | `{{TIMESTAMP}}` | Generation timestamp | "2025-01-15 10:30:00 UTC" |
 | `{{COMMIT_RANGE}}` | Commit range | "abc1234..def5678" |
 | `{{DEPTH}}` | Number of commits | "50" |
+| `{{ALL_REPORTS_URL}}` | URL to the reports index page | "/perf/index.html" |
 | `{{AUDIT_SECTION}}` | Audit results (future) | "" (not yet implemented) |
 
 ### Conditional Sections

@@ -35,6 +35,8 @@ struct ReportMetadata {
     timestamp: String,
     commit_range: String,
     depth: usize,
+    /// URL to the index page listing all reports (for navigation)
+    all_reports_url: Option<String>,
 }
 
 impl ReportMetadata {
@@ -42,6 +44,7 @@ impl ReportMetadata {
         title: Option<String>,
         custom_css_content: String,
         commits: &[Commit],
+        all_reports_url: Option<String>,
     ) -> ReportMetadata {
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
@@ -68,6 +71,7 @@ impl ReportMetadata {
             timestamp,
             commit_range,
             depth,
+            all_reports_url,
         }
     }
 }
@@ -182,9 +186,40 @@ const DEFAULT_HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
     <meta charset="utf-8">
     <title>{{TITLE}}</title>
     {{PLOTLY_HEAD}}
-    <style>{{CUSTOM_CSS}}</style>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        .report-header h1 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #333;
+        }
+        .report-header a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .report-header a:hover {
+            text-decoration: underline;
+        }
+        {{CUSTOM_CSS}}
+    </style>
 </head>
 <body>
+    <div class="report-header">
+        <h1>{{TITLE}}</h1>
+        <a href="{{ALL_REPORTS_URL}}">All Reports</a>
+    </div>
     {{PLOTLY_BODY}}
 </body>
 </html>"#;
@@ -843,6 +878,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
             // Replace global placeholders
             let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+            let all_reports_url = metadata.all_reports_url.as_deref().unwrap_or("index.html");
             output = output
                 .replace("{{TITLE}}", &metadata.title)
                 .replace("{{PLOTLY_HEAD}}", &plotly_head)
@@ -850,6 +886,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .replace("{{TIMESTAMP}}", &metadata.timestamp)
                 .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
                 .replace("{{DEPTH}}", &metadata.depth.to_string())
+                .replace("{{ALL_REPORTS_URL}}", all_reports_url)
                 .replace("{{AUDIT_SECTION}}", "");
 
             output.into_bytes()
@@ -1008,11 +1045,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             timestamp: String::new(),
             commit_range: String::new(),
             depth: 0,
+            all_reports_url: None,
         };
         let metadata = self.metadata.as_ref().unwrap_or(&default_metadata);
 
         // Apply template with placeholder substitution
         let (plotly_head, plotly_body) = extract_plotly_parts(&final_plot);
+        let all_reports_url = metadata.all_reports_url.as_deref().unwrap_or("index.html");
         let output = template
             .replace("{{TITLE}}", &metadata.title)
             .replace("{{PLOTLY_HEAD}}", &plotly_head)
@@ -1021,6 +1060,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             .replace("{{TIMESTAMP}}", &metadata.timestamp)
             .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
             .replace("{{DEPTH}}", &metadata.depth.to_string())
+            .replace("{{ALL_REPORTS_URL}}", all_reports_url)
             .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
 
         output.as_bytes().to_vec()
@@ -1643,7 +1683,12 @@ fn prepare_sections_and_metadata(
             // Build metadata
             let resolved_title = template_config.title.clone().or_else(config::report_title);
             let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-            let metadata = ReportMetadata::new(resolved_title, custom_css_content, commits);
+            let metadata = ReportMetadata::new(
+                resolved_title,
+                custom_css_content,
+                commits,
+                template_config.all_reports_url.clone(),
+            );
 
             Ok((sections, Some(template_str), metadata))
         }
@@ -1664,7 +1709,7 @@ fn prepare_sections_and_metadata(
             );
 
             // CSV doesn't use metadata, but provide default for API consistency
-            let metadata = ReportMetadata::new(None, String::new(), commits);
+            let metadata = ReportMetadata::new(None, String::new(), commits, None);
 
             Ok((vec![section], None, metadata))
         }
@@ -2478,8 +2523,12 @@ mod tests {
             },
         ];
 
-        let metadata =
-            ReportMetadata::new(Some("Custom Title".to_string()), "".to_string(), &commits);
+        let metadata = ReportMetadata::new(
+            Some("Custom Title".to_string()),
+            "".to_string(),
+            &commits,
+            None,
+        );
 
         assert_eq!(metadata.title, "Custom Title");
         assert_eq!(metadata.commit_range, "def0987..abc1234");
@@ -2497,7 +2546,7 @@ mod tests {
             measurements: vec![],
         }];
 
-        let metadata = ReportMetadata::new(None, "".to_string(), &commits);
+        let metadata = ReportMetadata::new(None, "".to_string(), &commits, None);
 
         assert_eq!(metadata.title, "Performance Measurements");
         assert_eq!(metadata.commit_range, "abc1234");
@@ -2507,7 +2556,7 @@ mod tests {
     #[test]
     fn test_report_metadata_new_empty_commits() {
         let commits = vec![];
-        let metadata = ReportMetadata::new(None, "".to_string(), &commits);
+        let metadata = ReportMetadata::new(None, "".to_string(), &commits, None);
 
         assert_eq!(metadata.commit_range, "No commits");
         assert_eq!(metadata.depth, 0);
