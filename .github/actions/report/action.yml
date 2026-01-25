@@ -249,7 +249,7 @@ runs:
         git perf generate-index \
           --output reports/index.html \
           --title "${{ inputs.index-title }}" \
-          $SUBDIR_FLAG || echo "Index generation failed, continuing without index"
+          $SUBDIR_FLAG
 
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4

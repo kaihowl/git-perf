@@ -2179,16 +2179,22 @@ fn remove_conditional_section(template: &str, section_name: &str) -> String {
 fn list_reports_from_branch(branch: &str, subdirectory: Option<&str>) -> Result<Vec<String>> {
     use std::process::Command;
 
-    // Build the tree path
-    let tree_path = if let Some(subdir) = subdirectory {
-        format!("{}:", subdir)
-    } else {
-        String::new()
-    };
+    // Build the git ls-tree command arguments
+    // When subdirectory is None or empty, list root; otherwise list the subdirectory
+    let mut args = vec!["ls-tree", "--name-only", branch];
+
+    // Only add path argument if subdirectory is specified and non-empty
+    let subdir_path;
+    if let Some(subdir) = subdirectory {
+        if !subdir.is_empty() {
+            subdir_path = subdir.to_string();
+            args.push(&subdir_path);
+        }
+    }
 
     // List files in the branch
     let output = Command::new("git")
-        .args(["ls-tree", "--name-only", branch, &tree_path])
+        .args(&args)
         .output()
         .map_err(|e| anyhow!("Failed to list files from branch {}: {}", branch, e))?;
 
