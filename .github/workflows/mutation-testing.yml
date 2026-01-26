@@ -79,10 +79,10 @@ jobs:
         # On schedule, run full mutation testing
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           echo "🔍 Running quick mutation test for PR validation (smoke test)"
-          mutants_args="--test-tool=nextest --output mutation-report.json --jobs 2 --timeout 20 --file src/config.rs"
+          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 20 --file src/config.rs"
         else
           echo "🔍 Running full mutation testing (scheduled run)"
-          mutants_args="--test-tool=nextest --output mutation-report.json --jobs 2 --timeout 60"
+          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 60"
         fi
 
         # Run full mutation testing with nextest (no sharding - weekly comprehensive testing)
@@ -142,9 +142,9 @@ jobs:
         # Cargo-mutants creates output in different locations depending on version
         # Try multiple possible locations for the outcomes.json file
         possible_locations=(
-          "mutation-report.json/mutants.out/outcomes.json"
+          "mutation-report/mutants.out/outcomes.json"
           "mutants.out/outcomes.json"
-          "mutation-report.json/outcomes.json"
+          "mutation-report/outcomes.json"
         )
 
         report_file=""
@@ -271,7 +271,7 @@ jobs:
       with:
         name: weekly-mutation-testing-report-${{ github.run_number }}
         path: |
-          git_perf/mutation-report.json
+          git_perf/mutation-report
           git_perf/mutation-report-outcomes.json
           git_perf/mutation-summary.md
         retention-days: 90
