@@ -1,5 +1,5 @@
 name: 'Cleanup git-perf Measurements and Reports'
-description: 'Remove old measurements and orphaned reports from git-perf tracking'
+description: 'Remove old measurements and orphaned reports from git-perf tracking. IMPORTANT: Jobs using this action must include concurrency: { group: gh-pages-${{ github.ref }}, cancel-in-progress: false } to prevent race conditions when pushing to gh-pages.'
 author: 'Kai Höwelmeyer'
 
 branding:
@@ -134,6 +134,8 @@ runs:
 
           git checkout gh-pages
           if [ -n "$(git status --porcelain)" ]; then
+            # IMPORTANT: The workflow using this action must have concurrency control
+            # to prevent race conditions with other gh-pages pushes
             git push origin gh-pages
             echo "Pushed cleanup changes to gh-pages"
           else
