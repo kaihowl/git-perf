@@ -1,8 +1,8 @@
 # Plan: Add `size` Subcommand to Estimate Measurement Storage
 
-**Status:** Phase 1 Complete
+**Status:** Complete
 **Created:** 2025-10-26
-**Updated:** 2025-10-27
+**Updated:** 2026-01-25
 
 ## Overview
 
@@ -841,17 +841,17 @@ Current implementation targets Git 2.13+ for disk size support.
 
 ## Success Criteria
 
-- [ ] Command successfully reports size for repositories with measurements
-- [ ] Command reports 0 for repositories without measurements
-- [ ] Detailed breakdown accurately attributes sizes to measurement names
-- [ ] Bytes format outputs parseable integer values
-- [ ] Disk-size flag provides compressed size information
-- [ ] Include-objects flag provides repository context
-- [ ] All integration tests pass
-- [ ] No clippy warnings
-- [ ] Code properly formatted with `cargo fmt`
-- [ ] Documentation generated and committed
-- [ ] Manual testing with various repository sizes
+- [x] Command successfully reports size for repositories with measurements
+- [x] Command reports 0 for repositories without measurements
+- [x] Detailed breakdown accurately attributes sizes to measurement names
+- [x] Bytes format outputs parseable integer values
+- [x] Disk-size flag provides compressed size information
+- [x] Include-objects flag provides repository context
+- [x] All integration tests pass
+- [x] No clippy warnings
+- [x] Code properly formatted with `cargo fmt`
+- [x] Documentation generated and committed
+- [x] Manual testing with various repository sizes
 
 ## Risks and Mitigations
 

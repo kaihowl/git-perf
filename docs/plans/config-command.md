@@ -1,7 +1,8 @@
 # Plan: Add `config` Command with `--list` Flag
 
-**Status:** Planning
+**Status:** Complete
 **Created:** 2025-10-30
+**Completed:** 2026-01-25
 **Issue:** #327
 
 ## Overview
@@ -984,19 +985,19 @@ dirs-next = "2.0"  # Already used in config.rs
 
 ## Success Criteria
 
-- [ ] Command successfully displays git context
-- [ ] Command shows configuration sources
-- [ ] Command lists all measurement configurations
-- [ ] Detailed view shows all settings for each measurement
-- [ ] JSON output is valid and complete
-- [ ] Validation detects common config issues
-- [ ] Measurement filtering works correctly
-- [ ] Gracefully handles missing config files
-- [ ] All integration tests pass
-- [ ] No clippy warnings
-- [ ] Code properly formatted with `cargo fmt`
-- [ ] Documentation generated and committed
-- [ ] Manual testing with various configurations
+- [x] Command successfully displays git context
+- [x] Command shows configuration sources
+- [x] Command lists all measurement configurations
+- [x] Detailed view shows all settings for each measurement
+- [x] JSON output is valid and complete
+- [x] Validation detects common config issues
+- [x] Measurement filtering works correctly
+- [x] Gracefully handles missing config files
+- [x] All integration tests pass
+- [x] No clippy warnings
+- [x] Code properly formatted with `cargo fmt`
+- [x] Documentation generated and committed
+- [x] Manual testing with various configurations
 
 ## Risks and Mitigations
 
