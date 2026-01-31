@@ -1,5 +1,5 @@
 name: 'Publish git-perf Report'
-description: 'Generate and publish git-perf performance reports to GitHub Pages'
+description: 'Generate and publish git-perf performance reports to GitHub Pages. IMPORTANT: Jobs using this action must include a concurrency group (e.g., gh-pages) with cancel-in-progress: false to prevent race conditions when pushing to gh-pages.'
 author: 'Kai Höwelmeyer'
 
 branding:
@@ -209,6 +209,8 @@ runs:
         fi
         git perf size $SIZE_FLAGS --detailed || true
 
+    # IMPORTANT: The workflow using this action must have concurrency control
+    # to prevent race conditions with other gh-pages pushes
     - name: Publish to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
