@@ -1,5 +1,5 @@
 name: 'Cleanup git-perf Measurements and Reports'
-description: 'Remove old measurements and orphaned reports from git-perf tracking. IMPORTANT: Jobs using this action must include concurrency: { group: gh-pages-${{ github.ref }}, cancel-in-progress: false } to prevent race conditions when pushing to gh-pages.'
+description: 'Remove old measurements and orphaned reports from git-perf tracking. IMPORTANT: Jobs using this action must include a concurrency group (e.g., gh-pages) with cancel-in-progress: false to prevent race conditions when pushing to gh-pages.'
 author: 'Kai Höwelmeyer'
 
 branding:

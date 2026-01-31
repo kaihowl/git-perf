@@ -1,5 +1,5 @@
 name: 'Publish git-perf Report'
-description: 'Generate and publish git-perf performance reports to GitHub Pages. IMPORTANT: Jobs using this action must include concurrency: { group: gh-pages-${{ github.ref }}, cancel-in-progress: false } to prevent race conditions when pushing to gh-pages.'
+description: 'Generate and publish git-perf performance reports to GitHub Pages. IMPORTANT: Jobs using this action must include a concurrency group (e.g., gh-pages) with cancel-in-progress: false to prevent race conditions when pushing to gh-pages.'
 author: 'Kai Höwelmeyer'
 
 branding:
