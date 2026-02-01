@@ -904,7 +904,7 @@ jobs:
         with:
           fetch-depth: 100
 
-      - uses: kaihowl/git-perf/.github/actions/report@master
+      - uses: kaihowl/git-perf/.github/actions/report@latest
         with:
           reports-subdirectory: 'perf'
           preserve-existing: 'true'
@@ -1164,7 +1164,7 @@ This index is preserved by `keep_files: true` when reports are deployed to `/per
 
 **Current Setup:**
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@master
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -1173,7 +1173,7 @@ This index is preserved by `keep_files: true` when reports are deployed to `/per
 
 **Optional Migration to Subdirectory:**
 ```yaml
-- uses: kaihowl/git-perf/.github/actions/report@master
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     reports-subdirectory: 'perf'
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -1209,7 +1209,7 @@ concurrency:
 **Step 3**: Add performance workflow:
 ```yaml
 # .github/workflows/performance.yml
-- uses: kaihowl/git-perf/.github/actions/report@master
+- uses: kaihowl/git-perf/.github/actions/report@latest
   with:
     reports-subdirectory: 'perf'
     preserve-existing: 'true'

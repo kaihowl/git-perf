@@ -36,14 +36,14 @@ jobs:
           fetch-depth: 0  # Full checkout required for git perf operations
 
       - name: Cleanup measurements
-        uses: kaihowl/git-perf/.github/actions/cleanup@master
+        uses: kaihowl/git-perf/.github/actions/cleanup@latest
 ```
 
 ### Custom Retention Period
 
 ```yaml
 - name: Cleanup measurements (retain 30 days)
-  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     retention-days: 30
 ```
@@ -52,7 +52,7 @@ jobs:
 
 ```yaml
 - name: Cleanup measurements (no backup)
-  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     backup: false
 ```
@@ -61,7 +61,7 @@ jobs:
 
 ```yaml
 - name: Cleanup measurements only
-  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     cleanup-reports: false
 ```
@@ -70,7 +70,7 @@ jobs:
 
 ```yaml
 - name: Cleanup measurements
-  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     git-perf-version: '0.17.2'
 ```
@@ -141,7 +141,7 @@ jobs:
           fetch-depth: 0  # Full checkout required for git perf operations
 
       - name: Cleanup old measurements and reports
-        uses: kaihowl/git-perf/.github/actions/cleanup@master
+        uses: kaihowl/git-perf/.github/actions/cleanup@latest
         with:
           retention-days: 90
           backup: true
@@ -197,7 +197,7 @@ If you're using the report action with `reports-subdirectory`, ensure the cleanu
 
 ```yaml
 - name: Cleanup measurements and reports
-  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     retention-days: 90
     cleanup-reports: true
@@ -212,7 +212,7 @@ Test the cleanup before running it:
 
 ```yaml
 - name: Test cleanup (dry-run)
-  uses: kaihowl/git-perf/.github/actions/cleanup@master
+  uses: kaihowl/git-perf/.github/actions/cleanup@latest
   with:
     dry-run: true
     reports-subdirectory: 'perf'

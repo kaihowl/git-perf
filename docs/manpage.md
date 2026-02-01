@@ -15,6 +15,8 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf bump-epoch`↴](#git-perf-bump-epoch)
 * [`git-perf remove`↴](#git-perf-remove)
 * [`git-perf prune`↴](#git-perf-prune)
+* [`git-perf status`↴](#git-perf-status)
+* [`git-perf reset`↴](#git-perf-reset)
 * [`git-perf list-commits`↴](#git-perf-list-commits)
 * [`git-perf size`↴](#git-perf-size)
 * [`git-perf config`↴](#git-perf-config)
@@ -36,6 +38,8 @@ This document contains the help content for the `git-perf` command-line program.
 * `bump-epoch` — Accept HEAD commit's measurement for audit, even if outside of range. This is allows to accept expected performance changes. This is accomplished by starting a new epoch for the given measurement. The epoch is configured in the git perf config file. A change to the epoch therefore has to be committed and will result in a new HEAD for which new measurements have to be taken
 * `remove` — Remove all performance measurements for commits that have been committed at or before the specified time (inclusive boundary, uses <=)
 * `prune` — Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
+* `status` — Show pending measurements that haven't been pushed
+* `reset` — Drop locally pending measurements that haven't been pushed
 * `list-commits` — List all commits that have performance measurements
 * `size` — Estimate storage size of live performance measurements
 * `config` — Manage git-perf configuration
@@ -301,6 +305,45 @@ Note: Only published measurements (i.e., those that have been pushed to the remo
 Remove all performance measurements for non-existent/unreachable objects. Will refuse to work if run on a shallow clone
 
 **Usage:** `git-perf prune`
+
+
+
+## `git-perf status`
+
+Show pending measurements that haven't been pushed
+
+Lists local measurements that exist in write branches but haven't been pushed to the remote repository. Similar to `git status` for tracking which changes are pending.
+
+Pending measurements are those created with `add`, `measure`, or `import` that haven't been published via `push`. These can be safely discarded with the `reset` command.
+
+Examples: git perf status                    # Show summary of pending measurements git perf status --detailed         # Show per-commit breakdown
+
+**Usage:** `git-perf status [OPTIONS]`
+
+###### **Options:**
+
+* `-d`, `--detailed` — Show detailed per-commit breakdown
+
+
+
+## `git-perf reset`
+
+Drop locally pending measurements that haven't been pushed
+
+Removes measurements from local write branches that haven't been pushed to the remote repository. This is useful for discarding test or debug measurements before publishing.
+
+IMPORTANT: This only affects local pending measurements. Measurements that have been pushed to the remote are not affected. Use `remove` or `prune` for managing published measurements.
+
+Removes ALL pending measurements.
+
+Examples: git perf reset                        # Remove all pending measurements git perf reset --dry-run              # Preview what would be reset git perf reset --force                # Skip confirmation prompt
+
+**Usage:** `git-perf reset [OPTIONS]`
+
+###### **Options:**
+
+* `--dry-run` — Preview what would be reset without actually resetting
+* `-f`, `--force` — Skip confirmation prompt (dangerous)
 
 
 

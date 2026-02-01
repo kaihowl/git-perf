@@ -10,6 +10,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: write
 
 on:
   schedule:
@@ -21,7 +22,7 @@ jobs:
   slow-test-loop:
     name: Slow Test Loop (until failure)
     runs-on: ubuntu-22.04
-    timeout-minutes: 360  # 6 hours maximum runtime
+    timeout-minutes: 120  # 2 hours maximum runtime
     
     env:
       # Emit backtraces on panics
@@ -49,7 +50,7 @@ jobs:
       run: |
         echo "Starting slow test loop - will run until failure..."
         echo "================================================"
-        
+
         # Use the existing script but capture output for PR comments
         if bash test/run_test_loop.sh; then
           echo "✅ All iterations passed without failure!"
@@ -57,3 +58,72 @@ jobs:
           echo "❌ Test FAILED in the loop!"
           exit 1
         fi
+
+    - name: Create issue on scheduled workflow failure
+      if: failure() && github.event_name == 'schedule'
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const title = '🔴 Scheduled Slow Test Loop Failed';
+          const body = `## Workflow Failure Report
+
+          The scheduled slow test loop has detected a failure.
+
+          **Workflow:** Slow Test Loop
+          **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Triggered:** ${{ github.event_name }}
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+          **Time:** ${new Date().toISOString()}
+
+          ### Action Required
+
+          The slow test loop runs tests repeatedly to catch intermittent failures. A failure here indicates:
+          - A flaky test that fails inconsistently
+          - Race conditions or timing-dependent bugs
+          - Resource cleanup issues
+
+          Please investigate the test failure in the workflow logs.
+
+          ### Useful Links
+
+          - [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [Workflow File](${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/slow-test-loop.yml)
+          - [Test Script](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/test/run_test_loop.sh)
+
+          ---
+          *This issue was automatically created by the scheduled workflow failure detector.*`;
+
+          // Check if a similar issue already exists (open issues with the same title)
+          const existingIssues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: 'automated,workflow-failure',
+            per_page: 100
+          });
+
+          const duplicateIssue = existingIssues.data.find(issue =>
+            issue.title === title
+          );
+
+          if (duplicateIssue) {
+            // Add a comment to the existing issue instead of creating a new one
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: duplicateIssue.number,
+              body: `Another failure occurred:\n\n**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n**Time:** ${new Date().toISOString()}`
+            });
+            console.log(`Added comment to existing issue #${duplicateIssue.number}`);
+          } else {
+            // Create a new issue
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['automated', 'workflow-failure', 'bug', 'flaky-test']
+            });
+            console.log(`Created issue #${issue.data.number}`);
+          }
