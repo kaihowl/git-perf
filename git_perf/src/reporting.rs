@@ -2306,6 +2306,30 @@ fn categorize_reports(
 fn get_commit_metadata(commit_sha: &str) -> Result<(Option<String>, Option<String>)> {
     use std::process::Command;
 
+    // First, try to get metadata from local history
+    if let Some(result) = try_get_commit_metadata_local(commit_sha) {
+        return Ok(result);
+    }
+
+    // If not found locally, try to fetch the commit from origin
+    let _ = Command::new("git")
+        .args(["fetch", "--depth=1", "origin", commit_sha])
+        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .status();
+
+    // Try again after fetching
+    if let Some(result) = try_get_commit_metadata_local(commit_sha) {
+        return Ok(result);
+    }
+
+    Ok((None, None))
+}
+
+/// Try to get commit metadata from local git history
+fn try_get_commit_metadata_local(commit_sha: &str) -> Option<(Option<String>, Option<String>)> {
+    use std::process::Command;
+
     let output = Command::new("git")
         .args(["log", "-1", "--format=%ci|||%an", commit_sha])
         .output();
@@ -2314,15 +2338,15 @@ fn get_commit_metadata(commit_sha: &str) -> Result<(Option<String>, Option<Strin
         Ok(output) if output.status.success() => {
             let info = String::from_utf8_lossy(&output.stdout);
             let parts: Vec<&str> = info.trim().split("|||").collect();
-            if parts.len() == 2 {
+            if parts.len() == 2 && !parts[0].is_empty() {
                 let date = parts[0].split(' ').next().unwrap_or("").to_string();
                 let author = parts[1].to_string();
-                Ok((Some(date), Some(author)))
+                Some((Some(date), Some(author)))
             } else {
-                Ok((None, None))
+                None
             }
         }
-        _ => Ok((None, None)),
+        _ => None,
     }
 }
 
