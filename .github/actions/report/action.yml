@@ -75,6 +75,9 @@ outputs:
   report-url:
     description: 'URL of the published report'
     value: ${{ steps.get-pages-url.outputs.full-report-url }}
+  index-url:
+    description: 'URL of the reports index page (only set when generate-index is enabled)'
+    value: ${{ steps.get-pages-url.outputs.index-url }}
   audit-output:
     description: 'Output from git-perf audit command'
     value: ${{ steps.audit.outputs.audit-output }}
@@ -307,17 +310,25 @@ runs:
         echo "Pages URL: $pages_url"
 
         # Construct full report URL including subdirectory
+        # Remove trailing slash from pages_url if present
+        pages_url="${pages_url%/}"
         SUBDIR="${{ inputs.reports-subdirectory }}"
         REPORT_NAME="${{ steps.set-report-name.outputs.report-name }}"
         if [ -n "$SUBDIR" ]; then
-          # Remove trailing slash from pages_url if present
-          pages_url="${pages_url%/}"
           full_report_url="${pages_url}/${SUBDIR}/${REPORT_NAME}.html"
+          index_url="${pages_url}/${SUBDIR}/index.html"
         else
           full_report_url="${pages_url}/${REPORT_NAME}.html"
+          index_url="${pages_url}/index.html"
         fi
         echo "full-report-url=$full_report_url" >> $GITHUB_OUTPUT
         echo "Full report URL: $full_report_url"
+
+        # Output index URL if generate-index is enabled
+        if [ "${{ inputs.generate-index }}" = "true" ]; then
+          echo "index-url=$index_url" >> $GITHUB_OUTPUT
+          echo "Index URL: $index_url"
+        fi
 
     - name: Comment on PR
       if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
@@ -326,6 +337,8 @@ runs:
         github-token: ${{ inputs.github-token }}
         script: |
           const reportUrl = '${{ steps.get-pages-url.outputs.full-report-url }}'
+          const indexUrl = '${{ steps.get-pages-url.outputs.index-url }}'
+          const generateIndex = '${{ inputs.generate-index }}' === 'true'
 
           const auditOutput = `${{ steps.audit.outputs.audit-output }}`.trim()
           const auditSection = auditOutput ? `\n\n## Audit Results\n\n\`\`\`\n${auditOutput}\n\`\`\`` : ''
@@ -333,7 +346,8 @@ runs:
           const sizeOutput = `${{ steps.size.outputs.size-output }}`.trim()
           const sizeSection = sizeOutput ? `\n\n## Measurement Storage Size\n\n\`\`\`\n${sizeOutput}\n\`\`\`` : ''
 
-          const commentBody = `## Performance Report\n\n⏱  [Performance Results](${reportUrl})${auditSection}${sizeSection}\n\n_Created by [git-perf](https://github.com/kaihowl/git-perf/)_`
+          const indexLink = generateIndex && indexUrl ? ` | [All Reports](${indexUrl})` : ''
+          const commentBody = `## Performance Report\n\n⏱  [Performance Results](${reportUrl})${indexLink}${auditSection}${sizeSection}\n\n_Created by [git-perf](https://github.com/kaihowl/git-perf/)_`
 
           // Find existing performance comment
           const comments = await github.rest.issues.listComments({
