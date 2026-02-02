@@ -242,6 +242,10 @@ runs:
         # Fetch gh-pages branch to access existing reports
         git fetch origin gh-pages:gh-pages 2>/dev/null || echo "No gh-pages branch yet"
 
+        # Fetch full history so we can look up commit metadata (date, author)
+        # This is needed because CI often uses shallow clones
+        git fetch --unshallow origin 2>/dev/null || echo "Already have full history"
+
         # Build subdirectory flag
         SUBDIR_FLAG=""
         if [ -n "${{ inputs.reports-subdirectory }}" ]; then
