@@ -2307,7 +2307,7 @@ fn get_commit_metadata(commit_sha: &str) -> Result<(Option<String>, Option<Strin
     use std::process::Command;
 
     let output = Command::new("git")
-        .args(["log", "-1", "--format=%ci|||%an", "--", commit_sha])
+        .args(["log", "-1", "--format=%ci|||%an", commit_sha])
         .output();
 
     match output {
