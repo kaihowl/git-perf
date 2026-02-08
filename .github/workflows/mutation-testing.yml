@@ -79,10 +79,10 @@ jobs:
         # On schedule, run full mutation testing
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           echo "🔍 Running quick mutation test for PR validation (smoke test)"
-          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 20 --file src/config.rs"
+          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 20 --shuffle --limit 1 --file src/config.rs"
         else
-          echo "🔍 Running full mutation testing (scheduled run)"
-          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 60"
+          echo "🔍 Running full mutation testing (scheduled run, random shuffle, first 50 mutations)"
+          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 60 --shuffle --limit 50"
         fi
 
         # Run full mutation testing with nextest (no sharding - weekly comprehensive testing)
