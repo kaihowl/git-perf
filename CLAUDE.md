@@ -10,11 +10,13 @@ cargo clippy                           # Lint code (must pass)
 cargo nextest run -- --skip slow       # Run tests (standard)
 cargo nextest run                      # Run full test suite including slow tests
 ./scripts/generate-manpages.sh        # Regenerate docs after CLI changes
+cargo mutants --in-diff <diff-file>    # Check for missed mutants (required before PR)
 ```
 
 **Setup (one-time)**:
 ```bash
 cargo install cargo-nextest --locked
+cargo install cargo-mutants --version 25.3.1  # Required for mutation testing
 export PATH="/usr/local/cargo/bin:$PATH"  # Add to shell profile
 
 # Install test dependencies
@@ -34,6 +36,7 @@ cat /proc/net/if_inet6  # Should show IPv6 addresses
 - Always explicitly specify the PR title using Conventional Commits format
 - Never rely on auto-generated titles - they break CI
 - Title must be provided when creating pull requests
+- **CRITICAL**: Check for missed mutants before creating PR (see [Mutation Testing](#mutation-testing-required-before-pr))
 
 **Format**: `type(scope): lowercase description`
 
@@ -74,6 +77,26 @@ cargo nextest run                      # Full suite including slow tests
 cargo nextest run -- --skip slow --skip test_customheader --skip test_remove
 ```
 
+## Mutation Testing (Required Before PR)
+
+**MANDATORY**: PRs with uncaught mutants will fail CI.
+
+**Before creating PR**:
+```bash
+git diff origin/master.. > /tmp/changes.diff
+cd git_perf
+cargo mutants --test-tool=nextest --in-diff /tmp/changes.diff
+```
+
+**Exit codes**:
+- `0`: ✅ Pass - create PR
+- `2`: ❌ Missed mutants - add tests, repeat until exit 0
+- `3`: ❌ Timeout - optimize slow tests
+
+**If mutants missed**: Check `mutants.out/` for which code paths need tests (boundary conditions, error handling, boolean branches, edge cases).
+
+**Config**: `.cargo/mutants.toml` | **Install**: `cargo install cargo-mutants --version 25.3.1`
+
 ## Documentation Generation
 
 **IMPORTANT**: Run `./scripts/generate-manpages.sh` after modifying:
@@ -94,6 +117,7 @@ cargo nextest run -- --skip slow --skip test_customheader --skip test_remove
 - Meaningful variable/function names
 - No compiler warnings allowed
 - No clippy warnings allowed
+- **All code changes must pass mutation testing** (no uncaught mutants in PR diff)
 
 ## Project Architecture
 
