@@ -2561,6 +2561,7 @@ fn generate_custom_reports_html(reports: &[ReportInfo], subdirectory: Option<&st
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::with_isolated_test_setup;
 
     #[test]
     fn test_convert_to_x_y_empty() {
@@ -3789,58 +3790,67 @@ mod tests {
 
     #[test]
     fn test_batch_commit_metadata_single() {
-        // This test requires a git repository with at least one commit
-        // Get HEAD commit SHA
-        let output = std::process::Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .output();
+        with_isolated_test_setup(|_git_dir, _home_path| {
+            // Get HEAD commit SHA from the isolated git repository
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .unwrap();
 
-        if let Ok(output) = output {
-            if output.status.success() {
-                let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let result = get_batch_commit_metadata(std::slice::from_ref(&sha)).unwrap();
+            assert!(output.status.success());
+            let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let result = get_batch_commit_metadata(std::slice::from_ref(&sha)).unwrap();
 
-                // Should have metadata for the commit
-                assert_eq!(result.len(), 1);
-                assert!(result.contains_key(&sha));
+            // Should have metadata for the commit
+            assert_eq!(result.len(), 1);
+            assert!(result.contains_key(&sha));
 
-                let (date, author, subject) = result.get(&sha).unwrap();
-                assert!(!date.is_empty());
-                assert!(!author.is_empty());
-                assert!(!subject.is_empty());
-            }
-        }
+            let (date, author, subject) = result.get(&sha).unwrap();
+            assert!(!date.is_empty());
+            assert!(!author.is_empty());
+            assert!(!subject.is_empty());
+        });
     }
 
     #[test]
     fn test_batch_commit_metadata_multiple() {
-        // This test requires a git repository with at least two commits
-        let output = std::process::Command::new("git")
-            .args(["log", "-2", "--format=%H"])
-            .output();
+        with_isolated_test_setup(|git_dir, _home_path| {
+            // Create a second commit in the isolated repository
+            std::fs::write(git_dir.join("test2.txt"), "test content 2").unwrap();
+            std::process::Command::new("git")
+                .args(["add", "test2.txt"])
+                .output()
+                .unwrap();
+            std::process::Command::new("git")
+                .args(["commit", "-m", "Second commit"])
+                .output()
+                .unwrap();
 
-        if let Ok(output) = output {
-            if output.status.success() {
-                let shas: Vec<String> = String::from_utf8_lossy(&output.stdout)
-                    .lines()
-                    .map(|s| s.trim().to_string())
-                    .collect();
+            // Get last 2 commit SHAs
+            let output = std::process::Command::new("git")
+                .args(["log", "-2", "--format=%H"])
+                .output()
+                .unwrap();
 
-                if shas.len() >= 2 {
-                    let result = get_batch_commit_metadata(&shas).unwrap();
+            assert!(output.status.success());
+            let shas: Vec<String> = String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(|s| s.trim().to_string())
+                .collect();
 
-                    // Should have metadata for both commits
-                    assert_eq!(result.len(), shas.len());
-                    for sha in &shas {
-                        assert!(result.contains_key(sha));
-                        let (date, author, subject) = result.get(sha).unwrap();
-                        assert!(!date.is_empty());
-                        assert!(!author.is_empty());
-                        assert!(!subject.is_empty());
-                    }
-                }
+            assert_eq!(shas.len(), 2);
+            let result = get_batch_commit_metadata(&shas).unwrap();
+
+            // Should have metadata for both commits
+            assert_eq!(result.len(), shas.len());
+            for sha in &shas {
+                assert!(result.contains_key(sha));
+                let (date, author, subject) = result.get(sha).unwrap();
+                assert!(!date.is_empty());
+                assert!(!author.is_empty());
+                assert!(!subject.is_empty());
             }
-        }
+        });
     }
 
     #[test]
@@ -3855,23 +3865,23 @@ mod tests {
 
     #[test]
     fn test_batch_commit_metadata_mixed() {
-        // Mix of valid and invalid SHAs
-        let output = std::process::Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .output();
+        with_isolated_test_setup(|_git_dir, _home_path| {
+            // Mix of valid and invalid SHAs
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .unwrap();
 
-        if let Ok(output) = output {
-            if output.status.success() {
-                let valid_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let invalid_sha = "0000000000000000000000000000000000000000".to_string();
-                let shas = vec![valid_sha.clone(), invalid_sha.clone()];
+            assert!(output.status.success());
+            let valid_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let invalid_sha = "0000000000000000000000000000000000000000".to_string();
+            let shas = vec![valid_sha.clone(), invalid_sha.clone()];
 
-                let result = get_batch_commit_metadata(&shas).unwrap();
+            let result = get_batch_commit_metadata(&shas).unwrap();
 
-                // Should have metadata for valid commit only
-                assert!(result.contains_key(&valid_sha));
-                assert!(!result.contains_key(&invalid_sha));
-            }
-        }
+            // Should have metadata for valid commit only
+            assert!(result.contains_key(&valid_sha));
+            assert!(!result.contains_key(&invalid_sha));
+        });
     }
 }
