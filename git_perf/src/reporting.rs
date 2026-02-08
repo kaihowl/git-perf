@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{self, ErrorKind, Write},
+    io::{self, BufRead, BufReader, ErrorKind, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 use anyhow::anyhow;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use itertools::Itertools;
 use plotly::{
@@ -2284,6 +2285,9 @@ fn categorize_reports(files: Vec<String>) -> Result<CategorizedReports> {
     let mut dangling_commits = Vec::new();
     let mut custom_reports = Vec::new();
 
+    // PHASE 1: Collect commit SHAs (no git calls yet)
+    let mut commit_filenames = Vec::new(); // Vec<(filename, sha)>
+
     for filename in files {
         // Skip index.html
         if filename == "index.html" {
@@ -2294,25 +2298,8 @@ fn categorize_reports(files: Vec<String>) -> Result<CategorizedReports> {
 
         // Check if it's a full SHA (40 characters, all hex)
         if name_without_ext.len() == 40 && name_without_ext.chars().all(|c| c.is_ascii_hexdigit()) {
-            // Commit report - try to get metadata
-            let (date, author, subject) =
-                get_commit_metadata(name_without_ext).unwrap_or((None, None, None));
-
-            let report_info = ReportInfo {
-                filename: filename.clone(),
-                commit_sha: Some(name_without_ext.to_string()),
-                commit_date: date.clone(),
-                commit_author: author.clone(),
-                commit_subject: subject.clone(),
-                is_branch_report: false,
-            };
-
-            // Separate commits with full details from dangling commits
-            if date.is_some() && author.is_some() {
-                commit_reports.push(report_info);
-            } else {
-                dangling_commits.push(report_info);
-            }
+            // Defer metadata lookup - collect for batch processing
+            commit_filenames.push((filename.clone(), name_without_ext.to_string()));
         } else {
             // Could be branch name or custom report
             // Common branch names: main, master, develop, etc.
@@ -2341,6 +2328,45 @@ fn categorize_reports(files: Vec<String>) -> Result<CategorizedReports> {
         }
     }
 
+    // PHASE 2: Batch metadata retrieval (single git process)
+    let commit_shas: Vec<String> = commit_filenames
+        .iter()
+        .map(|(_, sha)| sha.clone())
+        .collect();
+    let metadata_map = get_batch_commit_metadata(&commit_shas)?;
+
+    // PHASE 3: Create ReportInfo with metadata lookup
+    for (filename, sha) in commit_filenames {
+        let report_info = if let Some((date, author, subject)) = metadata_map.get(&sha) {
+            // Metadata found
+            ReportInfo {
+                filename: filename.clone(),
+                commit_sha: Some(sha.clone()),
+                commit_date: Some(date.clone()),
+                commit_author: Some(author.clone()),
+                commit_subject: Some(subject.clone()),
+                is_branch_report: false,
+            }
+        } else {
+            // Metadata missing (shallow clone or invalid SHA)
+            ReportInfo {
+                filename: filename.clone(),
+                commit_sha: Some(sha),
+                commit_date: None,
+                commit_author: None,
+                commit_subject: None,
+                is_branch_report: false,
+            }
+        };
+
+        // Categorize: same logic as before
+        if report_info.commit_date.is_some() && report_info.commit_author.is_some() {
+            commit_reports.push(report_info);
+        } else {
+            dangling_commits.push(report_info);
+        }
+    }
+
     // Sort commit reports by date (most recent first)
     commit_reports.sort_by(|a, b| {
         match (&a.commit_date, &b.commit_date) {
@@ -2362,31 +2388,65 @@ fn categorize_reports(files: Vec<String>) -> Result<CategorizedReports> {
     })
 }
 
-/// Get commit metadata (date, author, and subject) for a commit SHA
-fn get_commit_metadata(
-    commit_sha: &str,
-) -> Result<(Option<String>, Option<String>, Option<String>)> {
-    use std::process::Command;
-
-    let output = Command::new("git")
-        .args(["log", "-1", "--format=%ci|||%an|||%s", commit_sha])
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            let info = String::from_utf8_lossy(&output.stdout);
-            let parts: Vec<&str> = info.trim().split("|||").collect();
-            if parts.len() == 3 && !parts[0].is_empty() {
-                let date = parts[0].split(' ').next().unwrap_or("").to_string();
-                let author = parts[1].to_string();
-                let subject = parts[2].to_string();
-                Ok((Some(date), Some(author), Some(subject)))
-            } else {
-                Ok((None, None, None))
-            }
-        }
-        _ => Ok((None, None, None)),
+/// Batch retrieve commit metadata for multiple commits in a single git process.
+///
+/// Returns a HashMap mapping full commit SHA to (date, author, subject) tuples.
+/// Only commits with valid metadata are included in the result.
+/// Missing or invalid commits are silently skipped by git.
+fn get_batch_commit_metadata(
+    commit_shas: &[String],
+) -> Result<HashMap<String, (String, String, String)>> {
+    // Guard: empty input would cause git log to default to HEAD
+    if commit_shas.is_empty() {
+        return Ok(HashMap::new());
     }
+
+    // Spawn git log with commit SHAs as command-line arguments
+    // --ignore-missing: silently skip missing/invalid commits (e.g., shallow clones)
+    // Note: We use command-line args instead of --stdin because --ignore-missing
+    // doesn't work with --stdin in git.
+    let mut git_log = Command::new("git")
+        .arg("log")
+        .arg("--no-walk")
+        .arg("--ignore-missing")
+        .arg("--format=%H|||%ci|||%an|||%s")
+        .args(commit_shas)
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to spawn git log")?;
+
+    let git_stdout = git_log
+        .stdout
+        .take()
+        .context("Failed to take stdout from git log")?;
+
+    // Read and parse output
+    let reader = BufReader::new(git_stdout);
+    let mut metadata_map = HashMap::new();
+
+    for line in reader.lines() {
+        let line = line.context("Failed to read line from git log")?;
+        let parts: Vec<&str> = line.trim().split("|||").collect();
+        if parts.len() == 4 {
+            let full_sha = parts[0].to_string();
+            let datetime = parts[1];
+            // Extract just the date part (first space-delimited token from datetime)
+            let date = datetime.split(' ').next().unwrap_or("").to_string();
+            let author = parts[2].to_string();
+            let subject = parts[3].to_string();
+            metadata_map.insert(full_sha, (date, author, subject));
+        } else if !line.trim().is_empty() {
+            eprintln!("Warning: Malformed git log output line: {}", line);
+        }
+    }
+
+    // Wait for process completion
+    let status = git_log.wait().context("Failed to wait for git log")?;
+    if !status.success() {
+        bail!("git log failed with status: {}", status);
+    }
+
+    Ok(metadata_map)
 }
 
 /// Generate HTML for branch reports
@@ -3718,5 +3778,100 @@ mod tests {
         assert!(merged[0].show_changes);
         assert!(merged[1].show_epochs);
         assert!(merged[1].show_changes);
+    }
+
+    #[test]
+    fn test_batch_commit_metadata_empty_input() {
+        // Empty input should return empty HashMap without calling git
+        let result = get_batch_commit_metadata(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_batch_commit_metadata_single() {
+        // This test requires a git repository with at least one commit
+        // Get HEAD commit SHA
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let result = get_batch_commit_metadata(std::slice::from_ref(&sha)).unwrap();
+
+                // Should have metadata for the commit
+                assert_eq!(result.len(), 1);
+                assert!(result.contains_key(&sha));
+
+                let (date, author, subject) = result.get(&sha).unwrap();
+                assert!(!date.is_empty());
+                assert!(!author.is_empty());
+                assert!(!subject.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_batch_commit_metadata_multiple() {
+        // This test requires a git repository with at least two commits
+        let output = std::process::Command::new("git")
+            .args(["log", "-2", "--format=%H"])
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                let shas: Vec<String> = String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .map(|s| s.trim().to_string())
+                    .collect();
+
+                if shas.len() >= 2 {
+                    let result = get_batch_commit_metadata(&shas).unwrap();
+
+                    // Should have metadata for both commits
+                    assert_eq!(result.len(), shas.len());
+                    for sha in &shas {
+                        assert!(result.contains_key(sha));
+                        let (date, author, subject) = result.get(sha).unwrap();
+                        assert!(!date.is_empty());
+                        assert!(!author.is_empty());
+                        assert!(!subject.is_empty());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_batch_commit_metadata_missing() {
+        // Invalid SHA should be silently skipped
+        let invalid_sha = "0000000000000000000000000000000000000000".to_string();
+        let result = get_batch_commit_metadata(std::slice::from_ref(&invalid_sha)).unwrap();
+
+        // Should be empty or not contain the invalid SHA
+        assert!(!result.contains_key(&invalid_sha));
+    }
+
+    #[test]
+    fn test_batch_commit_metadata_mixed() {
+        // Mix of valid and invalid SHAs
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                let valid_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let invalid_sha = "0000000000000000000000000000000000000000".to_string();
+                let shas = vec![valid_sha.clone(), invalid_sha.clone()];
+
+                let result = get_batch_commit_metadata(&shas).unwrap();
+
+                // Should have metadata for valid commit only
+                assert!(result.contains_key(&valid_sha));
+                assert!(!result.contains_key(&invalid_sha));
+            }
+        }
     }
 }
