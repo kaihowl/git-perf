@@ -1939,8 +1939,17 @@ struct ReportInfo {
     commit_sha: Option<String>,
     commit_date: Option<String>,
     commit_author: Option<String>,
+    commit_subject: Option<String>,
     #[allow(dead_code)] // Used for categorization logic, may be useful in future
     is_branch_report: bool,
+}
+
+/// Categorized reports
+struct CategorizedReports {
+    branch_reports: Vec<ReportInfo>,
+    commit_reports: Vec<ReportInfo>,
+    dangling_commits: Vec<ReportInfo>,
+    custom_reports: Vec<ReportInfo>,
 }
 
 /// Default HTML template for index page
@@ -2054,11 +2063,12 @@ const DEFAULT_INDEX_TEMPLATE: &str = r#"<!DOCTYPE html>
         {{#COMMIT_REPORTS}}
         <div class="section">
             <h2>📈 Commit Reports</h2>
-            <p>Reports for individual commits (most recent first)</p>
+            <p>Reports for individual commits with full metadata (most recent first)</p>
             <table>
                 <thead>
                     <tr>
                         <th>Commit</th>
+                        <th>Subject</th>
                         <th>Date</th>
                         <th>Author</th>
                         <th>Report</th>
@@ -2070,6 +2080,24 @@ const DEFAULT_INDEX_TEMPLATE: &str = r#"<!DOCTYPE html>
             </table>
         </div>
         {{/COMMIT_REPORTS}}
+
+        {{#DANGLING_COMMITS}}
+        <div class="section">
+            <h2>⚠️ Dangling Commits</h2>
+            <p>Commits without full metadata (likely due to shallow clone or missing history)</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Commit</th>
+                        <th>Report</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{DANGLING_COMMITS}}
+                </tbody>
+            </table>
+        </div>
+        {{/DANGLING_COMMITS}}
 
         {{#CUSTOM_REPORTS}}
         <div class="section">
@@ -2112,12 +2140,13 @@ pub fn generate_index(
     let reports = list_reports_from_branch(branch, subdirectory)?;
 
     // Categorize reports
-    let (branch_reports, commit_reports, custom_reports) = categorize_reports(reports)?;
+    let categorized = categorize_reports(reports)?;
 
     // Generate HTML for each category
-    let branch_html = generate_branch_reports_html(&branch_reports, subdirectory);
-    let commit_html = generate_commit_reports_html(&commit_reports, subdirectory);
-    let custom_html = generate_custom_reports_html(&custom_reports, subdirectory);
+    let branch_html = generate_branch_reports_html(&categorized.branch_reports, subdirectory);
+    let commit_html = generate_commit_reports_html(&categorized.commit_reports, subdirectory);
+    let dangling_html = generate_dangling_commits_html(&categorized.dangling_commits, subdirectory);
+    let custom_html = generate_custom_reports_html(&categorized.custom_reports, subdirectory);
 
     // Apply template
     let mut output = template.replace("{{TITLE}}", title);
@@ -2142,6 +2171,15 @@ pub fn generate_index(
         output = remove_conditional_section(&output, "COMMIT_REPORTS");
     }
 
+    if !dangling_html.is_empty() {
+        output = output
+            .replace("{{#DANGLING_COMMITS}}", "")
+            .replace("{{/DANGLING_COMMITS}}", "")
+            .replace("{{DANGLING_COMMITS}}", &dangling_html);
+    } else {
+        output = remove_conditional_section(&output, "DANGLING_COMMITS");
+    }
+
     if !custom_html.is_empty() {
         output = output
             .replace("{{#CUSTOM_REPORTS}}", "")
@@ -2152,7 +2190,11 @@ pub fn generate_index(
     }
 
     // Show "no reports" message if all categories are empty
-    if branch_html.is_empty() && commit_html.is_empty() && custom_html.is_empty() {
+    if branch_html.is_empty()
+        && commit_html.is_empty()
+        && dangling_html.is_empty()
+        && custom_html.is_empty()
+    {
         output = output
             .replace("{{#NO_REPORTS}}", "")
             .replace("{{/NO_REPORTS}}", "");
@@ -2235,12 +2277,11 @@ fn list_reports_from_branch(branch: &str, subdirectory: Option<&str>) -> Result<
     Ok(html_files)
 }
 
-/// Categorize reports into branch, commit, and custom reports
-fn categorize_reports(
-    files: Vec<String>,
-) -> Result<(Vec<ReportInfo>, Vec<ReportInfo>, Vec<ReportInfo>)> {
+/// Categorize reports into branch, commit (with details), dangling commit, and custom reports
+fn categorize_reports(files: Vec<String>) -> Result<CategorizedReports> {
     let mut branch_reports = Vec::new();
     let mut commit_reports = Vec::new();
+    let mut dangling_commits = Vec::new();
     let mut custom_reports = Vec::new();
 
     for filename in files {
@@ -2254,15 +2295,24 @@ fn categorize_reports(
         // Check if it's a full SHA (40 characters, all hex)
         if name_without_ext.len() == 40 && name_without_ext.chars().all(|c| c.is_ascii_hexdigit()) {
             // Commit report - try to get metadata
-            let (date, author) = get_commit_metadata(name_without_ext).unwrap_or((None, None));
+            let (date, author, subject) =
+                get_commit_metadata(name_without_ext).unwrap_or((None, None, None));
 
-            commit_reports.push(ReportInfo {
+            let report_info = ReportInfo {
                 filename: filename.clone(),
                 commit_sha: Some(name_without_ext.to_string()),
-                commit_date: date,
-                commit_author: author,
+                commit_date: date.clone(),
+                commit_author: author.clone(),
+                commit_subject: subject.clone(),
                 is_branch_report: false,
-            });
+            };
+
+            // Separate commits with full details from dangling commits
+            if date.is_some() && author.is_some() {
+                commit_reports.push(report_info);
+            } else {
+                dangling_commits.push(report_info);
+            }
         } else {
             // Could be branch name or custom report
             // Common branch names: main, master, develop, etc.
@@ -2275,6 +2325,7 @@ fn categorize_reports(
                     commit_sha: None,
                     commit_date: None,
                     commit_author: None,
+                    commit_subject: None,
                     is_branch_report: true,
                 });
             } else {
@@ -2283,6 +2334,7 @@ fn categorize_reports(
                     commit_sha: None,
                     commit_date: None,
                     commit_author: None,
+                    commit_subject: None,
                     is_branch_report: false,
                 });
             }
@@ -2299,30 +2351,41 @@ fn categorize_reports(
         }
     });
 
-    Ok((branch_reports, commit_reports, custom_reports))
+    // Sort dangling commits by SHA (alphabetically)
+    dangling_commits.sort_by(|a, b| a.filename.cmp(&b.filename));
+
+    Ok(CategorizedReports {
+        branch_reports,
+        commit_reports,
+        dangling_commits,
+        custom_reports,
+    })
 }
 
-/// Get commit metadata (date and author) for a commit SHA
-fn get_commit_metadata(commit_sha: &str) -> Result<(Option<String>, Option<String>)> {
+/// Get commit metadata (date, author, and subject) for a commit SHA
+fn get_commit_metadata(
+    commit_sha: &str,
+) -> Result<(Option<String>, Option<String>, Option<String>)> {
     use std::process::Command;
 
     let output = Command::new("git")
-        .args(["log", "-1", "--format=%ci|||%an", commit_sha])
+        .args(["log", "-1", "--format=%ci|||%an|||%s", commit_sha])
         .output();
 
     match output {
         Ok(output) if output.status.success() => {
             let info = String::from_utf8_lossy(&output.stdout);
             let parts: Vec<&str> = info.trim().split("|||").collect();
-            if parts.len() == 2 && !parts[0].is_empty() {
+            if parts.len() == 3 && !parts[0].is_empty() {
                 let date = parts[0].split(' ').next().unwrap_or("").to_string();
                 let author = parts[1].to_string();
-                Ok((Some(date), Some(author)))
+                let subject = parts[2].to_string();
+                Ok((Some(date), Some(author), Some(subject)))
             } else {
-                Ok((None, None))
+                Ok((None, None, None))
             }
         }
-        _ => Ok((None, None)),
+        _ => Ok((None, None, None)),
     }
 }
 
@@ -2369,12 +2432,42 @@ fn generate_commit_reports_html(reports: &[ReportInfo], subdirectory: Option<&st
                 .as_ref()
                 .map(|s| &s[..7])
                 .unwrap_or("unknown");
+            let subject = report.commit_subject.as_deref().unwrap_or("N/A");
             let date = report.commit_date.as_deref().unwrap_or("N/A");
             let author = report.commit_author.as_deref().unwrap_or("N/A");
 
             format!(
-                "<tr><td class=\"commit-sha\">{}</td><td>{}</td><td>{}</td><td><a href=\"{}\">View Report</a></td></tr>",
-                short_sha, date, author, url
+                "<tr><td class=\"commit-sha\">{}</td><td>{}</td><td>{}</td><td>{}</td><td><a href=\"{}\">View Report</a></td></tr>",
+                short_sha, subject, date, author, url
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n                    ")
+}
+
+/// Generate HTML for dangling commit reports (commits without full metadata)
+fn generate_dangling_commits_html(reports: &[ReportInfo], subdirectory: Option<&str>) -> String {
+    if reports.is_empty() {
+        return String::new();
+    }
+
+    reports
+        .iter()
+        .map(|report| {
+            let url = if let Some(subdir) = subdirectory {
+                format!("{}/{}", subdir, report.filename)
+            } else {
+                report.filename.clone()
+            };
+            let short_sha = report
+                .commit_sha
+                .as_ref()
+                .map(|s| &s[..7])
+                .unwrap_or("unknown");
+
+            format!(
+                "<tr><td class=\"commit-sha\">{}</td><td><a href=\"{}\">View Report</a></td></tr>",
+                short_sha, url
             )
         })
         .collect::<Vec<_>>()
