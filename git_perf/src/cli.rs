@@ -93,6 +93,7 @@ pub fn handle_calls() -> Result<()> {
             title,
             show_epochs,
             show_changes,
+            all_reports_url,
         } => {
             let commit = commit.as_deref().unwrap_or("HEAD");
 
@@ -104,6 +105,7 @@ pub fn handle_calls() -> Result<()> {
                 template_path: template,
                 custom_css_path: custom_css,
                 title,
+                all_reports_url,
             };
 
             report(
@@ -208,5 +210,18 @@ pub fn handle_calls() -> Result<()> {
                 anyhow::bail!("config command requires --list flag (try: git perf config --list)");
             }
         }
+        Commands::GenerateIndex {
+            output,
+            subdirectory,
+            title,
+            template,
+            branch,
+        } => crate::reporting::generate_index(
+            &branch,
+            subdirectory.as_deref(),
+            &output,
+            &title,
+            template.as_deref(),
+        ),
     }
 }
