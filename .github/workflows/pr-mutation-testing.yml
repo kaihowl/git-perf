@@ -1,0 +1,319 @@
+name: PR Mutation Testing
+
+on:
+  pull_request:
+    # Run on all PRs except those only touching documentation or CI config
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/mutation-testing.yml'  # Skip if only weekly workflow changed
+      - '.github/workflows/pr-mutation-testing.yml'  # Skip if only this workflow changed
+
+concurrency:
+  group: pr-mutation-testing-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  incremental-mutation-testing:
+    name: Incremental Mutation Testing (PR Changes Only)
+    env:
+      RUST_BACKTRACE: 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        # Need full history to generate diff against base branch
+        fetch-depth: 0
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
+    - name: Install libfaketime
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install libfaketime
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-pr-mutation-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-pr-mutation-
+          ${{ runner.os }}-cargo-mutation-
+          ${{ runner.os }}-cargo-
+
+    - name: Install nextest
+      run: cargo install cargo-nextest --locked --force
+
+    - name: Install cargo-mutants
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-mutants@25.3.1
+
+    - name: Generate diff for changed code
+      run: |
+        set -euo pipefail
+
+        # Generate diff against the base branch
+        echo "🔍 Generating diff against origin/${{ github.base_ref }}"
+        git diff origin/${{ github.base_ref }}.. > git.diff
+
+        # Show diff stats for debugging
+        echo "📊 Diff stats:"
+        git diff --stat origin/${{ github.base_ref }}..
+
+        # Check if diff is empty
+        if [ ! -s git.diff ]; then
+          echo "⚠️ Warning: Diff file is empty. No code changes to test."
+          echo "SKIP_MUTATION_TESTING=true" >> $GITHUB_ENV
+        else
+          echo "✅ Diff file created ($(wc -l < git.diff) lines)"
+          echo "SKIP_MUTATION_TESTING=false" >> $GITHUB_ENV
+        fi
+
+    - name: Run incremental mutation testing
+      if: env.SKIP_MUTATION_TESTING != 'true'
+      run: |
+        set -euo pipefail
+        cd git_perf
+
+        echo "🧬 Running mutation testing on PR changes only"
+        echo "📁 Current directory: $(pwd)"
+
+        # Run cargo-mutants with --in-diff to test only changed code
+        # Exit codes: 0=all mutants caught, 2=missed mutants, 3=timeouts, others=errors
+        # For PR validation, we want to FAIL on missed mutants (strict mode)
+
+        set +e
+        cargo mutants \
+          --test-tool=nextest \
+          --output pr-mutation-report \
+          --no-shuffle \
+          -vV \
+          --in-diff ../git.diff
+        exit_code=$?
+        set -e
+
+        echo "MUTANTS_EXIT_CODE=$exit_code" >> $GITHUB_ENV
+        echo "📊 Mutation testing exit code: $exit_code"
+
+        # Interpret exit codes
+        case $exit_code in
+          0)
+            echo "✅ SUCCESS: All mutants in changed code were caught by tests!"
+            ;;
+          2)
+            echo "❌ FAILURE: Some mutants in changed code were NOT caught by tests"
+            echo "This PR introduces code that is not adequately tested."
+            exit 2
+            ;;
+          3)
+            echo "⚠️ WARNING: Some mutation tests timed out"
+            echo "This may indicate performance issues or tests that take too long."
+            exit 3
+            ;;
+          *)
+            echo "❌ ERROR: Mutation testing failed with exit code $exit_code"
+            exit $exit_code
+            ;;
+        esac
+
+    - name: Generate mutation report summary
+      if: always() && env.SKIP_MUTATION_TESTING != 'true'
+      run: |
+        set -euo pipefail
+        cd git_perf
+
+        exit_code=${MUTANTS_EXIT_CODE:-0}
+
+        # Find the outcomes.json file
+        possible_locations=(
+          "pr-mutation-report/mutants.out/outcomes.json"
+          "mutants.out/outcomes.json"
+          "pr-mutation-report/outcomes.json"
+        )
+
+        report_file=""
+        for location in "${possible_locations[@]}"; do
+          if [ -f "$location" ]; then
+            report_file="$location"
+            echo "✅ Found mutation report at: $location"
+            break
+          fi
+        done
+
+        if [ -z "$report_file" ]; then
+          echo "⚠️ No mutation report found. Creating minimal summary."
+          echo "## 🧬 PR Mutation Testing Results" > pr-mutation-summary.md
+          echo "" >> pr-mutation-summary.md
+          echo "**Status:** ⚠️ No mutation report generated" >> pr-mutation-summary.md
+          echo "**Note:** This may indicate no mutants were generated from the diff." >> pr-mutation-summary.md
+        else
+          # Validate JSON
+          if ! jq empty "$report_file" 2>/dev/null; then
+            echo "❌ ERROR: Invalid JSON in mutation report"
+            exit 1
+          fi
+
+          # Extract metrics
+          total_mutants=$(jq '.total_mutants // 0' "$report_file")
+          caught_mutants=$(jq '.caught // 0' "$report_file")
+          missed_mutants=$(jq '.missed // 0' "$report_file")
+          timeout_mutants=$(jq '.timeout // 0' "$report_file")
+          unviable_mutants=$(jq '.unviable // 0' "$report_file")
+
+          # Generate summary
+          echo "## 🧬 PR Mutation Testing Results" > pr-mutation-summary.md
+          echo "" >> pr-mutation-summary.md
+
+          # Status badge
+          case $exit_code in
+            0) echo "**Status:** ✅ All mutants caught - excellent test coverage!" >> pr-mutation-summary.md ;;
+            2) echo "**Status:** ❌ Missed mutants detected - tests need improvement" >> pr-mutation-summary.md ;;
+            3) echo "**Status:** ⚠️ Some tests timed out" >> pr-mutation-summary.md ;;
+            *) echo "**Status:** ❌ Error (exit code $exit_code)" >> pr-mutation-summary.md ;;
+          esac
+
+          echo "" >> pr-mutation-summary.md
+          echo "### Mutation Testing Metrics (Changed Code Only)" >> pr-mutation-summary.md
+          echo "" >> pr-mutation-summary.md
+          echo "| Metric | Count |" >> pr-mutation-summary.md
+          echo "|--------|-------|" >> pr-mutation-summary.md
+          echo "| Total Mutants | $total_mutants |" >> pr-mutation-summary.md
+          echo "| ✅ Caught | $caught_mutants |" >> pr-mutation-summary.md
+          echo "| ❌ Missed | $missed_mutants |" >> pr-mutation-summary.md
+          echo "| ⏱️ Timeout | $timeout_mutants |" >> pr-mutation-summary.md
+          echo "| 🚫 Unviable | $unviable_mutants |" >> pr-mutation-summary.md
+
+          # Calculate mutation score
+          viable_mutants=$((total_mutants - unviable_mutants))
+          if [ "$viable_mutants" -gt 0 ]; then
+            score=$(echo "scale=1; $caught_mutants * 100 / $viable_mutants" | bc -l)
+            echo "" >> pr-mutation-summary.md
+            echo "**Mutation Score:** ${score}% (${caught_mutants}/${viable_mutants} viable mutants caught)" >> pr-mutation-summary.md
+          fi
+
+          echo "" >> pr-mutation-summary.md
+
+          # Add explanation and next steps
+          if [ "$missed_mutants" -gt 0 ]; then
+            echo "### ⚠️ Action Required" >> pr-mutation-summary.md
+            echo "" >> pr-mutation-summary.md
+            echo "This PR has **$missed_mutants uncaught mutant(s)** in the changed code." >> pr-mutation-summary.md
+            echo "" >> pr-mutation-summary.md
+            echo "**What this means:** The tests do not adequately verify the behavior of the code changes." >> pr-mutation-summary.md
+            echo "" >> pr-mutation-summary.md
+            echo "**Next steps:**" >> pr-mutation-summary.md
+            echo "1. Review the mutation testing artifacts (download below)" >> pr-mutation-summary.md
+            echo "2. Add or improve tests to catch the missed mutants" >> pr-mutation-summary.md
+            echo "3. Run \`cargo mutants --in-diff <diff-file>\` locally to iterate faster" >> pr-mutation-summary.md
+            echo "" >> pr-mutation-summary.md
+          else
+            echo "### ✅ Great Job!" >> pr-mutation-summary.md
+            echo "" >> pr-mutation-summary.md
+            echo "All mutants in your changes were caught by the test suite. Your code is well-tested!" >> pr-mutation-summary.md
+            echo "" >> pr-mutation-summary.md
+          fi
+
+          echo "---" >> pr-mutation-summary.md
+          echo "_Incremental mutation testing only tests code modified in this PR._" >> pr-mutation-summary.md
+          echo "_Full mutation testing runs weekly to catch issues in unchanged code._" >> pr-mutation-summary.md
+        fi
+
+    - name: Add summary to GitHub Actions
+      if: always() && env.SKIP_MUTATION_TESTING != 'true'
+      run: |
+        set -euo pipefail
+        cd git_perf
+        if [ -f pr-mutation-summary.md ]; then
+          cat pr-mutation-summary.md >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Comment on PR with results
+      if: always() && env.SKIP_MUTATION_TESTING != 'true'
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          // Read the summary file
+          const summaryPath = path.join(process.cwd(), 'git_perf', 'pr-mutation-summary.md');
+          let summary = '## 🧬 Mutation Testing Results\n\nNo summary available.';
+
+          if (fs.existsSync(summaryPath)) {
+            summary = fs.readFileSync(summaryPath, 'utf8');
+          }
+
+          // Add link to artifacts
+          summary += `\n\n### 📦 Artifacts\n\n`;
+          summary += `[Download full mutation report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)\n`;
+
+          // Check if we already commented on this PR
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('🧬 Mutation Testing Results')
+          );
+
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: summary
+            });
+            console.log('Updated existing mutation testing comment');
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+            console.log('Created new mutation testing comment');
+          }
+
+    - name: Upload mutation testing artifacts
+      if: always() && env.SKIP_MUTATION_TESTING != 'true'
+      uses: actions/upload-artifact@v6
+      with:
+        name: pr-mutation-report-${{ github.event.pull_request.number }}-${{ github.run_number }}
+        path: |
+          git_perf/pr-mutation-report/
+          git_perf/pr-mutation-summary.md
+          git.diff
+        retention-days: 30
+
+    - name: Skip message
+      if: env.SKIP_MUTATION_TESTING == 'true'
+      run: |
+        echo "⏭️ Skipping mutation testing - no code changes detected in diff"
+        echo "## 🧬 Mutation Testing Skipped" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "No code changes detected in this PR that require mutation testing." >> $GITHUB_STEP_SUMMARY

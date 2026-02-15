@@ -70,8 +70,12 @@ The best way to get started is by asking for help! We're here to support you.
 # Install cargo-nextest (required for running tests)
 cargo install cargo-nextest --locked
 
+# Install cargo-mutants (required for mutation testing on PRs)
+cargo install cargo-mutants --version 25.3.1
+
 # Verify installation
 cargo nextest --version
+cargo mutants --version
 ```
 
 ## Development Workflow
@@ -224,6 +228,51 @@ fn test_measurement_parsing_handles_empty_input() {
     assert!(result.is_err());
 }
 ```
+
+### Mutation Testing (Required for PRs)
+
+**All pull requests must pass mutation testing.** This ensures your tests actually verify the code's behavior.
+
+**What is mutation testing?**
+Mutation testing modifies your code (creates "mutants") and runs your tests against each modification. If your tests still pass with the mutant code, it means your tests aren't actually verifying that behavior.
+
+**Before submitting a PR:**
+
+1. Install cargo-mutants:
+```bash
+cargo install cargo-mutants --version 25.3.1
+```
+
+2. Generate a diff of your changes:
+```bash
+git diff origin/master.. > changes.diff
+```
+
+3. Run mutation testing on your changes:
+```bash
+cd git_perf
+cargo mutants --test-tool=nextest --in-diff ../changes.diff -vV
+```
+
+4. Check the exit code:
+   - **Exit code 0**: ✅ All mutants caught - you're good to submit!
+   - **Exit code 2**: ❌ Some mutants missed - add/improve tests
+   - **Exit code 3**: ⚠️ Tests timed out - optimize slow tests
+
+5. If mutants were missed, review the report and add tests:
+   - Check `mutants.out/missed.txt` to see which mutants weren't caught
+   - Add tests that verify the specific behavior that wasn't tested
+   - Re-run mutation testing until exit code is 0
+
+**Common reasons for missed mutants:**
+- Not testing boundary conditions (`>` vs `>=`)
+- Not testing error paths
+- Not testing all branches of boolean logic
+- Not asserting on specific return values
+- Not testing edge cases (empty inputs, None values, etc.)
+
+**Why this matters:**
+High code coverage doesn't guarantee good tests - it only means your tests execute the code, not that they verify its behavior. Mutation testing ensures your tests actually check what the code does.
 
 ## Submitting Changes
 
