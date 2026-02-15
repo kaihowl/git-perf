@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.3.0...git_perf_cli_types-v0.4.0) - 2026-02-15
+
+### Added
+
+- *(cli)* add status and reset commands ([#589](https://github.com/kaihowl/git-perf/pull/589))
+- *(audit)* show aggregation method in audit output ([#618](https://github.com/kaihowl/git-perf/pull/618))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group with 2 updates ([#628](https://github.com/kaihowl/git-perf/pull/628))
+
 ## [0.3.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.2.1...git_perf_cli_types-v0.3.0) - 2025-12-30
 
 ### Added
