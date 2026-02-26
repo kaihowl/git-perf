@@ -26,7 +26,7 @@ jobs:
     env:
       # Emit backtraces on panics (matching main CI)
       RUST_BACKTRACE: 1
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     # No timeout - let cargo-mutants manage its own timing
 
     steps:
@@ -36,10 +36,8 @@ jobs:
         fetch-depth: 40
 
     - name: Set up Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        override: true
         components: rustfmt, clippy
 
     - name: Install libfaketime
