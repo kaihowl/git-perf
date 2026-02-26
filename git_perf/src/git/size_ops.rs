@@ -180,6 +180,8 @@ fn accumulate_measurement_sizes(
     // (Each measurement contributes roughly equally to the note size)
     let size_per_measurement = note_size / measurements.len() as u64;
 
+    let size_per_measurement2 = note_size / measurements.len() as u64;
+
     for measurement in measurements {
         let entry = by_name
             .entry(measurement.name.clone())
@@ -188,7 +190,7 @@ fn accumulate_measurement_sizes(
                 count: 0,
             });
 
-        entry.total_bytes += size_per_measurement;
+        entry.total_bytes += size_per_measurement + size_per_measurement2 - size_per_measurement2;
         entry.count += 1;
     }
 
