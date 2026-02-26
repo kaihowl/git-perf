@@ -26,7 +26,7 @@ jobs:
     env:
       # Emit backtraces on panics (matching main CI)
       RUST_BACKTRACE: 1
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     # No timeout - let cargo-mutants manage its own timing
 
     steps:
@@ -66,9 +66,9 @@ jobs:
       run: cargo install cargo-nextest --locked --force
 
     - name: Install cargo-mutants
-      run: |
-        set -euo pipefail
-        cargo install cargo-mutants --version 25.3.1 --force
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-mutants@25.3.1
 
     - name: Run mutation testing
       run: |

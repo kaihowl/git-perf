@@ -33,11 +33,17 @@ Closes #
 
 - [ ] All tests pass: `cargo nextest run -- --skip slow`
 - [ ] Added new tests for changes
+- [ ] **Mutation testing passed**: `cargo mutants --test-tool=nextest --in-diff <diff-file>` (exit code 0)
 - [ ] Manual testing performed
 
 **Test results:**
 ```bash
 # Output of test command
+```
+
+**Mutation testing results:**
+```bash
+# Output of: git diff origin/master.. > changes.diff && cd git_perf && cargo mutants --test-tool=nextest --in-diff ../changes.diff
 ```
 
 ## Documentation
@@ -52,6 +58,7 @@ Closes #
 - [ ] Code formatted with `cargo fmt`
 - [ ] Linting passes: `cargo clippy`
 - [ ] All tests pass: `cargo nextest run -- --skip slow`
+- [ ] **Mutation testing passes**: No uncaught mutants in changed code (required - CI will fail otherwise)
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] PR title follows Conventional Commits format: `type(scope): description`
 - [ ] Branch is up to date with base branch
