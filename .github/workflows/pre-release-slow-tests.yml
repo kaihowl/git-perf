@@ -27,7 +27,7 @@ on:
 jobs:
   pre-release-slow-tests:
     name: Pre-Release Slow Tests (Scale Factor ${{ inputs.scale_factor || '4' }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 720  # 12 hours maximum runtime
 
     env:

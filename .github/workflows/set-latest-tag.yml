@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   set-latest-tag:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     # Only run for git-perf releases
     if: ${{ startsWith(github.event.release.tag_name, 'git-perf-') }}
     steps:

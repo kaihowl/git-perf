@@ -32,10 +32,10 @@ jobs:
         - beta
         include:
         - build: stable
-          os: ubuntu-22.04
+          os: ubuntu-latest
           rust: stable
         - build: beta
-          os: ubuntu-22.04
+          os: ubuntu-latest
           rust: beta
     steps:
     - name: Checkout repository
@@ -182,7 +182,7 @@ jobs:
 
   rustfmt:
     name: rustfmt
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -196,7 +196,7 @@ jobs:
 
   clippy:
     name: clippy
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -210,7 +210,7 @@ jobs:
 
   rustdoc:
     name: rust doc
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -226,7 +226,7 @@ jobs:
 
   documentation-check:
     name: Check documentation is up to date
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -251,7 +251,7 @@ jobs:
 
   report:
     name: git-perf
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     if: always()
     needs: [test, rustfmt, clippy, rustdoc, documentation-check, release-binary-size]
     concurrency:
@@ -276,7 +276,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-22.04" -s rust="stable"'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size -s os="ubuntu-latest" -s rust="stable"'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
@@ -287,7 +287,7 @@ jobs:
 
   release-binary-size:
     name: release-binary-size
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -319,12 +319,12 @@ jobs:
         BYTES=$(stat -c%s "$BIN")
         mkdir -p metrics
         echo "$BYTES" > metrics/release_binary_size.txt
-        ./target/release/git-perf add -m release-binary-size -k os=ubuntu-22.04 -k rust=stable "$BYTES"
+        ./target/release/git-perf add -m release-binary-size -k os=ubuntu-latest -k rust=stable "$BYTES"
         ./target/release/git-perf push
 
     - name: Audit release binary size
       run: |
-        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable
+        ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-latest -s rust=stable
 
     - name: Upload size artifact
       uses: actions/upload-artifact@v6

@@ -177,7 +177,7 @@ permissions:
 
 jobs:
   report:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     concurrency:
       group: gh-pages-${{ github.ref }}
       cancel-in-progress: false
@@ -296,7 +296,7 @@ concurrency:
 
 jobs:
   report:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
@@ -328,7 +328,7 @@ concurrency:
 
 jobs:
   deploy-docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5

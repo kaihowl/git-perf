@@ -21,7 +21,7 @@ on:
 jobs:
   slow-test-loop:
     name: Slow Test Loop (until failure)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 120  # 2 hours maximum runtime
     
     env:
