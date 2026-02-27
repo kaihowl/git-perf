@@ -1,15 +1,7 @@
 name: Cross-Runner Variance Experiment
 
 on:
-  push:
-    branches:
-      - 02-27-ci_fake_change_test
   workflow_dispatch:
-    inputs:
-      batch_size:
-        description: 'Number of parallel instances per OS'
-        required: false
-        default: '10'
 
 jobs:
   measure:
