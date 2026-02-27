@@ -34,6 +34,11 @@ dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 10
+# MAD converges to ~228µs as measurements stabilize, making the ±3.5σ threshold
+# only ±800µs — too tight for CI runner variability. Even when the z-score
+# exceeds 3.5σ, the failure is suppressed if the actual head deviation is
+# below 10% of the tail median.
+min_relative_deviation = 10.0
 
 [measurement."report-size-benchmark"]
 epoch = "0e26dd2"
