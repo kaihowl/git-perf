@@ -1,0 +1,113 @@
+name: Cross-Runner Variance Experiment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  measure:
+    name: measure (${{ matrix.os }}, instance ${{ matrix.instance }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest]
+        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            variance-experiment/target
+          key: ${{ runner.os }}-variance-${{ hashFiles('variance-experiment/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-variance-
+
+      - name: Build benchmark binary
+        working-directory: variance-experiment
+        run: cargo build --release
+
+      - name: Capture runner metadata
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            CPU_MODEL=$(grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs | tr ',' '_')
+            CPU_COUNT=$(nproc)
+          else
+            CPU_MODEL=$(sysctl -n machdep.cpu.brand_string | tr ',' '_')
+            CPU_COUNT=$(sysctl -n hw.logicalcpu)
+          fi
+          echo "cpu_model=${CPU_MODEL}" >> "$GITHUB_OUTPUT"
+          echo "cpu_count=${CPU_COUNT}" >> "$GITHUB_OUTPUT"
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          BINARY="variance-experiment/target/release/variance-experiment"
+          RUNNER_ID="${{ runner.name }}"
+          CPU_MODEL="${{ steps.meta.outputs.cpu_model }}"
+          CPU_COUNT="${{ steps.meta.outputs.cpu_count }}"
+          OS="${{ matrix.os }}"
+          RUN_NUMBER="${{ github.run_number }}"
+          INSTANCE="${{ matrix.instance }}"
+          REPS=30
+
+          OUTPUT_FILE="results_${OS}_${INSTANCE}_${RUN_NUMBER}.csv"
+
+          echo "runner_id,cpu_model,cpu_count,os,run_number,instance,workload,rep_index,duration_ns" > "$OUTPUT_FILE"
+
+          for WORKLOAD in sha256 sort matrix noop; do
+            "$BINARY" --workload "$WORKLOAD" --reps "$REPS" | while IFS= read -r line; do
+              echo "${RUNNER_ID},${CPU_MODEL},${CPU_COUNT},${OS},${RUN_NUMBER},${INSTANCE},${line}"
+            done >> "$OUTPUT_FILE"
+          done
+
+      - name: Upload CSV artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.os }}-${{ matrix.instance }}-${{ github.run_number }}
+          path: results_*.csv
+          retention-days: 30
+
+  analyze:
+    name: Analyze results
+    runs-on: ubuntu-22.04
+    needs: measure
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all CSV artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          merge-multiple: true
+          path: all-results/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install pandas matplotlib scipy
+
+      - name: Run analysis
+        run: python scripts/analyze-variance.py all-results/ analysis-output/
+
+      - name: Upload analysis artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-${{ github.run_number }}
+          path: analysis-output/
+          retention-days: 90
