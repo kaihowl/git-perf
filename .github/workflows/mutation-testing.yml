@@ -6,10 +6,6 @@ on:
     - cron: '0 3 * * 0'
   # Allow manual triggering
   workflow_dispatch:
-  # Run on PRs that modify this workflow file
-  pull_request:
-    paths:
-      - '.github/workflows/mutation-testing.yml'
 
 concurrency:
   group: weekly-mutation-testing
@@ -75,15 +71,7 @@ jobs:
         set -euo pipefail
         cd git_perf
 
-        # On PRs, run a quick smoke test (test just one file to verify workflow works)
-        # On schedule, run full mutation testing
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          echo "🔍 Running quick mutation test for PR validation (smoke test, test only 5% of all mutants and limit to single file)"
-          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 20 --shuffle --shard 1/20 --file src/config.rs"
-        else
-          echo "🔍 Running full mutation testing (scheduled run, random shuffle, random sample 20% of mutants)"
-          mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 60 --shuffle --shard 1/5"
-        fi
+        mutants_args="--test-tool=nextest --output mutation-report --jobs 2 --timeout 60 --shuffle --shard 1/5"
 
         # Run full mutation testing with nextest (no sharding - weekly comprehensive testing)
         # Exit codes: 0=success, 1=usage error, 2=missed mutants, 3=timeouts, 4=baseline fail, 5-6=diff issues, 70=internal error
