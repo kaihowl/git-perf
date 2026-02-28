@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "pandas",
+#     "matplotlib",
+#     "scipy",
+# ]
+# ///
 """
 Analyze cross-runner variance experiment results.
 
 Usage:
-    python scripts/analyze-variance.py <input_dir> <output_dir>
+    uv run scripts/analyze-variance.py <input_dir> <output_dir>
 
 Input:  directory containing CSV files with columns:
         runner_id,cpu_model,cpu_count,os,run_number,instance,workload,rep_index,duration_ns
@@ -127,9 +135,21 @@ def between_runner_cov(agg_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def format_duration(ms: float) -> str:
+    """Format milliseconds with appropriate unit (s/ms/µs/ns)."""
+    if ms >= 1000:
+        return f"{ms / 1000:.2f}s"
+    if ms >= 1:
+        return f"{ms:.2f}ms"
+    if ms >= 0.001:
+        return f"{ms * 1000:.2f}µs"
+    return f"{ms * 1e6:.2f}ns"
+
+
 def compute_mde(between_df: pd.DataFrame) -> pd.DataFrame:
     """
     MDE% = sigma * dispersion / center * 100
+    MDE_abs = sigma * dispersion (in ms)
     """
     rows = []
     for _, row in between_df.iterrows():
@@ -142,6 +162,7 @@ def compute_mde(between_df: pd.DataFrame) -> pd.DataFrame:
                 continue
             for sigma in SIGMAS:
                 mde_pct = sigma * disp / center * 100.0
+                mde_abs_ms = sigma * disp
                 rows.append({
                     "os": row["os"],
                     "workload": row["workload"],
@@ -149,6 +170,8 @@ def compute_mde(between_df: pd.DataFrame) -> pd.DataFrame:
                     "disp_method": disp_method,
                     "sigma": sigma,
                     "mde_pct": mde_pct,
+                    "mde_abs_ms": mde_abs_ms,
+                    "center_ms": center,
                     "inter_cov_pct": row["inter_cov_pct"],
                 })
     return pd.DataFrame(rows)
@@ -202,8 +225,9 @@ def plot_mde_heatmap(mde_df: pd.DataFrame, output_dir: str) -> None:
         subset = subset.copy()
         subset["config"] = subset["agg_method"] + "/" + subset["disp_method"]
         pivot = subset.pivot_table(index="workload", columns="config", values="mde_pct")
+        pivot_abs = subset.pivot_table(index="workload", columns="config", values="mde_abs_ms")
 
-        fig, ax = plt.subplots(figsize=(max(8, len(pivot.columns) * 1.5), 4))
+        fig, ax = plt.subplots(figsize=(max(10, len(pivot.columns) * 1.8), 4))
         im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlGn_r", vmin=0, vmax=100)
         ax.set_xticks(range(len(pivot.columns)))
         ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
@@ -212,10 +236,12 @@ def plot_mde_heatmap(mde_df: pd.DataFrame, output_dir: str) -> None:
         for r in range(len(pivot.index)):
             for c in range(len(pivot.columns)):
                 val = pivot.values[r, c]
+                abs_val = pivot_abs.values[r, c]
                 if not math.isnan(val):
-                    ax.text(c, r, f"{val:.1f}%", ha="center", va="center", fontsize=8)
+                    label = f"{val:.1f}%\n({format_duration(abs_val)})"
+                    ax.text(c, r, label, ha="center", va="center", fontsize=7)
         plt.colorbar(im, ax=ax, label="MDE %")
-        ax.set_title(f"MDE% at sigma=3.5 — {os_name}")
+        ax.set_title(f"MDE% and absolute at sigma=3.5 — {os_name}")
         ax.set_xlabel("agg_method / disp_method")
         ax.set_ylabel("Workload")
         fig.tight_layout()
@@ -234,7 +260,8 @@ def plot_box_plots(agg_df: pd.DataFrame, output_dir: str) -> None:
         if len(workloads_present) == 1:
             axes = [axes]
         for ax, wl in zip(axes, workloads_present):
-            data_by_agg = [subset[subset["agg_method"] == a]["value_ms"].dropna().values
+            wl_subset = subset[subset["workload"] == wl]
+            data_by_agg = [wl_subset[wl_subset["agg_method"] == a]["value_ms"].dropna().values
                            for a in AGGREGATION_METHODS]
             ax.boxplot(data_by_agg, labels=AGGREGATION_METHODS, showfliers=True)
             ax.set_title(wl)

@@ -71,6 +71,14 @@ Resources for contributors and developers:
   - Release flow diagram
   - Environment setup
 
+## Research & Analysis
+
+- **[CI Runner Variance Experiment](./ci-variance-experiment/README.md)** - Quantified inter-runner noise on GitHub Actions
+  - 100 runner instances across Ubuntu and macOS
+  - Aggregation and dispersion method comparison
+  - Minimum detectable effect (MDE) analysis
+  - Recommended configuration for CI environments
+
 ## Additional Resources
 
 - **[Evaluation Tools](../evaluation/INDEX.md)** - Statistical method comparison tools
@@ -102,6 +110,9 @@ docs/
 ├── importing-measurements.md              # Test and benchmark import guide
 ├── manpage.md                             # CLI reference (auto-generated)
 ├── example_config.toml                    # Configuration template
+├── ci-variance-experiment/                # Runner variance analysis
+│   ├── README.md                          # Full results and methodology
+│   └── *.png                              # Analysis plots
 └── plans/                                 # Feature design documents (internal)
 ```
 
