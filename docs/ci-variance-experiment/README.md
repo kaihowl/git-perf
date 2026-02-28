@@ -38,16 +38,16 @@ The `noop` workload exists to measure pure timing overhead and is expected to be
 
 | OS | Workload | Best CoV (%) | Best Aggregation | Verdict |
 |---|---|---|---|---|
-| macOS | sha256 | 7.04% | min | GREEN (<10%) |
-| macOS | sort | 3.65% | min | GREEN |
-| macOS | matrix | 3.58% | min | GREEN |
-| macOS | noop | 25.47% | mean | RED (>20%) |
-| Ubuntu | sha256 | 7.23% | min | GREEN |
-| Ubuntu | sort | 3.83% | min | GREEN |
-| Ubuntu | matrix | 14.43% | max | YELLOW (10-20%) |
-| Ubuntu | noop | 9.71% | max | GREEN |
+| macOS | sha256 | 7.04% | min | 🟢 (<10%) |
+| macOS | sort | 3.65% | min | 🟢 |
+| macOS | matrix | 3.58% | min | 🟢 |
+| macOS | noop | 25.47% | mean | 🔴 (>20%) |
+| Ubuntu | sha256 | 7.23% | min | 🟢 |
+| Ubuntu | sort | 3.83% | min | 🟢 |
+| Ubuntu | matrix | 14.43% | max | 🟡 (10-20%) |
+| Ubuntu | noop | 9.71% | max | 🟢 |
 
-**Thresholds**: GREEN < 10%, YELLOW 10-20%, RED > 20%.
+**Thresholds**: 🟢 < 10%, 🟡 10-20%, 🔴 > 20%.
 
 ### Inter-Runner CoV by Aggregation Method
 
@@ -86,7 +86,7 @@ This measures how much a single runner's 30 reps vary (the intra-machine noise).
 
 ### MDE Heatmaps (sigma=3.5)
 
-The Minimum Detectable Effect is computed as `sigma * dispersion / center * 100%`. Lower is better -- it means git-perf can detect smaller regressions.
+The Minimum Detectable Effect is computed as `sigma * dispersion / center * 100%` (percentage) and `sigma * dispersion` (absolute). Lower is better -- it means git-perf can detect smaller regressions. Each cell shows the percentage MDE and the absolute value in parentheses.
 
 **Ubuntu:**
 
@@ -159,9 +159,11 @@ All macOS runners report "Apple M1 (Virtual)" with 3 vCPUs. Despite hardware hom
 
 ### 5. More reps help on macOS, plateau quickly on Ubuntu
 
+"Repetitions" here means the number of times a benchmark is run **within a single CI job** (intra-runner). More repetitions give the `min` aggregation more chances to capture a clean, uncontested run, reducing within-runner noise. This is distinct from `min_measurements` (see below), which controls how many historical data points (across past commits and runners) git-perf requires before computing dispersion statistics.
+
 On macOS, inter-runner CoV (with `min`) drops from ~12% at 1 rep to ~7% at 30 reps. The curve flattens around 15-20 reps. On Ubuntu, CoV is already near its floor at 5 reps.
 
-**Recommendation**: Use at least 15 repetitions for macOS runners, 5-10 for Ubuntu.
+**Recommendation**: Run each benchmark at least 15 times per CI job for macOS runners, 5-10 times for Ubuntu.
 
 ### 6. Sub-millisecond workloads are useless
 
@@ -179,16 +181,21 @@ sigma = 3.5
 min_measurements = 10
 ```
 
+Two distinct sources of variance are controlled separately:
+
+- **Per-job repetitions** (intra-runner): how many times each benchmark runs within a single CI job. More repetitions give `min` aggregation more chances to capture a clean run. Configure this in your benchmark harness or git-perf measurement collection, not in `.gitperfconfig`. Target 15+ reps for macOS, 5-10 for Ubuntu.
+- **`min_measurements`** (inter-runner): the minimum number of historical measurements across past commits that git-perf requires before it will compute dispersion statistics and flag regressions. This guards against false positives when the history is too short to establish a reliable baseline. It does **not** affect within-job repetitions.
+
 With this configuration and the observed noise levels:
 
-| OS | Workload Type | Expected MDE |
-|---|---|---|
-| Ubuntu | CPU-bound (~1s) | ~0.1% (excellent) |
-| Ubuntu | Memory-bound (~16ms) | ~0.3-1% (excellent) |
-| macOS | CPU-bound (~1s) | ~10% (moderate) |
-| macOS | Memory-bound (~16ms) | ~11-13% (moderate) |
+| OS | Workload Type | Expected MDE (%) | Expected MDE (absolute) |
+|---|---|---|---|
+| Ubuntu | CPU-bound (~1s) | ~0.1% (excellent) | ~1ms |
+| Ubuntu | Memory-bound (~16ms) | ~0.3-1% (excellent) | ~0.05-0.16ms |
+| macOS | CPU-bound (~1s) | ~10% (moderate) | ~100ms |
+| macOS | Memory-bound (~16ms) | ~11-13% (moderate) | ~1.8-2.1ms |
 
-**Translation**: On Ubuntu runners, git-perf can reliably detect regressions as small as 1%. On macOS runners, expect to detect regressions of ~10% or larger.
+**Translation**: On Ubuntu runners, git-perf can reliably detect regressions as small as 1% (~1ms for a 1s benchmark). On macOS runners, expect to detect regressions of ~10% or larger (~100ms for a 1s benchmark, ~2ms for a 16ms benchmark).
 
 ## Reproducing the Experiment
 
