@@ -196,6 +196,28 @@ git perf audit v2.0.0 -m critical_test
 
 See the [Non-HEAD Measurements Guide](./docs/non-head-measurements.md) for detailed examples and best practices.
 
+## How Reliably Can git-perf Detect Regressions in CI?
+
+When git-perf audits in CI, each commit runs on a **different machine** from the shared runner pool. The question is: how much do results vary across machines, and what size regression can git-perf actually catch?
+
+We ran an [experiment across 100 GitHub Actions runners](./docs/ci-variance-experiment/README.md) to find out. The short answer:
+
+- **Ubuntu runners**: git-perf can reliably catch regressions of **~1% or larger** for CPU-bound benchmarks.
+- **macOS runners**: expect to catch regressions of **~10% or larger** due to higher machine-to-machine variability.
+- **Taking the minimum** of several repetitions (rather than the mean or median) significantly reduces noise from OS scheduling and noisy neighbours.
+- **Using MAD** as the dispersion method is much more robust than standard deviation when occasional outlier machines appear in the pool.
+
+Recommended `.gitperfconfig` for CI:
+```toml
+[measurement]
+aggregate_by = "min"
+dispersion_method = "mad"
+sigma = 3.5
+min_measurements = 10
+```
+
+See the [full experiment results](./docs/ci-variance-experiment/README.md) for methodology, plots, and reproduction instructions.
+
 ## ⚠️ Important Notes
 
 - **Experimental Status**: This tool is experimental and under active development

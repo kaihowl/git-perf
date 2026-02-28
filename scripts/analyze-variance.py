@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "pandas",
+#     "matplotlib",
+#     "scipy",
+# ]
+# ///
 """
 Analyze cross-runner variance experiment results.
 
 Usage:
-    python scripts/analyze-variance.py <input_dir> <output_dir>
+    uv run scripts/analyze-variance.py <input_dir> <output_dir>
 
 Input:  directory containing CSV files with columns:
         runner_id,cpu_model,cpu_count,os,run_number,instance,workload,rep_index,duration_ns
