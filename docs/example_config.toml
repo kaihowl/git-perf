@@ -18,6 +18,14 @@
         # where tail_median is the median of historical measurements (excluding HEAD)
         min_relative_deviation = 5.0
 
+        # Minimum absolute deviation threshold (in measurement units)
+        # Measurements with absolute deviation below this threshold will be ignored
+        # even if they exceed the sigma threshold
+        # Useful when measurements are near zero (where relative deviation is meaningless)
+        # or when there is a known acceptable absolute tolerance
+        # The absolute deviation is calculated as: |head_value - tail_median|
+        min_absolute_deviation = 0.5
+
         # Statistical dispersion method for outlier detection
         # Options: "stddev" (standard deviation) or "mad" (median absolute deviation)
         # MAD is more robust to outliers, stddev is more sensitive
@@ -47,13 +55,14 @@
         # If set, this unit will be displayed in reports, audit output, and CSV exports
         # for all measurements that don't have a specific unit configured
         # Common units: "ms", "seconds", "bytes", "MB", "requests/sec", etc.
-        # unit = "ms"
+        unit = "ms"
 
 # Measurement-specific settings (override parent defaults)
 [measurement."build_time"]
 # Build time measurements can have higher variance, so use a higher threshold
 # Use MAD for build times as they can have occasional outliers from system load
 min_relative_deviation = 10.0
+min_absolute_deviation = 50.0  # e.g., ignore changes below 50ms
 dispersion_method = "mad"
 epoch = "12345678"
 unit = "ms"  # Display build time in milliseconds

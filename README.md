@@ -621,13 +621,19 @@ Tail: μ: 101.7 σ: 45.8 MAD: 2.5 n: 3
 
 ### 5. Threshold Notes (Optional)
 
-When configured with `min_relative_deviation`, you may see:
+When configured with `min_relative_deviation` or `min_absolute_deviation`, you may see:
 
 ```
 Note: Passed due to relative deviation (3.2%) being below threshold (5.0%)
+Note: Passed due to absolute deviation (0.4) being below threshold (1.0)
 ```
 
 This indicates the audit passed because the performance change was below the configured threshold, even though it may have been statistically significant. This prevents false alarms from minor fluctuations.
+
+- **`min_relative_deviation`**: Threshold as a percentage of the tail median. Useful for measurements where relative change is meaningful.
+- **`min_absolute_deviation`**: Threshold in raw measurement units (`|head - tail_median|`). Useful when measurements are near zero (where relative deviation becomes meaningless) or when there is a known absolute tolerance.
+
+Both can be configured simultaneously — if either threshold passes, the audit passes.
 
 ### 6. Skipped Audits
 
@@ -760,6 +766,11 @@ If audits detect regressions for normal variations, try these solutions:
    ```toml
    [measurement."build_time"]
    min_relative_deviation = 10.0  # Percentage change required
+   ```
+   Or use an **absolute deviation threshold** for near-zero measurements:
+   ```toml
+   [measurement."build_time"]
+   min_absolute_deviation = 50.0  # Raw unit change required (e.g., 50ms)
    ```
 
 2. **Switch to MAD for more robust detection**:

@@ -1,6 +1,6 @@
 use crate::config::{
-    audit_aggregate_by, audit_dispersion_method, audit_min_measurements,
-    audit_min_relative_deviation, audit_sigma, backoff_max_elapsed_seconds,
+    audit_aggregate_by, audit_dispersion_method, audit_min_absolute_deviation,
+    audit_min_measurements, audit_min_relative_deviation, audit_sigma, backoff_max_elapsed_seconds,
     determine_epoch_from_config, measurement_unit, read_hierarchical_config,
 };
 use crate::git::git_interop::get_repository_root;
@@ -73,6 +73,10 @@ pub struct MeasurementConfig {
     /// Minimum relative deviation threshold (%)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_relative_deviation: Option<f64>,
+
+    /// Minimum absolute deviation threshold (raw units)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_absolute_deviation: Option<f64>,
 
     /// Dispersion method (stddev or mad)
     pub dispersion_method: String,
@@ -291,6 +295,7 @@ fn gather_single_measurement_config(name: &str, config: &Config) -> MeasurementC
         name: name.to_string(),
         epoch: determine_epoch_from_config(name).map(|e| format!("{:08x}", e)),
         min_relative_deviation: audit_min_relative_deviation(name),
+        min_absolute_deviation: audit_min_absolute_deviation(name),
         dispersion_method: format!("{:?}", audit_dispersion_method(name)).to_lowercase(),
         min_measurements: audit_min_measurements(name),
         aggregate_by: audit_aggregate_by(name).map(|f| format!("{:?}", f).to_lowercase()),
@@ -328,6 +333,16 @@ fn validate_config(measurements: &HashMap<String, MeasurementConfig>) -> Result<
             if deviation < 0.0 {
                 issues.push(format!(
                     "Measurement '{}': Invalid min_relative_deviation {} (must be non-negative)",
+                    name, deviation
+                ));
+            }
+        }
+
+        // Check for invalid min_absolute_deviation
+        if let Some(deviation) = config.min_absolute_deviation {
+            if deviation < 0.0 {
+                issues.push(format!(
+                    "Measurement '{}': Invalid min_absolute_deviation {} (must be non-negative)",
                     name, deviation
                 ));
             }
@@ -427,6 +442,10 @@ fn display_measurement_human(measurement: &MeasurementConfig, detailed: bool) {
         println!(
             "    min_relative_deviation: {:?}",
             measurement.min_relative_deviation
+        );
+        println!(
+            "    min_absolute_deviation: {:?}",
+            measurement.min_absolute_deviation
         );
         println!(
             "    dispersion_method:      {}",
@@ -660,6 +679,7 @@ dispersion_method = "stddev"
                 name: "build_time".to_string(),
                 epoch: Some("12345678".to_string()),
                 min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
                 dispersion_method: "stddev".to_string(),
                 min_measurements: Some(10),
                 aggregate_by: Some("mean".to_string()),
@@ -682,6 +702,7 @@ dispersion_method = "stddev"
                 name: "build_time".to_string(),
                 epoch: None,
                 min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
                 dispersion_method: "stddev".to_string(),
                 min_measurements: Some(10),
                 aggregate_by: Some("mean".to_string()),
@@ -705,6 +726,7 @@ dispersion_method = "stddev"
                 name: "build_time".to_string(),
                 epoch: Some("12345678".to_string()),
                 min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
                 dispersion_method: "stddev".to_string(),
                 min_measurements: Some(10),
                 aggregate_by: Some("mean".to_string()),
@@ -728,6 +750,7 @@ dispersion_method = "stddev"
                 name: "build_time".to_string(),
                 epoch: Some("12345678".to_string()),
                 min_relative_deviation: Some(-5.0),
+                min_absolute_deviation: None,
                 dispersion_method: "stddev".to_string(),
                 min_measurements: Some(10),
                 aggregate_by: Some("mean".to_string()),
@@ -751,6 +774,7 @@ dispersion_method = "stddev"
                 name: "build_time".to_string(),
                 epoch: Some("12345678".to_string()),
                 min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
                 dispersion_method: "stddev".to_string(),
                 min_measurements: Some(1),
                 aggregate_by: Some("mean".to_string()),
@@ -766,6 +790,58 @@ dispersion_method = "stddev"
     }
 
     #[test]
+    fn test_validate_config_invalid_min_absolute_deviation() {
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                min_absolute_deviation: Some(-1.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
+
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("Invalid min_absolute_deviation"));
+    }
+
+    #[test]
+    fn test_validate_config_min_absolute_deviation_zero_is_valid() {
+        // 0.0 is non-negative, so it should be allowed (catches < vs <= mutation)
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                min_absolute_deviation: Some(0.0),
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                from_parent_fallback: false,
+            },
+        );
+
+        let issues = validate_config(&measurements).unwrap();
+        assert!(
+            issues.is_empty(),
+            "min_absolute_deviation = 0.0 should be valid (non-negative). Got issues: {:?}",
+            issues
+        );
+    }
+
+    #[test]
     fn test_validate_config_multiple_issues() {
         let mut measurements = HashMap::new();
         measurements.insert(
@@ -774,6 +850,7 @@ dispersion_method = "stddev"
                 name: "build_time".to_string(),
                 epoch: None,
                 min_relative_deviation: Some(-5.0),
+                min_absolute_deviation: None,
                 dispersion_method: "stddev".to_string(),
                 min_measurements: Some(1),
                 aggregate_by: Some("mean".to_string()),
@@ -853,6 +930,7 @@ epoch = 0x87654321
             name: "build_time".to_string(),
             epoch: Some("12345678".to_string()),
             min_relative_deviation: Some(5.0),
+            min_absolute_deviation: None,
             dispersion_method: "stddev".to_string(),
             min_measurements: Some(10),
             aggregate_by: Some("mean".to_string()),
@@ -871,6 +949,7 @@ epoch = 0x87654321
             name: "build_time".to_string(),
             epoch: Some("12345678".to_string()),
             min_relative_deviation: Some(5.0),
+            min_absolute_deviation: None,
             dispersion_method: "stddev".to_string(),
             min_measurements: Some(10),
             aggregate_by: Some("mean".to_string()),
