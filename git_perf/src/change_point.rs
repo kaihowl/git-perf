@@ -30,6 +30,7 @@
 use std::cmp::Ordering;
 
 use average::Mean;
+use serde::{Deserialize, Serialize};
 
 use crate::stats::aggregate_measurements;
 
@@ -69,13 +70,16 @@ pub struct EpochTransition {
 }
 
 /// Configuration for change point detection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangePointConfig {
+    /// Whether change point detection is enabled
+    pub enabled: bool,
     /// Minimum number of data points required for detection
     pub min_data_points: usize,
     /// Minimum percentage change to consider significant
     pub min_magnitude_pct: f64,
-    /// Minimum confidence threshold for reporting
+    /// Minimum confidence threshold for reporting (not user-configurable)
+    #[serde(skip)]
     pub confidence_threshold: f64,
     /// Penalty factor for adding change points (BIC-based)
     pub penalty: f64,
@@ -84,6 +88,7 @@ pub struct ChangePointConfig {
 impl Default for ChangePointConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             min_data_points: 10,
             min_magnitude_pct: 5.0,
             confidence_threshold: 0.75,
@@ -563,6 +568,7 @@ mod tests {
         let epochs = vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2];
 
         let config = ChangePointConfig {
+            enabled: true,
             min_data_points: 5,
             min_magnitude_pct: 10.0,
             confidence_threshold: 0.5,
@@ -596,6 +602,7 @@ mod tests {
         let measurements: Vec<f64> = (0..20).map(|i| 10.0 + (i as f64 * 0.1)).collect();
 
         let config = ChangePointConfig {
+            enabled: true,
             min_data_points: 10,
             min_magnitude_pct: 20.0,
             confidence_threshold: 0.8,
@@ -670,6 +677,7 @@ mod tests {
         }
 
         let config = ChangePointConfig {
+            enabled: true,
             min_data_points: 10,
             min_magnitude_pct: 5.0,
             confidence_threshold: 0.7,

@@ -65,6 +65,44 @@ assert_contains "$output" "no performance measurements" "No warning for missing 
 assert_failure_with_output output git perf report -s does-not-exist
 assert_contains "$output" "invalid separator" "No warning for invalid separator 'does-not-exist'"
 
+test_section "Report command tests - change point detection enabled"
+cd_empty_repo
+# Add enough commits with a clear regime change to trigger detection (need >= min_data_points)
+for i in $(seq 1 10); do
+  create_commit
+  git perf add -m perf_metric 10
+done
+for i in $(seq 1 10); do
+  create_commit
+  git perf add -m perf_metric 20
+done
+cat > .gitperfconfig << 'EOF'
+[change_point]
+min_data_points = 5
+EOF
+git perf report --show-changes -o cp_enabled.html
+assert_file_exists "cp_enabled.html"
+assert_contains "$(cat cp_enabled.html)" "change_points" "Expected change_points trace in HTML when enabled"
+
+test_section "Report command tests - change point detection disabled"
+cd_empty_repo
+for i in $(seq 1 10); do
+  create_commit
+  git perf add -m perf_metric 10
+done
+for i in $(seq 1 10); do
+  create_commit
+  git perf add -m perf_metric 20
+done
+cat > .gitperfconfig << 'EOF'
+[change_point]
+enabled = false
+min_data_points = 5
+EOF
+git perf report --show-changes -o cp_disabled.html
+assert_file_exists "cp_disabled.html"
+assert_not_contains "$(cat cp_disabled.html)" "change_points" "Expected no change_points trace in HTML when disabled"
+
 test_stats
 exit 0
 

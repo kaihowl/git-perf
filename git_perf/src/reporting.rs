@@ -1433,6 +1433,9 @@ fn add_change_point_traces(
     prepared: &PreparedDetectionData,
 ) {
     let config = crate::config::change_point_config(params.measurement_name);
+    if !config.enabled {
+        return;
+    }
     let raw_cps = crate::change_point::detect_change_points(&prepared.values, &config);
     log::debug!(
         "Raw change points for {}: {:?}",
