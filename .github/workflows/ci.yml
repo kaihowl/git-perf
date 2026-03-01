@@ -145,8 +145,8 @@ jobs:
           # Return to main repo for measurements
           cd "$GITHUB_WORKSPACE"
 
-          # Measure add performance: 20 sequential adds on pre-populated repo (increased for stability)
-          git perf measure -n 20 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf add -m inner-test-metric 123
+          # Measure add performance: 50 sequential adds on pre-populated repo (increased for stability)
+          git perf measure -n 50 -m add-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf add -m inner-test-metric 123
 
           # Measure report generation performance on fixed dataset
           git perf measure -n 10 -m report-benchmark -k os=${{matrix.os}} -k rust=${{matrix.rust}} -- git -C "$TEMP_REPO" perf report -n 10 -o "$TEMP_REPO/report.html"
