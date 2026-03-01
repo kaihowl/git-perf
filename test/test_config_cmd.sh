@@ -174,5 +174,52 @@ assert_contains "$output" "Git Context:"
 assert_contains "$output" "Branch:"
 assert_contains "$output" "Repository:"
 
+test_section "Config command tests - summary hint"
+cd_temp_repo
+cat > .gitperfconfig << 'EOF'
+[measurement.build_time]
+epoch = "12345678"
+EOF
+# Summary mode should show the --detailed hint
+assert_success_with_output output git perf config --list
+assert_contains "$output" "use --detailed"
+# Detailed mode should NOT show the --detailed hint
+assert_success_with_output output git perf config --list --detailed
+assert_not_contains "$output" "use --detailed"
+
+test_section "Config command tests - change_point in detailed output"
+cd_temp_repo
+cat > .gitperfconfig << 'EOF'
+[measurement.build_time]
+epoch = "12345678"
+
+[change_point]
+enabled = false
+min_data_points = 20
+min_magnitude_pct = 10.0
+penalty = 1.5
+EOF
+assert_success_with_output output git perf config --list --detailed
+assert_contains "$output" "change_point.enabled"
+assert_contains "$output" "change_point.min_data_points"
+assert_contains "$output" "change_point.min_magnitude_pct"
+assert_contains "$output" "change_point.penalty"
+assert_contains "$output" "false"
+assert_matches "$output" "min_data_points.*20"
+assert_matches "$output" "penalty.*1.5"
+
+test_section "Config command tests - change_point in JSON output"
+cd_temp_repo
+cat > .gitperfconfig << 'EOF'
+[measurement.build_time]
+epoch = "12345678"
+
+[change_point]
+penalty = 2.0
+EOF
+assert_success_with_output output git perf config --list --format json
+echo "$output" | jq -e '.measurements.build_time.change_point' > /dev/null
+echo "$output" | jq -e '.measurements.build_time.change_point.penalty == 2.0' > /dev/null
+
 test_stats
 exit 0

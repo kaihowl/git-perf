@@ -1,7 +1,8 @@
+use crate::change_point::ChangePointConfig;
 use crate::config::{
     audit_aggregate_by, audit_dispersion_method, audit_min_absolute_deviation,
     audit_min_measurements, audit_min_relative_deviation, audit_sigma, backoff_max_elapsed_seconds,
-    determine_epoch_from_config, measurement_unit, read_hierarchical_config,
+    change_point_config, determine_epoch_from_config, measurement_unit, read_hierarchical_config,
 };
 use crate::git::git_interop::get_repository_root;
 use anyhow::{Context, Result};
@@ -96,6 +97,9 @@ pub struct MeasurementConfig {
     /// Measurement unit
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
+
+    /// Change point detection configuration
+    pub change_point: ChangePointConfig,
 
     /// Whether this is from parent table fallback (vs measurement-specific)
     pub from_parent_fallback: bool,
@@ -301,6 +305,7 @@ fn gather_single_measurement_config(name: &str, config: &Config) -> MeasurementC
         aggregate_by: audit_aggregate_by(name).map(|f| format!("{:?}", f).to_lowercase()),
         sigma: audit_sigma(name),
         unit: measurement_unit(name),
+        change_point: change_point_config(name),
         from_parent_fallback: !has_specific_config,
     }
 }
@@ -357,6 +362,30 @@ fn validate_config(measurements: &HashMap<String, MeasurementConfig>) -> Result<
                 ));
             }
         }
+
+        // Check for invalid change_point.min_data_points
+        if config.change_point.min_data_points == 0 {
+            issues.push(format!(
+                "Measurement '{}': Invalid change_point.min_data_points {} (must be > 0)",
+                name, config.change_point.min_data_points
+            ));
+        }
+
+        // Check for invalid change_point.min_magnitude_pct
+        if config.change_point.min_magnitude_pct < 0.0 {
+            issues.push(format!(
+                "Measurement '{}': Invalid change_point.min_magnitude_pct {} (must be non-negative)",
+                name, config.change_point.min_magnitude_pct
+            ));
+        }
+
+        // Check for invalid change_point.penalty
+        if config.change_point.penalty <= 0.0 {
+            issues.push(format!(
+                "Measurement '{}': Invalid change_point.penalty {} (must be positive)",
+                name, config.change_point.penalty
+            ));
+        }
     }
 
     Ok(issues)
@@ -412,6 +441,10 @@ fn display_human_readable(info: &ConfigInfo, detailed: bool) -> Result<()> {
         for measurement in sorted_measurements {
             display_measurement_human(measurement, detailed);
         }
+
+        if !detailed {
+            println!("  (use --detailed for full configuration)");
+        }
     }
 
     // Validation Issues
@@ -438,26 +471,51 @@ fn display_measurement_human(measurement: &MeasurementConfig, detailed: bool) {
         if measurement.from_parent_fallback {
             println!("    (using parent table defaults)");
         }
-        println!("    epoch:                  {:?}", measurement.epoch);
         println!(
-            "    min_relative_deviation: {:?}",
+            "    epoch:                          {:?}",
+            measurement.epoch
+        );
+        println!(
+            "    min_relative_deviation:         {:?}",
             measurement.min_relative_deviation
         );
         println!(
-            "    min_absolute_deviation: {:?}",
+            "    min_absolute_deviation:         {:?}",
             measurement.min_absolute_deviation
         );
         println!(
-            "    dispersion_method:      {}",
+            "    dispersion_method:              {}",
             measurement.dispersion_method
         );
         println!(
-            "    min_measurements:       {:?}",
+            "    min_measurements:               {:?}",
             measurement.min_measurements
         );
-        println!("    aggregate_by:           {:?}", measurement.aggregate_by);
-        println!("    sigma:                  {:?}", measurement.sigma);
-        println!("    unit:                   {:?}", measurement.unit);
+        println!(
+            "    aggregate_by:                   {:?}",
+            measurement.aggregate_by
+        );
+        println!(
+            "    sigma:                          {:?}",
+            measurement.sigma
+        );
+        println!("    unit:                           {:?}", measurement.unit);
+        println!(
+            "    change_point.enabled:           {}",
+            measurement.change_point.enabled
+        );
+        println!(
+            "    change_point.min_data_points:   {}",
+            measurement.change_point.min_data_points
+        );
+        println!(
+            "    change_point.min_magnitude_pct: {}",
+            measurement.change_point.min_magnitude_pct
+        );
+        println!(
+            "    change_point.penalty:           {}",
+            measurement.change_point.penalty
+        );
         println!();
     } else {
         // Summary view - just name and epoch
@@ -685,6 +743,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -708,6 +767,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -732,6 +792,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(-1.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -756,6 +817,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -780,6 +842,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -804,6 +867,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -829,6 +893,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -856,6 +921,7 @@ dispersion_method = "stddev"
                 aggregate_by: Some("mean".to_string()),
                 sigma: Some(-3.0),
                 unit: Some("ms".to_string()),
+                change_point: ChangePointConfig::default(),
                 from_parent_fallback: false,
             },
         );
@@ -936,6 +1002,7 @@ epoch = 0x87654321
             aggregate_by: Some("mean".to_string()),
             sigma: Some(3.0),
             unit: Some("ms".to_string()),
+            change_point: ChangePointConfig::default(),
             from_parent_fallback: false,
         };
 
@@ -955,10 +1022,206 @@ epoch = 0x87654321
             aggregate_by: Some("mean".to_string()),
             sigma: Some(3.0),
             unit: Some("ms".to_string()),
+            change_point: ChangePointConfig::default(),
             from_parent_fallback: false,
         };
 
         // This test just ensures the function doesn't panic
         display_measurement_human(&measurement, false);
+    }
+
+    #[test]
+    fn test_gather_single_measurement_config_change_point_defaults() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            write_gitperfconfig(
+                git_dir,
+                r#"
+[measurement.build_time]
+epoch = "12345678"
+"#,
+            );
+
+            let config = read_hierarchical_config().unwrap();
+            let meas_config = gather_single_measurement_config("build_time", &config);
+
+            assert!(meas_config.change_point.enabled);
+            assert_eq!(meas_config.change_point.min_data_points, 10);
+            assert_eq!(meas_config.change_point.min_magnitude_pct, 5.0);
+            assert_eq!(meas_config.change_point.penalty, 0.5);
+        });
+    }
+
+    #[test]
+    fn test_gather_single_measurement_config_change_point_from_config() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            write_gitperfconfig(
+                git_dir,
+                r#"
+[measurement.build_time]
+epoch = "12345678"
+
+[change_point]
+enabled = false
+min_data_points = 20
+min_magnitude_pct = 10.0
+penalty = 1.5
+"#,
+            );
+
+            let config = read_hierarchical_config().unwrap();
+            let meas_config = gather_single_measurement_config("build_time", &config);
+
+            assert!(!meas_config.change_point.enabled);
+            assert_eq!(meas_config.change_point.min_data_points, 20);
+            assert_eq!(meas_config.change_point.min_magnitude_pct, 10.0);
+            assert_eq!(meas_config.change_point.penalty, 1.5);
+        });
+    }
+
+    #[test]
+    fn test_validate_config_invalid_change_point_min_data_points() {
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                change_point: ChangePointConfig {
+                    min_data_points: 0,
+                    ..ChangePointConfig::default()
+                },
+                from_parent_fallback: false,
+            },
+        );
+
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("change_point.min_data_points"));
+    }
+
+    #[test]
+    fn test_validate_config_invalid_change_point_min_magnitude_pct() {
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                change_point: ChangePointConfig {
+                    min_magnitude_pct: -1.0,
+                    ..ChangePointConfig::default()
+                },
+                from_parent_fallback: false,
+            },
+        );
+
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("change_point.min_magnitude_pct"));
+    }
+
+    #[test]
+    fn test_validate_config_invalid_change_point_penalty() {
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                change_point: ChangePointConfig {
+                    penalty: 0.0,
+                    ..ChangePointConfig::default()
+                },
+                from_parent_fallback: false,
+            },
+        );
+
+        let issues = validate_config(&measurements).unwrap();
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("change_point.penalty"));
+    }
+
+    #[test]
+    fn test_validate_config_change_point_min_magnitude_pct_zero_is_valid() {
+        // 0.0 is non-negative, so it should be valid
+        let mut measurements = HashMap::new();
+        measurements.insert(
+            "build_time".to_string(),
+            MeasurementConfig {
+                name: "build_time".to_string(),
+                epoch: Some("12345678".to_string()),
+                min_relative_deviation: Some(5.0),
+                min_absolute_deviation: None,
+                dispersion_method: "stddev".to_string(),
+                min_measurements: Some(10),
+                aggregate_by: Some("mean".to_string()),
+                sigma: Some(3.0),
+                unit: Some("ms".to_string()),
+                change_point: ChangePointConfig {
+                    min_magnitude_pct: 0.0,
+                    ..ChangePointConfig::default()
+                },
+                from_parent_fallback: false,
+            },
+        );
+
+        let issues = validate_config(&measurements).unwrap();
+        assert!(
+            issues.is_empty(),
+            "change_point.min_magnitude_pct = 0.0 should be valid. Got issues: {:?}",
+            issues
+        );
+    }
+
+    #[test]
+    fn test_config_info_json_contains_change_point() {
+        with_isolated_test_setup(|git_dir, home_path| {
+            write_gitperfconfig(
+                git_dir,
+                r#"
+[measurement.build_time]
+epoch = "12345678"
+
+[change_point]
+penalty = 1.0
+"#,
+            );
+
+            let config_info = gather_config_info(false, None).unwrap();
+            let json = serde_json::to_string_pretty(&config_info).unwrap();
+
+            assert!(
+                json.contains("change_point"),
+                "JSON should contain change_point: {}",
+                json
+            );
+            assert!(
+                json.contains("penalty"),
+                "JSON should contain penalty: {}",
+                json
+            );
+            let _ = home_path; // suppress unused warning
+        });
     }
 }

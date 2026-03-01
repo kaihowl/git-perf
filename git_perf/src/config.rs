@@ -334,11 +334,7 @@ pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePoin
         file_config.get_with_parent_fallback("change_point", measurement, "enabled")
     {
         if let Ok(enabled) = enabled_str.parse::<bool>() {
-            if !enabled {
-                // If disabled, return a config that will skip detection
-                config.min_data_points = usize::MAX;
-                return config;
-            }
+            config.enabled = enabled;
         }
     }
 
