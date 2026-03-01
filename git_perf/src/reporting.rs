@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{self, ErrorKind, Write},
+    io::{self, BufRead, BufReader, ErrorKind, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 use anyhow::anyhow;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use itertools::Itertools;
 use plotly::{
@@ -35,6 +36,8 @@ struct ReportMetadata {
     timestamp: String,
     commit_range: String,
     depth: usize,
+    /// URL to the index page listing all reports (for navigation)
+    all_reports_url: Option<String>,
 }
 
 impl ReportMetadata {
@@ -42,6 +45,7 @@ impl ReportMetadata {
         title: Option<String>,
         custom_css_content: String,
         commits: &[Commit],
+        all_reports_url: Option<String>,
     ) -> ReportMetadata {
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
@@ -68,6 +72,7 @@ impl ReportMetadata {
             timestamp,
             commit_range,
             depth,
+            all_reports_url,
         }
     }
 }
@@ -182,9 +187,40 @@ const DEFAULT_HTML_TEMPLATE: &str = r#"<!DOCTYPE html>
     <meta charset="utf-8">
     <title>{{TITLE}}</title>
     {{PLOTLY_HEAD}}
-    <style>{{CUSTOM_CSS}}</style>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        .report-header h1 {
+            margin: 0;
+            font-size: 1.2em;
+            color: #333;
+        }
+        .report-header a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .report-header a:hover {
+            text-decoration: underline;
+        }
+        {{CUSTOM_CSS}}
+    </style>
 </head>
 <body>
+    <div class="report-header">
+        <h1>{{TITLE}}</h1>
+        <a href="{{ALL_REPORTS_URL}}">All Reports</a>
+    </div>
     {{PLOTLY_BODY}}
 </body>
 </html>"#;
@@ -852,6 +888,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
 
             // Replace global placeholders
             let (plotly_head, _) = extract_plotly_parts(&Plot::new());
+            let all_reports_url = metadata.all_reports_url.as_deref().unwrap_or("index.html");
             output = output
                 .replace("{{TITLE}}", &metadata.title)
                 .replace("{{PLOTLY_HEAD}}", &plotly_head)
@@ -859,6 +896,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
                 .replace("{{TIMESTAMP}}", &metadata.timestamp)
                 .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
                 .replace("{{DEPTH}}", &metadata.depth.to_string())
+                .replace("{{ALL_REPORTS_URL}}", all_reports_url)
                 .replace("{{AUDIT_SECTION}}", "");
 
             output.into_bytes()
@@ -1017,11 +1055,13 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             timestamp: String::new(),
             commit_range: String::new(),
             depth: 0,
+            all_reports_url: None,
         };
         let metadata = self.metadata.as_ref().unwrap_or(&default_metadata);
 
         // Apply template with placeholder substitution
         let (plotly_head, plotly_body) = extract_plotly_parts(&final_plot);
+        let all_reports_url = metadata.all_reports_url.as_deref().unwrap_or("index.html");
         let output = template
             .replace("{{TITLE}}", &metadata.title)
             .replace("{{PLOTLY_HEAD}}", &plotly_head)
@@ -1030,6 +1070,7 @@ impl<'a> Reporter<'a> for PlotlyReporter {
             .replace("{{TIMESTAMP}}", &metadata.timestamp)
             .replace("{{COMMIT_RANGE}}", &metadata.commit_range)
             .replace("{{DEPTH}}", &metadata.depth.to_string())
+            .replace("{{ALL_REPORTS_URL}}", all_reports_url)
             .replace("{{AUDIT_SECTION}}", ""); // Future enhancement
 
         output.as_bytes().to_vec()
@@ -1652,7 +1693,12 @@ fn prepare_sections_and_metadata(
             // Build metadata
             let resolved_title = template_config.title.clone().or_else(config::report_title);
             let custom_css_content = load_custom_css(template_config.custom_css_path.as_ref())?;
-            let metadata = ReportMetadata::new(resolved_title, custom_css_content, commits);
+            let metadata = ReportMetadata::new(
+                resolved_title,
+                custom_css_content,
+                commits,
+                template_config.all_reports_url.clone(),
+            );
 
             Ok((sections, Some(template_str), metadata))
         }
@@ -1673,7 +1719,7 @@ fn prepare_sections_and_metadata(
             );
 
             // CSV doesn't use metadata, but provide default for API consistency
-            let metadata = ReportMetadata::new(None, String::new(), commits);
+            let metadata = ReportMetadata::new(None, String::new(), commits, None);
 
             Ok((vec![section], None, metadata))
         }
@@ -1887,9 +1933,635 @@ pub fn report(
     Ok(())
 }
 
+/// Information about a report file
+#[derive(Debug, Clone)]
+struct ReportInfo {
+    filename: String,
+    commit_sha: Option<String>,
+    commit_date: Option<String>,
+    commit_author: Option<String>,
+    commit_subject: Option<String>,
+    #[allow(dead_code)] // Used for categorization logic, may be useful in future
+    is_branch_report: bool,
+}
+
+/// Categorized reports
+struct CategorizedReports {
+    branch_reports: Vec<ReportInfo>,
+    commit_reports: Vec<ReportInfo>,
+    dangling_commits: Vec<ReportInfo>,
+    custom_reports: Vec<ReportInfo>,
+}
+
+/// Default HTML template for index page
+const DEFAULT_INDEX_TEMPLATE: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        header {
+            background: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #444;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        ul li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        ul li:last-child {
+            border-bottom: none;
+        }
+        a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px 8px;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            font-weight: 600;
+            color: #555;
+            background: #f8f9fa;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .commit-sha {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #666;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .empty-message {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>{{TITLE}}</h1>
+        <p>Performance reports generated by git-perf</p>
+    </header>
+
+    <main>
+        {{#BRANCH_REPORTS}}
+        <div class="section">
+            <h2>📊 Branch Reports</h2>
+            <ul>
+                {{BRANCH_REPORTS}}
+            </ul>
+        </div>
+        {{/BRANCH_REPORTS}}
+
+        {{#COMMIT_REPORTS}}
+        <div class="section">
+            <h2>📈 Commit Reports</h2>
+            <p>Reports for individual commits with full metadata (most recent first)</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Commit</th>
+                        <th>Subject</th>
+                        <th>Date</th>
+                        <th>Author</th>
+                        <th>Report</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{COMMIT_REPORTS}}
+                </tbody>
+            </table>
+        </div>
+        {{/COMMIT_REPORTS}}
+
+        {{#DANGLING_COMMITS}}
+        <div class="section">
+            <h2>⚠️ Dangling Commits</h2>
+            <p>Commits without full metadata (likely due to shallow clone or missing history)</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Commit</th>
+                        <th>Report</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{DANGLING_COMMITS}}
+                </tbody>
+            </table>
+        </div>
+        {{/DANGLING_COMMITS}}
+
+        {{#CUSTOM_REPORTS}}
+        <div class="section">
+            <h2>📁 Other Reports</h2>
+            <ul>
+                {{CUSTOM_REPORTS}}
+            </ul>
+        </div>
+        {{/CUSTOM_REPORTS}}
+
+        {{#NO_REPORTS}}
+        <div class="section">
+            <p class="empty-message">No reports found. Generate reports using <code>git perf report</code>.</p>
+        </div>
+        {{/NO_REPORTS}}
+    </main>
+
+    <footer>
+        <p>Generated by <a href="https://github.com/kaihowl/git-perf">git-perf</a></p>
+    </footer>
+</body>
+</html>"#;
+
+/// Generate an index page listing all reports on the gh-pages branch
+pub fn generate_index(
+    branch: &str,
+    subdirectory: Option<&str>,
+    output_path: &Path,
+    title: &str,
+    template_path: Option<&Path>,
+) -> Result<()> {
+    // Load template
+    let template = if let Some(path) = template_path {
+        load_template(path)?
+    } else {
+        DEFAULT_INDEX_TEMPLATE.to_string()
+    };
+
+    // Get list of HTML files from gh-pages branch
+    let reports = list_reports_from_branch(branch, subdirectory)?;
+
+    // Categorize reports
+    let categorized = categorize_reports(reports)?;
+
+    // Generate HTML for each category
+    let branch_html = generate_branch_reports_html(&categorized.branch_reports, subdirectory);
+    let commit_html = generate_commit_reports_html(&categorized.commit_reports, subdirectory);
+    let dangling_html = generate_dangling_commits_html(&categorized.dangling_commits, subdirectory);
+    let custom_html = generate_custom_reports_html(&categorized.custom_reports, subdirectory);
+
+    // Apply template
+    let mut output = template.replace("{{TITLE}}", title);
+
+    // Handle conditional sections using simple {{#SECTION}} ... {{/SECTION}} syntax
+    if !branch_html.is_empty() {
+        output = output
+            .replace("{{#BRANCH_REPORTS}}", "")
+            .replace("{{/BRANCH_REPORTS}}", "")
+            .replace("{{BRANCH_REPORTS}}", &branch_html);
+    } else {
+        // Remove the branch reports section
+        output = remove_conditional_section(&output, "BRANCH_REPORTS");
+    }
+
+    if !commit_html.is_empty() {
+        output = output
+            .replace("{{#COMMIT_REPORTS}}", "")
+            .replace("{{/COMMIT_REPORTS}}", "")
+            .replace("{{COMMIT_REPORTS}}", &commit_html);
+    } else {
+        output = remove_conditional_section(&output, "COMMIT_REPORTS");
+    }
+
+    if !dangling_html.is_empty() {
+        output = output
+            .replace("{{#DANGLING_COMMITS}}", "")
+            .replace("{{/DANGLING_COMMITS}}", "")
+            .replace("{{DANGLING_COMMITS}}", &dangling_html);
+    } else {
+        output = remove_conditional_section(&output, "DANGLING_COMMITS");
+    }
+
+    if !custom_html.is_empty() {
+        output = output
+            .replace("{{#CUSTOM_REPORTS}}", "")
+            .replace("{{/CUSTOM_REPORTS}}", "")
+            .replace("{{CUSTOM_REPORTS}}", &custom_html);
+    } else {
+        output = remove_conditional_section(&output, "CUSTOM_REPORTS");
+    }
+
+    // Show "no reports" message if all categories are empty
+    if branch_html.is_empty()
+        && commit_html.is_empty()
+        && dangling_html.is_empty()
+        && custom_html.is_empty()
+    {
+        output = output
+            .replace("{{#NO_REPORTS}}", "")
+            .replace("{{/NO_REPORTS}}", "");
+    } else {
+        output = remove_conditional_section(&output, "NO_REPORTS");
+    }
+
+    // Write output
+    write_output(output_path, output.as_bytes())?;
+
+    Ok(())
+}
+
+/// Remove a conditional section from the template
+fn remove_conditional_section(template: &str, section_name: &str) -> String {
+    let start_marker = format!("{{{{#{}}}}}", section_name);
+    let end_marker = format!("{{{{/{}}}}}", section_name);
+
+    if let Some(start) = template.find(&start_marker) {
+        if let Some(end) = template[start..].find(&end_marker) {
+            let full_end = start + end + end_marker.len();
+            let mut result = String::new();
+            result.push_str(&template[..start]);
+            result.push_str(&template[full_end..]);
+            return result;
+        }
+    }
+
+    template.to_string()
+}
+
+/// List all HTML reports from a git branch
+fn list_reports_from_branch(branch: &str, subdirectory: Option<&str>) -> Result<Vec<String>> {
+    use std::process::Command;
+
+    // Build the git ls-tree command arguments
+    // When subdirectory is None or empty, list root; otherwise list the subdirectory
+    let mut args = vec!["ls-tree", "--name-only", branch];
+
+    // Only add path argument if subdirectory is specified and non-empty
+    let subdir_path;
+    if let Some(subdir) = subdirectory {
+        if !subdir.is_empty() {
+            subdir_path = subdir.to_string();
+            args.push(&subdir_path);
+        }
+    }
+
+    // List files in the branch
+    let output = Command::new("git")
+        .args(&args)
+        .output()
+        .map_err(|e| anyhow!("Failed to list files from branch {}: {}", branch, e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "Failed to list files from branch {}: {}",
+            branch,
+            stderr.trim()
+        );
+    }
+
+    let files = String::from_utf8(output.stdout)?;
+    let html_files: Vec<String> = files
+        .lines()
+        .filter(|line| line.ends_with(".html"))
+        .map(|line| {
+            // Remove subdirectory prefix if present
+            if let Some(subdir) = subdirectory {
+                line.strip_prefix(&format!("{}/", subdir))
+                    .unwrap_or(line)
+                    .to_string()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+
+    Ok(html_files)
+}
+
+/// Categorize reports into branch, commit (with details), dangling commit, and custom reports
+fn categorize_reports(files: Vec<String>) -> Result<CategorizedReports> {
+    let mut branch_reports = Vec::new();
+    let mut commit_reports = Vec::new();
+    let mut dangling_commits = Vec::new();
+    let mut custom_reports = Vec::new();
+
+    // PHASE 1: Collect commit SHAs (no git calls yet)
+    let mut commit_filenames = Vec::new(); // Vec<(filename, sha)>
+
+    for filename in files {
+        // Skip index.html
+        if filename == "index.html" {
+            continue;
+        }
+
+        let name_without_ext = filename.strip_suffix(".html").unwrap_or(&filename);
+
+        // Check if it's a full SHA (40 characters, all hex)
+        if name_without_ext.len() == 40 && name_without_ext.chars().all(|c| c.is_ascii_hexdigit()) {
+            // Defer metadata lookup - collect for batch processing
+            commit_filenames.push((filename.clone(), name_without_ext.to_string()));
+        } else {
+            // Could be branch name or custom report
+            // Common branch names: main, master, develop, etc.
+            let common_branches = ["main", "master", "develop", "dev", "staging", "production"];
+            let is_likely_branch = common_branches.contains(&name_without_ext);
+
+            if is_likely_branch {
+                branch_reports.push(ReportInfo {
+                    filename: filename.clone(),
+                    commit_sha: None,
+                    commit_date: None,
+                    commit_author: None,
+                    commit_subject: None,
+                    is_branch_report: true,
+                });
+            } else {
+                custom_reports.push(ReportInfo {
+                    filename: filename.clone(),
+                    commit_sha: None,
+                    commit_date: None,
+                    commit_author: None,
+                    commit_subject: None,
+                    is_branch_report: false,
+                });
+            }
+        }
+    }
+
+    // PHASE 2: Batch metadata retrieval (single git process)
+    let commit_shas: Vec<String> = commit_filenames
+        .iter()
+        .map(|(_, sha)| sha.clone())
+        .collect();
+    let metadata_map = get_batch_commit_metadata(&commit_shas)?;
+
+    // PHASE 3: Create ReportInfo with metadata lookup
+    for (filename, sha) in commit_filenames {
+        let report_info = if let Some((date, author, subject)) = metadata_map.get(&sha) {
+            // Metadata found
+            ReportInfo {
+                filename: filename.clone(),
+                commit_sha: Some(sha.clone()),
+                commit_date: Some(date.clone()),
+                commit_author: Some(author.clone()),
+                commit_subject: Some(subject.clone()),
+                is_branch_report: false,
+            }
+        } else {
+            // Metadata missing (shallow clone or invalid SHA)
+            ReportInfo {
+                filename: filename.clone(),
+                commit_sha: Some(sha),
+                commit_date: None,
+                commit_author: None,
+                commit_subject: None,
+                is_branch_report: false,
+            }
+        };
+
+        // Categorize: same logic as before
+        if report_info.commit_date.is_some() && report_info.commit_author.is_some() {
+            commit_reports.push(report_info);
+        } else {
+            dangling_commits.push(report_info);
+        }
+    }
+
+    // Sort commit reports by date (most recent first)
+    commit_reports.sort_by(|a, b| {
+        match (&a.commit_date, &b.commit_date) {
+            (Some(date_a), Some(date_b)) => date_b.cmp(date_a), // Reverse for newest first
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.filename.cmp(&b.filename),
+        }
+    });
+
+    // Sort dangling commits by SHA (alphabetically)
+    dangling_commits.sort_by(|a, b| a.filename.cmp(&b.filename));
+
+    Ok(CategorizedReports {
+        branch_reports,
+        commit_reports,
+        dangling_commits,
+        custom_reports,
+    })
+}
+
+/// Batch retrieve commit metadata for multiple commits in a single git process.
+///
+/// Returns a HashMap mapping full commit SHA to (date, author, subject) tuples.
+/// Only commits with valid metadata are included in the result.
+/// Missing or invalid commits are silently skipped by git.
+fn get_batch_commit_metadata(
+    commit_shas: &[String],
+) -> Result<HashMap<String, (String, String, String)>> {
+    // Guard: empty input would cause git log to default to HEAD
+    if commit_shas.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // Spawn git log with commit SHAs as command-line arguments
+    // --ignore-missing: silently skip missing/invalid commits (e.g., shallow clones)
+    // Note: We use command-line args instead of --stdin because --ignore-missing
+    // doesn't work with --stdin in git.
+    let mut git_log = Command::new("git")
+        .arg("log")
+        .arg("--no-walk")
+        .arg("--ignore-missing")
+        .arg("--format=%H|||%ci|||%an|||%s")
+        .args(commit_shas)
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to spawn git log")?;
+
+    let git_stdout = git_log
+        .stdout
+        .take()
+        .context("Failed to take stdout from git log")?;
+
+    // Read and parse output
+    let reader = BufReader::new(git_stdout);
+    let mut metadata_map = HashMap::new();
+
+    for line in reader.lines() {
+        let line = line.context("Failed to read line from git log")?;
+        let parts: Vec<&str> = line.trim().split("|||").collect();
+        if parts.len() == 4 {
+            let full_sha = parts[0].to_string();
+            let datetime = parts[1];
+            // Extract just the date part (first space-delimited token from datetime)
+            let date = datetime.split(' ').next().unwrap_or("").to_string();
+            let author = parts[2].to_string();
+            let subject = parts[3].to_string();
+            metadata_map.insert(full_sha, (date, author, subject));
+        } else if !line.trim().is_empty() {
+            eprintln!("Warning: Malformed git log output line: {}", line);
+        }
+    }
+
+    // Wait for process completion
+    let status = git_log.wait().context("Failed to wait for git log")?;
+    if !status.success() {
+        bail!("git log failed with status: {}", status);
+    }
+
+    Ok(metadata_map)
+}
+
+/// Generate HTML for branch reports
+fn generate_branch_reports_html(reports: &[ReportInfo], subdirectory: Option<&str>) -> String {
+    if reports.is_empty() {
+        return String::new();
+    }
+
+    reports
+        .iter()
+        .map(|report| {
+            let url = if let Some(subdir) = subdirectory {
+                format!("{}/{}", subdir, report.filename)
+            } else {
+                report.filename.clone()
+            };
+            let name = report
+                .filename
+                .strip_suffix(".html")
+                .unwrap_or(&report.filename);
+            format!("<li><a href=\"{}\">{}</a></li>", url, name)
+        })
+        .collect::<Vec<_>>()
+        .join("\n                ")
+}
+
+/// Generate HTML for commit reports
+fn generate_commit_reports_html(reports: &[ReportInfo], subdirectory: Option<&str>) -> String {
+    if reports.is_empty() {
+        return String::new();
+    }
+
+    reports
+        .iter()
+        .map(|report| {
+            let url = if let Some(subdir) = subdirectory {
+                format!("{}/{}", subdir, report.filename)
+            } else {
+                report.filename.clone()
+            };
+            let short_sha = report
+                .commit_sha
+                .as_ref()
+                .map(|s| &s[..7])
+                .unwrap_or("unknown");
+            let subject = report.commit_subject.as_deref().unwrap_or("N/A");
+            let date = report.commit_date.as_deref().unwrap_or("N/A");
+            let author = report.commit_author.as_deref().unwrap_or("N/A");
+
+            format!(
+                "<tr><td class=\"commit-sha\">{}</td><td>{}</td><td>{}</td><td>{}</td><td><a href=\"{}\">View Report</a></td></tr>",
+                short_sha, subject, date, author, url
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n                    ")
+}
+
+/// Generate HTML for dangling commit reports (commits without full metadata)
+fn generate_dangling_commits_html(reports: &[ReportInfo], subdirectory: Option<&str>) -> String {
+    if reports.is_empty() {
+        return String::new();
+    }
+
+    reports
+        .iter()
+        .map(|report| {
+            let url = if let Some(subdir) = subdirectory {
+                format!("{}/{}", subdir, report.filename)
+            } else {
+                report.filename.clone()
+            };
+            let short_sha = report
+                .commit_sha
+                .as_ref()
+                .map(|s| &s[..7])
+                .unwrap_or("unknown");
+
+            format!(
+                "<tr><td class=\"commit-sha\">{}</td><td><a href=\"{}\">View Report</a></td></tr>",
+                short_sha, url
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n                    ")
+}
+
+/// Generate HTML for custom reports
+fn generate_custom_reports_html(reports: &[ReportInfo], subdirectory: Option<&str>) -> String {
+    if reports.is_empty() {
+        return String::new();
+    }
+
+    reports
+        .iter()
+        .map(|report| {
+            let url = if let Some(subdir) = subdirectory {
+                format!("{}/{}", subdir, report.filename)
+            } else {
+                report.filename.clone()
+            };
+            let name = report
+                .filename
+                .strip_suffix(".html")
+                .unwrap_or(&report.filename);
+            format!("<li><a href=\"{}\">{}</a></li>", url, name)
+        })
+        .collect::<Vec<_>>()
+        .join("\n                ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::with_isolated_test_setup;
 
     #[test]
     fn test_convert_to_x_y_empty() {
@@ -2020,8 +2692,12 @@ mod tests {
             },
         ];
 
-        let metadata =
-            ReportMetadata::new(Some("Custom Title".to_string()), "".to_string(), &commits);
+        let metadata = ReportMetadata::new(
+            Some("Custom Title".to_string()),
+            "".to_string(),
+            &commits,
+            None,
+        );
 
         assert_eq!(metadata.title, "Custom Title");
         assert_eq!(metadata.commit_range, "def0987..abc1234");
@@ -2039,7 +2715,7 @@ mod tests {
             measurements: vec![],
         }];
 
-        let metadata = ReportMetadata::new(None, "".to_string(), &commits);
+        let metadata = ReportMetadata::new(None, "".to_string(), &commits, None);
 
         assert_eq!(metadata.title, "Performance Measurements");
         assert_eq!(metadata.commit_range, "abc1234");
@@ -2049,7 +2725,7 @@ mod tests {
     #[test]
     fn test_report_metadata_new_empty_commits() {
         let commits = vec![];
-        let metadata = ReportMetadata::new(None, "".to_string(), &commits);
+        let metadata = ReportMetadata::new(None, "".to_string(), &commits, None);
 
         assert_eq!(metadata.commit_range, "No commits");
         assert_eq!(metadata.depth, 0);

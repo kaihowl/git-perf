@@ -284,6 +284,7 @@ jobs:
           show-epochs: 'true'
           show-changes: 'true'
           template: '.git-perf/templates/dashboard-example.html'
+          generate-index: 'true'
 
   release-binary-size:
     name: release-binary-size

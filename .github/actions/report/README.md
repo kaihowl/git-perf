@@ -88,6 +88,8 @@ The action automatically comments on PRs by default. To disable automatic commen
 | `show-epochs` | Whether to show epoch boundaries in the report | No | `false` |
 | `show-changes` | Whether to detect and display change points in the report | No | `false` |
 | `template` | Path to custom report template (relative to repo root). Empty for default single-plot report | No | `` |
+| `generate-index` | Whether to generate an index page listing all reports | No | `false` |
+| `index-title` | Title for the generated index page | No | `Performance Reports` |
 | `github-token` | GitHub token for publishing to gh-pages and commenting on PRs | Yes | - |
 
 ### Common Audit Arguments
@@ -104,7 +106,9 @@ The action automatically comments on PRs by default. To disable automatic commen
 | Output | Description |
 |--------|-------------|
 | `report-url` | URL of the published report on GitHub Pages |
+| `index-url` | URL of the reports index page (only set when generate-index is enabled) |
 | `audit-output` | Output from git-perf audit command (if audit-args provided) |
+| `size-output` | Output from git-perf size command (if show-size is enabled) |
 
 ## Prerequisites
 
