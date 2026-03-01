@@ -160,6 +160,7 @@ min_relative_deviation = 10.0
 penalty = 0.5                       # PELT sensitivity (0.3=high, 0.5=default, 1.0+=low)
 min_data_points = 10
 min_magnitude_pct = 5.0
+confidence_threshold = 0.75        # Min confidence to report a change point (0.0-1.0)
 
 [change_point."specific_test"]      # Per-measurement overrides
 penalty = 0.3                       # More sensitive for this measurement

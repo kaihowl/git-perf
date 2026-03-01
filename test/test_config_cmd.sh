@@ -197,15 +197,18 @@ epoch = "12345678"
 enabled = false
 min_data_points = 20
 min_magnitude_pct = 10.0
+confidence_threshold = 0.8
 penalty = 1.5
 EOF
 assert_success_with_output output git perf config --list --detailed
 assert_contains "$output" "change_point.enabled"
 assert_contains "$output" "change_point.min_data_points"
 assert_contains "$output" "change_point.min_magnitude_pct"
+assert_contains "$output" "change_point.confidence_threshold"
 assert_contains "$output" "change_point.penalty"
 assert_contains "$output" "false"
 assert_matches "$output" "min_data_points.*20"
+assert_matches "$output" "confidence_threshold.*0.8"
 assert_matches "$output" "penalty.*1.5"
 
 test_section "Config command tests - change_point in JSON output"

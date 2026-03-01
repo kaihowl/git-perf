@@ -78,8 +78,7 @@ pub struct ChangePointConfig {
     pub min_data_points: usize,
     /// Minimum percentage change to consider significant
     pub min_magnitude_pct: f64,
-    /// Minimum confidence threshold for reporting (not user-configurable)
-    #[serde(skip)]
+    /// Minimum confidence threshold for reporting (0.0-1.0, default: 0.75)
     pub confidence_threshold: f64,
     /// Penalty factor for adding change points (BIC-based)
     pub penalty: f64,
