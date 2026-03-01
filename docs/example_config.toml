@@ -105,6 +105,10 @@ min_data_points = 10
 # Minimum percentage change to consider significant (default: 5.0)
 min_magnitude_pct = 5.0
 
+# Minimum confidence threshold for reporting a change point (0.0-1.0, default: 0.75)
+# Higher values require stronger statistical evidence before reporting
+confidence_threshold = 0.75
+
 # Penalty factor for PELT algorithm (default: 0.5)
 # Higher values result in fewer change points detected (less sensitive)
 # Lower values result in more change points detected (more sensitive)

@@ -320,6 +320,7 @@ pub fn report_title() -> Option<String> {
 /// - `enabled`: Enable/disable change point detection (default: true)
 /// - `min_data_points`: Minimum data points required (default: 10)
 /// - `min_magnitude_pct`: Minimum percentage change to consider significant (default: 5.0)
+/// - `confidence_threshold`: Minimum confidence to report a change point (0.0-1.0, default: 0.75)
 /// - `penalty`: Penalty factor for PELT algorithm (default: 0.5, lower = more sensitive)
 #[must_use]
 pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePointConfig {
@@ -353,6 +354,15 @@ pub fn change_point_config(measurement: &str) -> crate::change_point::ChangePoin
     {
         if let Ok(v) = s.parse::<f64>() {
             config.min_magnitude_pct = v;
+        }
+    }
+
+    // confidence_threshold
+    if let Some(s) =
+        file_config.get_with_parent_fallback("change_point", measurement, "confidence_threshold")
+    {
+        if let Ok(v) = s.parse::<f64>() {
+            config.confidence_threshold = v;
         }
     }
 

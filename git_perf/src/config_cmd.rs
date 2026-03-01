@@ -509,11 +509,15 @@ fn display_measurement_human(measurement: &MeasurementConfig, detailed: bool) {
             measurement.change_point.min_data_points
         );
         println!(
-            "    change_point.min_magnitude_pct: {}",
+            "    change_point.min_magnitude_pct:  {}",
             measurement.change_point.min_magnitude_pct
         );
         println!(
-            "    change_point.penalty:           {}",
+            "    change_point.confidence_threshold: {}",
+            measurement.change_point.confidence_threshold
+        );
+        println!(
+            "    change_point.penalty:            {}",
             measurement.change_point.penalty
         );
         println!();
