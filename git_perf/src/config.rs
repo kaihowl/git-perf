@@ -204,6 +204,22 @@ pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     None
 }
 
+/// Returns the minimum absolute deviation threshold from config, or None if not set.
+#[must_use]
+pub fn audit_min_absolute_deviation(measurement: &str) -> Option<f64> {
+    let config = read_hierarchical_config().ok()?;
+
+    if let Some(s) =
+        config.get_with_parent_fallback("measurement", measurement, "min_absolute_deviation")
+    {
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
+    }
+
+    None
+}
+
 /// Returns the dispersion method from config, or StandardDeviation if not set.
 #[must_use]
 pub fn audit_dispersion_method(measurement: &str) -> DispersionMethod {
@@ -547,6 +563,76 @@ min_relative_deviation = 10.0
             // Test no config
             fs::remove_file(&workspace_config_path).unwrap();
             assert_eq!(super::audit_min_relative_deviation("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_audit_min_absolute_deviation() {
+        with_isolated_home(|temp_dir| {
+            // Create git repository
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+
+            // Create workspace config with measurement-specific settings
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+min_absolute_deviation = 5.0
+
+[measurement."build_time"]
+min_absolute_deviation = 10.0
+
+[measurement."memory_usage"]
+min_absolute_deviation = 2.5
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Test measurement-specific settings
+            assert_eq!(
+                super::audit_min_absolute_deviation("build_time"),
+                Some(10.0)
+            );
+            assert_eq!(
+                super::audit_min_absolute_deviation("memory_usage"),
+                Some(2.5)
+            );
+            assert_eq!(
+                super::audit_min_absolute_deviation("other_measurement"),
+                Some(5.0) // falls back to parent table
+            );
+
+            // Test global (parent table) setting
+            let global_config = r#"
+[measurement]
+min_absolute_deviation = 5.0
+"#;
+            fs::write(&workspace_config_path, global_config).unwrap();
+            assert_eq!(
+                super::audit_min_absolute_deviation("any_measurement"),
+                Some(5.0)
+            );
+
+            // Test precedence - measurement-specific overrides global
+            let precedence_config = r#"
+[measurement]
+min_absolute_deviation = 5.0
+
+[measurement."build_time"]
+min_absolute_deviation = 10.0
+"#;
+            fs::write(&workspace_config_path, precedence_config).unwrap();
+            assert_eq!(
+                super::audit_min_absolute_deviation("build_time"),
+                Some(10.0)
+            );
+            assert_eq!(
+                super::audit_min_absolute_deviation("other_measurement"),
+                Some(5.0)
+            );
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_min_absolute_deviation("any_measurement"), None);
         });
     }
 

@@ -433,14 +433,24 @@ fn audit_with_data(
     // Calculate relative deviation - naturally handles infinity when tail_median is zero
     let head_relative_deviation = (head / tail_median - 1.0).abs() * 100.0;
 
+    // Calculate absolute deviation
+    let head_absolute_deviation = (head - tail_median).abs();
+
     // Check if we have a minimum relative deviation threshold configured
     let min_relative_deviation = config::audit_min_relative_deviation(measurement);
-    let threshold_applied = min_relative_deviation.is_some();
+    let min_absolute_deviation = config::audit_min_absolute_deviation(measurement);
 
     // MUTATION POINT: < vs == (Line 156)
-    let passed_due_to_threshold = min_relative_deviation
+    let passed_due_to_relative_threshold = min_relative_deviation
         .map(|threshold| head_relative_deviation < threshold)
         .unwrap_or(false);
+
+    let passed_due_to_absolute_threshold = min_absolute_deviation
+        .map(|threshold| head_absolute_deviation < threshold)
+        .unwrap_or(false);
+
+    let passed_due_to_threshold =
+        passed_due_to_relative_threshold || passed_due_to_absolute_threshold;
 
     let text_summary = build_summary();
 
@@ -453,12 +463,27 @@ fn audit_with_data(
 
     // Add threshold information to output if applicable
     // Only show note when the audit would have failed without the threshold
-    let threshold_note = if threshold_applied && passed_due_to_threshold && z_score_exceeds_sigma {
-        format!(
-            "\nNote: Passed due to relative deviation ({:.1}%) being below threshold ({:.1}%)",
-            head_relative_deviation,
-            min_relative_deviation.unwrap()
-        )
+    let threshold_note = if z_score_exceeds_sigma {
+        let mut notes = Vec::new();
+        if passed_due_to_relative_threshold {
+            notes.push(format!(
+                "Note: Passed due to relative deviation ({:.1}%) being below threshold ({:.1}%)",
+                head_relative_deviation,
+                min_relative_deviation.unwrap()
+            ));
+        }
+        if passed_due_to_absolute_threshold {
+            notes.push(format!(
+                "Note: Passed due to absolute deviation ({:.1}) being below threshold ({:.1})",
+                head_absolute_deviation,
+                min_absolute_deviation.unwrap()
+            ));
+        }
+        if notes.is_empty() {
+            String::new()
+        } else {
+            format!("\n{}", notes.join("\n"))
+        }
     } else {
         String::new()
     };
@@ -1115,6 +1140,105 @@ min_relative_deviation = 10.0
                 .message
                 .contains("Note: Passed due to relative deviation"),
             "Note should not appear when audit fails"
+        );
+    }
+
+    #[test]
+    fn test_absolute_threshold_note_and_deviation_value() {
+        // Tests that:
+        // 1. The note shows the correct absolute deviation value (catches - vs / mutation)
+        // 2. The boundary: deviation exactly AT threshold fails (catches < vs <= mutation)
+        use crate::test_helpers::setup_test_env_with_config;
+
+        let config_content = r#"
+[measurement."build_time"]
+min_absolute_deviation = 50.0
+"#;
+        let (_temp_dir, _dir_guard) = setup_test_env_with_config(config_content);
+
+        // Case 1: High z-score but low absolute deviation (threshold saves the audit)
+        // head=1010, tail values very tightly clustered around 1000
+        // absolute deviation = |1010 - 1000| = 10 < 50 => should pass
+        // if - were replaced with /, deviation would be |1010/1000| = 1.01, still < 50 (passes anyway)
+        // So we need values where subtraction and division give meaningfully different results
+        // head=1005, tail=1000: subtract=5, divide=1.005; but threshold=50, both < 50
+        // Let's use head=100, tail_median=10: subtract=90, divide=10; threshold=50
+        // With threshold=50: subtract(90) >= 50 fails, divide(10) < 50 passes
+        // This catches the - vs / mutation
+        let result = audit_with_data(
+            "build_time",
+            100.0,                              // head value
+            vec![10.0, 10.0, 10.0, 10.0, 10.0], // tail values, median=10
+            2,
+            0.5, // Low sigma - will be exceeded
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // absolute deviation = |100 - 10| = 90, which is > 50 threshold => should FAIL
+        assert!(
+            !audit_result.passed,
+            "Should fail: absolute deviation 90 > threshold 50. Got: {}",
+            audit_result.message
+        );
+
+        // Case 2: absolute deviation exactly equals threshold => should FAIL (< not <=)
+        // head=1050, tail_median=1000, absolute_deviation=50, threshold=50
+        // With < : 50 < 50 is false => fails (correct)
+        // With <= : 50 <= 50 is true => passes (wrong)
+        let result = audit_with_data(
+            "build_time",
+            1050.0,                                       // head value
+            vec![1000.0, 1000.0, 1000.0, 1000.0, 1000.0], // tail values, median=1000
+            2,
+            0.5, // Low sigma - will be exceeded
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        // absolute deviation = |1050 - 1000| = 50, which equals threshold 50 => should FAIL
+        assert!(
+            !audit_result.passed,
+            "Should fail: absolute deviation 50 == threshold 50 (not strictly less than). Got: {}",
+            audit_result.message
+        );
+
+        // Case 3: absolute deviation strictly below threshold => should PASS with note
+        // head=1049, tail_median=1000, absolute_deviation=49, threshold=50
+        let result = audit_with_data(
+            "build_time",
+            1049.0,                                       // head value
+            vec![1000.0, 1000.0, 1000.0, 1000.0, 1000.0], // tail values, median=1000
+            2,
+            0.5, // Low sigma - will be exceeded
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+        );
+
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(
+            audit_result.passed,
+            "Should pass: absolute deviation 49 < threshold 50. Got: {}",
+            audit_result.message
+        );
+        assert!(
+            audit_result
+                .message
+                .contains("Note: Passed due to absolute deviation"),
+            "Note should appear when audit passes due to absolute threshold. Got: {}",
+            audit_result.message
+        );
+        // Verify the note contains the correct deviation value (catches - vs / mutation)
+        // If / were used: |1049/1000| = 1.049, note would say "1.0" not "49.0"
+        assert!(
+            audit_result.message.contains("49.0"),
+            "Note should show absolute deviation 49.0, not 1.0 (which would indicate / instead of -). Got: {}",
+            audit_result.message
         );
     }
 
