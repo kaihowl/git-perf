@@ -122,6 +122,81 @@ fn discover_matching_measurements(
     result
 }
 
+/// Compute group value combinations for splitting measurements by metadata keys.
+///
+/// Returns a vector of group values where each inner vector contains the values
+/// for the split keys. If no splits are specified, returns a single empty group.
+///
+/// # Errors
+/// Returns error if separate_by is non-empty but no measurements have all required keys
+fn compute_group_values(
+    commits: &[Result<Commit>],
+    measurement_name: &str,
+    selectors: &[(String, String)],
+    filters: &[regex::Regex],
+    separate_by: &[String],
+) -> Result<Vec<Vec<String>>> {
+    if separate_by.is_empty() {
+        return Ok(vec![vec![]]);
+    }
+
+    let mut unique_groups = HashSet::new();
+
+    for commit in commits.iter().flatten() {
+        for measurement in &commit.measurements {
+            // Only consider measurements that match the name
+            if measurement.name != measurement_name {
+                continue;
+            }
+
+            // Check if measurement name matches any filter
+            if !crate::filter::matches_any_filter(&measurement.name, filters) {
+                continue;
+            }
+
+            // Check if measurement matches selectors
+            if !measurement.key_values_is_superset_of(selectors) {
+                continue;
+            }
+
+            // Extract values for separate_by keys
+            let values: Vec<String> = separate_by
+                .iter()
+                .filter_map(|key| measurement.key_values.get(key).cloned())
+                .collect();
+
+            // Only include if all keys are present
+            if values.len() == separate_by.len() {
+                unique_groups.insert(values);
+            }
+        }
+    }
+
+    if unique_groups.is_empty() {
+        bail!(
+            "Measurement '{}': Invalid separator supplied, no measurements have all required keys: {:?}",
+            measurement_name,
+            separate_by
+        );
+    }
+
+    // Convert to sorted vector for deterministic ordering
+    let mut result: Vec<Vec<String>> = unique_groups.into_iter().collect();
+    result.sort();
+    Ok(result)
+}
+
+/// Formats a group label from separate_by keys and values.
+/// Example: ["os", "arch"] with ["ubuntu", "x64"] -> "os=ubuntu/arch=x64"
+fn format_group_label(separate_by: &[String], group_values: &[String]) -> String {
+    separate_by
+        .iter()
+        .zip(group_values.iter())
+        .map(|(key, value)| format!("{}={}", key, value))
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     start_commit: &str,
@@ -132,6 +207,7 @@ pub fn audit_multiple(
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
     combined_patterns: &[String],
+    separate_by: &[String],
     _no_change_point_warning: bool, // TODO: Implement change point warning in Phase 2
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
@@ -176,6 +252,8 @@ pub fn audit_multiple(
     }
 
     let mut failed = false;
+    let mut total_groups = 0;
+    let mut passed_groups = 0;
 
     // Phase 3: For each measurement, audit using the pre-loaded commit data
     for measurement in measurements_to_audit {
@@ -198,28 +276,77 @@ pub fn audit_multiple(
             );
         }
 
-        let result = audit_with_commits(
-            &measurement,
-            &all_commits,
-            params.min_count,
-            selectors,
-            params.summarize_by,
-            params.sigma,
-            params.dispersion_method,
-        )?;
+        // Compute groups for this measurement
+        let groups =
+            compute_group_values(&all_commits, &measurement, selectors, &filters, separate_by)?;
 
-        // TODO(Phase 2): Add change point detection warning here
-        // If !_no_change_point_warning, detect change points in current epoch
-        // and warn if any exist, as they make z-score comparisons unreliable:
-        //   ⚠️  WARNING: Change point detected in current epoch at commit a1b2c3d (+23.5%)
-        //       Historical z-score comparison may be unreliable due to regime shift.
-        //       Consider bumping epoch or investigating the change.
-        // See docs/plans/change-point-detection.md for implementation details.
+        // Audit each group independently
+        for group_values in &groups {
+            // Build combined selectors (original selectors + group selectors)
+            let mut group_selectors = selectors.to_vec();
+            for (key, value) in separate_by.iter().zip(group_values.iter()) {
+                group_selectors.push((key.clone(), value.clone()));
+            }
 
-        println!("{}", result.message);
+            // Format group label for display
+            let group_label = if separate_by.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", format_group_label(separate_by, group_values))
+            };
 
-        if !result.passed {
-            failed = true;
+            let result = audit_with_commits(
+                &measurement,
+                &all_commits,
+                params.min_count,
+                &group_selectors,
+                params.summarize_by,
+                params.sigma,
+                params.dispersion_method,
+            )?;
+
+            // TODO(Phase 2): Add change point detection warning here
+            // If !_no_change_point_warning, detect change points in current epoch
+            // and warn if any exist, as they make z-score comparisons unreliable:
+            //   ⚠️  WARNING: Change point detected in current epoch at commit a1b2c3d (+23.5%)
+            //       Historical z-score comparison may be unreliable due to regime shift.
+            //       Consider bumping epoch or investigating the change.
+            // See docs/plans/change-point-detection.md for implementation details.
+
+            // Print the result with group label
+            if !separate_by.is_empty() {
+                // Print header for the group
+                println!("Auditing measurement \"{}\"{}:", measurement, group_label);
+                // Indent the result message
+                for line in result.message.lines() {
+                    println!("  {}", line);
+                }
+                println!(); // Add blank line between groups
+            } else {
+                println!("{}", result.message);
+            }
+
+            total_groups += 1;
+            if result.passed {
+                passed_groups += 1;
+            } else {
+                failed = true;
+            }
+        }
+    }
+
+    // Print summary if grouping is active
+    if !separate_by.is_empty() {
+        if failed {
+            println!(
+                "Overall: FAILED ({}/{} groups passed)",
+                passed_groups, total_groups
+            );
+        } else {
+            println!(
+                "Overall: PASSED ({}/{} groups passed)",
+                passed_groups, total_groups
+            );
         }
     }
 
@@ -610,6 +737,7 @@ mod test {
                 Some(2.0),
                 Some(DispersionMethod::StandardDeviation),
                 &[], // Empty combined_patterns
+                &[], // Empty separate_by
                 false,
             );
 
