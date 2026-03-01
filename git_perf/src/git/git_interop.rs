@@ -15,7 +15,7 @@ use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use itertools::Itertools;
 
 use chrono::prelude::*;
-use rand::{rng, Rng};
+use rand::{rng, RngExt};
 
 use crate::config;
 
