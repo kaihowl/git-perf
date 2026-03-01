@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.3...git-perf-v0.19.0) - 2026-03-01
+
+### Added
+
+- make confidence_threshold user configurable ([#650](https://github.com/kaihowl/git-perf/pull/650))
+- add changepoints config to detailed config output ([#649](https://github.com/kaihowl/git-perf/pull/649))
+- add min_absolute_deviation ([#647](https://github.com/kaihowl/git-perf/pull/647))
+- *(cli)* add status and reset commands ([#589](https://github.com/kaihowl/git-perf/pull/589))
+- *(audit)* show aggregation method in audit output ([#618](https://github.com/kaihowl/git-perf/pull/618))
+- *(reporting)* add commit author and title to change point hover text ([#599](https://github.com/kaihowl/git-perf/pull/599))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group with 6 updates ([#646](https://github.com/kaihowl/git-perf/pull/646))
+- *(deps)* bump the cargo-dependencies group with 4 updates ([#637](https://github.com/kaihowl/git-perf/pull/637))
+- *(deps)* bump thiserror from 2.0.17 to 2.0.18 in the cargo-dependencies group ([#631](https://github.com/kaihowl/git-perf/pull/631))
+- *(deps)* bump the cargo-dependencies group with 2 updates ([#628](https://github.com/kaihowl/git-perf/pull/628))
+- *(deps)* bump the cargo-dependencies group with 4 updates ([#621](https://github.com/kaihowl/git-perf/pull/621))
+- *(deps)* bump the cargo-dependencies group across 1 directory with 4 updates ([#616](https://github.com/kaihowl/git-perf/pull/616))
+
 ## [0.18.3](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.2...git-perf-v0.18.3) - 2026-01-02
 
 ### Fixed
