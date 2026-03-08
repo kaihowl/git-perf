@@ -28,6 +28,20 @@ Detailed guides for specific use cases:
   - JUnit XML format (pytest, Jest, cargo-nextest, JUnit, and more)
   - Criterion JSON format (Rust benchmarks)
   - Cross-language examples and best practices
+- **[GitHub Pages Integration](./github-pages-integration.md)** - Deploy reports to GitHub Pages
+  - Subdirectory deployment for coexistence with documentation
+  - Workflow coordination and race condition prevention
+  - Index page generation
+  - Integration examples (MkDocs, Jekyll, static sites)
+- **[Report Templating](./report-templating.md)** - Customize HTML report appearance
+  - Simple templates with custom layout and styling
+  - Dashboard templates with multiple visualizations
+  - Template placeholders and custom CSS
+  - Branded and multi-project examples
+- **[Dashboard Templates](./dashboard-templates.md)** - Multi-section performance reports
+  - Section-based configuration syntax
+  - Independent filtering and aggregation per section
+  - Dashboard examples and use cases
 
 ## Reference Documentation
 
@@ -108,6 +122,9 @@ docs/
 ├── README.md (this file)                  # Documentation index
 ├── INTEGRATION_TUTORIAL.md                # End-to-end GitHub Actions setup
 ├── importing-measurements.md              # Test and benchmark import guide
+├── github-pages-integration.md            # GitHub Pages deployment guide
+├── report-templating.md                   # Report customization guide
+├── dashboard-templates.md                 # Multi-section report templates
 ├── manpage.md                             # CLI reference (auto-generated)
 ├── example_config.toml                    # Configuration template
 ├── ci-variance-experiment/                # Runner variance analysis

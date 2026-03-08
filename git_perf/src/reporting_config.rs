@@ -32,6 +32,8 @@ pub struct ReportTemplateConfig {
     pub template_path: Option<PathBuf>,
     pub custom_css_path: Option<PathBuf>,
     pub title: Option<String>,
+    /// URL to the index page listing all reports (used in navigation)
+    pub all_reports_url: Option<String>,
 }
 
 /// Configuration for a single report section in a multi-section template
