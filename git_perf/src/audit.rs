@@ -133,7 +133,6 @@ fn compute_group_values(
     commits: &[Result<Commit>],
     measurement_name: &str,
     selectors: &[(String, String)],
-    filters: &[regex::Regex],
     separate_by: &[String],
 ) -> Result<Vec<Vec<String>>> {
     if separate_by.is_empty() {
@@ -146,11 +145,6 @@ fn compute_group_values(
         for measurement in &commit.measurements {
             // Only consider measurements that match the name
             if measurement.name != measurement_name {
-                continue;
-            }
-
-            // Check if measurement name matches any filter
-            if !crate::filter::matches_any_filter(&measurement.name, filters) {
                 continue;
             }
 
@@ -277,8 +271,7 @@ pub fn audit_multiple(
         }
 
         // Compute groups for this measurement
-        let groups =
-            compute_group_values(&all_commits, &measurement, selectors, &filters, separate_by)?;
+        let groups = compute_group_values(&all_commits, &measurement, selectors, separate_by)?;
 
         // Audit each group independently
         for group_values in &groups {
@@ -326,10 +319,13 @@ pub fn audit_multiple(
                 println!("{}", result.message);
             }
 
-            total_groups += 1;
-            if result.passed {
-                passed_groups += 1;
-            } else {
+            if !separate_by.is_empty() {
+                total_groups += 1;
+                if result.passed {
+                    passed_groups += 1;
+                }
+            }
+            if !result.passed {
                 failed = true;
             }
         }
