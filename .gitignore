@@ -5,3 +5,8 @@
 # Mutation testing artifacts
 mutants.out/
 mutants.out.old/
+
+# TLC model checker artifacts
+tla/*.bin
+tla/*_TTrace_*.tla
+tla/states/
