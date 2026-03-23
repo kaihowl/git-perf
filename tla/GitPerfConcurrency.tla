@@ -375,6 +375,14 @@ PusherDeleteFail(p) ==
 (* ====================================================================
    TRANSITION RELATION
    ==================================================================== *)
+\* Terminal state: all processes have finished.  This self-loop lets TLC
+\* know the state is intentionally terminal rather than an unexpected
+\* deadlock.
+Terminating ==
+    /\ \A a \in Adders  : adderPC[a]  = "Done"
+    /\ \A p \in Pushers : pusherPC[p] = "Done"
+    /\ UNCHANGED vars
+
 Next ==
     \/ \E a \in Adders :
            \/ AdderReadSymref(a)
@@ -391,6 +399,7 @@ Next ==
            \/ PusherFetch(p)
            \/ PusherDeleteSuccess(p)
            \/ PusherDeleteFail(p)
+    \/ Terminating
 
 (* ====================================================================
    SAFETY INVARIANTS
