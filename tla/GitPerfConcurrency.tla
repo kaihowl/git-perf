@@ -67,22 +67,23 @@
  * -----------------------------------------------------------------------
  * Modelling choices
  * -----------------------------------------------------------------------
- * • Measurements are opaque values; each adder adds exactly one (its ID).
- * • git notes content is a set of measurements (cat_sort_uniq = set union).
- * • OIDs are identified with content sets: equal content ↔ equal OID.
- * • Write-ref names are drawn from a finite pool of integers.
- * • Merge-refs (refs/notes/perf-v3-merge-*) are tracked separately so
+ * - Measurements are opaque values; each adder adds exactly one (its ID).
+ * - git notes content is a set of measurements (cat_sort_uniq = set union).
+ * - OIDs are identified with content sets: equal content <-> equal OID.
+ * - Write-ref names are drawn from a finite pool of integers.
+ * - Merge-refs (refs/notes/perf-v3-merge-STAR) are tracked separately so
  *   they are never confused with write-targets during enumeration.
- * • Only safety is checked; liveness / termination are out of scope.
- * • Steps P4 and P5 are modelled as one atomic action (overapproximation)
+ * - Only safety is checked; liveness / termination are out of scope.
+ * - Steps P4 and P5 are modelled as one atomic action (overapproximation)
  *   because combining them cannot hide safety violations: the delete CAS
  *   is the true guard that prevents measurement loss.
  *)
 EXTENDS Integers, FiniteSets, TLC
 
 CONSTANTS
-    Adders,   \* Set of adder process identifiers
-    Pushers   \* Set of pusher process identifiers
+    Adders,      \* Set of adder process identifiers
+    Pushers,     \* Set of pusher process identifiers
+    NonExistent  \* Model-value sentinel: ref does not exist as a git object
 
 ASSUME /\ Adders  # {}
        /\ Pushers # {}
@@ -99,9 +100,6 @@ AllMeasurements == { Measurement(a) : a \in Adders }
 \*   + per adder: retries bounded by MaxWR
 MaxWR == 2 + 3 * Cardinality(Adders) + 4 * Cardinality(Pushers)
 WRPool == 1..MaxWR
-
-\* Sentinel: the ref does not exist as a git object
-NonExistent == "NonExistent"
 
 (* ====================================================================
    STATE VARIABLES
