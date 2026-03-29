@@ -142,6 +142,13 @@ jobs:
             done
           done
 
+          # Pre-populate inner-test-metric to a fixed size: normalizes notes object size for all
+          # 50 measured samples and warms the filesystem cache, preventing cold-cache variance
+          # on the first measured sample.
+          for i in {1..50}; do
+            git -C "$TEMP_REPO" perf add -m inner-test-metric $((100 + i))
+          done
+
           # Return to main repo for measurements
           cd "$GITHUB_WORKSPACE"
 
@@ -172,7 +179,7 @@ jobs:
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
 
     - name: Archive report
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         include-hidden-files: true
@@ -327,7 +334,7 @@ jobs:
         ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable
 
     - name: Upload size artifact
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: release-binary-size
         path: metrics/release_binary_size.txt

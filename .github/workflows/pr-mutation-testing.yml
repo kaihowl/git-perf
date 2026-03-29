@@ -298,7 +298,7 @@ jobs:
 
     - name: Upload mutation testing artifacts
       if: always() && env.SKIP_MUTATION_TESTING != 'true'
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: pr-mutation-report-${{ github.event.pull_request.number }}-${{ github.run_number }}
         path: |
