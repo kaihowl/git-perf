@@ -215,9 +215,9 @@ The audit supports two methods for calculating statistical dispersion:
 
 Configuration is done via the `.gitperfconfig` file:
 
-**Default settings:** - `[measurement].min_relative_deviation = 5.0` - `[measurement].dispersion_method = "mad"` - `[measurement].min_measurements = 3` - `[measurement].aggregate_by = "median"` - `[measurement].sigma = 3.5`
+**Default settings:** - `[measurement].min_relative_deviation = 5.0` - `[measurement].min_absolute_deviation = 0.5` - `[measurement].dispersion_method = "mad"` - `[measurement].min_measurements = 3` - `[measurement].aggregate_by = "median"` - `[measurement].sigma = 3.5`
 
-**Measurement-specific settings (override defaults):** - `[measurement."name"].min_relative_deviation = 10.0` - `[measurement."name"].dispersion_method = "stddev"` - `[measurement."name"].min_measurements = 5` - `[measurement."name"].aggregate_by = "mean"` - `[measurement."name"].sigma = 4.5`
+**Measurement-specific settings (override defaults):** - `[measurement."name"].min_relative_deviation = 10.0` - `[measurement."name"].min_absolute_deviation = 1.0` - `[measurement."name"].dispersion_method = "stddev"` - `[measurement."name"].min_measurements = 5` - `[measurement."name"].aggregate_by = "mean"` - `[measurement."name"].sigma = 4.5`
 
 ## Precedence
 
