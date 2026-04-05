@@ -1058,57 +1058,78 @@ pub fn get_commits_with_notes(notes_ref: &str) -> Result<Vec<String>> {
     Ok(commits)
 }
 
-/// Get detailed commit information (SHA, title, author) for specific commits.
-/// This is more efficient than walking commits when you already know which commits you need.
-pub fn get_commit_details(commit_shas: &[String]) -> Result<Vec<CommitWithNotes>> {
+/// Batch-fetch all commits that have notes in `notes_ref`, together with their
+/// note content, commit subject, and author — in exactly 2 git calls regardless
+/// of how many commits have notes.
+///
+/// Uses `git notes list` to discover which commits have notes, then a single
+/// `git log --no-walk` with `--notes=<ref>` to fetch everything in one pass.
+pub fn get_commits_with_notes_content(notes_ref: &str) -> Result<Vec<CommitWithNotes>> {
+    // Call 1: get commit SHAs that have notes in this ref
+    let list_output = capture_git_output(&["notes", "--ref", notes_ref, "list"], &None)
+        .context(format!("Failed to list notes in {}", notes_ref))?;
+
+    let commit_shas: Vec<String> = list_output
+        .stdout
+        .lines()
+        .filter(|l| !l.is_empty())
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            (parts.len() >= 2).then(|| parts[1].to_string())
+        })
+        .collect();
+
     if commit_shas.is_empty() {
         return Ok(Vec::new());
     }
 
-    let mut commits = Vec::new();
+    // Call 2: fetch commit metadata + note content in one git log --no-walk pass.
+    // Format: each commit header is "<sha>\0<title>\0<author>" (null-separated to
+    // handle commas/special chars in subjects), followed by note lines via %N.
+    let notes_flag = format!("--notes={}", notes_ref);
+    let mut args = vec![
+        "--no-pager",
+        "log",
+        "--no-color",
+        "--no-walk",
+        "--pretty=format:%H%x00%s%x00%an%n%N",
+        &notes_flag,
+    ];
+    args.extend(commit_shas.iter().map(|s| s.as_str()));
 
-    for sha in commit_shas {
-        let output =
-            capture_git_output(&["show", "--no-patch", "--format=%H%n%s%n%an", sha], &None)
-                .context(format!("Failed to get commit details for {}", sha))?;
+    let output =
+        capture_git_output(&args, &None).context("Failed to fetch commit details and notes")?;
 
-        let lines: Vec<&str> = output.stdout.lines().collect();
-        if lines.len() >= 3 {
+    // Parse output: lines containing '\0' are commit headers; all other lines
+    // (until the next header) are note content for the preceding commit.
+    let mut commits: Vec<CommitWithNotes> = Vec::new();
+
+    for line in output.stdout.lines() {
+        if line.contains('\0') {
+            let mut parts = line.splitn(3, '\0');
+            let sha = parts.next().unwrap_or("").to_string();
+            let title = parts
+                .next()
+                .map(|s| if s.is_empty() { "[no subject]" } else { s })
+                .unwrap_or("[no subject]")
+                .to_string();
+            let author = parts
+                .next()
+                .map(|s| if s.is_empty() { "[unknown]" } else { s })
+                .unwrap_or("[unknown]")
+                .to_string();
             commits.push(CommitWithNotes {
-                sha: lines[0].to_string(),
-                title: if lines[1].is_empty() {
-                    "[no subject]".to_string()
-                } else {
-                    lines[1].to_string()
-                },
-                author: if lines[2].is_empty() {
-                    "[unknown]".to_string()
-                } else {
-                    lines[2].to_string()
-                },
-                note_lines: Vec::new(), // Will be filled in by caller
+                sha,
+                title,
+                author,
+                note_lines: Vec::new(),
             });
+        } else if let Some(last) = commits.last_mut() {
+            last.note_lines.push(line.to_string());
         }
     }
 
     Ok(commits)
-}
-
-/// Get the notes content for a specific commit from a notes ref.
-/// Returns the note lines as a vector of strings.
-pub fn get_notes_for_commit(notes_ref: &str, commit_sha: &str) -> Result<Vec<String>> {
-    let output = capture_git_output(&["notes", "--ref", notes_ref, "show", commit_sha], &None);
-
-    match output {
-        Ok(output) => {
-            let note_lines: Vec<String> = output.stdout.lines().map(|s| s.to_string()).collect();
-            Ok(note_lines)
-        }
-        Err(_) => {
-            // No notes for this commit is not an error
-            Ok(Vec::new())
-        }
-    }
 }
 
 pub fn pull(work_dir: Option<&Path>) -> Result<()> {

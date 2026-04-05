@@ -1,6 +1,5 @@
 use crate::git::git_interop::{
-    create_consolidated_pending_read_branch, get_commit_details, get_commits_with_notes,
-    get_notes_for_commit,
+    create_consolidated_pending_read_branch, get_commits_with_notes_content,
 };
 use crate::serialization::deserialize;
 use anyhow::Result;
@@ -59,23 +58,18 @@ pub fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
     // Get the temporary ref name from the guard
     let pending_ref = pending_guard.ref_name();
 
-    // Efficiently get commits that have notes in the pending branch
-    // These are all commits with pending (unpushed) measurements
-    let pending_commits = get_commits_with_notes(pending_ref)?;
+    // Batch-fetch all commits with notes + their content and metadata in 2 git
+    // calls total, regardless of how many commits have pending measurements.
+    let commits_with_notes = get_commits_with_notes_content(pending_ref)?;
 
     let mut commit_count = 0;
     let mut measurement_count = 0;
     let mut all_measurement_names = HashSet::new();
     let mut per_commit = if detailed { Some(Vec::new()) } else { None };
 
-    for commit_sha in &pending_commits {
-        let note_lines = get_notes_for_commit(pending_ref, commit_sha)?;
-        if note_lines.is_empty() {
-            continue;
-        }
-
+    for commit in &commits_with_notes {
         // Deserialize measurements from note
-        let note_text = note_lines.join("\n");
+        let note_text = commit.note_lines.join("\n");
         let measurements = deserialize(&note_text);
 
         if measurements.is_empty() {
@@ -92,18 +86,14 @@ pub fn gather_pending_status(detailed: bool) -> Result<PendingStatus> {
             all_measurement_names.insert(name.clone());
         }
 
-        // Store per-commit details if requested
+        // Store per-commit details if requested (title already fetched in batch)
         if let Some(ref mut per_commit_vec) = per_commit {
-            // Get commit details (title, author)
-            let commit_details = get_commit_details(std::slice::from_ref(commit_sha))?;
-            if let Some(commit_info) = commit_details.first() {
-                per_commit_vec.push(CommitMeasurements {
-                    commit: commit_sha.clone(),
-                    title: commit_info.title.clone(),
-                    measurement_names: measurement_names.clone(),
-                    count: measurements.len(),
-                });
-            }
+            per_commit_vec.push(CommitMeasurements {
+                commit: commit.sha.clone(),
+                title: commit.title.clone(),
+                measurement_names,
+                count: measurements.len(),
+            });
         }
     }
 
