@@ -7,14 +7,12 @@ set -e
 
 echo "Generating manpages and markdown documentation (manpages without version)"
 
-# Build to generate docs in OUT_DIR
-cargo build --package git_perf_cli_types --package git-perf
-
-# Find the OUT_DIR by looking for the generated files
-OUT_DIR=$(find target/debug/build/git-perf-*/out -type d 2>/dev/null | head -n 1)
+# Build and extract the exact OUT_DIR from cargo's JSON output
+OUT_DIR=$(cargo build --package git_perf_cli_types --package git-perf --message-format=json 2>/dev/null \
+  | jq -r 'select(.reason == "build-script-executed") | select(.package_id | contains("git-perf")) | .out_dir')
 
 if [[ -z "$OUT_DIR" ]]; then
-  echo "Error: Could not find OUT_DIR in target/debug/build/git-perf-*/out"
+  echo "Error: Could not determine OUT_DIR from cargo build output"
   exit 1
 fi
 

@@ -142,6 +142,13 @@ jobs:
             done
           done
 
+          # Pre-populate inner-test-metric to a fixed size: normalizes notes object size for all
+          # 50 measured samples and warms the filesystem cache, preventing cold-cache variance
+          # on the first measured sample.
+          for i in {1..50}; do
+            git -C "$TEMP_REPO" perf add -m inner-test-metric $((100 + i))
+          done
+
           # Return to main repo for measurements
           cd "$GITHUB_WORKSPACE"
 

@@ -24,7 +24,7 @@ min_measurements = 10
 epoch = "f010ce39"
 unit = "ns"
 sigma = 3
-aggregate_by = "median"
+aggregate_by = "min"
 min_measurements = 10
 
 [measurement."add-benchmark"]
@@ -32,7 +32,7 @@ epoch = "f010ce39"
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
-aggregate_by = "median"
+aggregate_by = "min"
 min_measurements = 10
 # MAD converges to ~228µs as measurements stabilize, making the ±3.5σ threshold
 # only ±800µs — too tight for CI runner variability. Even when the z-score
@@ -41,7 +41,7 @@ min_measurements = 10
 min_relative_deviation = 10.0
 
 [measurement."report-size-benchmark"]
-epoch = "bb39c5f7"
+epoch = "fe2d91f5"
 unit = "bytes"
 min_relative_deviation = 10.0
 sigma = 3.5

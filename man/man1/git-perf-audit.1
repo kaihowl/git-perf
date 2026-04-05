@@ -62,7 +62,17 @@ What to aggregate the measurements in each group with. If not specified, uses th
 .br
 
 .br
-[\fIpossible values: \fRmin, max, median, mean]
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+min
+.IP \(bu 2
+max
+.IP \(bu 2
+median
+.IP \(bu 2
+mean
+.RE
 .TP
 \fB\-d\fR, \fB\-\-sigma\fR \fI<SIGMA>\fR
 Multiple of the dispersion after which an outlier is detected. If the HEAD measurement is within the acceptable range based on this threshold, it is considered acceptable. If not specified, uses the value from .gitperfconfig file, or defaults to 4.0
@@ -78,7 +88,13 @@ If not specified, uses the value from .gitperfconfig file, or defaults to stddev
 .br
 
 .br
-[\fIpossible values: \fRstddev, mad]
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+stddev
+.IP \(bu 2
+mad
+.RE
 .TP
 \fB\-\-no\-change\-point\-warning\fR
 Suppress warning when change points are detected in the current epoch. By default, audit will warn if a change point (regime shift) is detected within the current measurement epoch, as this may affect z\-score reliability
