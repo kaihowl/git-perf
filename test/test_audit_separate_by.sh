@@ -29,7 +29,7 @@ git perf add -m timer --key-value os=macos 20
 assert_success_with_output output git perf audit -m timer -S os
 assert_contains "$output" "Auditing measurement \"timer\" (os=linux):"
 assert_contains "$output" "Auditing measurement \"timer\" (os=macos):"
-assert_contains "$output" "Overall: PASSED"
+assert_contains "$output" "Overall: PASSED (2/2 groups passed)"
 
 # Test that groups are audited independently
 # Add a failing measurement to one group (linux), but keep macos stable
@@ -90,6 +90,42 @@ assert_success_with_output output git perf audit -m test --selectors env=prod -S
 assert_contains "$output" "Auditing measurement \"test\" (os=linux):"
 # Should only show one group since we filtered to env=prod first
 assert_not_contains "$output" "env=dev"
+
+test_section "Audit with separate-by: combined with filter regex"
+
+cd_empty_repo
+
+# Create two different measurements, both with an os key
+create_commit
+git perf add -m bench_a --key-value os=linux 10
+git perf add -m bench_b --key-value os=linux 10
+create_commit
+git perf add -m bench_a --key-value os=linux 10
+git perf add -m bench_b --key-value os=linux 10
+create_commit
+git perf add -m bench_a --key-value os=linux 10
+git perf add -m bench_b --key-value os=linux 10
+
+# Using -f (filter) instead of -m should still work with -S
+assert_success_with_output output git perf audit -f "bench_.*" -S os
+assert_contains "$output" "Auditing measurement \"bench_a\" (os=linux):"
+assert_contains "$output" "Auditing measurement \"bench_b\" (os=linux):"
+assert_contains "$output" "Overall: PASSED"
+
+test_section "Audit with separate-by: error when separate-by key overlaps with selectors"
+
+cd_empty_repo
+
+create_commit
+git perf add -m timer --key-value os=linux 10
+create_commit
+git perf add -m timer --key-value os=linux 10
+create_commit
+git perf add -m timer --key-value os=linux 10
+
+# Should fail when -S key is already specified via -s
+assert_failure_with_output output git perf audit -m timer -s os=linux -S os
+assert_contains "$output" "separate-by key 'os' already present in selectors"
 
 test_section "Audit with separate-by: error when key doesn't exist"
 
