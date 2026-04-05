@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.19.0...git-perf-v0.20.0) - 2026-04-05
+
+### Added
+
+- *(audit)* add --separate-by option for grouped auditing ([#586](https://github.com/kaihowl/git-perf/pull/586))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group with 3 updates ([#666](https://github.com/kaihowl/git-perf/pull/666))
+- *(deps)* bump the cargo-dependencies group with 4 updates ([#661](https://github.com/kaihowl/git-perf/pull/661))
+- *(deps)* bump the cargo-dependencies group with 3 updates ([#655](https://github.com/kaihowl/git-perf/pull/655))
+
 ## [0.19.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.18.3...git-perf-v0.19.0) - 2026-03-14
 
 ### Added
