@@ -132,7 +132,8 @@ ASSUME RemovableMeasurements \subseteq AllMeasurements
 \* Sized conservatively to cover all refs created during TLC model checking.
 \*   1 initial write-target
 \*   + per pusher attempt: 1 W_new (write-target) + 1 merge-ref
-\*   + per adder: retries bounded by MaxWR
+\*   + additional retry slots for adder-induced CAS failures at P8:
+\*     each adder can cause ~1-2 pusher retries (= 3 extra ref slots per adder)
 \* Removers do not allocate write-refs (their rewrite-ref is modelled as
 \* local state), so they do not increase the pool size.
 MaxWR == 2 + 3 * Cardinality(Adders) + 4 * Cardinality(Pushers)
@@ -355,7 +356,7 @@ PusherEnumMerge(p) ==
     /\ pusherPC[p] = "EnumMerge"
     /\ LET wn  == pusherNewWR[p]
            mr  == pusherMergeRef[p]
-           cap == { wr \in EnumerableWRs : wr # wn /\ wr # mr }
+           cap == { wr \in EnumerableWRs : wr # wn }
            captured    == [wr \in cap |-> writeRefs[wr]]
            mergedContent == UNION ({ writeRefs[wr] : wr \in cap }
                                    \cup {writeRefs[mr]})
