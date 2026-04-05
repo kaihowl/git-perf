@@ -209,6 +209,18 @@ pub fn audit_multiple(
         return Ok(());
     }
 
+    // Validate that separate_by keys don't overlap with selectors (would produce contradictory filters)
+    let selector_keys: std::collections::HashSet<&str> =
+        selectors.iter().map(|(k, _)| k.as_str()).collect();
+    for key in separate_by {
+        if selector_keys.contains(key.as_str()) {
+            bail!(
+                "separate-by key '{}' already present in selectors; remove it from --selectors or --separate-by",
+                key
+            );
+        }
+    }
+
     // Compile combined regex patterns (measurements as exact matches + filter patterns)
     // early to fail fast on invalid patterns
     let filters = crate::filter::compile_filters(combined_patterns)?;
