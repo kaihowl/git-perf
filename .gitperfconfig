@@ -21,14 +21,14 @@ min_relative_deviation = 10.0
 min_measurements = 10
 
 [measurement."report-benchmark"]
-epoch = "f010ce39"
+epoch = "296bc41"
 unit = "ns"
 sigma = 3
 aggregate_by = "min"
 min_measurements = 10
 
 [measurement."add-benchmark"]
-epoch = "f010ce39"
+epoch = "296bc41"
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
