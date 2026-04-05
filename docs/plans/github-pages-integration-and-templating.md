@@ -1029,14 +1029,15 @@ This index is preserved by `keep_files: true` when reports are deployed to `/per
 - Implementation in `git_perf/src/reporting.rs` (~500 lines added)
 - Backward compatible with simple templates
 
-### Phase 3: Index Generation (Weeks 5-6)
-- [ ] Implement `generate-index` subcommand
-- [ ] Create default index template
-- [ ] Add report scanning and categorization logic
-- [ ] Integrate index generation into report action
-- [ ] Add `generate-index` input to action
-- [ ] Create example index templates for common scenarios
-- [ ] Document index customization
+### Phase 3: Index Generation (Weeks 5-6) — Won't Do
+
+Most performance measurements are recorded on ephemeral merge commits created by GitHub for PR events. These commits are never part of permanent git history and are deleted shortly after the CI run. This means:
+
+- The index cannot retrieve meaningful metadata (author, subject, date) for any PR report
+- All PR reports end up in a "dangling commits" section with no useful information
+- Even using the PR head commit SHA instead of the merge commit SHA does not fully solve the problem, as feature branches are deleted after merging, making those commits unreachable and eventually GC'd
+
+The `generate-index` approach fundamentally relies on commit SHAs being resolvable in git history, which is not the case for the primary use case (PR CI runs). The feature would produce a largely useless index page for most users.
 
 ### Phase 4: Documentation & Examples (Week 7)
 - [ ] Create integration guide for MkDocs
