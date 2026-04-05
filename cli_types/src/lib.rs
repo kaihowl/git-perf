@@ -402,6 +402,13 @@ pub enum Commands {
         #[arg(short = 'f', long = "filter", required_unless_present = "measurement")]
         filter: Vec<String>,
 
+        /// Create separate audit groups by grouping with the value of this selector.
+        /// Can be specified multiple times to split on multiple dimensions (e.g., -S os -S arch).
+        /// Multiple splits create combined group labels like "os=ubuntu/arch=x64".
+        /// Each group is audited independently with its own statistical validation.
+        #[arg(short = 'S', long, value_parser=parse_spaceless_string)]
+        separate_by: Vec<String>,
+
         /// Minimum number of historic measurements needed. If less, pass test and assume
         /// more measurements are needed.
         /// A minimum of two historic measurements are needed for proper evaluation of standard
