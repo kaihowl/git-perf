@@ -181,6 +181,8 @@ Create an HTML performance report
 * `-n`, `--max-count <MAX_COUNT>` — Limit the number of previous commits considered. HEAD is included in this count
 
   Default value: `40`
+* `--since <SINCE>` — Only include commits more recent than a specific date. Accepts all formats that `git log --since` accepts, e.g. "2025-01-01", "2 weeks ago", "yesterday"
+* `--until <UNTIL>` — Only include commits older than a specific date. Accepts all formats that `git log --until` accepts, e.g. "2025-12-31", "yesterday"
 * `-m`, `--measurement <MEASUREMENT>` — Select an individual measurements instead of all
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '=', select only matching measurements
 * `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Example: -f "bench.*" -f "test_.*"
@@ -243,6 +245,8 @@ The sparkline visualization shows the range of measurements relative to the tail
 * `-n`, `--max-count <MAX_COUNT>` — Limit the number of previous commits considered. HEAD is included in this count
 
   Default value: `40`
+* `--since <SINCE>` — Only include commits more recent than a specific date. Accepts all formats that `git log --since` accepts, e.g. "2025-01-01", "2 weeks ago", "yesterday"
+* `--until <UNTIL>` — Only include commits older than a specific date. Accepts all formats that `git log --until` accepts, e.g. "2025-12-31", "yesterday"
 * `-s`, `--selectors <SELECTORS>` — Key-value pair separated by "=" with no whitespaces to subselect measurements
 * `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). At least one of --measurement or --filter must be provided. If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Examples: -f "bench_.*" (prefix), -f ".*_x64$" (suffix), -f "^perf_" (anchored prefix)
 * `-S`, `--separate-by <SEPARATE_BY>` — Create separate audit groups by grouping with the value of this selector. Can be specified multiple times to split on multiple dimensions (e.g., -S os -S arch). Multiple splits create combined group labels like "os=ubuntu/arch=x64". Each group is audited independently with its own statistical validation

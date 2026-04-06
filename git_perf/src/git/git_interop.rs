@@ -949,7 +949,12 @@ fn update_pending_read_branch() -> Result<TempRef> {
 ///     println!("Commit: {} by {}: {}", commit.sha, commit.author, commit.title);
 /// }
 /// ```
-pub fn walk_commits_from(start_commit: &str, num_commits: usize) -> Result<Vec<CommitWithNotes>> {
+pub fn walk_commits_from(
+    start_commit: &str,
+    num_commits: usize,
+    since: Option<&str>,
+    until: Option<&str>,
+) -> Result<Vec<CommitWithNotes>> {
     // update local read branch
     let temp_ref = update_read_branch()?;
 
@@ -957,23 +962,33 @@ pub fn walk_commits_from(start_commit: &str, num_commits: usize) -> Result<Vec<C
     let resolved_commit = resolve_committish(start_commit)
         .context(format!("Failed to resolve commit '{}'", start_commit))?;
 
-    let output = capture_git_output(
-        &[
-            "--no-pager",
-            "log",
-            "--no-color",
-            "--ignore-missing",
-            "-n",
-            num_commits.to_string().as_str(),
-            "--first-parent",
-            "--pretty=--,%H,%s,%an,%D%n%N",
-            "--decorate=full",
-            format!("--notes={}", temp_ref.ref_name).as_str(),
-            &resolved_commit,
-        ],
-        &None,
-    )
-    .context(format!("Failed to retrieve commits from {}", start_commit))?;
+    let num_commits_str = num_commits.to_string();
+    let notes_ref = format!("--notes={}", temp_ref.ref_name);
+    let since_arg = since.map(|s| format!("--since={}", s));
+    let until_arg = until.map(|u| format!("--until={}", u));
+
+    let mut args = vec![
+        "--no-pager",
+        "log",
+        "--no-color",
+        "--ignore-missing",
+        "-n",
+        &num_commits_str,
+        "--first-parent",
+        "--pretty=--,%H,%s,%an,%D%n%N",
+        "--decorate=full",
+        &notes_ref,
+    ];
+    if let Some(ref s) = since_arg {
+        args.push(s.as_str());
+    }
+    if let Some(ref u) = until_arg {
+        args.push(u.as_str());
+    }
+    args.push(&resolved_commit);
+
+    let output = capture_git_output(&args, &None)
+        .context(format!("Failed to retrieve commits from {}", start_commit))?;
 
     let mut commits: Vec<CommitWithNotes> = Vec::new();
     let mut detected_shallow = false;
@@ -1028,7 +1043,7 @@ pub fn walk_commits_from(start_commit: &str, num_commits: usize) -> Result<Vec<C
 
 /// Walk commits starting from HEAD (convenience wrapper)
 pub fn walk_commits(num_commits: usize) -> Result<Vec<CommitWithNotes>> {
-    walk_commits_from("HEAD", num_commits)
+    walk_commits_from("HEAD", num_commits, None, None)
 }
 
 /// Get commits that have notes in a specific notes ref.
