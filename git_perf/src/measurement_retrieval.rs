@@ -107,7 +107,7 @@ where
 ///
 /// ```no_run
 /// # use git_perf::measurement_retrieval::walk_commits_from;
-/// for commit_result in walk_commits_from("HEAD", 10).unwrap() {
+/// for commit_result in walk_commits_from("HEAD", 10, None, None).unwrap() {
 ///     let commit = commit_result.unwrap();
 ///     println!("Commit: {}", commit.commit);
 /// }
@@ -115,8 +115,10 @@ where
 pub fn walk_commits_from(
     start_commit: &str,
     num_commits: usize,
+    since: Option<&str>,
+    until: Option<&str>,
 ) -> Result<impl Iterator<Item = Result<Commit>>> {
-    let vec = git_interop::walk_commits_from(start_commit, num_commits)?;
+    let vec = git_interop::walk_commits_from(start_commit, num_commits, since, until)?;
     Ok(vec
         .into_iter()
         .take(num_commits)
@@ -131,8 +133,4 @@ pub fn walk_commits_from(
             })
         }))
     // When this fails it is due to a shallow clone.
-}
-
-pub fn walk_commits(num_commits: usize) -> Result<impl Iterator<Item = Result<Commit>>> {
-    walk_commits_from("HEAD", num_commits)
 }

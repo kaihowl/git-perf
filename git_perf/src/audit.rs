@@ -195,6 +195,8 @@ fn format_group_label(separate_by: &[String], group_values: &[String]) -> String
 pub fn audit_multiple(
     start_commit: &str,
     max_count: usize,
+    since: Option<&str>,
+    until: Option<&str>,
     min_count: Option<u16>,
     selectors: &[(String, String)],
     summarize_by: Option<ReductionFunc>,
@@ -228,7 +230,7 @@ pub fn audit_multiple(
     // Phase 1: Walk commits ONCE (optimization: scan commits only once)
     // Collect into Vec so we can reuse the data for multiple measurements
     let all_commits: Vec<Result<Commit>> =
-        measurement_retrieval::walk_commits_from(start_commit, max_count)?.collect();
+        measurement_retrieval::walk_commits_from(start_commit, max_count, since, until)?.collect();
 
     // Phase 2: Discover all measurements that match the combined patterns from the commit data
     // The combined_patterns already include both measurements (as exact regex) and filters (OR behavior)
@@ -739,6 +741,8 @@ mod test {
             let result = audit_multiple(
                 "HEAD",
                 100,
+                None,
+                None,
                 Some(1),
                 &[],
                 Some(ReductionFunc::Mean),

@@ -106,6 +106,18 @@ pub struct CliReportHistory {
     /// HEAD is included in this count.
     #[arg(short = 'n', long, default_value = "40")]
     pub max_count: usize,
+
+    /// Only include commits more recent than a specific date.
+    /// Accepts all formats that `git log --since` accepts, e.g.
+    /// "2025-01-01", "2 weeks ago", "yesterday".
+    #[arg(long, alias = "after")]
+    pub since: Option<String>,
+
+    /// Only include commits older than a specific date.
+    /// Accepts all formats that `git log --until` accepts, e.g.
+    /// "2025-12-31", "yesterday".
+    #[arg(long, alias = "before")]
+    pub until: Option<String>,
 }
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]

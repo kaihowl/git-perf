@@ -1807,6 +1807,8 @@ pub fn report(
     output: PathBuf,
     separate_by: Vec<String>,
     num_commits: usize,
+    since: Option<&str>,
+    until: Option<&str>,
     key_values: &[(String, String)],
     aggregate_by: Option<ReductionFunc>,
     combined_patterns: &[String],
@@ -1819,7 +1821,8 @@ pub fn report(
     let _filters = crate::filter::compile_filters(combined_patterns)?;
 
     let commits: Vec<Commit> =
-        measurement_retrieval::walk_commits_from(start_commit, num_commits)?.try_collect()?;
+        measurement_retrieval::walk_commits_from(start_commit, num_commits, since, until)?
+            .try_collect()?;
 
     if commits.is_empty() {
         bail!(

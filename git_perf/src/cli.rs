@@ -111,6 +111,8 @@ pub fn handle_calls() -> Result<()> {
                 output,
                 separate_by,
                 report_history.max_count,
+                report_history.since.as_deref(),
+                report_history.until.as_deref(),
                 &key_value,
                 aggregate_by.map(ReductionFunc::from),
                 &combined_patterns,
@@ -158,6 +160,8 @@ pub fn handle_calls() -> Result<()> {
             audit::audit_multiple(
                 commit,
                 report_history.max_count,
+                report_history.since.as_deref(),
+                report_history.until.as_deref(),
                 min_measurements,
                 &selectors,
                 aggregate_by.map(ReductionFunc::from),
