@@ -41,7 +41,7 @@ jobs:
         sudo apt-get install libfaketime
 
     - name: Cache Rust dependencies
-      uses: actions/cache@v5
+      uses: actions/cache@v5.0.4
       with:
         path: |
           ~/.cargo/bin/
@@ -246,7 +246,7 @@ jobs:
 
     - name: Comment on PR with results
       if: always() && env.SKIP_MUTATION_TESTING != 'true'
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         script: |
           const fs = require('fs');
