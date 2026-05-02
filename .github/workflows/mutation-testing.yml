@@ -276,7 +276,7 @@ jobs:
 
     - name: Create issue on scheduled workflow failure
       if: failure() && github.event_name == 'schedule'
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         script: |
           const title = '🔴 Scheduled Mutation Testing Workflow Failed';
