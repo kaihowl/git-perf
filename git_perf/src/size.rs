@@ -96,7 +96,7 @@ fn display_size_report(
 
         // Sort by size descending
         let mut sorted: Vec<_> = by_name.iter().collect();
-        sorted.sort_by(|a, b| b.1.total_bytes.cmp(&a.1.total_bytes));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.1.total_bytes));
 
         for (name, size_info) in sorted {
             println!(
