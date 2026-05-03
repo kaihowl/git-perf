@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.20.0...git-perf-v0.21.0) - 2026-05-03
+
+### Added
+
+- *(git_perf)* add --since/--until date filtering to audit and report ([#674](https://github.com/kaihowl/git-perf/pull/674))
+
+### Fixed
+
+- *(git_perf)* resolve clippy warning from Rust 1.95.0 toolchain bump ([#682](https://github.com/kaihowl/git-perf/pull/682))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group across 1 directory with 8 updates ([#681](https://github.com/kaihowl/git-perf/pull/681))
+- *(status)* batch git process spawning in status command ([#671](https://github.com/kaihowl/git-perf/pull/671))
+
 ## [0.20.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.19.0...git-perf-v0.20.0) - 2026-04-05
 
 ### Added
