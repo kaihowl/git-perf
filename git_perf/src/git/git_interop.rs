@@ -157,8 +157,9 @@ fn raw_add_note_line(commit: &str, line: &str) -> Result<(), GitError> {
         .expect("Missing symbolic-ref for target");
     let temp_target = create_temp_add_head(&current_note_head)?;
 
-    defer!(remove_reference(&temp_target)
-        .expect("Deleting our own temp ref for adding should never fail"));
+    defer!(if let Err(e) = remove_reference(&temp_target) {
+        warn!("Failed to delete temp add ref {temp_target}: {e:?}");
+    });
 
     // Verify the target commit exists by resolving it
     let resolved_commit = git_rev_parse(commit)?;
@@ -398,7 +399,9 @@ where
         .as_str(),
     ))?;
 
-    remove_reference(&target)?;
+    if let Err(e) = remove_reference(&target) {
+        warn!("Failed to delete temp notes ref {target}: {e:?}");
+    }
 
     Ok(())
 }
@@ -658,7 +661,9 @@ fn raw_push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<(), GitErro
 
     let merge_ref = create_temp_ref_name(REFS_NOTES_MERGE_BRANCH_PREFIX);
 
-    defer!(remove_reference(&merge_ref).expect("Deleting our own branch should never fail"));
+    defer!(if let Err(e) = remove_reference(&merge_ref) {
+        warn!("Failed to delete temp merge ref {merge_ref}: {e:?}");
+    });
 
     // - Create a temporary merge ref, set to the upstream perf ref, merge in all existing write refs except the newly created one from the previous step.
     //     - Same step (except for filtering of the new ref) happens on local read as well.)
@@ -872,8 +877,9 @@ impl TempRef {
 
 impl Drop for TempRef {
     fn drop(&mut self) {
-        remove_reference(&self.ref_name)
-            .unwrap_or_else(|_| panic!("Failed to remove reference: {}", self.ref_name))
+        if let Err(e) = remove_reference(&self.ref_name) {
+            warn!("Failed to remove reference {}: {e:?}", self.ref_name);
+        }
     }
 }
 
