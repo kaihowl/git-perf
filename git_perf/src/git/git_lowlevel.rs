@@ -109,6 +109,14 @@ pub(super) fn map_git_error(err: GitError) -> GitError {
         GitError::ExecError { output, .. } if output.stderr.contains("bad object") => {
             GitError::BadObject { output }
         }
+        GitError::ExecError { output, .. } if output.stderr.contains("packed-refs.lock") => {
+            GitError::RefFailedToLock { output }
+        }
+        GitError::ExecError { output, .. }
+            if output.stderr.contains("lock") && output.stderr.contains("File exists") =>
+        {
+            GitError::RefFailedToLock { output }
+        }
         GitError::ExecError { .. }
         | GitError::RefFailedToPush { .. }
         | GitError::MissingHead { .. }
@@ -453,5 +461,48 @@ mod test {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_map_git_error_packed_refs_lock_maps_to_ref_failed_to_lock() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: commit: Unable to create '/tmp/test/.git/packed-refs.lock': File exists.\nAnother git process seems to be running in this repository".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_lock_file_exists_catch_all() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "error: Unable to create '/path/to/some.lock': File exists.".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_lock_without_file_exists_does_not_match() {
+        // Regression guard: "lock" alone must not map to RefFailedToLock
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: failed to lock the index".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "add".to_string(),
+            output,
+        };
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::ExecError { .. }));
     }
 }
