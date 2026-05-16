@@ -760,10 +760,29 @@ pub fn prune() -> Result<()> {
     Ok(())
 }
 
+fn cleanup_orphan_staging_refs() {
+    let prefixes = [
+        REFS_NOTES_ADD_TARGET_PREFIX,
+        REFS_NOTES_MERGE_BRANCH_PREFIX,
+        REFS_NOTES_READ_PREFIX,
+        REFS_NOTES_REWRITE_TARGET_PREFIX,
+    ];
+    for prefix in prefixes {
+        let refs = get_refs(vec![format!("{prefix}*")]).unwrap_or_default();
+        for r in refs {
+            if let Err(e) = remove_reference(&r.refname) {
+                warn!("Failed to clean up orphan ref {}: {e:?}", r.refname);
+            }
+        }
+    }
+}
+
 fn raw_prune() -> Result<(), GitError> {
     if is_shallow_repo()? {
         return Err(GitError::ShallowRepository);
     }
+
+    cleanup_orphan_staging_refs();
 
     execute_notes_operation(|target| {
         capture_git_output(&["notes", "--ref", target, "prune"], &None).map(|_| ())
