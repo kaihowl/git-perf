@@ -505,4 +505,19 @@ mod test {
         let mapped = map_git_error(error);
         assert!(matches!(mapped, GitError::ExecError { .. }));
     }
+
+    #[test]
+    fn test_map_git_error_packed_refs_lock_without_file_exists_also_maps() {
+        // Verifies the "packed-refs.lock" arm fires independently of "File exists"
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "error: packed-refs.lock is held by another process".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
+    }
 }
