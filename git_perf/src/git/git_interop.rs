@@ -780,6 +780,7 @@ fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
 /// On non-Unix platforms, conservatively returns `true` to avoid false deletions.
 #[cfg(unix)]
 fn is_process_alive(pid: u32) -> bool {
+    const ESRCH: i32 = 3;
     extern "C" {
         fn kill(pid: i32, sig: i32) -> i32;
     }
@@ -788,8 +789,8 @@ fn is_process_alive(pid: u32) -> bool {
     if result == 0 {
         return true;
     }
-    // ESRCH (3) = no such process; EPERM (1) = exists but no permission to signal
-    std::io::Error::last_os_error().raw_os_error() != Some(3)
+    // EPERM = process exists but we lack permission to signal it — treat as alive
+    std::io::Error::last_os_error().raw_os_error() != Some(ESRCH)
 }
 
 #[cfg(not(unix))]
