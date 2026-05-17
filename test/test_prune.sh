@@ -74,7 +74,7 @@ assert_equals "$nr_notes" "0" "Expected to have no notes after pruning unreachab
 
 popd
 
-test_section "Prune cleans up orphan staging refs"
+test_section "Prune cleans up orphan staging refs from dead processes"
 
 pushd "$(mktemp -d)"
 git init
@@ -84,10 +84,14 @@ git fetch --update-head-ok origin master:master
 git perf add -m test-orphan-cleanup 5
 git perf push
 
-# Manually create orphan staging refs (simulating a crashed process that left refs behind)
+# Simulate a crashed process: spawn a subshell just to capture its PID, then let it exit.
+# By the time we use the PID, the process is already dead.
+dead_pid=$(bash -c 'echo $$')
+dead_pid_hex=$(printf '%08x' "$dead_pid")
+
 current_oid=$(git rev-parse HEAD)
-git update-ref refs/notes/perf-v3-add-orphan-test "$current_oid"
-git update-ref refs/notes/perf-v3-merge-orphan-test "$current_oid"
+git update-ref "refs/notes/perf-v3-add-${dead_pid_hex}-deadbeef" "$current_oid"
+git update-ref "refs/notes/perf-v3-merge-${dead_pid_hex}-deadbeef" "$current_oid"
 
 orphan_count=$(git for-each-ref 'refs/notes/perf-v3-add-*' 'refs/notes/perf-v3-merge-*' | wc -l | tr -d '[:space:]')
 assert_equals "$orphan_count" "2" "Expected 2 orphan staging refs before prune"
@@ -96,6 +100,33 @@ git perf prune
 
 orphan_count=$(git for-each-ref 'refs/notes/perf-v3-add-*' 'refs/notes/perf-v3-merge-*' | wc -l | tr -d '[:space:]')
 assert_equals "$orphan_count" "0" "Expected 0 orphan staging refs after prune"
+
+popd
+
+test_section "Prune preserves staging refs from live processes"
+
+pushd "$(mktemp -d)"
+git init
+git remote add origin "${repo}"
+git fetch --update-head-ok origin master:master
+
+git perf add -m test-live-ref 5
+git perf push
+
+# Create a staging ref with the current process's PID — this process is still alive
+live_pid=$$
+live_pid_hex=$(printf '%08x' "$live_pid")
+current_oid=$(git rev-parse HEAD)
+live_ref="refs/notes/perf-v3-add-${live_pid_hex}-cafebabe"
+git update-ref "$live_ref" "$current_oid"
+
+git perf prune
+
+live_count=$(git for-each-ref "$live_ref" | wc -l | tr -d '[:space:]')
+assert_equals "$live_count" "1" "Expected prune to preserve staging ref from live process (PID $$)"
+
+# Clean up the ref we created
+git update-ref -d "$live_ref"
 
 popd
 

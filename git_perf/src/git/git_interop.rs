@@ -236,8 +236,9 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
 }
 
 fn random_suffix() -> String {
-    let suffix: u32 = rng().random::<u32>();
-    format!("{suffix:08x}")
+    let pid = std::process::id();
+    let random: u32 = rng().random::<u32>();
+    format!("{pid:08x}-{random:08x}")
 }
 
 fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
@@ -760,6 +761,37 @@ pub fn prune() -> Result<()> {
     Ok(())
 }
 
+fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
+    let suffix = refname.strip_prefix(prefix)?;
+    let pid_hex = suffix.split('-').next()?;
+    u32::from_str_radix(pid_hex, 16).ok()
+}
+
+/// Checks whether a process with the given PID is currently alive.
+///
+/// Uses `kill(pid, 0)` which probes for process existence without sending a signal.
+/// Returns `true` if the process exists (EPERM counts as alive — we just lack permission).
+/// Returns `false` only for ESRCH (no such process).
+/// On non-Unix platforms, conservatively returns `true` to avoid false deletions.
+#[cfg(unix)]
+fn is_process_alive(pid: u32) -> bool {
+    extern "C" {
+        fn kill(pid: i32, sig: i32) -> i32;
+    }
+    // SAFETY: kill(pid, 0) is a read-only probe; it does not affect the target process.
+    let result = unsafe { kill(pid as i32, 0) };
+    if result == 0 {
+        return true;
+    }
+    // ESRCH (3) = no such process; EPERM (1) = exists but no permission to signal
+    std::io::Error::last_os_error().raw_os_error() != Some(3)
+}
+
+#[cfg(not(unix))]
+fn is_process_alive(_pid: u32) -> bool {
+    true
+}
+
 fn cleanup_orphan_staging_refs() {
     let prefixes = [
         REFS_NOTES_ADD_TARGET_PREFIX,
@@ -770,6 +802,11 @@ fn cleanup_orphan_staging_refs() {
     for prefix in prefixes {
         let refs = get_refs(vec![format!("{prefix}*")]).unwrap_or_default();
         for r in refs {
+            if let Some(pid) = extract_pid_from_staging_ref(&r.refname, prefix) {
+                if is_process_alive(pid) {
+                    continue;
+                }
+            }
             if let Err(e) = remove_reference(&r.refname) {
                 warn!("Failed to clean up orphan ref {}: {e:?}", r.refname);
             }
@@ -1328,17 +1365,21 @@ mod test {
     fn test_random_suffix() {
         for _ in 1..1000 {
             let first = random_suffix();
-            dbg!(&first);
             let second = random_suffix();
-            dbg!(&second);
 
-            let all_hex = |s: &String| s.chars().all(|c| c.is_ascii_hexdigit());
+            // Format: {pid:08x}-{random:08x}
+            let is_valid = |s: &String| {
+                let parts: Vec<&str> = s.splitn(2, '-').collect();
+                parts.len() == 2
+                    && parts[0].len() == 8
+                    && parts[0].chars().all(|c| c.is_ascii_hexdigit())
+                    && parts[1].len() == 8
+                    && parts[1].chars().all(|c| c.is_ascii_hexdigit())
+            };
 
             assert_ne!(first, second);
-            assert_eq!(first.len(), 8);
-            assert_eq!(second.len(), 8);
-            assert!(all_hex(&first));
-            assert!(all_hex(&second));
+            assert!(is_valid(&first), "Invalid suffix format: {}", first);
+            assert!(is_valid(&second), "Invalid suffix format: {}", second);
         }
     }
 
@@ -1423,13 +1464,19 @@ mod test {
                 ref_name
             );
 
-            // Should have a hex suffix
+            // Should have a suffix in format {pid:08x}-{random:08x}
             let suffix = ref_name
                 .strip_prefix(REFS_NOTES_WRITE_TARGET_PREFIX)
                 .expect("Should have prefix");
+            let parts: Vec<&str> = suffix.splitn(2, '-').collect();
+            let is_valid_suffix = parts.len() == 2
+                && parts[0].len() == 8
+                && parts[0].chars().all(|c| c.is_ascii_hexdigit())
+                && parts[1].len() == 8
+                && parts[1].chars().all(|c| c.is_ascii_hexdigit());
             assert!(
-                !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_hexdigit()),
-                "Suffix should be non-empty hex string, got: {}",
+                is_valid_suffix,
+                "Suffix should be in format {{pid:08x}}-{{random:08x}}, got: {}",
                 suffix
             );
         });
