@@ -1643,4 +1643,28 @@ mod test {
             None,
         );
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_is_process_alive_returns_true_for_current_process() {
+        assert!(
+            is_process_alive(std::process::id()),
+            "Current process must be alive",
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_is_process_alive_returns_false_for_dead_process() {
+        let mut child = std::process::Command::new("true")
+            .spawn()
+            .expect("Failed to spawn 'true'");
+        let pid = child.id();
+        child.wait().expect("Failed to wait for child");
+        // PID is freed after wait(); extremely unlikely to be reused before the next line
+        assert!(
+            !is_process_alive(pid),
+            "PID {pid} should be dead after process exited",
+        );
+    }
 }
