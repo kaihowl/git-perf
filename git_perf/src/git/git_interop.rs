@@ -1605,4 +1605,37 @@ mod test {
             assert!(!commits.is_empty(), "Should have found commits");
         });
     }
+
+    #[test]
+    fn test_extract_pid_from_staging_ref() {
+        // Valid new-format suffix: {pid:08x}-{random:08x}
+        let refname = format!("{}{}", REFS_NOTES_ADD_TARGET_PREFIX, "deadbeef-01234567");
+        assert_eq!(
+            extract_pid_from_staging_ref(&refname, REFS_NOTES_ADD_TARGET_PREFIX),
+            Some(0xdeadbeef),
+        );
+
+        // Old-format suffix: 8-hex-char only, no dash — must return None
+        // (would overflow to negative i32 and call kill(-N, 0) on a process group)
+        let old_refname = format!("{}{}", REFS_NOTES_ADD_TARGET_PREFIX, "deadbeef");
+        assert_eq!(
+            extract_pid_from_staging_ref(&old_refname, REFS_NOTES_ADD_TARGET_PREFIX),
+            None,
+            "Old-format refs without a dash must return None to avoid kill(-N, 0) on a process group",
+        );
+
+        // Wrong prefix — strip_prefix returns None
+        let wrong_prefix = format!("{}{}", REFS_NOTES_WRITE_TARGET_PREFIX, "deadbeef-01234567");
+        assert_eq!(
+            extract_pid_from_staging_ref(&wrong_prefix, REFS_NOTES_ADD_TARGET_PREFIX),
+            None,
+        );
+
+        // Non-hex characters in pid field — from_str_radix returns Err
+        let bad_hex = format!("{}{}", REFS_NOTES_ADD_TARGET_PREFIX, "xyz00000-01234567");
+        assert_eq!(
+            extract_pid_from_staging_ref(&bad_hex, REFS_NOTES_ADD_TARGET_PREFIX),
+            None,
+        );
+    }
 }
