@@ -7,7 +7,7 @@ use std::{
 };
 
 use defer::defer;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use unindent::unindent;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -813,6 +813,7 @@ fn cleanup_orphan_staging_refs() {
                     continue;
                 }
             }
+            info!("Cleaning up orphan staging ref {}", r.refname);
             if let Err(e) = remove_reference(&r.refname) {
                 warn!("Failed to clean up orphan ref {}: {e:?}", r.refname);
             }
