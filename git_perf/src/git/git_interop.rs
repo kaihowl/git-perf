@@ -763,6 +763,11 @@ pub fn prune() -> Result<()> {
 
 fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
     let suffix = refname.strip_prefix(prefix)?;
+    // Reject old-format refs (8-hex-char only, no dash) — they would parse as
+    // large u32 values, overflow to negative i32, and make kill() target a process group.
+    if !suffix.contains('-') {
+        return None;
+    }
     let pid_hex = suffix.split('-').next()?;
     u32::from_str_radix(pid_hex, 16).ok()
 }
