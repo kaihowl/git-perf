@@ -799,6 +799,9 @@ fn is_process_alive(_pid: u32) -> bool {
 }
 
 fn cleanup_orphan_staging_refs() {
+    // REFS_NOTES_WRITE_TARGET_PREFIX is intentionally excluded: write-target refs accumulate
+    // measurements and are consumed by consolidate_write_branches_into() on the next push.
+    // Deleting them here would silently discard uncommitted measurements.
     let prefixes = [
         REFS_NOTES_ADD_TARGET_PREFIX,
         REFS_NOTES_MERGE_BRANCH_PREFIX,
