@@ -1013,6 +1013,7 @@ dependencies = [
  "human-repr",
  "itertools 0.14.0",
  "log",
+ "mutants",
  "plotly",
  "quick-xml",
  "rand 0.10.1",
@@ -1443,6 +1444,12 @@ dependencies = [
  "wasi",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "mutants"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "add0ac067452ff1aca8c5002111bd6b1c895baee6e45fcbc44e0193aea17be56"
 
 [[package]]
 name = "nichi"

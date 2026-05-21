@@ -19,6 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 git_perf_cli_types = { version = "0.5.0", path = "../cli_types" }
+mutants = "0.0.4"
 anyhow = "1.0.102"
 average = "0.17.0"
 backoff = "0.4.0"
