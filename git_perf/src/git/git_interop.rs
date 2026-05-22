@@ -772,31 +772,18 @@ fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
     u32::from_str_radix(pid_hex, 16).ok()
 }
 
-/// Checks whether a process with the given PID is currently alive.
-///
-/// Uses `kill(pid, 0)` which probes for process existence without sending a signal.
-/// Returns `true` if the process exists (EPERM counts as alive — we just lack permission).
-/// Returns `false` only for ESRCH (no such process).
-/// On non-Unix platforms, conservatively returns `true` to avoid false deletions.
-#[cfg(unix)]
 fn is_process_alive(pid: u32) -> bool {
-    const ESRCH: i32 = 3;
-    extern "C" {
-        fn kill(pid: i32, sig: i32) -> i32;
-    }
-    // SAFETY: kill(pid, 0) is a read-only probe; it does not affect the target process.
-    let result = unsafe { kill(pid as i32, 0) };
-    if result == 0 {
-        return true;
-    }
-    // EPERM = process exists but we lack permission to signal it — treat as alive
-    std::io::Error::last_os_error().raw_os_error() != Some(ESRCH)
-}
-
-#[cfg(not(unix))]
-#[mutants::skip] // Non-unix fallback: untestable in CI (unix-only build environment)
-fn is_process_alive(_pid: u32) -> bool {
-    true
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[Pid::from(pid as usize)]),
+        false,
+        ProcessRefreshKind::nothing(),
+    );
+    system
+        .process(Pid::from(pid as usize))
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 fn cleanup_orphan_staging_refs() {
@@ -1650,7 +1637,6 @@ mod test {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_is_process_alive_returns_true_for_current_process() {
         assert!(
