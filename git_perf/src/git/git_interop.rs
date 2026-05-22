@@ -794,7 +794,7 @@ fn is_process_alive(pid: u32) -> bool {
 }
 
 #[cfg(not(unix))]
-#[mutants::skip] // Untestable on unix: conservative fallback always returns true
+#[mutants::skip] // Non-unix fallback: untestable in CI (unix-only build environment)
 fn is_process_alive(_pid: u32) -> bool {
     true
 }
