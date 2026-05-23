@@ -274,9 +274,12 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Install git-perf from branch
         run: |
-          cargo install --path git_perf
+          cargo install --locked --path git_perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - uses: ./.github/actions/report
