@@ -6,6 +6,7 @@ jobs:
   test_with_git_versions:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         # Test against multiple git versions to ensure compatibility
         # NOTE: All versions must be >= 2.43.0 (see git_definitions.rs:EXPECTED_VERSION)

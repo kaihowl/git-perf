@@ -191,7 +191,7 @@ pub(super) fn git_rev_parse(reference: &str) -> Result<String, GitError> {
 /// # Examples
 ///
 /// ```no_run
-/// # use git_perf::git::git_lowlevel::resolve_committish;
+/// # use git_perf::git::git_interop::resolve_committish;
 /// let sha = resolve_committish("HEAD").unwrap();
 /// assert_eq!(sha.len(), 40); // Full SHA-1 hash
 /// ```
