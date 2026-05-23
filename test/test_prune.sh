@@ -130,5 +130,30 @@ git update-ref -d "$live_ref"
 
 popd
 
+test_section "Prune preserves old-format staging refs (no PID prefix)"
+
+pushd "$(mktemp -d)"
+git init
+git remote add origin "${repo}"
+git fetch --update-head-ok origin master:master
+
+git perf add -m test-old-format 5
+git perf push
+
+current_oid=$(git rev-parse HEAD)
+# Old format: 8 hex chars, no dash — PID cannot be extracted, must not be deleted
+old_ref="refs/notes/perf-v3-add-deadbeef"
+git update-ref "$old_ref" "$current_oid"
+
+git perf prune
+
+old_count=$(git for-each-ref "$old_ref" | wc -l | tr -d '[:space:]')
+assert_equals "$old_count" "1" "Expected prune to preserve old-format staging ref (no PID)"
+
+# Clean up
+git update-ref -d "$old_ref"
+
+popd
+
 test_stats
 exit 0

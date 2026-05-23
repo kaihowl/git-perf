@@ -763,8 +763,7 @@ pub fn prune() -> Result<()> {
 
 fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
     let suffix = refname.strip_prefix(prefix)?;
-    // Reject old-format refs (8-hex-char only, no dash) — they would parse as
-    // large u32 values, overflow to negative i32, and make kill() target a process group.
+    // Old-format refs (8-hex-char only, no dash) predate PID-prefixed naming.
     if !suffix.contains('-') {
         return None;
     }
@@ -774,16 +773,14 @@ fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
 
 fn is_process_alive(pid: u32) -> bool {
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+    let pid = Pid::from(pid as usize);
     let mut system = System::new();
     system.refresh_processes_specifics(
-        ProcessesToUpdate::Some(&[Pid::from(pid as usize)]),
+        ProcessesToUpdate::Some(&[pid]),
         false,
         ProcessRefreshKind::nothing(),
     );
-    system
-        .process(Pid::from(pid as usize))
-        .map(|p| p.exists())
-        .unwrap_or(false)
+    system.process(pid).is_some()
 }
 
 fn cleanup_orphan_staging_refs() {
@@ -799,10 +796,13 @@ fn cleanup_orphan_staging_refs() {
     for prefix in prefixes {
         let refs = get_refs(vec![format!("{prefix}*")]).unwrap_or_default();
         for r in refs {
-            if let Some(pid) = extract_pid_from_staging_ref(&r.refname, prefix) {
-                if is_process_alive(pid) {
-                    continue;
-                }
+            let Some(pid) = extract_pid_from_staging_ref(&r.refname, prefix) else {
+                // Cannot determine owning process — skip rather than risk deleting a ref
+                // from a live process (e.g., old-format refs created before PID tracking).
+                continue;
+            };
+            if is_process_alive(pid) {
+                continue;
             }
             info!("Cleaning up orphan staging ref {}", r.refname);
             if let Err(e) = remove_reference(&r.refname) {
