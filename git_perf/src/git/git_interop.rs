@@ -1004,7 +1004,7 @@ fn update_pending_read_branch() -> Result<TempRef> {
 ///
 /// ```no_run
 /// # use git_perf::git::git_interop::walk_commits_from;
-/// let commits = walk_commits_from("HEAD", 5).unwrap();
+/// let commits = walk_commits_from("HEAD", 5, None, None).unwrap();
 /// for commit in commits {
 ///     println!("Commit: {} by {}: {}", commit.sha, commit.author, commit.title);
 /// }
