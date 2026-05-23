@@ -7,7 +7,7 @@ use std::{
 };
 
 use defer::defer;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use unindent::unindent;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -157,8 +157,9 @@ fn raw_add_note_line(commit: &str, line: &str) -> Result<(), GitError> {
         .expect("Missing symbolic-ref for target");
     let temp_target = create_temp_add_head(&current_note_head)?;
 
-    defer!(remove_reference(&temp_target)
-        .expect("Deleting our own temp ref for adding should never fail"));
+    defer!(if let Err(e) = remove_reference(&temp_target) {
+        warn!("Failed to delete temp add ref {temp_target}: {e:?}");
+    });
 
     // Verify the target commit exists by resolving it
     let resolved_commit = git_rev_parse(commit)?;
@@ -235,8 +236,9 @@ fn ensure_symbolic_write_ref_exists() -> Result<(), GitError> {
 }
 
 fn random_suffix() -> String {
-    let suffix: u32 = rng().random::<u32>();
-    format!("{suffix:08x}")
+    let pid = std::process::id();
+    let random: u32 = rng().random::<u32>();
+    format!("{pid:08x}-{random:08x}")
 }
 
 fn fetch(work_dir: Option<&Path>) -> Result<(), GitError> {
@@ -398,7 +400,9 @@ where
         .as_str(),
     ))?;
 
-    remove_reference(&target)?;
+    if let Err(e) = remove_reference(&target) {
+        warn!("Failed to delete temp notes ref {target}: {e:?}");
+    }
 
     Ok(())
 }
@@ -658,7 +662,9 @@ fn raw_push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<(), GitErro
 
     let merge_ref = create_temp_ref_name(REFS_NOTES_MERGE_BRANCH_PREFIX);
 
-    defer!(remove_reference(&merge_ref).expect("Deleting our own branch should never fail"));
+    defer!(if let Err(e) = remove_reference(&merge_ref) {
+        warn!("Failed to delete temp merge ref {merge_ref}: {e:?}");
+    });
 
     // - Create a temporary merge ref, set to the upstream perf ref, merge in all existing write refs except the newly created one from the previous step.
     //     - Same step (except for filtering of the new ref) happens on local read as well.)
@@ -755,10 +761,63 @@ pub fn prune() -> Result<()> {
     Ok(())
 }
 
+fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
+    let suffix = refname.strip_prefix(prefix)?;
+    // Old-format refs (8-hex-char only, no dash) predate PID-prefixed naming.
+    if !suffix.contains('-') {
+        return None;
+    }
+    let pid_hex = suffix.split('-').next()?;
+    u32::from_str_radix(pid_hex, 16).ok()
+}
+
+fn is_process_alive(pid: u32) -> bool {
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+    let pid = Pid::from(pid as usize);
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[pid]),
+        false,
+        ProcessRefreshKind::nothing(),
+    );
+    system.process(pid).is_some()
+}
+
+fn cleanup_orphan_staging_refs() {
+    // REFS_NOTES_WRITE_TARGET_PREFIX is intentionally excluded: write-target refs accumulate
+    // measurements and are consumed by consolidate_write_branches_into() on the next push.
+    // Deleting them here would silently discard uncommitted measurements.
+    let prefixes = [
+        REFS_NOTES_ADD_TARGET_PREFIX,
+        REFS_NOTES_MERGE_BRANCH_PREFIX,
+        REFS_NOTES_READ_PREFIX,
+        REFS_NOTES_REWRITE_TARGET_PREFIX,
+    ];
+    for prefix in prefixes {
+        let refs = get_refs(vec![format!("{prefix}*")]).unwrap_or_default();
+        for r in refs {
+            let Some(pid) = extract_pid_from_staging_ref(&r.refname, prefix) else {
+                // Cannot determine owning process — skip rather than risk deleting a ref
+                // from a live process (e.g., old-format refs created before PID tracking).
+                continue;
+            };
+            if is_process_alive(pid) {
+                continue;
+            }
+            info!("Cleaning up orphan staging ref {}", r.refname);
+            if let Err(e) = remove_reference(&r.refname) {
+                warn!("Failed to clean up orphan ref {}: {e:?}", r.refname);
+            }
+        }
+    }
+}
+
 fn raw_prune() -> Result<(), GitError> {
     if is_shallow_repo()? {
         return Err(GitError::ShallowRepository);
     }
+
+    cleanup_orphan_staging_refs();
 
     execute_notes_operation(|target| {
         capture_git_output(&["notes", "--ref", target, "prune"], &None).map(|_| ())
@@ -872,8 +931,9 @@ impl TempRef {
 
 impl Drop for TempRef {
     fn drop(&mut self) {
-        remove_reference(&self.ref_name)
-            .unwrap_or_else(|_| panic!("Failed to remove reference: {}", self.ref_name))
+        if let Err(e) = remove_reference(&self.ref_name) {
+            warn!("Failed to remove reference {}: {e:?}", self.ref_name);
+        }
     }
 }
 
@@ -1303,17 +1363,21 @@ mod test {
     fn test_random_suffix() {
         for _ in 1..1000 {
             let first = random_suffix();
-            dbg!(&first);
             let second = random_suffix();
-            dbg!(&second);
 
-            let all_hex = |s: &String| s.chars().all(|c| c.is_ascii_hexdigit());
+            // Format: {pid:08x}-{random:08x}
+            let is_valid = |s: &String| {
+                let parts: Vec<&str> = s.splitn(2, '-').collect();
+                parts.len() == 2
+                    && parts[0].len() == 8
+                    && parts[0].chars().all(|c| c.is_ascii_hexdigit())
+                    && parts[1].len() == 8
+                    && parts[1].chars().all(|c| c.is_ascii_hexdigit())
+            };
 
             assert_ne!(first, second);
-            assert_eq!(first.len(), 8);
-            assert_eq!(second.len(), 8);
-            assert!(all_hex(&first));
-            assert!(all_hex(&second));
+            assert!(is_valid(&first), "Invalid suffix format: {}", first);
+            assert!(is_valid(&second), "Invalid suffix format: {}", second);
         }
     }
 
@@ -1398,13 +1462,19 @@ mod test {
                 ref_name
             );
 
-            // Should have a hex suffix
+            // Should have a suffix in format {pid:08x}-{random:08x}
             let suffix = ref_name
                 .strip_prefix(REFS_NOTES_WRITE_TARGET_PREFIX)
                 .expect("Should have prefix");
+            let parts: Vec<&str> = suffix.splitn(2, '-').collect();
+            let is_valid_suffix = parts.len() == 2
+                && parts[0].len() == 8
+                && parts[0].chars().all(|c| c.is_ascii_hexdigit())
+                && parts[1].len() == 8
+                && parts[1].chars().all(|c| c.is_ascii_hexdigit());
             assert!(
-                !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_hexdigit()),
-                "Suffix should be non-empty hex string, got: {}",
+                is_valid_suffix,
+                "Suffix should be in format {{pid:08x}}-{{random:08x}}, got: {}",
                 suffix
             );
         });
@@ -1532,5 +1602,61 @@ mod test {
             // Should have commits
             assert!(!commits.is_empty(), "Should have found commits");
         });
+    }
+
+    #[test]
+    fn test_extract_pid_from_staging_ref() {
+        // Valid new-format suffix: {pid:08x}-{random:08x}
+        let refname = format!("{}{}", REFS_NOTES_ADD_TARGET_PREFIX, "deadbeef-01234567");
+        assert_eq!(
+            extract_pid_from_staging_ref(&refname, REFS_NOTES_ADD_TARGET_PREFIX),
+            Some(0xdeadbeef),
+        );
+
+        // Old-format suffix: 8-hex-char only, no dash — must return None
+        // (would overflow to negative i32 and call kill(-N, 0) on a process group)
+        let old_refname = format!("{}{}", REFS_NOTES_ADD_TARGET_PREFIX, "deadbeef");
+        assert_eq!(
+            extract_pid_from_staging_ref(&old_refname, REFS_NOTES_ADD_TARGET_PREFIX),
+            None,
+            "Old-format refs without a dash must return None to avoid kill(-N, 0) on a process group",
+        );
+
+        // Wrong prefix — strip_prefix returns None
+        let wrong_prefix = format!("{}{}", REFS_NOTES_WRITE_TARGET_PREFIX, "deadbeef-01234567");
+        assert_eq!(
+            extract_pid_from_staging_ref(&wrong_prefix, REFS_NOTES_ADD_TARGET_PREFIX),
+            None,
+        );
+
+        // Non-hex characters in pid field — from_str_radix returns Err
+        let bad_hex = format!("{}{}", REFS_NOTES_ADD_TARGET_PREFIX, "xyz00000-01234567");
+        assert_eq!(
+            extract_pid_from_staging_ref(&bad_hex, REFS_NOTES_ADD_TARGET_PREFIX),
+            None,
+        );
+    }
+
+    #[test]
+    fn test_is_process_alive_returns_true_for_current_process() {
+        assert!(
+            is_process_alive(std::process::id()),
+            "Current process must be alive",
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_is_process_alive_returns_false_for_dead_process() {
+        let mut child = std::process::Command::new("true")
+            .spawn()
+            .expect("Failed to spawn 'true'");
+        let pid = child.id();
+        child.wait().expect("Failed to wait for child");
+        // PID is freed after wait(); extremely unlikely to be reused before the next line
+        assert!(
+            !is_process_alive(pid),
+            "PID {pid} should be dead after process exited",
+        );
     }
 }
