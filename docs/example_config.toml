@@ -127,3 +127,24 @@ penalty = 0.3
 [backoff]
 # Maximum elapsed seconds for backoff
 max_elapsed_seconds = 60
+
+# Automatically attach environment variables as metadata on every measure/add/import call.
+# Each key maps to one environment variable name or a fallback list of names.
+# The first non-empty variable in the list is used; remaining entries are ignored.
+# Opt out for a single invocation with --skip-env.
+#
+# SECURITY: .gitperfconfig is committed to the repo and resolved values are stored
+# in git-notes. Do NOT reference sensitive variables (tokens, passwords, keys) here.
+[environment]
+# Single variable: captures the GitHub Actions runner name
+runner_id = "RUNNER_NAME"
+# Fallback list: use RUNNER_OS if set, otherwise fall back to OSTYPE
+os = ["RUNNER_OS", "OSTYPE"]
+# Capture the CI workflow name
+workflow = "GITHUB_WORKFLOW"
+
+# Static fallback values used when the corresponding [environment] variable is absent.
+# Applied at lower priority than [environment] but higher than nothing.
+[defaults]
+# Default environment label when running locally (not in CI)
+environment = "local"

@@ -442,6 +442,32 @@ min_relative_deviation = 7.5
 dispersion_method = "mad"  # Test times can vary significantly
 ```
 
+### Automatic Metadata from Environment Variables
+
+The `[environment]` and `[defaults]` sections let you automatically attach metadata to every measurement without repeating `--key-value` on every command:
+
+```toml
+# Map metadata keys to environment variable names.
+# Each key can reference a single variable or a fallback list; the first
+# non-empty variable wins.
+[environment]
+runner_id = "RUNNER_NAME"            # single variable
+os        = ["RUNNER_OS", "OSTYPE"]  # fallback list
+
+# Static values used when the [environment] variable is absent or unset.
+[defaults]
+environment = "local"
+```
+
+**Precedence** (highest to lowest) for `measure`, `add`, and `import`:
+1. `--key-value` / `--metadata` CLI flags
+2. `[environment]` section — first non-empty env var in the list wins
+3. `[defaults]` section — static string fallback
+
+Use `--skip-env` on any of those commands to bypass the `[environment]` lookup for that single invocation (defaults still apply).
+
+**Security note**: `.gitperfconfig` is committed to your repository and the resolved values are stored in git-notes. Do **not** reference sensitive variables (tokens, passwords, private keys) in `[environment]`.
+
 ### Unit Configuration
 
 git-perf supports specifying units for measurements in your configuration. Units are displayed in audit output, HTML reports, and CSV exports:

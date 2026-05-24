@@ -159,6 +159,10 @@ pub enum Commands {
         #[arg(long = "commit", value_name = "COMMIT")]
         commit: Option<String>,
 
+        /// Skip reading environment variables from the `[environment]` config section
+        #[arg(long = "skip-env", default_value = "false")]
+        skip_env: bool,
+
         /// Command to measure
         #[arg(required(true), last(true))]
         command: Vec<String>,
@@ -175,6 +179,10 @@ pub enum Commands {
         /// Target commit for measurement (default: HEAD)
         #[arg(long = "commit", value_name = "COMMIT")]
         commit: Option<String>,
+
+        /// Skip reading environment variables from the `[environment]` config section
+        #[arg(long = "skip-env", default_value = "false")]
+        skip_env: bool,
     },
 
     /// Import measurements from test runners and benchmarks
@@ -251,6 +259,10 @@ pub enum Commands {
         /// Show detailed information about imported measurements
         #[arg(short, long)]
         verbose: bool,
+
+        /// Skip reading environment variables from the `[environment]` config section
+        #[arg(long = "skip-env", default_value = "false")]
+        skip_env: bool,
     },
 
     /// Publish performance results to remote

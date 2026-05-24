@@ -67,6 +67,9 @@ Measure the runtime of the supplied command (in nanoseconds)
 * `-m`, `--measurement <NAME>` — Name of the measurement
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '='
 * `--commit <COMMIT>` — Target commit for measurement (default: HEAD)
+* `--skip-env` — Skip reading environment variables from the `[environment]` config section
+
+  Default value: `false`
 
 
 
@@ -85,6 +88,9 @@ Add single measurement
 * `-m`, `--measurement <NAME>` — Name of the measurement
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '='
 * `--commit <COMMIT>` — Target commit for measurement (default: HEAD)
+* `--skip-env` — Skip reading environment variables from the `[environment]` config section
+
+  Default value: `false`
 
 
 
@@ -140,6 +146,9 @@ Tests: `test::<test_name>` Benchmarks: `bench::<benchmark_id>::<statistic>` (mea
 * `-f`, `--filter <FILTER>` — Regex filter to select specific tests/benchmarks
 * `--dry-run` — Preview what would be imported without storing
 * `-v`, `--verbose` — Show detailed information about imported measurements
+* `--skip-env` — Skip reading environment variables from the `[environment]` config section
+
+  Default value: `false`
 
 
 
