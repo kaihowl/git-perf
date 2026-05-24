@@ -199,26 +199,12 @@ pub fn read_defaults_config() -> HashMap<String, String> {
         .unwrap_or_default()
 }
 
-fn is_safe_env_var(var_name: &str) -> bool {
-    let upper = var_name.to_uppercase();
-    if upper.contains("TOKEN") || upper.contains("SECRET") {
-        log::warn!(
-            "Skipping environment variable '{}': matches sensitive variable pattern",
-            var_name
-        );
-        return false;
-    }
-    true
-}
-
 fn apply_env_source(result: &mut HashMap<String, String>, key: String, var_names: Vec<String>) {
     for var_name in &var_names {
-        if is_safe_env_var(var_name) {
-            if let Ok(val) = std::env::var(var_name) {
-                if !val.is_empty() {
-                    result.insert(key, val);
-                    break;
-                }
+        if let Ok(val) = std::env::var(var_name) {
+            if !val.is_empty() {
+                result.insert(key, val);
+                break;
             }
         }
     }
@@ -1540,42 +1526,6 @@ unit = "seconds"
             init_repo(temp_dir);
             let result = resolve_key_values(&[], false);
             assert!(result.is_empty());
-        });
-    }
-
-    #[test]
-    fn test_resolve_key_values_blocks_token_var() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir).unwrap();
-            init_repo(temp_dir);
-            let config_path = temp_dir.join(".gitperfconfig");
-            fs::write(
-                &config_path,
-                "[environment]\nmy_token = \"MY_API_TOKEN_GITPERF\"\n",
-            )
-            .unwrap();
-            env::set_var("MY_API_TOKEN_GITPERF", "secret123");
-            let result = resolve_key_values(&[], false);
-            env::remove_var("MY_API_TOKEN_GITPERF");
-            assert!(!result.iter().any(|(_, v)| v == "secret123"));
-        });
-    }
-
-    #[test]
-    fn test_resolve_key_values_blocks_secret_var() {
-        with_isolated_home(|temp_dir| {
-            env::set_current_dir(temp_dir).unwrap();
-            init_repo(temp_dir);
-            let config_path = temp_dir.join(".gitperfconfig");
-            fs::write(
-                &config_path,
-                "[environment]\nmy_secret = \"DEPLOY_SECRET_GITPERF\"\n",
-            )
-            .unwrap();
-            env::set_var("DEPLOY_SECRET_GITPERF", "hunter2");
-            let result = resolve_key_values(&[], false);
-            env::remove_var("DEPLOY_SECRET_GITPERF");
-            assert!(!result.iter().any(|(_, v)| v == "hunter2"));
         });
     }
 

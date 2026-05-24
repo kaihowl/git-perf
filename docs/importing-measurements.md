@@ -132,6 +132,25 @@ git perf import criterion-json bench.json \
   --metadata cpu=intel_i7
 ```
 
+### Automatic Metadata via Config
+
+Instead of repeating `--metadata` on every import call, declare the mappings once in `.gitperfconfig`:
+
+```toml
+# Map metadata keys to environment variable names (single var or fallback list).
+[environment]
+os       = ["RUNNER_OS", "OSTYPE"]
+workflow = "GITHUB_WORKFLOW"
+
+# Static fallbacks when the env var is absent (e.g. local development).
+[defaults]
+os = "local"
+```
+
+With this config `git perf import junit junit.xml` automatically attaches `os` and `workflow` to every measurement without extra flags. Use `--skip-env` to bypass the `[environment]` lookup for a single invocation (defaults still apply).
+
+See the [Configuration Guide](../README.md#automatic-metadata-from-environment-variables) for full precedence rules.
+
 ### Filter Imports
 
 Only import specific tests or benchmarks:

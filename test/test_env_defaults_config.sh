@@ -97,22 +97,6 @@ assert_failure git perf audit -m bench -s runner_id=runner2
 unset GITPERF_IT_FIRST
 unset GITPERF_IT_SECOND
 
-test_section "Sensitive variable names are blocked"
-cd_temp_repo
-cat > .gitperfconfig << 'EOF'
-[environment]
-tok = "MY_GITPERF_TOKEN"
-sec = "GITPERF_SECRET_KEY"
-EOF
-export MY_GITPERF_TOKEN=supersecret
-export GITPERF_SECRET_KEY=hunter2
-git perf add -m bench 100
-# Audit with the blocked values must fail (values not stored)
-assert_failure git perf audit -m bench -s tok=supersecret
-assert_failure git perf audit -m bench -s sec=hunter2
-unset MY_GITPERF_TOKEN
-unset GITPERF_SECRET_KEY
-
 test_section "import command respects [environment]"
 cd_temp_repo
 cat > .gitperfconfig << 'EOF'
@@ -143,6 +127,44 @@ export GITPERF_IT_TAG=tagged
 git perf measure -m bench -- true
 assert_success git perf audit -m bench -s env_tag=tagged
 unset GITPERF_IT_TAG
+
+test_section "measure --skip-env bypasses [environment], falls back to [defaults]"
+cd_temp_repo
+cat > .gitperfconfig << 'EOF'
+[environment]
+env_tag = "GITPERF_IT_MEASURE_SKIP"
+
+[defaults]
+env_tag = "from_defaults"
+EOF
+export GITPERF_IT_MEASURE_SKIP=from_env
+git perf measure -m bench --skip-env -- true
+assert_success git perf audit -m bench -s env_tag=from_defaults
+assert_failure git perf audit -m bench -s env_tag=from_env
+unset GITPERF_IT_MEASURE_SKIP
+
+test_section "import --skip-env bypasses [environment], falls back to [defaults]"
+cd_temp_repo
+cat > .gitperfconfig << 'EOF'
+[environment]
+ci = "GITPERF_IT_IMPORT_SKIP"
+
+[defaults]
+ci = "from_defaults"
+EOF
+export GITPERF_IT_IMPORT_SKIP=from_env
+cat > junit.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="suite" tests="1" time="0.5">
+    <testcase name="mytest" time="0.5"/>
+  </testsuite>
+</testsuites>
+EOF
+git perf import junit junit.xml --skip-env
+assert_success git perf audit -m "test::mytest" -s ci=from_defaults
+assert_failure git perf audit -m "test::mytest" -s ci=from_env
+unset GITPERF_IT_IMPORT_SKIP
 
 test_section "No [environment] or [defaults] means no extra metadata"
 cd_temp_repo

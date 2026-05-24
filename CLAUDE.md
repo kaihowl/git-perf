@@ -164,9 +164,27 @@ confidence_threshold = 0.75        # Min confidence to report a change point (0.
 
 [change_point."specific_test"]      # Per-measurement overrides
 penalty = 0.3                       # More sensitive for this measurement
+
+# Automatically capture environment variables as metadata on measure/add/import.
+# Each key maps to one or more env var names; first non-empty value wins.
+# Opt out per-command with --skip-env.
+[environment]
+runner_id = "RUNNER_NAME"           # single variable
+os        = ["RUNNER_OS", "OSTYPE"] # fallback list: first set variable wins
+
+# Static fallback values used when the corresponding [environment] variable is absent.
+[defaults]
+environment = "local"
 ```
 
 **Precedence**: CLI flags > Per-measurement config > Default config > Built-in defaults
+
+**Metadata key-value precedence** (for `measure`, `add`, `import`):
+1. `--key-value` / `--metadata` CLI flags (highest)
+2. `[environment]` section (env var lookup, first non-empty wins)
+3. `[defaults]` section (static fallback)
+
+**Note**: `.gitperfconfig` is committed to the repository. Do **not** reference sensitive environment variables (tokens, passwords, keys) in `[environment]`; their values will be stored in git-notes.
 
 ### Change Point Detection Tuning
 
