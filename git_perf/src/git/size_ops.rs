@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
@@ -135,9 +135,7 @@ pub fn get_notes_size(detailed: bool, disk_size: bool) -> Result<NotesSizeInfo> 
 
     // If detailed breakdown requested, parse measurement names
     if let Some(ref mut by_name) = by_measurement {
-        for (note_oid, &size) in note_oids.iter().zip(sizes.iter()) {
-            accumulate_measurement_sizes(Path::new(&repo_root), note_oid, size, by_name)?;
-        }
+        batch_accumulate_measurement_sizes(Path::new(&repo_root), &note_oids, &sizes, by_name)?;
     }
 
     Ok(NotesSizeInfo {
@@ -147,49 +145,105 @@ pub fn get_notes_size(detailed: bool, disk_size: bool) -> Result<NotesSizeInfo> 
     })
 }
 
-/// Parse note contents and accumulate sizes by measurement name
-fn accumulate_measurement_sizes(
-    repo_root: &std::path::Path,
-    note_oid: &str,
-    note_size: u64,
+/// Parse note contents in batch and accumulate sizes by measurement name.
+/// Uses a single `git cat-file --batch` process instead of one process per note.
+fn batch_accumulate_measurement_sizes(
+    repo_root: &Path,
+    note_oids: &[String],
+    note_sizes: &[u64],
     by_name: &mut HashMap<String, MeasurementSizeInfo>,
 ) -> Result<()> {
     use crate::serialization::deserialize;
 
-    // Get note content
-    let output = Command::new("git")
-        .args(["cat-file", "-p", note_oid])
-        .current_dir(repo_root)
-        .output()
-        .context("Failed to execute git cat-file -p")?;
-
-    if !output.status.success() {
-        anyhow::bail!("git cat-file -p failed for {}", note_oid);
-    }
-
-    let content = String::from_utf8_lossy(&output.stdout);
-
-    // Parse measurements from note
-    let measurements = deserialize(&content);
-
-    if measurements.is_empty() {
+    if note_oids.is_empty() {
         return Ok(());
     }
 
-    // Distribute note size evenly among measurements in this note
-    // (Each measurement contributes roughly equally to the note size)
-    let size_per_measurement = note_size / measurements.len() as u64;
+    let mut cat_file = Command::new("git")
+        .args(["cat-file", "--batch"])
+        .current_dir(repo_root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Failed to spawn git cat-file --batch")?;
 
-    for measurement in measurements {
-        let entry = by_name
-            .entry(measurement.name.clone())
-            .or_insert(MeasurementSizeInfo {
-                total_bytes: 0,
-                count: 0,
-            });
+    let cat_file_in = cat_file
+        .stdin
+        .take()
+        .context("Failed to take stdin from git cat-file --batch")?;
+    let cat_file_out = cat_file
+        .stdout
+        .take()
+        .context("Failed to take stdout from git cat-file --batch")?;
 
-        entry.total_bytes += size_per_measurement;
-        entry.count += 1;
+    let oids_owned = note_oids.to_vec();
+    let writer_handle = thread::spawn(move || -> Result<()> {
+        let mut writer = BufWriter::new(cat_file_in);
+        for oid in &oids_owned {
+            writeln!(writer, "{}", oid).context("Failed to write OID to git cat-file --batch")?;
+        }
+        Ok(())
+    });
+
+    let mut reader = BufReader::new(cat_file_out);
+    for &note_size in note_sizes {
+        let mut header = String::new();
+        reader
+            .read_line(&mut header)
+            .context("Failed to read header from git cat-file --batch")?;
+        let header = header.trim();
+        let content_len: usize = header
+            .split_whitespace()
+            .nth(2)
+            .and_then(|s| s.parse().ok())
+            .with_context(|| {
+                format!(
+                    "Failed to parse object size from git cat-file --batch header: {}",
+                    header
+                )
+            })?;
+
+        let mut content_buf = vec![0u8; content_len];
+        reader
+            .read_exact(&mut content_buf)
+            .context("Failed to read object content from git cat-file --batch")?;
+        // Consume the trailing newline separator after each object
+        let mut newline = [0u8; 1];
+        reader
+            .read_exact(&mut newline)
+            .context("Failed to read trailing newline from git cat-file --batch")?;
+
+        let content = String::from_utf8_lossy(&content_buf);
+        let measurements = deserialize(&content);
+
+        if measurements.is_empty() {
+            continue;
+        }
+
+        // Distribute note size evenly among measurements in this note
+        let size_per_measurement = note_size / measurements.len() as u64;
+
+        for measurement in measurements {
+            let entry = by_name
+                .entry(measurement.name)
+                .or_insert(MeasurementSizeInfo {
+                    total_bytes: 0,
+                    count: 0,
+                });
+            entry.total_bytes += size_per_measurement;
+            entry.count += 1;
+        }
+    }
+
+    writer_handle
+        .join()
+        .map_err(|_| anyhow::anyhow!("Writer thread panicked"))??;
+
+    let status = cat_file
+        .wait()
+        .context("Failed to wait for git cat-file --batch")?;
+    if !status.success() {
+        anyhow::bail!("git cat-file --batch failed");
     }
 
     Ok(())
