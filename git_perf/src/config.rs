@@ -46,15 +46,6 @@ impl ConfigParentFallbackExt for Config {
     }
 }
 
-/// Describes where to read an environment variable from for a metadata key.
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnvVarSource {
-    /// Read from a single named environment variable.
-    Single(String),
-    /// Try each variable name in order; use the first one that is set and non-empty.
-    Multiple(Vec<String>),
-}
-
 /// Get the main repository config path (always in repo root)
 fn get_main_config_path() -> Result<PathBuf> {
     // Use git to find the repository root
@@ -142,14 +133,14 @@ fn read_gitperfconfig_document() -> Option<DocumentMut> {
     read_raw_gitperfconfig()?.parse::<DocumentMut>().ok()
 }
 
-fn parse_environment_from_doc(doc: &DocumentMut) -> HashMap<String, EnvVarSource> {
+fn parse_environment_from_doc(doc: &DocumentMut) -> HashMap<String, Vec<String>> {
     let Some(table) = doc.get("environment").and_then(|item| item.as_table()) else {
         return HashMap::new();
     };
     let mut result = HashMap::new();
     for (key, item) in table.iter() {
         if let Some(s) = item.as_str() {
-            result.insert(key.to_string(), EnvVarSource::Single(s.to_string()));
+            result.insert(key.to_string(), vec![s.to_string()]);
         } else if let Some(arr) = item.as_array() {
             let vars: Vec<String> = arr
                 .iter()
@@ -157,7 +148,7 @@ fn parse_environment_from_doc(doc: &DocumentMut) -> HashMap<String, EnvVarSource
                 .map(String::from)
                 .collect();
             if !vars.is_empty() {
-                result.insert(key.to_string(), EnvVarSource::Multiple(vars));
+                result.insert(key.to_string(), vars);
             }
         } else {
             log::warn!(
@@ -190,7 +181,7 @@ fn parse_defaults_from_doc(doc: &DocumentMut) -> HashMap<String, String> {
 /// measurement time (first non-empty value wins for multi-source lists).
 /// Returns an empty map when the section is absent or the file cannot be parsed.
 #[must_use]
-pub fn read_environment_config() -> HashMap<String, EnvVarSource> {
+pub fn read_environment_config() -> HashMap<String, Vec<String>> {
     read_gitperfconfig_document()
         .map(|doc| parse_environment_from_doc(&doc))
         .unwrap_or_default()
@@ -220,26 +211,13 @@ fn is_safe_env_var(var_name: &str) -> bool {
     true
 }
 
-fn apply_env_source(result: &mut HashMap<String, String>, key: String, source: EnvVarSource) {
-    match source {
-        EnvVarSource::Single(var_name) => {
-            if is_safe_env_var(&var_name) {
-                if let Ok(val) = std::env::var(&var_name) {
-                    if !val.is_empty() {
-                        result.insert(key, val);
-                    }
-                }
-            }
-        }
-        EnvVarSource::Multiple(var_names) => {
-            for var_name in &var_names {
-                if is_safe_env_var(var_name) {
-                    if let Ok(val) = std::env::var(var_name) {
-                        if !val.is_empty() {
-                            result.insert(key, val);
-                            break;
-                        }
-                    }
+fn apply_env_source(result: &mut HashMap<String, String>, key: String, var_names: Vec<String>) {
+    for var_name in &var_names {
+        if is_safe_env_var(var_name) {
+            if let Ok(val) = std::env::var(var_name) {
+                if !val.is_empty() {
+                    result.insert(key, val);
+                    break;
                 }
             }
         }
@@ -1385,7 +1363,7 @@ unit = "seconds"
             let cfg = read_environment_config();
             assert_eq!(
                 cfg.get("commit"),
-                Some(&EnvVarSource::Single("TEST_GITPERF_SHA".to_string()))
+                Some(&vec!["TEST_GITPERF_SHA".to_string()])
             );
         });
     }
@@ -1404,10 +1382,7 @@ unit = "seconds"
             let cfg = read_environment_config();
             assert_eq!(
                 cfg.get("runner_id"),
-                Some(&EnvVarSource::Multiple(vec![
-                    "GITPERF_R1".to_string(),
-                    "GITPERF_R2".to_string()
-                ]))
+                Some(&vec!["GITPERF_R1".to_string(), "GITPERF_R2".to_string()])
             );
         });
     }
