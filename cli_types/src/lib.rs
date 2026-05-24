@@ -467,6 +467,13 @@ pub enum Commands {
         #[arg(short = 'D', long, value_enum)]
         dispersion_method: Option<DispersionMethod>,
 
+        /// Flag measurements with high Coefficient of Variation (CoV = σ/μ × 100%).
+        /// When tail or head CoV exceeds this percentage threshold, a warning is shown
+        /// in the audit output indicating low measurement stability.
+        /// If not specified, uses the value from .gitperfconfig file, or no flagging.
+        #[arg(long)]
+        max_cov: Option<f64>,
+
         /// Suppress warning when change points are detected in the current epoch.
         /// By default, audit will warn if a change point (regime shift) is detected
         /// within the current measurement epoch, as this may affect z-score reliability.
