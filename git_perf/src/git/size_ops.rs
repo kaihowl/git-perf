@@ -155,6 +155,8 @@ fn batch_accumulate_measurement_sizes(
 ) -> Result<()> {
     use crate::serialization::deserialize;
 
+    debug_assert_eq!(note_oids.len(), note_sizes.len());
+
     if note_oids.is_empty() {
         return Ok(());
     }
