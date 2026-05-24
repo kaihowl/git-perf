@@ -1,6 +1,7 @@
 use anyhow::Result;
 use config::{Config, ConfigError, File, FileFormat};
 use std::{
+    collections::HashMap,
     env,
     fs::File as StdFile,
     io::{Read, Write},
@@ -43,6 +44,15 @@ impl ConfigParentFallbackExt for Config {
 
         None
     }
+}
+
+/// Describes where to read an environment variable from for a metadata key.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnvVarSource {
+    /// Read from a single named environment variable.
+    Single(String),
+    /// Try each variable name in order; use the first one that is set and non-empty.
+    Multiple(Vec<String>),
 }
 
 /// Get the main repository config path (always in repo root)
@@ -121,6 +131,146 @@ fn read_config_from_file<P: AsRef<Path>>(file: P) -> Result<String> {
     let mut conf_str = String::new();
     StdFile::open(file)?.read_to_string(&mut conf_str)?;
     Ok(conf_str)
+}
+
+fn read_raw_gitperfconfig() -> Option<String> {
+    let path = find_config_path()?;
+    read_config_from_file(path).ok()
+}
+
+/// Returns the `[environment]` mapping from `.gitperfconfig`.
+///
+/// Each key maps to one or more environment variable names to look up at
+/// measurement time (first non-empty value wins for multi-source lists).
+/// Returns an empty map when the section is absent or the file cannot be parsed.
+#[must_use]
+pub fn read_environment_config() -> HashMap<String, EnvVarSource> {
+    let Some(raw) = read_raw_gitperfconfig() else {
+        return HashMap::new();
+    };
+    let Ok(doc) = raw.parse::<DocumentMut>() else {
+        return HashMap::new();
+    };
+    let Some(table) = doc.get("environment").and_then(|item| item.as_table()) else {
+        return HashMap::new();
+    };
+
+    let mut result = HashMap::new();
+    for (key, item) in table.iter() {
+        if let Some(s) = item.as_str() {
+            result.insert(key.to_string(), EnvVarSource::Single(s.to_string()));
+        } else if let Some(arr) = item.as_array() {
+            let vars: Vec<String> = arr
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(String::from)
+                .collect();
+            if !vars.is_empty() {
+                result.insert(key.to_string(), EnvVarSource::Multiple(vars));
+            }
+        } else {
+            log::warn!(
+                "Ignoring unsupported value type for [environment] key '{}'",
+                key
+            );
+        }
+    }
+    result
+}
+
+/// Returns the `[defaults]` mapping from `.gitperfconfig`.
+///
+/// Each key maps to a static string value used as a fallback when the
+/// corresponding `[environment]` variable is not set.
+/// Returns an empty map when the section is absent or the file cannot be parsed.
+#[must_use]
+pub fn read_defaults_config() -> HashMap<String, String> {
+    let Some(raw) = read_raw_gitperfconfig() else {
+        return HashMap::new();
+    };
+    let Ok(doc) = raw.parse::<DocumentMut>() else {
+        return HashMap::new();
+    };
+    let Some(table) = doc.get("defaults").and_then(|item| item.as_table()) else {
+        return HashMap::new();
+    };
+
+    let mut result = HashMap::new();
+    for (key, item) in table.iter() {
+        if let Some(s) = item.as_str() {
+            result.insert(key.to_string(), s.to_string());
+        } else {
+            log::warn!("Ignoring non-string value for [defaults] key '{}'", key);
+        }
+    }
+    result
+}
+
+fn is_safe_env_var(var_name: &str) -> bool {
+    let upper = var_name.to_uppercase();
+    if upper.contains("TOKEN") || upper.contains("SECRET") {
+        log::warn!(
+            "Skipping environment variable '{}': matches sensitive variable pattern",
+            var_name
+        );
+        return false;
+    }
+    true
+}
+
+/// Resolves merged key-value pairs for measurement commands by applying precedence:
+///   1. `cli_key_values` — highest priority (from --key-value / --metadata)
+///   2. `[environment]` section — env var lookup, first-found-wins for multi-source lists
+///   3. `[defaults]` section — static fallback values
+///
+/// When `skip_env` is true the `[environment]` section is ignored entirely.
+#[must_use]
+pub fn resolve_key_values(
+    cli_key_values: &[(String, String)],
+    skip_env: bool,
+) -> Vec<(String, String)> {
+    let mut result: HashMap<String, String> = HashMap::new();
+
+    // 3. Base layer: [defaults] static values
+    for (key, value) in read_defaults_config() {
+        result.insert(key, value);
+    }
+
+    // 2. [environment] env var lookups (skipped when --skip-env)
+    if !skip_env {
+        for (key, source) in read_environment_config() {
+            match source {
+                EnvVarSource::Single(var_name) => {
+                    if is_safe_env_var(&var_name) {
+                        if let Ok(val) = std::env::var(&var_name) {
+                            if !val.is_empty() {
+                                result.insert(key, val);
+                            }
+                        }
+                    }
+                }
+                EnvVarSource::Multiple(var_names) => {
+                    for var_name in &var_names {
+                        if is_safe_env_var(var_name) {
+                            if let Ok(val) = std::env::var(var_name) {
+                                if !val.is_empty() {
+                                    result.insert(key, val);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 1. CLI args always win — insert last to overwrite everything
+    for (key, value) in cli_key_values {
+        result.insert(key.clone(), value.clone());
+    }
+
+    result.into_iter().collect()
 }
 
 #[must_use]
@@ -1208,6 +1358,275 @@ unit = "seconds"
                 super::measurement_unit("other_measurement"),
                 Some("ms".to_string())
             );
+        });
+    }
+
+    #[test]
+    fn test_read_environment_config_single_var() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\ncommit = \"TEST_GITPERF_SHA\"\n",
+            )
+            .unwrap();
+            let cfg = read_environment_config();
+            assert_eq!(
+                cfg.get("commit"),
+                Some(&EnvVarSource::Single("TEST_GITPERF_SHA".to_string()))
+            );
+        });
+    }
+
+    #[test]
+    fn test_read_environment_config_multi_var() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nrunner_id = [\"GITPERF_R1\", \"GITPERF_R2\"]\n",
+            )
+            .unwrap();
+            let cfg = read_environment_config();
+            assert_eq!(
+                cfg.get("runner_id"),
+                Some(&EnvVarSource::Multiple(vec![
+                    "GITPERF_R1".to_string(),
+                    "GITPERF_R2".to_string()
+                ]))
+            );
+        });
+    }
+
+    #[test]
+    fn test_read_defaults_config() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(&config_path, "[defaults]\nenvironment = \"local\"\n").unwrap();
+            let cfg = read_defaults_config();
+            assert_eq!(cfg.get("environment"), Some(&"local".to_string()));
+        });
+    }
+
+    #[test]
+    fn test_read_environment_config_missing_section() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(&config_path, "[measurement]\n").unwrap();
+            assert!(read_environment_config().is_empty());
+        });
+    }
+
+    #[test]
+    fn test_read_defaults_config_missing_section() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(&config_path, "[measurement]\n").unwrap();
+            assert!(read_defaults_config().is_empty());
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_cli_wins_over_env() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nfoo = \"GITPERF_TEST_CLI_WINS\"\n",
+            )
+            .unwrap();
+            env::set_var("GITPERF_TEST_CLI_WINS", "from_env");
+            let result = resolve_key_values(&[("foo".to_string(), "from_cli".to_string())], false);
+            env::remove_var("GITPERF_TEST_CLI_WINS");
+            assert!(result.contains(&("foo".to_string(), "from_cli".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_env_wins_over_defaults() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nfoo = \"GITPERF_TEST_ENV_WINS\"\n[defaults]\nfoo = \"from_defaults\"\n",
+            )
+            .unwrap();
+            env::set_var("GITPERF_TEST_ENV_WINS", "from_env");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("GITPERF_TEST_ENV_WINS");
+            assert!(result.contains(&("foo".to_string(), "from_env".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_defaults_when_env_unset() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nfoo = \"GITPERF_TEST_DEFINITELY_NOT_SET_XYZ\"\n[defaults]\nfoo = \"fallback\"\n",
+            )
+            .unwrap();
+            env::remove_var("GITPERF_TEST_DEFINITELY_NOT_SET_XYZ");
+            let result = resolve_key_values(&[], false);
+            assert!(result.contains(&("foo".to_string(), "fallback".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_multi_source_first_wins() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nrunner_id = [\"GITPERF_MULTI_R1\", \"GITPERF_MULTI_R2\"]\n",
+            )
+            .unwrap();
+            env::set_var("GITPERF_MULTI_R1", "runner1");
+            env::set_var("GITPERF_MULTI_R2", "runner2");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("GITPERF_MULTI_R1");
+            env::remove_var("GITPERF_MULTI_R2");
+            assert!(result.contains(&("runner_id".to_string(), "runner1".to_string())));
+            assert!(!result.contains(&("runner_id".to_string(), "runner2".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_multi_source_fallback() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nrunner_id = [\"GITPERF_FALLBACK_R1\", \"GITPERF_FALLBACK_R2\"]\n",
+            )
+            .unwrap();
+            env::remove_var("GITPERF_FALLBACK_R1");
+            env::set_var("GITPERF_FALLBACK_R2", "runner2");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("GITPERF_FALLBACK_R2");
+            assert!(result.contains(&("runner_id".to_string(), "runner2".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_skip_env_uses_defaults() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nfoo = \"GITPERF_TEST_SKIP_ENV\"\n[defaults]\nfoo = \"from_defaults\"\n",
+            )
+            .unwrap();
+            env::set_var("GITPERF_TEST_SKIP_ENV", "from_env");
+            let result = resolve_key_values(&[], true);
+            env::remove_var("GITPERF_TEST_SKIP_ENV");
+            assert!(result.contains(&("foo".to_string(), "from_defaults".to_string())));
+            assert!(!result.contains(&("foo".to_string(), "from_env".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_no_config_empty() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let result = resolve_key_values(&[], false);
+            assert!(result.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_blocks_token_var() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nmy_token = \"MY_API_TOKEN_GITPERF\"\n",
+            )
+            .unwrap();
+            env::set_var("MY_API_TOKEN_GITPERF", "secret123");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("MY_API_TOKEN_GITPERF");
+            assert!(!result.iter().any(|(_, v)| v == "secret123"));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_blocks_secret_var() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nmy_secret = \"DEPLOY_SECRET_GITPERF\"\n",
+            )
+            .unwrap();
+            env::set_var("DEPLOY_SECRET_GITPERF", "hunter2");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("DEPLOY_SECRET_GITPERF");
+            assert!(!result.iter().any(|(_, v)| v == "hunter2"));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_allows_normal_var() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\ncommit = \"GITPERF_TEST_SHA_NORMAL\"\n",
+            )
+            .unwrap();
+            env::set_var("GITPERF_TEST_SHA_NORMAL", "abc123");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("GITPERF_TEST_SHA_NORMAL");
+            assert!(result.contains(&("commit".to_string(), "abc123".to_string())));
+        });
+    }
+
+    #[test]
+    fn test_resolve_key_values_empty_env_var_not_used() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+            let config_path = temp_dir.join(".gitperfconfig");
+            fs::write(
+                &config_path,
+                "[environment]\nfoo = \"GITPERF_TEST_EMPTY_VAR\"\n[defaults]\nfoo = \"fallback\"\n",
+            )
+            .unwrap();
+            env::set_var("GITPERF_TEST_EMPTY_VAR", "");
+            let result = resolve_key_values(&[], false);
+            env::remove_var("GITPERF_TEST_EMPTY_VAR");
+            assert!(result.contains(&("foo".to_string(), "fallback".to_string())));
         });
     }
 

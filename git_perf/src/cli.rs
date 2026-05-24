@@ -6,7 +6,7 @@ use log::Level;
 
 use crate::audit;
 use crate::basic_measure::measure;
-use crate::config::bump_epoch;
+use crate::config::{bump_epoch, resolve_key_values};
 use crate::config_cmd;
 use crate::git::git_interop::check_git_version;
 use crate::git::git_interop::{list_commits_with_measurements, prune, pull, push};
@@ -36,24 +36,28 @@ pub fn handle_calls() -> Result<()> {
             repetitions,
             measurement,
             commit,
+            skip_env,
             command,
         } => {
             let commit = commit.as_deref().unwrap_or("HEAD");
+            let key_values = resolve_key_values(&measurement.key_value, skip_env);
             measure(
                 commit,
                 &measurement.name,
                 repetitions,
                 &command,
-                &measurement.key_value,
+                &key_values,
             )
         }
         Commands::Add {
             value,
             measurement,
             commit,
+            skip_env,
         } => {
             let commit = commit.as_deref().unwrap_or("HEAD");
-            add(commit, &measurement.name, value, &measurement.key_value)
+            let key_values = resolve_key_values(&measurement.key_value, skip_env);
+            add(commit, &measurement.name, value, &key_values)
         }
         Commands::Import {
             format,
@@ -64,8 +68,10 @@ pub fn handle_calls() -> Result<()> {
             filter,
             dry_run,
             verbose,
+            skip_env,
         } => {
             let commit = commit.as_deref().unwrap_or("HEAD").to_string();
+            let metadata = resolve_key_values(&metadata, skip_env);
             handle_import(ImportOptions {
                 commit,
                 format,
