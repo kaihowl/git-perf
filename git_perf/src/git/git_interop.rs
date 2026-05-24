@@ -170,6 +170,7 @@ fn raw_add_note_line(commit: &str, line: &str) -> Result<(), GitError> {
             "--ref",
             &temp_target,
             "append",
+            "--no-separator",
             "-m",
             line,
             &resolved_commit,
