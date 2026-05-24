@@ -138,23 +138,14 @@ fn read_raw_gitperfconfig() -> Option<String> {
     read_config_from_file(path).ok()
 }
 
-/// Returns the `[environment]` mapping from `.gitperfconfig`.
-///
-/// Each key maps to one or more environment variable names to look up at
-/// measurement time (first non-empty value wins for multi-source lists).
-/// Returns an empty map when the section is absent or the file cannot be parsed.
-#[must_use]
-pub fn read_environment_config() -> HashMap<String, EnvVarSource> {
-    let Some(raw) = read_raw_gitperfconfig() else {
-        return HashMap::new();
-    };
-    let Ok(doc) = raw.parse::<DocumentMut>() else {
-        return HashMap::new();
-    };
+fn read_gitperfconfig_document() -> Option<DocumentMut> {
+    read_raw_gitperfconfig()?.parse::<DocumentMut>().ok()
+}
+
+fn parse_environment_from_doc(doc: &DocumentMut) -> HashMap<String, EnvVarSource> {
     let Some(table) = doc.get("environment").and_then(|item| item.as_table()) else {
         return HashMap::new();
     };
-
     let mut result = HashMap::new();
     for (key, item) in table.iter() {
         if let Some(s) = item.as_str() {
@@ -178,23 +169,10 @@ pub fn read_environment_config() -> HashMap<String, EnvVarSource> {
     result
 }
 
-/// Returns the `[defaults]` mapping from `.gitperfconfig`.
-///
-/// Each key maps to a static string value used as a fallback when the
-/// corresponding `[environment]` variable is not set.
-/// Returns an empty map when the section is absent or the file cannot be parsed.
-#[must_use]
-pub fn read_defaults_config() -> HashMap<String, String> {
-    let Some(raw) = read_raw_gitperfconfig() else {
-        return HashMap::new();
-    };
-    let Ok(doc) = raw.parse::<DocumentMut>() else {
-        return HashMap::new();
-    };
+fn parse_defaults_from_doc(doc: &DocumentMut) -> HashMap<String, String> {
     let Some(table) = doc.get("defaults").and_then(|item| item.as_table()) else {
         return HashMap::new();
     };
-
     let mut result = HashMap::new();
     for (key, item) in table.iter() {
         if let Some(s) = item.as_str() {
@@ -204,6 +182,30 @@ pub fn read_defaults_config() -> HashMap<String, String> {
         }
     }
     result
+}
+
+/// Returns the `[environment]` mapping from `.gitperfconfig`.
+///
+/// Each key maps to one or more environment variable names to look up at
+/// measurement time (first non-empty value wins for multi-source lists).
+/// Returns an empty map when the section is absent or the file cannot be parsed.
+#[must_use]
+pub fn read_environment_config() -> HashMap<String, EnvVarSource> {
+    read_gitperfconfig_document()
+        .map(|doc| parse_environment_from_doc(&doc))
+        .unwrap_or_default()
+}
+
+/// Returns the `[defaults]` mapping from `.gitperfconfig`.
+///
+/// Each key maps to a static string value used as a fallback when the
+/// corresponding `[environment]` variable is not set.
+/// Returns an empty map when the section is absent or the file cannot be parsed.
+#[must_use]
+pub fn read_defaults_config() -> HashMap<String, String> {
+    read_gitperfconfig_document()
+        .map(|doc| parse_defaults_from_doc(&doc))
+        .unwrap_or_default()
 }
 
 fn is_safe_env_var(var_name: &str) -> bool {
@@ -218,12 +220,39 @@ fn is_safe_env_var(var_name: &str) -> bool {
     true
 }
 
+fn apply_env_source(result: &mut HashMap<String, String>, key: String, source: EnvVarSource) {
+    match source {
+        EnvVarSource::Single(var_name) => {
+            if is_safe_env_var(&var_name) {
+                if let Ok(val) = std::env::var(&var_name) {
+                    if !val.is_empty() {
+                        result.insert(key, val);
+                    }
+                }
+            }
+        }
+        EnvVarSource::Multiple(var_names) => {
+            for var_name in &var_names {
+                if is_safe_env_var(var_name) {
+                    if let Ok(val) = std::env::var(var_name) {
+                        if !val.is_empty() {
+                            result.insert(key, val);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Resolves merged key-value pairs for measurement commands by applying precedence:
 ///   1. `cli_key_values` — highest priority (from --key-value / --metadata)
 ///   2. `[environment]` section — env var lookup, first-found-wins for multi-source lists
 ///   3. `[defaults]` section — static fallback values
 ///
 /// When `skip_env` is true the `[environment]` section is ignored entirely.
+/// The config file is read and parsed only once regardless of which sections are present.
 #[must_use]
 pub fn resolve_key_values(
     cli_key_values: &[(String, String)],
@@ -231,36 +260,17 @@ pub fn resolve_key_values(
 ) -> Vec<(String, String)> {
     let mut result: HashMap<String, String> = HashMap::new();
 
-    // 3. Base layer: [defaults] static values
-    for (key, value) in read_defaults_config() {
-        result.insert(key, value);
-    }
+    // Read and parse the config file exactly once for both sections
+    if let Some(doc) = read_gitperfconfig_document() {
+        // 3. Base layer: [defaults] static values
+        for (key, value) in parse_defaults_from_doc(&doc) {
+            result.insert(key, value);
+        }
 
-    // 2. [environment] env var lookups (skipped when --skip-env)
-    if !skip_env {
-        for (key, source) in read_environment_config() {
-            match source {
-                EnvVarSource::Single(var_name) => {
-                    if is_safe_env_var(&var_name) {
-                        if let Ok(val) = std::env::var(&var_name) {
-                            if !val.is_empty() {
-                                result.insert(key, val);
-                            }
-                        }
-                    }
-                }
-                EnvVarSource::Multiple(var_names) => {
-                    for var_name in &var_names {
-                        if is_safe_env_var(var_name) {
-                            if let Ok(val) = std::env::var(var_name) {
-                                if !val.is_empty() {
-                                    result.insert(key, val);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
+        // 2. [environment] env var lookups (skipped when --skip-env)
+        if !skip_env {
+            for (key, source) in parse_environment_from_doc(&doc) {
+                apply_env_source(&mut result, key, source);
             }
         }
     }

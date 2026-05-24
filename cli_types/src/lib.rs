@@ -159,7 +159,7 @@ pub enum Commands {
         #[arg(long = "commit", value_name = "COMMIT")]
         commit: Option<String>,
 
-        /// Skip reading environment variables from the [environment] config section
+        /// Skip reading environment variables from the `[environment]` config section
         #[arg(long = "skip-env", default_value = "false")]
         skip_env: bool,
 
@@ -180,7 +180,7 @@ pub enum Commands {
         #[arg(long = "commit", value_name = "COMMIT")]
         commit: Option<String>,
 
-        /// Skip reading environment variables from the [environment] config section
+        /// Skip reading environment variables from the `[environment]` config section
         #[arg(long = "skip-env", default_value = "false")]
         skip_env: bool,
     },
@@ -260,7 +260,7 @@ pub enum Commands {
         #[arg(short, long)]
         verbose: bool,
 
-        /// Skip reading environment variables from the [environment] config section
+        /// Skip reading environment variables from the `[environment]` config section
         #[arg(long = "skip-env", default_value = "false")]
         skip_env: bool,
     },
