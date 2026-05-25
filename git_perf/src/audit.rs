@@ -48,6 +48,7 @@ pub(crate) struct ResolvedAuditParams {
     pub summarize_by: ReductionFunc,
     pub sigma: f64,
     pub dispersion_method: DispersionMethod,
+    pub max_cov: Option<f64>,
 }
 
 /// Resolves audit parameters for a specific measurement with proper precedence:
@@ -61,6 +62,7 @@ pub(crate) fn resolve_audit_params(
     cli_summarize_by: Option<ReductionFunc>,
     cli_sigma: Option<f64>,
     cli_dispersion_method: Option<DispersionMethod>,
+    cli_max_cov: Option<f64>,
 ) -> ResolvedAuditParams {
     let min_count = cli_min_count
         .or_else(|| config::audit_min_measurements(measurement))
@@ -82,11 +84,14 @@ pub(crate) fn resolve_audit_params(
         })
         .unwrap_or(DispersionMethod::StandardDeviation);
 
+    let max_cov = cli_max_cov.or_else(|| config::audit_max_cov(measurement));
+
     ResolvedAuditParams {
         min_count,
         summarize_by,
         sigma,
         dispersion_method,
+        max_cov,
     }
 }
 
@@ -202,6 +207,7 @@ pub fn audit_multiple(
     summarize_by: Option<ReductionFunc>,
     sigma: Option<f64>,
     dispersion_method: Option<DispersionMethod>,
+    max_cov: Option<f64>,
     combined_patterns: &[String],
     separate_by: &[String],
     _no_change_point_warning: bool, // TODO: Implement change point warning in Phase 2
@@ -271,6 +277,7 @@ pub fn audit_multiple(
             summarize_by,
             sigma,
             dispersion_method,
+            max_cov,
         );
 
         // Warn if max_count limits historical data below min_measurements requirement
@@ -310,6 +317,7 @@ pub fn audit_multiple(
                 params.summarize_by,
                 params.sigma,
                 params.dispersion_method,
+                params.max_cov,
             )?;
 
             // TODO(Phase 2): Add change point detection warning here
@@ -370,6 +378,7 @@ pub fn audit_multiple(
 /// Audits a measurement using pre-loaded commit data.
 /// This is more efficient than the old `audit` function when auditing multiple measurements,
 /// as it reuses the same commit data instead of walking commits multiple times.
+#[allow(clippy::too_many_arguments)]
 fn audit_with_commits(
     measurement: &str,
     commits: &[Result<Commit>],
@@ -378,6 +387,7 @@ fn audit_with_commits(
     summarize_by: ReductionFunc,
     sigma: f64,
     dispersion_method: DispersionMethod,
+    max_cov: Option<f64>,
 ) -> Result<AuditResult> {
     // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
     // This is necessary because summarize_measurements expects an iterator of Result<Commit>
@@ -394,6 +404,20 @@ fn audit_with_commits(
     // Filter to only this specific measurement with matching selectors
     let filter_by =
         |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
+
+    // Extract raw HEAD measurements before aggregation for head CoV computation.
+    // Each measurement data point at HEAD is a separate sample (e.g., repeated benchmark runs).
+    let head_raw: Vec<f64> = commits
+        .first()
+        .and_then(|r| r.as_ref().ok())
+        .map(|c| {
+            c.measurements
+                .iter()
+                .filter(|m| filter_by(m))
+                .map(|m| m.val)
+                .collect()
+        })
+        .unwrap_or_default();
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
         commits_iter,
@@ -419,24 +443,29 @@ fn audit_with_commits(
     audit_with_data(
         measurement,
         head,
+        head_raw,
         tail,
         min_count,
         sigma,
         dispersion_method,
         summarize_by,
+        max_cov,
     )
 }
 
 /// Core audit logic that can be tested with mock data
 /// This function contains all the mutation-tested logic paths
+#[allow(clippy::too_many_arguments)]
 fn audit_with_data(
     measurement: &str,
     head: f64,
+    head_raw: Vec<f64>,
     tail: Vec<f64>,
     min_count: u16,
     sigma: f64,
     dispersion_method: DispersionMethod,
     summarize_by: ReductionFunc,
+    max_cov: Option<f64>,
 ) -> Result<AuditResult> {
     // Note: CLI enforces min_count >= 2 via clap::value_parser!(u16).range(2..)
     // Tests may use lower values for edge case testing, but production code
@@ -449,6 +478,30 @@ fn audit_with_data(
 
     let head_summary = stats::aggregate_measurements(iter::once(&head));
     let tail_summary = stats::aggregate_measurements(tail.iter());
+
+    // Compute CoV before tail is consumed. Tail CoV uses per-commit aggregated values
+    // (cross-run baseline stability). Head CoV uses the raw measurements at HEAD
+    // (within-run repeatability). Require ≥2 samples and a non-zero mean for each.
+    let cov_warning = max_cov.and_then(|threshold| {
+        let tail_cov = (tail_summary.len >= 2 && tail_summary.mean.abs() > f64::EPSILON)
+            .then(|| tail_summary.stddev / tail_summary.mean * 100.0);
+        let head_raw_summary = stats::aggregate_measurements(head_raw.iter());
+        let head_cov = (head_raw.len() >= 2 && head_raw_summary.mean.abs() > f64::EPSILON)
+            .then(|| head_raw_summary.stddev / head_raw_summary.mean * 100.0);
+
+        let tail_exceeds = tail_cov.is_some_and(|cov| cov > threshold);
+        let head_exceeds = head_cov.is_some_and(|cov| cov > threshold);
+
+        if tail_exceeds || head_exceeds {
+            let tail_str = tail_cov.map_or("n/a".to_string(), |c| format!("{c:.1}%"));
+            let head_str = head_cov.map_or("n/a".to_string(), |c| format!("{c:.1}%"));
+            Some(format!(
+                "\n⚠️ High CoV: tail={tail_str}, head={head_str} (threshold: {threshold:.1}%)"
+            ))
+        } else {
+            None
+        }
+    });
 
     // Generate sparkline and calculate range for all measurements - used in both skip and normal paths
     let all_measurements = tail.into_iter().chain(iter::once(head)).collect::<Vec<_>>();
@@ -536,6 +589,9 @@ fn audit_with_data(
             summary.push_str(&format!("Head: {}\n", head_display));
             summary.push_str(&format!("Tail: {}\n", tail_display));
             summary.push_str(&sparkline);
+            if let Some(ref warning) = cov_warning {
+                summary.push_str(warning);
+            }
         }
         // If 0 total measurements, return empty summary
 
@@ -748,8 +804,9 @@ mod test {
                 Some(ReductionFunc::Mean),
                 Some(2.0),
                 Some(DispersionMethod::StandardDeviation),
-                &[], // Empty combined_patterns
-                &[], // Empty separate_by
+                None, // max_cov
+                &[],  // Empty combined_patterns
+                &[],  // Empty separate_by
                 false,
             );
 
@@ -770,11 +827,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0, 12.0], // Exactly 3 measurements
             3,                      // min_count = 3
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -786,11 +845,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0], // Only 2 measurements
             3,                // min_count = 3
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -806,11 +867,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![], // 0 measurements
             5,      // min_count > 0 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -822,11 +885,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0], // 1 measurement
             5,          // min_count > 1 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -837,11 +902,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0], // 2 measurements
             5,                // min_count > 2 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -859,11 +926,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![], // 0 tail measurements = 1 total measurement
             5,      // min_count > 0 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -878,11 +947,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0], // 1 tail measurement = 2 total measurements
             5,          // min_count > 1 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -905,11 +976,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0], // 2 tail measurements = 3 total measurements
             5,                // min_count > 2 to trigger skip
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -932,11 +1005,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0], // 2 tail measurements = 3 total measurements
             5,                // min_count > 2 to trigger skip
             2.0,
             DispersionMethod::MedianAbsoluteDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -950,12 +1025,14 @@ mod test {
         // Use values where division and modulo produce very different results
         let result = audit_with_data(
             "test_measurement",
-            25.0,                   // head
+            25.0, // head
+            vec![],
             vec![10.0, 10.0, 10.0], // tail, median = 10.0
             2,
             10.0, // High sigma to avoid z-score failures
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -985,13 +1062,15 @@ mod test {
 
         // Case 1: z_score exceeds sigma, no threshold bypass (should fail)
         let result = audit_with_data(
-            "test_measurement",                 // No config threshold for this name
-            100.0,                              // Very high head value
+            "test_measurement", // No config threshold for this name
+            100.0,              // Very high head value
+            vec![],
             vec![10.0, 10.0, 10.0, 10.0, 10.0], // Low tail values
             2,
             0.5, // Low sigma threshold
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1002,12 +1081,14 @@ mod test {
         // Case 2: z_score within sigma (should pass)
         let result = audit_with_data(
             "test_measurement",
-            10.2,                               // Close to tail values
+            10.2, // Close to tail values
+            vec![],
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Some variance to avoid zero stddev
             2,
             100.0, // Very high sigma threshold
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1025,11 +1106,13 @@ mod test {
         let result = audit_with_data(
             "test_measurement",
             1000.0, // Extreme outlier
+            vec![],
             vec![10.0, 10.0, 10.0, 10.0, 10.0],
             2,
             0.1, // Very strict sigma
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1041,12 +1124,14 @@ mod test {
         // Test passing case (should get success message)
         let result = audit_with_data(
             "test_measurement",
-            10.01,                              // Very close to tail
+            10.01, // Very close to tail
+            vec![],
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Varied values to avoid zero variance
             2,
             100.0, // Very lenient sigma
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1065,21 +1150,25 @@ mod test {
         let result_stddev = audit_with_data(
             "test_measurement",
             head,
+            vec![],
             tail.clone(),
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         let result_mad = audit_with_data(
             "test_measurement",
             head,
+            vec![],
             tail,
             2,
             2.0,
             DispersionMethod::MedianAbsoluteDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result_stddev.is_ok());
@@ -1113,11 +1202,13 @@ unit = "ms"
         let result = audit_with_data(
             "build_time",
             head,
+            vec![],
             tail,
             2,
             10.0, // High sigma to ensure it passes
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1213,12 +1304,14 @@ min_relative_deviation = 10.0
         // Should pass without showing the note
         let result = audit_with_data(
             "build_time",
-            10.1,                               // Very close to tail values
+            10.1, // Very close to tail values
+            vec![],
             vec![10.0, 10.1, 10.0, 10.1, 10.0], // Low variance
             2,
             100.0, // Very high sigma threshold - won't be exceeded
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1238,11 +1331,13 @@ min_relative_deviation = 10.0
         let result = audit_with_data(
             "build_time",
             1002.0, // High z-score outlier but low relative deviation
+            vec![],
             vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
             2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1263,11 +1358,13 @@ min_relative_deviation = 10.0
         let result = audit_with_data(
             "build_time",
             1200.0, // High z-score AND high relative deviation
+            vec![],
             vec![1000.0, 1000.1, 1000.0, 1000.1, 1000.0], // Very low variance
             2,
             0.5, // Low sigma threshold - will be exceeded
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1307,12 +1404,14 @@ min_absolute_deviation = 50.0
         // This catches the - vs / mutation
         let result = audit_with_data(
             "build_time",
-            100.0,                              // head value
+            100.0, // head value
+            vec![],
             vec![10.0, 10.0, 10.0, 10.0, 10.0], // tail values, median=10
             2,
             0.5, // Low sigma - will be exceeded
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1330,12 +1429,14 @@ min_absolute_deviation = 50.0
         // With <= : 50 <= 50 is true => passes (wrong)
         let result = audit_with_data(
             "build_time",
-            1050.0,                                       // head value
+            1050.0, // head value
+            vec![],
             vec![1000.0, 1000.0, 1000.0, 1000.0, 1000.0], // tail values, median=1000
             2,
             0.5, // Low sigma - will be exceeded
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1351,12 +1452,14 @@ min_absolute_deviation = 50.0
         // head=1049, tail_median=1000, absolute_deviation=49, threshold=50
         let result = audit_with_data(
             "build_time",
-            1049.0,                                       // head value
+            1049.0, // head value
+            vec![],
             vec![1000.0, 1000.0, 1000.0, 1000.0, 1000.0], // tail values, median=1000
             2,
             0.5, // Low sigma - will be exceeded
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1543,6 +1646,7 @@ dispersion_method = "mad"
                 Some(ReductionFunc::Min),                  // CLI aggregate
                 Some(3.0),                                 // CLI sigma
                 Some(DispersionMethod::StandardDeviation), // CLI dispersion
+                None,                                      // CLI max_cov
             );
 
             assert_eq!(
@@ -1581,6 +1685,7 @@ dispersion_method = "mad"
                 None,
                 None,
                 None,
+                None, // max_cov
             );
 
             assert_eq!(
@@ -1611,6 +1716,7 @@ dispersion_method = "mad"
                 None,
                 None,
                 None,
+                None, // max_cov
             );
 
             assert_eq!(
@@ -1884,12 +1990,14 @@ dispersion_method = "mad"
         // causing division by zero in sparkline calculation
         let result = audit_with_data(
             "test_measurement",
-            10.0,   // head
+            10.0, // head
+            vec![],
             vec![], // empty tail - triggers the bug
             2,      // min_count
             2.0,    // sigma
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         // Should succeed and skip (not crash with division by zero)
@@ -1911,12 +2019,14 @@ dispersion_method = "mad"
         // This tests the edge case where median is 0.0 even with measurements
         let result = audit_with_data(
             "test_measurement",
-            5.0,                 // non-zero head
+            5.0, // non-zero head
+            vec![],
             vec![0.0, 0.0, 0.0], // all zeros in tail
             2,                   // min_count
             2.0,                 // sigma
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         // Should succeed (not crash with division by zero)
@@ -1937,12 +2047,14 @@ dispersion_method = "mad"
         // Case 1: Median is non-zero - use percentages (default behavior)
         let result = audit_with_data(
             "test_measurement",
-            15.0,                   // head
+            15.0, // head
+            vec![],
             vec![10.0, 11.0, 12.0], // median=11.0 (non-zero)
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1954,12 +2066,14 @@ dispersion_method = "mad"
         // Case 2: Median is zero with non-zero head - use absolute values
         let result = audit_with_data(
             "test_measurement",
-            5.0,                 // head (non-zero)
+            5.0, // head (non-zero)
+            vec![],
             vec![0.0, 0.0, 0.0], // median=0
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1974,12 +2088,14 @@ dispersion_method = "mad"
         // Case 3: Everything is zero - show absolute values [0 - 0]
         let result = audit_with_data(
             "test_measurement",
-            0.0,                 // head
+            0.0, // head
+            vec![],
             vec![0.0, 0.0, 0.0], // median=0
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -1995,12 +2111,14 @@ dispersion_method = "mad"
         // This should skip the audit since we have 0 < 2 tail measurements.
         let result = audit_with_data(
             "test_measurement",
-            15.0,   // head
+            15.0, // head
+            vec![],
             vec![], // no tail measurements
             2,      // min_count = 2 (minimum allowed by CLI)
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2028,12 +2146,14 @@ dispersion_method = "mad"
         // This should skip since we have 1 < 2 tail measurements.
         let result = audit_with_data(
             "test_measurement",
-            15.0,       // head
+            15.0, // head
+            vec![],
             vec![10.0], // single tail measurement
             2,          // min_count = 2 (minimum allowed by CLI)
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2062,11 +2182,13 @@ dispersion_method = "mad"
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0, 12.0],
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2080,11 +2202,13 @@ dispersion_method = "mad"
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0, 12.0],
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Max,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2098,11 +2222,13 @@ dispersion_method = "mad"
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0, 12.0],
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Median,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2116,11 +2242,13 @@ dispersion_method = "mad"
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![10.0, 11.0, 12.0],
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Mean,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2134,11 +2262,13 @@ dispersion_method = "mad"
         let result = audit_with_data(
             "test_measurement",
             15.0,
+            vec![],
             vec![], // No tail measurements, total = 1
             2,
             2.0,
             DispersionMethod::StandardDeviation,
             ReductionFunc::Median,
+            None,
         );
 
         assert!(result.is_ok());
@@ -2147,5 +2277,332 @@ dispersion_method = "mad"
         assert!(!audit_result.message.contains("Aggregation:"));
         // But should show Head summary
         assert!(audit_result.message.contains("Head:"));
+    }
+
+    // --- CoV warning tests ---
+
+    #[test]
+    fn test_tail_cov_warning_fires_above_threshold() {
+        // tail = [50, 100, 150, 100, 100]: mean=100, sample stddev≈35.4 → CoV≈35.4% > 30%
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![],
+            vec![50.0, 100.0, 150.0, 100.0, 100.0],
+            2,
+            10.0, // high sigma so audit passes on z-score
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(30.0),
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            msg.contains("⚠️ High CoV"),
+            "Should warn when tail CoV exceeds threshold, got: {msg}"
+        );
+        assert!(msg.contains("threshold: 30.0%"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_tail_cov_warning_absent_below_threshold() {
+        // tail = [100, 100, 100]: mean=100, stddev=0 → CoV=0% < 30%
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![],
+            vec![100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(30.0),
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not warn when tail CoV is below threshold, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_head_cov_warning_fires_above_threshold() {
+        // head_raw = [50, 150]: mean=100, sample stddev≈70.7 → CoV≈70.7% > 50%
+        // tail is stable so tail CoV is low; only head CoV triggers the warning
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![50.0, 150.0], // raw head measurements — high variance
+            vec![100.0, 100.0, 100.0, 100.0, 100.0], // stable tail
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(50.0),
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            msg.contains("⚠️ High CoV"),
+            "Should warn when head CoV exceeds threshold, got: {msg}"
+        );
+        assert!(
+            msg.contains("head="),
+            "Warning should include head CoV value, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_head_cov_warning_absent_below_threshold() {
+        // head_raw = [100, 100]: mean=100, stddev=0 → CoV=0% < 50%
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![100.0, 100.0],
+            vec![100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(50.0),
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not warn when head CoV is below threshold, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_warning_absent_with_no_threshold() {
+        // High-variance data but no threshold → no warning
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![10.0, 200.0, 50.0],               // high head variance
+            vec![10.0, 200.0, 50.0, 300.0, 100.0], // high tail variance
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            None, // no max_cov
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not warn when no threshold is set, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_warning_absent_for_single_tail_measurement() {
+        // Only 1 tail measurement → tail_summary.len = 1, so tail CoV skipped
+        // Also head_raw empty → head CoV also skipped → no warning
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![],
+            vec![100.0], // single tail — tail_summary.len = 1 < 2
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(0.0), // very strict threshold, would fire if CoV computed
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not warn when tail has only 1 measurement, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_warning_absent_for_single_head_raw_measurement() {
+        // head_raw has only 1 value → head CoV skipped; tail stable → tail CoV not triggered
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![100.0], // single raw head measurement — head CoV skipped
+            vec![100.0, 100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(0.0), // would fire if CoV computed
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not compute head CoV from a single raw measurement, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_shows_correct_tail_cov_value() {
+        // tail = [0, 200]: mean=100, sample stddev=141.4… → CoV≈141.4%
+        // Verifies stddev / mean (not stddev * mean or stddev + mean) and * 100.0
+        let result = audit_with_data(
+            "test_measurement",
+            105.0,
+            vec![],
+            vec![0.0, 200.0],
+            2,
+            100.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(100.0), // threshold=100%, CoV≈141.4% exceeds it
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            msg.contains("tail=141.4%"),
+            "Should show correct tail CoV percentage, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_shows_correct_head_cov_value() {
+        // head_raw = [0, 200]: mean=100, sample stddev=141.4… → CoV≈141.4%
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![0.0, 200.0],                 // raw head measurements
+            vec![100.0, 100.0, 100.0, 100.0], // stable tail
+            2,
+            100.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(100.0), // threshold=100%, head CoV≈141.4% exceeds it
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            msg.contains("head=141.4%"),
+            "Should show correct head CoV percentage, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_warning_shown_on_failing_audit() {
+        // CoV warning is informational and appears even when z-score causes a fail
+        let result = audit_with_data(
+            "test_measurement",
+            500.0, // extreme outlier — will fail z-score
+            vec![],
+            vec![50.0, 100.0, 150.0, 100.0, 100.0], // CoV≈35.4% > 30%
+            2,
+            0.5, // strict sigma — audit fails
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(30.0),
+        );
+        assert!(result.is_ok());
+        let audit_result = result.unwrap();
+        assert!(!audit_result.passed, "Should fail audit");
+        assert!(
+            audit_result.message.contains("⚠️ High CoV"),
+            "CoV warning should appear even on failure, got: {}",
+            audit_result.message
+        );
+    }
+
+    #[test]
+    fn test_cov_no_warning_when_cov_equals_threshold() {
+        // tail = [100, 100, 100]: CoV = 0%, threshold = 0%
+        // Strict > means 0 > 0 is false → no warning.
+        // With >= mutation: 0 >= 0 is true → warning fires → mutation caught.
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![],
+            vec![100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(0.0), // threshold = 0%
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not warn when CoV (0%) equals threshold (0%) with strict >, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_skips_near_zero_mean() {
+        // tail mean ≈ EPSILON: the guard "mean.abs() > EPSILON" prevents CoV computation.
+        // With >= mutation: EPSILON >= EPSILON → CoV computed → warning fires → caught.
+        let eps = f64::EPSILON;
+        let result = audit_with_data(
+            "test_measurement",
+            1.0,
+            vec![],
+            vec![0.0, 2.0 * eps], // mean = EPSILON, sample stddev = EPSILON*sqrt(2)
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Mean,
+            Some(100.0), // CoV would be ~141% if computed from near-zero mean
+        );
+        assert!(result.is_ok());
+        assert!(
+            !result.unwrap().message.contains("⚠️ High CoV"),
+            "Should not compute CoV when tail mean equals EPSILON"
+        );
+    }
+
+    #[test]
+    fn test_cov_warning_fires_when_only_head_exceeds_threshold() {
+        // tail CoV is below threshold, head CoV is above → warning fires (|| not &&)
+        // head_raw = [0, 200]: CoV≈141.4%; tail = [100, 100]: CoV=0%
+        // threshold = 50%: only head exceeds. With && instead of ||, no warning → mutation caught.
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![0.0, 200.0], // high head CoV
+            vec![100.0, 100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(50.0),
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            msg.contains("⚠️ High CoV"),
+            "Should warn when head CoV alone exceeds threshold (|| not &&), got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_cov_tail_len_boundary_two() {
+        // Verify tail CoV is computed when tail has exactly 2 measurements (len >= 2 boundary).
+        // With > instead of >= mutation: len=2 is NOT > 2 → CoV skipped → no warning → caught.
+        // tail = [0, 200]: mean=100, CoV≈141.4% > 50%
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![],
+            vec![0.0, 200.0], // exactly 2 tail values, high CoV
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(50.0),
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            msg.contains("⚠️ High CoV"),
+            "Should compute tail CoV with exactly 2 tail measurements (>= 2), got: {msg}"
+        );
     }
 }
