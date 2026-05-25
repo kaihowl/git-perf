@@ -328,6 +328,22 @@ pub fn audit_min_relative_deviation(measurement: &str) -> Option<f64> {
     None
 }
 
+/// Returns the maximum CoV (Coefficient of Variation = σ/μ × 100%) threshold from
+/// config, or None if not set. When tail or head CoV exceeds this value, a warning
+/// is emitted in the audit output.
+#[must_use]
+pub fn audit_max_cov(measurement: &str) -> Option<f64> {
+    let config = read_hierarchical_config().ok()?;
+
+    if let Some(s) = config.get_with_parent_fallback("measurement", measurement, "max_cov") {
+        if let Ok(v) = s.parse::<f64>() {
+            return Some(v);
+        }
+    }
+
+    None
+}
+
 /// Returns the minimum absolute deviation threshold from config, or None if not set.
 #[must_use]
 pub fn audit_min_absolute_deviation(measurement: &str) -> Option<f64> {
@@ -693,6 +709,41 @@ min_relative_deviation = 10.0
             // Test no config
             fs::remove_file(&workspace_config_path).unwrap();
             assert_eq!(super::audit_min_relative_deviation("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_audit_max_cov() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+max_cov = 30.0
+
+[measurement."build_time"]
+max_cov = 50.0
+
+[measurement."memory_usage"]
+max_cov = 20.0
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            assert_eq!(super::audit_max_cov("build_time"), Some(50.0));
+            assert_eq!(super::audit_max_cov("memory_usage"), Some(20.0));
+            assert_eq!(super::audit_max_cov("other_measurement"), Some(30.0));
+
+            let global_config = r#"
+[measurement]
+max_cov = 30.0
+"#;
+            fs::write(&workspace_config_path, global_config).unwrap();
+            assert_eq!(super::audit_max_cov("any_measurement"), Some(30.0));
+
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert_eq!(super::audit_max_cov("any_measurement"), None);
         });
     }
 
