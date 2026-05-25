@@ -553,18 +553,13 @@ fn audit_with_data(
             if let Some(threshold) = max_cov {
                 let tail_cov = (tail_summary.mean.abs() > f64::EPSILON)
                     .then(|| tail_summary.stddev / tail_summary.mean * 100.0);
-                let head_cov = (head_summary.mean.abs() > f64::EPSILON)
-                    .then(|| head_summary.stddev / head_summary.mean * 100.0);
 
-                let tail_exceeded = tail_cov.is_some_and(|c| c > threshold);
-                let head_exceeded = head_cov.is_some_and(|c| c > threshold);
-
-                if tail_exceeded || head_exceeded {
-                    let tail_str = tail_cov.map_or("N/A".to_string(), |c| format!("{c:.1}%"));
-                    let head_str = head_cov.map_or("N/A".to_string(), |c| format!("{c:.1}%"));
-                    summary.push_str(&format!(
-                        "\n⚠️ High CoV: tail={tail_str}, head={head_str} (threshold: {threshold:.1}%)"
-                    ));
+                if let Some(cov) = tail_cov {
+                    if cov > threshold {
+                        summary.push_str(&format!(
+                            "\n⚠️ High CoV: tail={cov:.1}% (threshold: {threshold:.1}%)"
+                        ));
+                    }
                 }
             }
         }
@@ -2312,28 +2307,29 @@ dispersion_method = "mad"
     }
 
     #[test]
-    fn test_high_cov_shows_both_tail_and_head_values() {
-        // tail has high CoV; verify both tail and head CoV values appear in warning
+    fn test_high_cov_shows_correct_tail_cov_value() {
+        // tail = [0, 200]: mean=100, sample stddev=141.4, CoV=141.4%
+        // Verifies the exact CoV percentage appears (catches / → * and / → % mutations)
         let result = audit_with_data(
             "test_measurement",
             105.0,
-            vec![50.0, 100.0, 150.0, 100.0, 100.0],
+            vec![0.0, 200.0],
             2,
-            10.0,
+            100.0, // very high sigma so audit passes
             DispersionMethod::StandardDeviation,
             ReductionFunc::Min,
-            Some(30.0),
+            Some(100.0), // threshold 100%, CoV 141.4% exceeds it
         );
 
         assert!(result.is_ok());
         let message = result.unwrap().message;
         assert!(
             message.contains("tail="),
-            "Should show tail CoV, got: {message}"
+            "Should show tail CoV label, got: {message}"
         );
         assert!(
-            message.contains("head="),
-            "Should show head CoV, got: {message}"
+            message.contains("141.4%"),
+            "Should show correct CoV percentage ≈141.4%, got: {message}"
         );
     }
 
@@ -2358,6 +2354,52 @@ dispersion_method = "mad"
             audit_result.message.contains("⚠️ High CoV"),
             "CoV warning should appear even on failure, got: {}",
             audit_result.message
+        );
+    }
+
+    #[test]
+    fn test_high_cov_no_warning_when_cov_equals_threshold() {
+        // cov = 0%, threshold = 0% → strict > means 0 > 0 is false, no warning
+        // With >= mutation: 0 >= 0 would be true → warning fires → catches mutation
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(0.0), // threshold = 0%
+        );
+
+        assert!(result.is_ok());
+        let message = result.unwrap().message;
+        assert!(
+            !message.contains("⚠️ High CoV"),
+            "Should not warn when CoV (0%) equals threshold (0%) with strict >, got: {message}"
+        );
+    }
+
+    #[test]
+    fn test_high_cov_skips_near_zero_mean() {
+        // tail mean = EPSILON exactly: the guard "mean.abs() > EPSILON" prevents CoV computation
+        // With >= mutation: EPSILON >= EPSILON is true → CoV ≈141.4% > threshold → warning fires
+        let eps = f64::EPSILON;
+        let result = audit_with_data(
+            "test_measurement",
+            1.0,
+            vec![0.0, 2.0 * eps], // mean = EPSILON, sample stddev = EPSILON*sqrt(2)
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Mean,
+            Some(100.0), // threshold: CoV would be ~141% if computed
+        );
+
+        // mean = EPSILON is not > EPSILON, so CoV is not computed → no warning
+        assert!(
+            !result.unwrap().message.contains("⚠️ High CoV"),
+            "Should not compute CoV when tail mean equals EPSILON"
         );
     }
 }
