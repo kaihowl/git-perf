@@ -309,16 +309,7 @@ pub fn audit_multiple(
                 format!(" ({})", format_group_label(separate_by, group_values))
             };
 
-            let result = audit_with_commits(
-                &measurement,
-                &all_commits,
-                params.min_count,
-                &group_selectors,
-                params.summarize_by,
-                params.sigma,
-                params.dispersion_method,
-                params.max_cov,
-            )?;
+            let result = audit_with_commits(&measurement, &all_commits, &group_selectors, &params)?;
 
             // TODO(Phase 2): Add change point detection warning here
             // If !_no_change_point_warning, detect change points in current epoch
@@ -378,16 +369,11 @@ pub fn audit_multiple(
 /// Audits a measurement using pre-loaded commit data.
 /// This is more efficient than the old `audit` function when auditing multiple measurements,
 /// as it reuses the same commit data instead of walking commits multiple times.
-#[allow(clippy::too_many_arguments)]
 fn audit_with_commits(
     measurement: &str,
     commits: &[Result<Commit>],
-    min_count: u16,
     selectors: &[(String, String)],
-    summarize_by: ReductionFunc,
-    sigma: f64,
-    dispersion_method: DispersionMethod,
-    max_cov: Option<f64>,
+    params: &ResolvedAuditParams,
 ) -> Result<AuditResult> {
     // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
     // This is necessary because summarize_measurements expects an iterator of Result<Commit>
@@ -421,7 +407,7 @@ fn audit_with_commits(
 
     let mut aggregates = measurement_retrieval::take_while_same_epoch(summarize_measurements(
         commits_iter,
-        &summarize_by,
+        &params.summarize_by,
         &filter_by,
     ));
 
@@ -440,37 +426,22 @@ fn audit_with_commits(
         .filter_map_ok(|cs| cs.measurement.map(|m| m.val))
         .try_collect()?;
 
-    audit_with_data(
-        measurement,
-        head,
-        head_raw,
-        tail,
-        min_count,
-        sigma,
-        dispersion_method,
-        summarize_by,
-        max_cov,
-    )
+    audit_with_data(measurement, head, head_raw, tail, params)
 }
 
 /// Core audit logic that can be tested with mock data
 /// This function contains all the mutation-tested logic paths
-#[allow(clippy::too_many_arguments)]
 fn audit_with_data(
     measurement: &str,
     head: f64,
     head_raw: Vec<f64>,
     tail: Vec<f64>,
-    min_count: u16,
-    sigma: f64,
-    dispersion_method: DispersionMethod,
-    summarize_by: ReductionFunc,
-    max_cov: Option<f64>,
+    params: &ResolvedAuditParams,
 ) -> Result<AuditResult> {
     // Note: CLI enforces min_count >= 2 via clap::value_parser!(u16).range(2..)
     // Tests may use lower values for edge case testing, but production code
     // should never call this with min_count < 2
-    assert!(min_count >= 2, "min_count must be at least 2");
+    assert!(params.min_count >= 2, "min_count must be at least 2");
 
     // Get unit for this measurement from config
     let unit = config::measurement_unit(measurement);
@@ -482,7 +453,7 @@ fn audit_with_data(
     // Compute CoV before tail is consumed. Tail CoV uses per-commit aggregated values
     // (cross-run baseline stability). Head CoV uses the raw measurements at HEAD
     // (within-run repeatability). Require ≥2 samples and a non-zero mean for each.
-    let cov_warning = max_cov.and_then(|threshold| {
+    let cov_warning = params.max_cov.and_then(|threshold| {
         let tail_cov = (tail_summary.len >= 2 && tail_summary.mean.abs() > f64::EPSILON)
             .then(|| tail_summary.stddev / tail_summary.mean * 100.0);
         let head_raw_summary = stats::aggregate_measurements(head_raw.iter());
@@ -493,10 +464,16 @@ fn audit_with_data(
         let head_exceeds = head_cov.is_some_and(|cov| cov > threshold);
 
         if tail_exceeds || head_exceeds {
-            let tail_str = tail_cov.map_or("n/a".to_string(), |c| format!("{c:.1}%"));
-            let head_str = head_cov.map_or("n/a".to_string(), |c| format!("{c:.1}%"));
+            let mut parts = Vec::new();
+            if let Some(cov) = tail_cov {
+                parts.push(format!("tail={:.1}%", cov));
+            }
+            if let Some(cov) = head_cov {
+                parts.push(format!("head={:.1}%", cov));
+            }
             Some(format!(
-                "\n⚠️ High CoV: tail={tail_str}, head={head_str} (threshold: {threshold:.1}%)"
+                "\n⚠️ High CoV: {} (threshold: {threshold:.1}%)",
+                parts.join(", ")
             ))
         } else {
             None
@@ -565,9 +542,9 @@ fn audit_with_data(
         } else if total_measurements >= 2 {
             // 2+ measurements: show aggregation method, z-score, head, tail, and sparkline
             let direction = get_direction_arrow(head_summary.mean, tail_summary.mean);
-            let z_score = head_summary.z_score_with_method(&tail_summary, dispersion_method);
+            let z_score = head_summary.z_score_with_method(&tail_summary, params.dispersion_method);
             let z_score_display = format_z_score_display(z_score);
-            let method_name = match dispersion_method {
+            let method_name = match params.dispersion_method {
                 DispersionMethod::StandardDeviation => "stddev",
                 DispersionMethod::MedianAbsoluteDeviation => "mad",
             };
@@ -581,7 +558,7 @@ fn audit_with_data(
                 unit: unit_str,
             };
 
-            summary.push_str(&format!("Aggregation: {summarize_by}\n"));
+            summary.push_str(&format!("Aggregation: {}\n", params.summarize_by));
             summary.push_str(&format!(
                 "z-score ({method_name}): {direction}{}\n",
                 z_score_display
@@ -599,14 +576,14 @@ fn audit_with_data(
     };
 
     // MUTATION POINT: < vs == (Line 120)
-    if tail_summary.len < min_count.into() {
+    if tail_summary.len < params.min_count.into() {
         let number_measurements = tail_summary.len;
         // MUTATION POINT: > vs < (Line 122)
         let plural_s = if number_measurements == 1 { "" } else { "s" };
-        info!("Only {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test.");
+        info!("Only {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {}. Skipping test.", params.min_count);
 
         let mut skip_message = format!(
-            "⏭️ '{measurement}'\nOnly {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {min_count}. Skipping test."
+            "⏭️ '{measurement}'\nOnly {number_measurements} historical measurement{plural_s} found. Less than requested min_measurements of {}. Skipping test.", params.min_count
         );
 
         // Add summary using the same logic as passing/failing cases
@@ -649,7 +626,7 @@ fn audit_with_data(
 
     // MUTATION POINT: > vs >= (Line 178)
     let z_score_exceeds_sigma =
-        head_summary.is_significant(&tail_summary, sigma, dispersion_method);
+        head_summary.is_significant(&tail_summary, params.sigma, params.dispersion_method);
 
     // MUTATION POINT: ! removal (Line 181)
     let passed = !z_score_exceeds_sigma || passed_due_to_threshold;
