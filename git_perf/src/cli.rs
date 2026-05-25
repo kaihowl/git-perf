@@ -137,6 +137,7 @@ pub fn handle_calls() -> Result<()> {
             aggregate_by,
             sigma,
             dispersion_method,
+            max_cov,
             filter,
             no_change_point_warning,
         } => {
@@ -173,6 +174,7 @@ pub fn handle_calls() -> Result<()> {
                 aggregate_by.map(ReductionFunc::from),
                 sigma,
                 dispersion_method.map(crate::stats::DispersionMethod::from),
+                max_cov,
                 &combined_patterns,
                 &separate_by,
                 no_change_point_warning,
