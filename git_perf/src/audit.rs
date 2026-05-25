@@ -2605,4 +2605,80 @@ dispersion_method = "mad"
             "Should compute tail CoV with exactly 2 tail measurements (>= 2), got: {msg}"
         );
     }
+
+    #[test]
+    fn test_head_cov_skips_near_zero_mean() {
+        // head_raw mean = EPSILON: the guard "mean.abs() > EPSILON" must prevent CoV computation.
+        // head_raw = [0.0, 2*EPSILON]: mean = EPSILON, sample stddev = EPSILON*sqrt(2)
+        // If guard used >= instead of >: EPSILON >= EPSILON → CoV = sqrt(2)*100% ≈ 141.4% > 100%
+        // → warning fires → mutation caught.
+        let eps = f64::EPSILON;
+        let result = audit_with_data(
+            "test_measurement",
+            1.0,
+            vec![0.0, 2.0 * eps], // head_raw: mean = EPSILON, not > EPSILON
+            vec![100.0, 100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Mean,
+            Some(100.0),
+        );
+        assert!(result.is_ok());
+        assert!(
+            !result.unwrap().message.contains("⚠️ High CoV"),
+            "Should not compute head CoV when mean equals EPSILON"
+        );
+    }
+
+    #[test]
+    fn test_head_cov_skips_when_mean_near_zero_despite_valid_len() {
+        // Catches && → || mutation on head guard (line 489:45).
+        // head_raw has len=2 (passes len >= 2) but mean = EPSILON/2 ≤ EPSILON (fails mean guard).
+        // Original (&&): true && false = false → no CoV.
+        // Mutated (||): true || false = true → CoV = stddev/(EPSILON/2)*100 ≈ 141.4% > threshold
+        // → warning fires → mutation caught.
+        let eps = f64::EPSILON;
+        let result = audit_with_data(
+            "test_measurement",
+            1.0,
+            vec![eps, 0.0], // mean = eps/2 < EPSILON, but len = 2
+            vec![100.0, 100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Mean,
+            Some(100.0),
+        );
+        assert!(result.is_ok());
+        assert!(
+            !result.unwrap().message.contains("⚠️ High CoV"),
+            "Should not compute head CoV when mean is near-zero, even with len >= 2"
+        );
+    }
+
+    #[test]
+    fn test_head_cov_no_warning_when_cov_equals_threshold() {
+        // head_raw = [100, 100]: stddev=0, CoV=0%, threshold=0%.
+        // Strict > means 0 > 0 is false → no warning.
+        // With >= mutation: 0 >= 0 → warning fires → mutation caught.
+        // Tail is stable (CoV=0%) so only the head threshold comparison is exercised.
+        let result = audit_with_data(
+            "test_measurement",
+            100.0,
+            vec![100.0, 100.0], // head_raw: CoV = 0%
+            vec![100.0, 100.0, 100.0],
+            2,
+            10.0,
+            DispersionMethod::StandardDeviation,
+            ReductionFunc::Min,
+            Some(0.0), // threshold = 0%
+        );
+        assert!(result.is_ok());
+        let msg = result.unwrap().message;
+        assert!(
+            !msg.contains("⚠️ High CoV"),
+            "Should not warn when head CoV (0%) equals threshold (0%) with strict >, got: {msg}"
+        );
+    }
 }
