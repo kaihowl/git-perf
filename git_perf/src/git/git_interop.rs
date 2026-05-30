@@ -1668,4 +1668,20 @@ mod test {
             "PID {pid} should be dead after process exited",
         );
     }
+
+    /// Test that raw_add_note_line succeeds under normal conditions (symref present).
+    /// This directly exercises the ok_or_else path without the 60-second backoff
+    /// wrapper, so any mutant that makes the function always return an error is
+    /// caught immediately rather than after a full backoff cycle.
+    #[test]
+    fn test_raw_add_note_line_succeeds_in_normal_repo() {
+        with_isolated_cwd_git(|_git_dir| {
+            let result = raw_add_note_line("HEAD", "test_measurement=1.0");
+            assert!(
+                result.is_ok(),
+                "raw_add_note_line should succeed in a freshly initialised repo: {:?}",
+                result
+            );
+        });
+    }
 }
