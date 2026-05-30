@@ -202,28 +202,24 @@ echo "Waiting for all tests to complete..."
 set +e
 
 PUSH_STATUS=0
-if [ $CONCURRENT_PUSHERS -gt 0 ]; then
-  wait "${PUSH_PIDS[@]}"
-  PUSH_STATUS=$?
-fi
+for pid in "${PUSH_PIDS[@]}"; do
+  wait "$pid" || PUSH_STATUS=$?
+done
 
 REMOVE_STATUS=0
-if [ $CONCURRENT_REMOVERS -gt 0 ]; then
-  wait "${REMOVE_PIDS[@]}"
-  REMOVE_STATUS=$?
-fi
+for pid in "${REMOVE_PIDS[@]}"; do
+  wait "$pid" || REMOVE_STATUS=$?
+done
 
 ADD_STATUS=0
-if [ $CONCURRENT_ADDERS -gt 0 ]; then
-  wait "${ADD_PIDS[@]}"
-  ADD_STATUS=$?
-fi
+for pid in "${ADD_PIDS[@]}"; do
+  wait "$pid" || ADD_STATUS=$?
+done
 
 PRUNE_STATUS=0
-if [ $CONCURRENT_PRUNERS -gt 0 ]; then
-  wait "${PRUNE_PIDS[@]}"
-  PRUNE_STATUS=$?
-fi
+for pid in "${PRUNE_PIDS[@]}"; do
+  wait "$pid" || PRUNE_STATUS=$?
+done
 
 # Reset trap for normal completion
 trap - SIGINT SIGTERM
