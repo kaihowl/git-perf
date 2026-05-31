@@ -115,22 +115,18 @@ jobs:
           set -x
           cargo criterion --bench add --features test-helpers --message-format json > add-bench-results.json
 
-          if [ -s add-bench-results.json ]; then
-            cargo run -- import criterion-json add-bench-results.json \
-              --metadata ci=true \
-              --metadata os=${{matrix.os}} \
-              --metadata rust=${{matrix.rust}}
+          cargo run -- import criterion-json add-bench-results.json \
+            --metadata ci=true \
+            --metadata os=${{matrix.os}} \
+            --metadata rust=${{matrix.rust}}
 
-            cargo run -- push || true
+          cargo run -- push || true
 
-            cargo run -- audit -n 40 \
-              -m "bench::add_measurements/add_measurement/1::median" \
-              -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
-              --min-measurements 3 \
-              || echo "add benchmark audit failed (expected on first runs)"
-          else
-            echo "No add benchmark results to import"
-          fi
+          cargo run -- audit -n 40 \
+            -m "bench::add_measurements/add_measurement/1::median" \
+            -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
+            --min-measurements 3 \
+            || echo "add benchmark audit failed (expected on first runs)"
 
     - name: Run sample perf measurements
       env:
