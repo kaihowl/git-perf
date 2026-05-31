@@ -113,7 +113,7 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          cargo criterion --bench add --message-format json > add-bench-results.json || true
+          cargo criterion --bench add --features test-helpers --message-format json > add-bench-results.json || true
 
           if [ -s add-bench-results.json ]; then
             cargo run -- import criterion-json add-bench-results.json \
@@ -314,7 +314,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/1::mean -m release-binary-size --separate-by os --separate-by rust'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
