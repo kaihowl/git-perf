@@ -105,6 +105,33 @@ jobs:
             echo "No benchmark results to import"
           fi
 
+    - name: Run add benchmark and track performance
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      run: |
+          set -x
+          cargo criterion --bench add --message-format json > add-bench-results.json || true
+
+          if [ -s add-bench-results.json ]; then
+            cargo run -- import criterion-json add-bench-results.json \
+              --metadata ci=true \
+              --metadata os=${{matrix.os}} \
+              --metadata rust=${{matrix.rust}}
+
+            cargo run -- push || true
+
+            cargo run -- audit -n 40 \
+              -m "bench::add_measurements/add_measurement/1::mean" \
+              -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
+              --min-measurements 3 \
+              || echo "add benchmark audit failed (expected on first runs)"
+          else
+            echo "No add benchmark results to import"
+          fi
+
     - name: Run sample perf measurements
       env:
         GIT_AUTHOR_NAME: github-actions[bot]
