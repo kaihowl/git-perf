@@ -95,7 +95,7 @@ jobs:
               --metadata rust=${{matrix.rust}}
 
             # Push imported measurements
-            git push origin refs/notes/perf-v3 || true
+            cargo run -- push || true
 
             # Audit fibonacci benchmarks (using mean statistic)
             # Allow up to 10 sigma deviation to account for CI variability
@@ -121,7 +121,7 @@ jobs:
               --metadata os=${{matrix.os}} \
               --metadata rust=${{matrix.rust}}
 
-            git push origin refs/notes/perf-v3 || true
+            cargo run -- push || true
 
             cargo run -- audit -n 40 \
               -m "bench::add_measurements/add_measurement/1::mean" \
