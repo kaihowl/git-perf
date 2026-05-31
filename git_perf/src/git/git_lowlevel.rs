@@ -94,13 +94,23 @@ pub(super) fn feed_git_command(
 }
 
 pub(super) fn map_git_error(err: GitError) -> GitError {
-    // Parsing error messasges is not a very good idea, but(!) there are no consistent + documented error code for these cases.
+    // Parsing error messages is not a very good idea, but(!) there are no consistent + documented error code for these cases.
     // This is tested by the git compatibility check and we add an explicit LANG to the git invocation.
     match err {
+        // "cannot lock ref" also subsumes the reftable-backend variant "cannot lock references"
+        // (no ref name) via substring match.
         GitError::ExecError { output, .. } if output.stderr.contains("cannot lock ref") => {
             GitError::RefFailedToLock { output }
         }
         GitError::ExecError { output, .. } if output.stderr.contains("unable to lock ref") => {
+            GitError::RefFailedToLock { output }
+        }
+        GitError::ExecError { output, .. } if output.stderr.contains("packed-refs.lock") => {
+            GitError::RefFailedToLock { output }
+        }
+        GitError::ExecError { output, .. }
+            if output.stderr.contains("lock") && output.stderr.contains("File exists") =>
+        {
             GitError::RefFailedToLock { output }
         }
         GitError::ExecError { output, .. } if output.stderr.contains("but expected") => {
@@ -111,14 +121,6 @@ pub(super) fn map_git_error(err: GitError) -> GitError {
         }
         GitError::ExecError { output, .. } if output.stderr.contains("bad object") => {
             GitError::BadObject { output }
-        }
-        GitError::ExecError { output, .. } if output.stderr.contains("packed-refs.lock") => {
-            GitError::RefFailedToLock { output }
-        }
-        GitError::ExecError { output, .. }
-            if output.stderr.contains("lock") && output.stderr.contains("File exists") =>
-        {
-            GitError::RefFailedToLock { output }
         }
         GitError::ExecError { .. }
         | GitError::RefFailedToPush { .. }
@@ -530,6 +532,22 @@ mod test {
             stdout: String::new(),
             stderr: "fatal: unable to lock ref 'refs/notes/perf-v3': reference already exists"
                 .to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_cannot_lock_references_reftable() {
+        // reftable backend emits "cannot lock references" (no ref name in message).
+        // "cannot lock ref" is a substring of "cannot lock references", so Pattern 1 covers it.
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "error: cannot lock references".to_string(),
         };
         let error = GitError::ExecError {
             command: "update-ref".to_string(),
