@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.6.0...git_perf_cli_types-v0.7.0) - 2026-05-31
+
+### Added
+
+- *(audit)* add CoV flagging with --max-cov threshold ([#696](https://github.com/kaihowl/git-perf/pull/696))
+- *(config)* add [environment] and [defaults] config sections for auto metadata ([#692](https://github.com/kaihowl/git-perf/pull/692))
+
 ## [0.6.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.5.0...git_perf_cli_types-v0.6.0) - 2026-05-24
 
 ### Added

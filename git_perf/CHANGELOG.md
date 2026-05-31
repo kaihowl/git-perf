@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.21.0...git-perf-v0.22.0) - 2026-05-31
+
+### Added
+
+- *(audit)* add CoV flagging with --max-cov threshold ([#696](https://github.com/kaihowl/git-perf/pull/696))
+- *(config)* add [environment] and [defaults] config sections for auto metadata ([#692](https://github.com/kaihowl/git-perf/pull/692))
+
+### Fixed
+
+- *(git)* eliminate panic, make notes-append lockable, fix wait-status capture
+- *(git)* re-enable --no-separator for git notes append ([#691](https://github.com/kaihowl/git-perf/pull/691))
+
+### Other
+
+- *(git)* document reftable lock coverage, fix arm order and comment typo ([#703](https://github.com/kaihowl/git-perf/pull/703))
+- *(git)* batch note content fetching for size --detailed command ([#689](https://github.com/kaihowl/git-perf/pull/689))
+
 ## [0.21.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.20.0...git-perf-v0.21.0) - 2026-05-24
 
 ### Added
