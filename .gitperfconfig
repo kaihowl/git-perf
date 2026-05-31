@@ -27,6 +27,13 @@ sigma = 3
 aggregate_by = "min"
 min_measurements = 10
 
+[measurement."bench::add_measurements/add_measurement/1"]
+unit = "ns"
+dispersion_method = "mad"
+sigma = 5.0
+aggregate_by = "median"
+min_measurements = 3
+
 [measurement."add-benchmark"]
 epoch = "296bc41"
 unit = "ns"
