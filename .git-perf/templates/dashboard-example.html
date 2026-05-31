@@ -106,7 +106,7 @@
     </header>
 
     <main>
-        <!-- Section 1: Add Benchmark -->
+        <!-- Section 1: Add Benchmark (legacy subprocess) -->
         <section class="report-section">
             <h2>🚀 Add Benchmark Performance</h2>
             <p>Median performance for add operations with change point detection and epoch boundaries.</p>
@@ -118,7 +118,19 @@
             }}
         </section>
 
-        <!-- Section 2: Report Benchmark -->
+        <!-- Section 2: Criterion Add Benchmark -->
+        <section class="report-section">
+            <h2>⚡ Criterion Add Benchmark</h2>
+            <p>In-process Criterion benchmark of add_note_line_to_head() for input size 1, with change point detection.</p>
+            {{SECTION[criterion-add-benchmark]
+                measurement-filter: ^bench::add_measurements/add_measurement/1::median$
+                aggregate-by: median
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Section 3: Report Benchmark -->
         <section class="report-section">
             <h2>📊 Report Benchmark Performance</h2>
             <p>Median performance for report generation with change point detection and epoch boundaries.</p>
@@ -130,7 +142,7 @@
             }}
         </section>
 
-        <!-- Section 3: Report Generation Performance -->
+        <!-- Section 4: Report Generation Performance -->
         <section class="report-section">
             <h2>⚙️ Report Generation Time</h2>
             <p>Report generation performance showing execution duration.</p>
@@ -142,7 +154,7 @@
             }}
         </section>
 
-        <!-- Section 4: Release Binary Size -->
+        <!-- Section 5: Release Binary Size -->
         <section class="report-section">
             <h2>💾 Release Binary Size</h2>
             <p>Binary size tracking with change point detection and epoch boundaries.</p>
@@ -154,7 +166,7 @@
             }}
         </section>
 
-        <!-- Section 5: Report Size -->
+        <!-- Section 6: Report Size -->
         <section class="report-section">
             <h2>📄 Report Size</h2>
             <p>Generated report size tracking with change point detection and epoch boundaries.</p>
