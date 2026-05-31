@@ -286,7 +286,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/1::mean -m release-binary-size --separate-by os --separate-by rust'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
