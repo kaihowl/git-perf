@@ -113,7 +113,7 @@ jobs:
         GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
-          cargo criterion --bench add --features test-helpers --message-format json > add-bench-results.json || true
+          cargo criterion --bench add --features test-helpers --message-format json > add-bench-results.json
 
           if [ -s add-bench-results.json ]; then
             cargo run -- import criterion-json add-bench-results.json \
@@ -124,7 +124,7 @@ jobs:
             cargo run -- push || true
 
             cargo run -- audit -n 40 \
-              -m "bench::add_measurements/add_measurement/1::mean" \
+              -m "bench::add_measurements/add_measurement/1::median" \
               -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
               --min-measurements 3 \
               || echo "add benchmark audit failed (expected on first runs)"
@@ -199,7 +199,7 @@ jobs:
           git perf push
 
           # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -m report-benchmark -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
+          git perf audit -n 40 -m test-measure2 -m report-benchmark -m report-size-benchmark -m "bench::add_measurements/add_measurement/1::median" -s os=${{matrix.os}} -s rust=${{matrix.rust}}
 
           # Informational audits: failures don't block CI
           git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
@@ -314,7 +314,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/1::mean -m release-binary-size --separate-by os --separate-by rust'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/1::median -m release-binary-size --separate-by os --separate-by rust'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'

@@ -27,7 +27,7 @@ sigma = 3
 aggregate_by = "min"
 min_measurements = 10
 
-[measurement."bench::add_measurements/add_measurement/1"]
+[measurement."bench::add_measurements/add_measurement/1::median"]
 unit = "ns"
 dispersion_method = "mad"
 sigma = 5.0
