@@ -100,6 +100,9 @@ pub(super) fn map_git_error(err: GitError) -> GitError {
         GitError::ExecError { output, .. } if output.stderr.contains("cannot lock ref") => {
             GitError::RefFailedToLock { output }
         }
+        GitError::ExecError { output, .. } if output.stderr.contains("unable to lock ref") => {
+            GitError::RefFailedToLock { output }
+        }
         GitError::ExecError { output, .. } if output.stderr.contains("but expected") => {
             GitError::RefConcurrentModification { output }
         }
@@ -512,6 +515,21 @@ mod test {
         let output = GitOutput {
             stdout: String::new(),
             stderr: "error: packed-refs.lock is held by another process".to_string(),
+        };
+        let error = GitError::ExecError {
+            command: "update-ref".to_string(),
+            output,
+        };
+        let mapped = map_git_error(error);
+        assert!(matches!(mapped, GitError::RefFailedToLock { .. }));
+    }
+
+    #[test]
+    fn test_map_git_error_unable_to_lock_ref_maps_to_ref_failed_to_lock() {
+        let output = GitOutput {
+            stdout: String::new(),
+            stderr: "fatal: unable to lock ref 'refs/notes/perf-v3': reference already exists"
+                .to_string(),
         };
         let error = GitError::ExecError {
             command: "update-ref".to_string(),

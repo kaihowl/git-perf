@@ -154,7 +154,14 @@ fn raw_add_note_line(commit: &str, line: &str) -> Result<(), GitError> {
     let current_note_head =
         git_rev_parse(REFS_NOTES_WRITE_SYMBOLIC_REF).unwrap_or(EMPTY_OID.to_string());
     let current_symbolic_ref_target = git_rev_parse_symbolic_ref(REFS_NOTES_WRITE_SYMBOLIC_REF)
-        .expect("Missing symbolic-ref for target");
+        .ok_or_else(|| GitError::RefFailedToLock {
+            output: GitOutput {
+                stdout: String::new(),
+                stderr: format!(
+                    "symbolic-ref {REFS_NOTES_WRITE_SYMBOLIC_REF} vanished after creation"
+                ),
+            },
+        })?;
     let temp_target = create_temp_add_head(&current_note_head)?;
 
     defer!(if let Err(e) = remove_reference(&temp_target) {
@@ -176,7 +183,8 @@ fn raw_add_note_line(commit: &str, line: &str) -> Result<(), GitError> {
             &resolved_commit,
         ],
         &None,
-    )?;
+    )
+    .map_err(map_git_error)?;
 
     // Update current write branch with pending write
     // We update the target ref directly (no symref-verify needed in git 2.43.0)
@@ -1659,5 +1667,21 @@ mod test {
             !is_process_alive(pid),
             "PID {pid} should be dead after process exited",
         );
+    }
+
+    /// Test that raw_add_note_line succeeds under normal conditions (symref present).
+    /// This directly exercises the ok_or_else path without the 60-second backoff
+    /// wrapper, so any mutant that makes the function always return an error is
+    /// caught immediately rather than after a full backoff cycle.
+    #[test]
+    fn test_raw_add_note_line_succeeds_in_normal_repo() {
+        with_isolated_cwd_git(|_git_dir| {
+            let result = raw_add_note_line("HEAD", "test_measurement=1.0");
+            assert!(
+                result.is_ok(),
+                "raw_add_note_line should succeed in a freshly initialised repo: {:?}",
+                result
+            );
+        });
     }
 }
