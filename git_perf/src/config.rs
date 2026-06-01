@@ -30,13 +30,24 @@ pub trait ConfigParentFallbackExt {
 
 impl ConfigParentFallbackExt for Config {
     fn get_with_parent_fallback(&self, parent: &str, name: &str, key: &str) -> Option<String> {
-        // Try specific measurement first: parent.name.key
-        let specific_key = format!("{}.{}.{}", parent, name, key);
-        if let Ok(v) = self.get_string(&specific_key) {
-            return Some(v);
+        // Use table-based navigation instead of building a dot-path key string.
+        // The config crate's path expression parser only accepts [a-zA-Z0-9_-] as identifier
+        // characters, so dot-path lookup silently fails for measurement names that contain
+        // '::' or '/' (e.g. Criterion benchmark names like "bench::group/bench/1::stat").
+        if let Ok(parent_table) = self.get_table(parent) {
+            if let Some(name_value) = parent_table.get(name) {
+                if let Ok(name_table) = name_value.clone().into_table() {
+                    if let Some(key_value) = name_table.get(key) {
+                        if let Ok(s) = key_value.clone().into_string() {
+                            return Some(s);
+                        }
+                    }
+                }
+            }
         }
 
-        // Fallback to parent table: parent.key
+        // Fallback to parent table default: parent.key
+        // parent and key are always simple identifiers, so dot-path is safe here
         let parent_key = format!("{}.{}", parent, key);
         if let Ok(v) = self.get_string(&parent_key) {
             return Some(v);
@@ -1646,6 +1657,44 @@ unit = "bytes"
 
             // Test measurement without unit (no parent default either)
             assert_eq!(super::measurement_unit("other_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_measurement_unit_special_chars_in_name() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement."with_colon::name"]
+unit = "ns"
+
+[measurement."with/slash"]
+unit = "ms"
+
+[measurement."bench::add_measurements/add_measurement/1::median"]
+unit = "ns"
+min_measurements = 3
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            assert_eq!(
+                super::measurement_unit("with_colon::name"),
+                Some("ns".to_string()),
+                "double-colon in name"
+            );
+            assert_eq!(
+                super::measurement_unit("with/slash"),
+                Some("ms".to_string()),
+                "slash in name"
+            );
+            assert_eq!(
+                super::measurement_unit("bench::add_measurements/add_measurement/1::median"),
+                Some("ns".to_string()),
+                "full benchmark name"
+            );
         });
     }
 }
