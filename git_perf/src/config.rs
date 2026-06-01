@@ -34,23 +34,24 @@ impl ConfigParentFallbackExt for Config {
         // The config crate's path expression parser only accepts [a-zA-Z0-9_-] as identifier
         // characters, so dot-path lookup silently fails for measurement names that contain
         // '::' or '/' (e.g. Criterion benchmark names like "bench::group/bench/1::stat").
-        if let Ok(parent_table) = self.get_table(parent) {
-            if let Some(name_value) = parent_table.get(name) {
-                if let Ok(name_table) = name_value.clone().into_table() {
-                    if let Some(key_value) = name_table.get(key) {
-                        if let Ok(s) = key_value.clone().into_string() {
+        if let Ok(mut parent_table) = self.get_table(parent) {
+            // Try specific measurement first: parent[name][key]
+            if let Some(name_value) = parent_table.remove(name) {
+                if let Ok(mut name_table) = name_value.into_table() {
+                    if let Some(key_value) = name_table.remove(key) {
+                        if let Ok(s) = key_value.into_string() {
                             return Some(s);
                         }
                     }
                 }
             }
-        }
 
-        // Fallback to parent table default: parent.key
-        // parent and key are always simple identifiers, so dot-path is safe here
-        let parent_key = format!("{}.{}", parent, key);
-        if let Ok(v) = self.get_string(&parent_key) {
-            return Some(v);
+            // Fallback to parent-level default: parent[key]
+            if let Some(key_value) = parent_table.remove(key) {
+                if let Ok(s) = key_value.into_string() {
+                    return Some(s);
+                }
+            }
         }
 
         None
