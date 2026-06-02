@@ -3063,6 +3063,43 @@ dispersion_method = "mad"
     }
 
     #[test]
+    fn test_generate_change_point_warnings_wrong_name() {
+        // Commits have a clear regime shift but under a different measurement name.
+        // The filter must exclude them, so no warnings should appear.
+        let commits: Vec<Result<Commit>> = (0..10)
+            .map(|i| {
+                let val = if i < 5 { 20.0 } else { 10.0 };
+                Ok(make_commit_with_measurement(
+                    &format!("sha{:040x}", i),
+                    "other", // wrong name
+                    val,
+                ))
+            })
+            .collect();
+
+        let cp_config = change_point::ChangePointConfig {
+            enabled: true,
+            min_data_points: 5,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.5,
+            penalty: 0.5,
+        };
+
+        let warnings = generate_change_point_warnings(
+            "bench", // asks for "bench", commits only have "other"
+            &commits,
+            &[],
+            &ReductionFunc::Min,
+            false,
+            &cp_config,
+        );
+        assert!(
+            warnings.is_empty(),
+            "Should not warn when no commits match the measurement name"
+        );
+    }
+
+    #[test]
     fn test_generate_change_point_warnings_suppressed() {
         // When no_change_point_warning=true, no warnings regardless of data
         let commits: Vec<Result<Commit>> = (0..10)
