@@ -2,7 +2,7 @@ use crate::{
     change_point, config,
     data::{Commit, MeasurementData},
     defaults,
-    measurement_retrieval::{self, summarize_measurements},
+    measurement_retrieval::{self, summarize_measurements, MeasurementReducer},
     stats::{self, DispersionMethod, ReductionFunc, StatsWithUnit, VecAggregation},
 };
 use anyhow::{anyhow, bail, Result};
@@ -208,25 +208,27 @@ fn collect_epoch_measurements(
     let filter_by =
         |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
 
-    let commits_iter = commits.iter().map(|r| match r {
-        Ok(commit) => Ok(Commit {
-            commit: commit.commit.clone(),
-            title: commit.title.clone(),
-            author: commit.author.clone(),
-            measurements: commit.measurements.clone(),
-        }),
-        Err(e) => Err(anyhow::anyhow!("{}", e)),
-    });
+    let mut first_epoch: Option<u32> = None;
+    let mut epoch_data: Vec<(String, f64)> = Vec::new();
 
-    let epoch_data: Vec<(String, f64)> = measurement_retrieval::take_while_same_epoch(
-        measurement_retrieval::summarize_measurements(commits_iter, summarize_by, &filter_by),
-    )
-    .filter_map(|r| r.ok())
-    .filter_map(|cs| cs.measurement.map(|m| (cs.commit, m.val)))
-    .collect();
+    for commit in commits.iter().flatten() {
+        if let Some(summary) = commit
+            .measurements
+            .iter()
+            .filter(|m| filter_by(m))
+            .reduce_by(*summarize_by)
+        {
+            let prev = first_epoch;
+            first_epoch = Some(summary.epoch);
+            if prev.unwrap_or(summary.epoch) != summary.epoch {
+                break;
+            }
+            epoch_data.push((commit.commit.clone(), summary.val));
+        }
+    }
 
     let values = epoch_data.iter().map(|(_, v)| *v).collect();
-    let shas = epoch_data.iter().map(|(c, _)| c.clone()).collect();
+    let shas = epoch_data.into_iter().map(|(c, _)| c).collect();
     (values, shas)
 }
 
@@ -394,6 +396,9 @@ pub fn audit_multiple(
         // Compute groups for this measurement
         let groups = compute_group_values(&all_commits, &measurement, selectors, separate_by)?;
 
+        let cp_config = config::change_point_config(&measurement);
+        let mut seen_warnings: HashSet<String> = HashSet::new();
+
         // Audit each group independently
         for group_values in &groups {
             // Build combined selectors (original selectors + group selectors)
@@ -411,7 +416,6 @@ pub fn audit_multiple(
 
             let result = audit_with_commits(&measurement, &all_commits, &group_selectors, &params)?;
 
-            let cp_config = config::change_point_config(&measurement);
             let cp_warnings = generate_change_point_warnings(
                 &measurement,
                 &all_commits,
@@ -425,10 +429,12 @@ pub fn audit_multiple(
             if !separate_by.is_empty() {
                 // Print header for the group
                 println!("Auditing measurement \"{}\"{}:", measurement, group_label);
-                // Print warnings indented inside the group block
+                // Print unique warnings (deduplicated across groups for the same measurement)
                 for warning in &cp_warnings {
-                    for line in warning.lines() {
-                        println!("  {}", line);
+                    if seen_warnings.insert(warning.clone()) {
+                        for line in warning.lines() {
+                            println!("  {}", line);
+                        }
                     }
                 }
                 // Indent the result message
