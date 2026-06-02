@@ -2968,9 +2968,7 @@ dispersion_method = "mad"
         );
     }
 
-    fn make_commits_iter(
-        commits: &[Result<Commit>],
-    ) -> impl Iterator<Item = Result<Commit>> + '_ {
+    fn make_commits_iter(commits: &[Result<Commit>]) -> impl Iterator<Item = Result<Commit>> + '_ {
         commits.iter().map(|r| match r {
             Ok(c) => Ok(c.clone()),
             Err(e) => Err(anyhow::anyhow!("{}", e)),
