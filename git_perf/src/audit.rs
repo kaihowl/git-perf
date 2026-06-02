@@ -232,25 +232,44 @@ fn collect_epoch_measurements(
 
 /// Formats change point warnings for a set of detected change points.
 ///
-/// Returns one warning string per change point, or an empty vec if none.
+/// Returns a single consolidated warning string, or an empty vec if none.
+/// Multiple change points are listed together under one warning to avoid repeating the boilerplate.
 fn format_change_point_warnings(
     change_points: &[change_point::ChangePoint],
     measurement: &str,
 ) -> Vec<String> {
-    change_points
-        .iter()
-        .map(|cp| {
-            let short_sha = if cp.commit_sha.is_empty() {
-                "unknown".to_string()
-            } else {
-                cp.commit_sha[..cp.commit_sha.len().min(7)].to_string()
-            };
-            format!(
-                "⚠️  WARNING: Change point detected in current epoch for '{}' at commit {} ({:+.1}%)\n   Historical z-score comparison may be unreliable due to regime shift.\n   Consider bumping epoch or investigating the change.",
-                measurement, short_sha, cp.magnitude_pct
-            )
-        })
-        .collect()
+    if change_points.is_empty() {
+        return vec![];
+    }
+    let short_sha = |cp: &change_point::ChangePoint| -> String {
+        if cp.commit_sha.is_empty() {
+            "unknown".to_string()
+        } else {
+            cp.commit_sha[..cp.commit_sha.len().min(7)].to_string()
+        }
+    };
+    let boilerplate = "   Historical z-score comparison may be unreliable due to regime shift.\n   Consider bumping epoch or investigating the change.";
+    let warning = if change_points.len() == 1 {
+        let cp = &change_points[0];
+        format!(
+            "⚠️  WARNING: Change point detected in current epoch for '{}' at commit {} ({:+.1}%)\n{}",
+            measurement,
+            short_sha(cp),
+            cp.magnitude_pct,
+            boilerplate
+        )
+    } else {
+        let commit_list = change_points
+            .iter()
+            .map(|cp| format!("   commit {} ({:+.1}%)", short_sha(cp), cp.magnitude_pct))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!(
+            "⚠️  WARNING: Change points detected in current epoch for '{}':\n{}\n{}",
+            measurement, commit_list, boilerplate
+        )
+    };
+    vec![warning]
 }
 
 /// Generates change point warnings for audit output.
@@ -2920,6 +2939,11 @@ dispersion_method = "mad"
             warnings[0].contains("regime shift"),
             "should mention regime shift"
         );
+        // Single change point uses "at commit" inline format
+        assert!(
+            warnings[0].contains("at commit abc1234"),
+            "single change point: should use 'at commit' inline format"
+        );
     }
 
     #[test]
@@ -2951,7 +2975,31 @@ dispersion_method = "mad"
             make_change_point("bbb2222", -5.0),
         ];
         let warnings = format_change_point_warnings(&cps, "my_bench");
-        assert_eq!(warnings.len(), 2);
+        // Multiple change points consolidated into a single warning
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("aaa1111"),
+            "should include first commit"
+        );
+        assert!(
+            warnings[0].contains("bbb2222"),
+            "should include second commit"
+        );
+        assert!(
+            warnings[0].contains("regime shift"),
+            "should have boilerplate"
+        );
+        // Boilerplate should appear only once, not per change point
+        assert_eq!(
+            warnings[0].matches("regime shift").count(),
+            1,
+            "boilerplate should not repeat"
+        );
+        // Multiple change points should NOT use the single "at commit" inline format
+        assert!(
+            !warnings[0].contains("at commit"),
+            "multiple change points: should not use 'at commit' inline format"
+        );
     }
 
     #[test]
