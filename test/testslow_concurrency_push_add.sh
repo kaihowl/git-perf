@@ -3,8 +3,7 @@ set -euo pipefail
 
 export TEST_TRACE=0
 
-export GIT_TRACE=1
-export RUST_LOG=trace
+export RUST_LOG=warn
 export RUST_BACKTRACE=1
 
 # Scaling factor for iterations (set via environment variable, default to 1)
