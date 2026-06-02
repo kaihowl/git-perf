@@ -401,20 +401,26 @@ pub fn audit_multiple(
                 no_change_point_warning,
                 &cp_config,
             );
-            for warning in &cp_warnings {
-                eprintln!("{}", warning);
-            }
 
             // Print the result with group label
             if !separate_by.is_empty() {
                 // Print header for the group
                 println!("Auditing measurement \"{}\"{}:", measurement, group_label);
+                // Print change point warnings indented under the group header
+                for warning in &cp_warnings {
+                    for line in warning.lines() {
+                        eprintln!("  {}", line);
+                    }
+                }
                 // Indent the result message
                 for line in result.message.lines() {
                     println!("  {}", line);
                 }
                 println!(); // Add blank line between groups
             } else {
+                for warning in &cp_warnings {
+                    eprintln!("{}", warning);
+                }
                 println!("{}", result.message);
             }
 
