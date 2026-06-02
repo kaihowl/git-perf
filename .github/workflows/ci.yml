@@ -95,7 +95,7 @@ jobs:
               --metadata rust=${{matrix.rust}}
 
             # Push imported measurements
-            git push origin refs/notes/perf-v3 || true
+            cargo run -- push || true
 
             # Audit fibonacci benchmarks (using mean statistic)
             # Allow up to 10 sigma deviation to account for CI variability
@@ -104,6 +104,29 @@ jobs:
           else
             echo "No benchmark results to import"
           fi
+
+    - name: Run add benchmark and track performance
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      run: |
+          set -x
+          cargo criterion --bench add --features test-helpers --message-format json > add-bench-results.json
+
+          cargo run -- import criterion-json add-bench-results.json \
+            --metadata ci=true \
+            --metadata os=${{matrix.os}} \
+            --metadata rust=${{matrix.rust}}
+
+          cargo run -- push || true
+
+          cargo run -- audit -n 40 \
+            -m "bench::add_measurements/add_measurement/1::median" \
+            -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
+            --min-measurements 3 \
+            || echo "add benchmark audit failed (expected on first runs)"
 
     - name: Run sample perf measurements
       env:
@@ -172,9 +195,10 @@ jobs:
           git perf push
 
           # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -m report-benchmark -m add-benchmark -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
+          git perf audit -n 40 -m test-measure2 -m report-benchmark -m report-size-benchmark -m "bench::add_measurements/add_measurement/1::median" -s os=${{matrix.os}} -s rust=${{matrix.rust}}
 
           # Informational audits: failures don't block CI
+          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
           git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report audit failed (informational only)"
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
 
@@ -286,7 +310,7 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust'
+          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/1::median -m release-binary-size --separate-by os --separate-by rust'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
