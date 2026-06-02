@@ -401,15 +401,15 @@ pub fn audit_multiple(
                 no_change_point_warning,
                 &cp_config,
             );
-
-            // Print the result with group label
+            // Print the result with group label, with warnings interleaved on stdout
+            // before the result so ordering is deterministic regardless of stderr/stdout capture.
             if !separate_by.is_empty() {
                 // Print header for the group
                 println!("Auditing measurement \"{}\"{}:", measurement, group_label);
-                // Print change point warnings indented under the group header
+                // Print warnings indented inside the group block
                 for warning in &cp_warnings {
                     for line in warning.lines() {
-                        eprintln!("  {}", line);
+                        println!("  {}", line);
                     }
                 }
                 // Indent the result message
@@ -419,7 +419,7 @@ pub fn audit_multiple(
                 println!(); // Add blank line between groups
             } else {
                 for warning in &cp_warnings {
-                    eprintln!("{}", warning);
+                    println!("{}", warning);
                 }
                 println!("{}", result.message);
             }
