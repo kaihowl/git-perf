@@ -196,40 +196,6 @@ fn format_group_label(separate_by: &[String], group_values: &[String]) -> String
         .join("/")
 }
 
-/// Collects aggregated measurement values and commit SHAs for the current epoch.
-///
-/// Returns (values, commit_shas) ordered from newest (HEAD) to oldest.
-fn collect_epoch_measurements(
-    measurement: &str,
-    commits: &[Result<Commit>],
-    selectors: &[(String, String)],
-    summarize_by: &ReductionFunc,
-) -> (Vec<f64>, Vec<String>) {
-    let filter_by =
-        |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
-
-    let commits_iter = commits.iter().map(|r| match r {
-        Ok(commit) => Ok(Commit {
-            commit: commit.commit.clone(),
-            title: commit.title.clone(),
-            author: commit.author.clone(),
-            measurements: commit.measurements.clone(),
-        }),
-        Err(e) => Err(anyhow::anyhow!("{}", e)),
-    });
-
-    let epoch_data: Vec<(String, f64)> = measurement_retrieval::take_while_same_epoch(
-        measurement_retrieval::summarize_measurements(commits_iter, summarize_by, &filter_by),
-    )
-    .filter_map(|r| r.ok())
-    .filter_map(|cs| cs.measurement.map(|m| (cs.commit, m.val)))
-    .collect();
-
-    let values = epoch_data.iter().map(|(_, v)| *v).collect();
-    let shas = epoch_data.iter().map(|(c, _)| c.clone()).collect();
-    (values, shas)
-}
-
 /// Formats change point warnings for a set of detected change points.
 ///
 /// Returns a single consolidated warning string, or an empty vec if none.
@@ -290,7 +256,14 @@ fn generate_change_point_warnings(
     if !cp_config.enabled {
         return vec![];
     }
-    let (values, shas) = collect_epoch_measurements(measurement, commits, selectors, summarize_by);
+    let filter_by =
+        |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
+    let commits_iter = commits.iter().map(|r| match r {
+        Ok(c) => Ok(c.clone()),
+        Err(e) => Err(anyhow::anyhow!("{}", e)),
+    });
+    let (values, shas) =
+        measurement_retrieval::collect_epoch_measurements(commits_iter, filter_by, summarize_by);
     let raw_cps = change_point::detect_change_points(&values, cp_config);
     let enriched = change_point::enrich_change_points(&raw_cps, &values, &shas, cp_config);
     format_change_point_warnings(&enriched, measurement)
@@ -486,15 +459,8 @@ fn audit_with_commits(
     selectors: &[(String, String)],
     params: &ResolvedAuditParams,
 ) -> Result<AuditResult> {
-    // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
-    // This is necessary because summarize_measurements expects an iterator of Result<Commit>
     let commits_iter = commits.iter().map(|r| match r {
-        Ok(commit) => Ok(Commit {
-            commit: commit.commit.clone(),
-            title: commit.title.clone(),
-            author: commit.author.clone(),
-            measurements: commit.measurements.clone(),
-        }),
+        Ok(c) => Ok(c.clone()),
         Err(e) => Err(anyhow::anyhow!("{}", e)),
     });
 
@@ -3002,6 +2968,15 @@ dispersion_method = "mad"
         );
     }
 
+    fn make_commits_iter(
+        commits: &[Result<Commit>],
+    ) -> impl Iterator<Item = Result<Commit>> + '_ {
+        commits.iter().map(|r| match r {
+            Ok(c) => Ok(c.clone()),
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        })
+    }
+
     #[test]
     fn test_collect_epoch_measurements_basic() {
         // 5 commits with values 10.0..50.0, same epoch
@@ -3015,8 +2990,11 @@ dispersion_method = "mad"
             })
             .collect();
 
-        let (values, shas) =
-            collect_epoch_measurements("bench", &commits, &[], &ReductionFunc::Min);
+        let (values, shas) = measurement_retrieval::collect_epoch_measurements(
+            make_commits_iter(&commits),
+            |m: &MeasurementData| m.name == "bench",
+            &ReductionFunc::Min,
+        );
         assert_eq!(values.len(), 5);
         assert_eq!(shas.len(), 5);
         assert!((values[0] - 10.0).abs() < f64::EPSILON); // HEAD is newest (index 0)
@@ -3026,8 +3004,11 @@ dispersion_method = "mad"
     fn test_collect_epoch_measurements_filters_by_name() {
         let commits: Vec<Result<Commit>> =
             vec![Ok(make_commit_with_measurement("sha1", "other", 99.0))];
-        let (values, shas) =
-            collect_epoch_measurements("bench", &commits, &[], &ReductionFunc::Min);
+        let (values, shas) = measurement_retrieval::collect_epoch_measurements(
+            make_commits_iter(&commits),
+            |m: &MeasurementData| m.name == "bench",
+            &ReductionFunc::Min,
+        );
         assert!(values.is_empty());
         assert!(shas.is_empty());
     }
@@ -3066,7 +3047,11 @@ dispersion_method = "mad"
             }));
         }
 
-        let (values, _) = collect_epoch_measurements("bench", &commits, &[], &ReductionFunc::Min);
+        let (values, _) = measurement_retrieval::collect_epoch_measurements(
+            make_commits_iter(&commits),
+            |m: &MeasurementData| m.name == "bench",
+            &ReductionFunc::Min,
+        );
         // Should only return epoch 1 data (3 commits)
         assert_eq!(values.len(), 3);
         for v in &values {

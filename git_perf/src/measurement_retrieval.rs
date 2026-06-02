@@ -53,6 +53,31 @@ where
     })
 }
 
+/// Collects aggregated measurement values and commit SHAs for the current epoch.
+///
+/// Returns `(values, commit_shas)` ordered from newest (HEAD) to oldest.
+pub fn collect_epoch_measurements<F>(
+    commits: impl Iterator<Item = Result<Commit>>,
+    filter_by: F,
+    summarize_by: &ReductionFunc,
+) -> (Vec<f64>, Vec<String>)
+where
+    F: Fn(&MeasurementData) -> bool,
+{
+    let epoch_data: Vec<(String, f64)> = take_while_same_epoch(summarize_measurements(
+        commits,
+        summarize_by,
+        &filter_by,
+    ))
+    .filter_map(|r| r.ok())
+    .filter_map(|cs| cs.measurement.map(|m| (cs.commit, m.val)))
+    .collect();
+
+    let values = epoch_data.iter().map(|(_, v)| *v).collect();
+    let shas = epoch_data.iter().map(|(c, _)| c.clone()).collect();
+    (values, shas)
+}
+
 impl<'a, T> MeasurementReducer<'a> for T
 where
     T: Iterator<Item = &'a MeasurementData>,
