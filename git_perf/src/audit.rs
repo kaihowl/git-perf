@@ -1,5 +1,5 @@
 use crate::{
-    config,
+    change_point, config,
     data::{Commit, MeasurementData},
     defaults,
     measurement_retrieval::{self, summarize_measurements},
@@ -196,6 +196,79 @@ fn format_group_label(separate_by: &[String], group_values: &[String]) -> String
         .join("/")
 }
 
+/// Formats change point warnings for a set of detected change points.
+///
+/// Returns a single consolidated warning string, or an empty vec if none.
+/// Multiple change points are listed together under one warning to avoid repeating the boilerplate.
+fn format_change_point_warnings(
+    change_points: &[change_point::ChangePoint],
+    measurement: &str,
+) -> Vec<String> {
+    if change_points.is_empty() {
+        return vec![];
+    }
+    let short_sha = |cp: &change_point::ChangePoint| -> String {
+        if cp.commit_sha.is_empty() {
+            "unknown".to_string()
+        } else {
+            cp.commit_sha[..cp.commit_sha.len().min(7)].to_string()
+        }
+    };
+    let boilerplate = "   Historical z-score comparison may be unreliable due to regime shift.\n   Consider bumping epoch or investigating the change.";
+    let warning = if change_points.len() == 1 {
+        let cp = &change_points[0];
+        format!(
+            "⚠️  WARNING: Change point detected in current epoch for '{}' at commit {} ({:+.1}%)\n{}",
+            measurement,
+            short_sha(cp),
+            cp.magnitude_pct,
+            boilerplate
+        )
+    } else {
+        let commit_list = change_points
+            .iter()
+            .map(|cp| format!("   commit {} ({:+.1}%)", short_sha(cp), cp.magnitude_pct))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!(
+            "⚠️  WARNING: Change points detected in current epoch for '{}':\n{}\n{}",
+            measurement, commit_list, boilerplate
+        )
+    };
+    vec![warning]
+}
+
+/// Generates change point warnings for audit output.
+///
+/// Returns warning strings to print before the audit result, or empty vec if
+/// warnings are suppressed or change point detection is disabled.
+fn generate_change_point_warnings(
+    measurement: &str,
+    commits: &[Result<Commit>],
+    selectors: &[(String, String)],
+    summarize_by: &ReductionFunc,
+    no_change_point_warning: bool,
+    cp_config: &change_point::ChangePointConfig,
+) -> Vec<String> {
+    if no_change_point_warning {
+        return vec![];
+    }
+    if !cp_config.enabled {
+        return vec![];
+    }
+    let filter_by =
+        |m: &MeasurementData| m.name == measurement && m.key_values_is_superset_of(selectors);
+    let commits_iter = commits.iter().map(|r| match r {
+        Ok(c) => Ok(c.clone()),
+        Err(e) => Err(anyhow::anyhow!("{}", e)),
+    });
+    let (values, shas) =
+        measurement_retrieval::collect_epoch_measurements(commits_iter, filter_by, summarize_by);
+    let raw_cps = change_point::detect_change_points(&values, cp_config);
+    let enriched = change_point::enrich_change_points(&raw_cps, &values, &shas, cp_config);
+    format_change_point_warnings(&enriched, measurement)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn audit_multiple(
     start_commit: &str,
@@ -210,7 +283,7 @@ pub fn audit_multiple(
     max_cov: Option<f64>,
     combined_patterns: &[String],
     separate_by: &[String],
-    _no_change_point_warning: bool, // TODO: Implement change point warning in Phase 2
+    no_change_point_warning: bool,
 ) -> Result<()> {
     // Early return if patterns are empty - nothing to audit
     if combined_patterns.is_empty() {
@@ -311,24 +384,35 @@ pub fn audit_multiple(
 
             let result = audit_with_commits(&measurement, &all_commits, &group_selectors, &params)?;
 
-            // TODO(Phase 2): Add change point detection warning here
-            // If !_no_change_point_warning, detect change points in current epoch
-            // and warn if any exist, as they make z-score comparisons unreliable:
-            //   ⚠️  WARNING: Change point detected in current epoch at commit a1b2c3d (+23.5%)
-            //       Historical z-score comparison may be unreliable due to regime shift.
-            //       Consider bumping epoch or investigating the change.
-            // See docs/plans/change-point-detection.md for implementation details.
-
-            // Print the result with group label
+            let cp_config = config::change_point_config(&measurement);
+            let cp_warnings = generate_change_point_warnings(
+                &measurement,
+                &all_commits,
+                &group_selectors,
+                &params.summarize_by,
+                no_change_point_warning,
+                &cp_config,
+            );
+            // Print the result with group label, with warnings interleaved on stdout
+            // before the result so ordering is deterministic regardless of stderr/stdout capture.
             if !separate_by.is_empty() {
                 // Print header for the group
                 println!("Auditing measurement \"{}\"{}:", measurement, group_label);
+                // Print warnings indented inside the group block
+                for warning in &cp_warnings {
+                    for line in warning.lines() {
+                        println!("  {}", line);
+                    }
+                }
                 // Indent the result message
                 for line in result.message.lines() {
                     println!("  {}", line);
                 }
                 println!(); // Add blank line between groups
             } else {
+                for warning in &cp_warnings {
+                    println!("{}", warning);
+                }
                 println!("{}", result.message);
             }
 
@@ -375,15 +459,8 @@ fn audit_with_commits(
     selectors: &[(String, String)],
     params: &ResolvedAuditParams,
 ) -> Result<AuditResult> {
-    // Convert Vec<Result<Commit>> into an iterator of Result<Commit> by cloning references
-    // This is necessary because summarize_measurements expects an iterator of Result<Commit>
     let commits_iter = commits.iter().map(|r| match r {
-        Ok(commit) => Ok(Commit {
-            commit: commit.commit.clone(),
-            title: commit.title.clone(),
-            author: commit.author.clone(),
-            measurements: commit.measurements.clone(),
-        }),
+        Ok(c) => Ok(c.clone()),
         Err(e) => Err(anyhow::anyhow!("{}", e)),
     });
 
@@ -2763,6 +2840,321 @@ dispersion_method = "mad"
         assert!(
             !msg.contains("⚠️ High CoV"),
             "Should not warn when head CoV (0%) equals threshold (0%) with strict >, got: {msg}"
+        );
+    }
+
+    // --- Change point warning tests ---
+
+    fn make_commit_with_measurement(sha: &str, name: &str, val: f64) -> Commit {
+        Commit {
+            commit: sha.to_string(),
+            title: String::new(),
+            author: String::new(),
+            measurements: vec![MeasurementData {
+                epoch: 1,
+                name: name.to_string(),
+                timestamp: 0.0,
+                val,
+                key_values: std::collections::HashMap::new(),
+            }],
+        }
+    }
+
+    fn make_change_point(sha: &str, magnitude_pct: f64) -> change_point::ChangePoint {
+        change_point::ChangePoint {
+            index: 5,
+            commit_sha: sha.to_string(),
+            magnitude_pct,
+            confidence: 0.9,
+            direction: if magnitude_pct > 0.0 {
+                change_point::ChangeDirection::Increase
+            } else {
+                change_point::ChangeDirection::Decrease
+            },
+        }
+    }
+
+    #[test]
+    fn test_format_change_point_warnings_empty() {
+        let warnings = format_change_point_warnings(&[], "my_bench");
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn test_format_change_point_warnings_increase() {
+        let cp = make_change_point("abc1234567890", 23.5);
+        let warnings = format_change_point_warnings(&[cp], "my_bench");
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("my_bench"),
+            "should include measurement name"
+        );
+        assert!(
+            warnings[0].contains("+23.5%"),
+            "should show positive magnitude"
+        );
+        assert!(
+            warnings[0].contains("abc1234"),
+            "should show 7-char short SHA"
+        );
+        assert!(
+            !warnings[0].contains("abc12345"),
+            "should NOT show 8+ chars"
+        );
+        assert!(
+            warnings[0].contains("regime shift"),
+            "should mention regime shift"
+        );
+        // Single change point uses "at commit" inline format
+        assert!(
+            warnings[0].contains("at commit abc1234"),
+            "single change point: should use 'at commit' inline format"
+        );
+    }
+
+    #[test]
+    fn test_format_change_point_warnings_decrease() {
+        let cp = make_change_point("def5678", -15.0);
+        let warnings = format_change_point_warnings(&[cp], "my_bench");
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("-15.0%"),
+            "should show negative magnitude"
+        );
+    }
+
+    #[test]
+    fn test_format_change_point_warnings_empty_sha() {
+        let cp = make_change_point("", 10.0);
+        let warnings = format_change_point_warnings(&[cp], "my_bench");
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("unknown"),
+            "empty SHA should show 'unknown'"
+        );
+    }
+
+    #[test]
+    fn test_format_change_point_warnings_multiple() {
+        let cps = vec![
+            make_change_point("aaa1111", 20.0),
+            make_change_point("bbb2222", -5.0),
+        ];
+        let warnings = format_change_point_warnings(&cps, "my_bench");
+        // Multiple change points consolidated into a single warning
+        assert_eq!(warnings.len(), 1);
+        assert!(
+            warnings[0].contains("aaa1111"),
+            "should include first commit"
+        );
+        assert!(
+            warnings[0].contains("bbb2222"),
+            "should include second commit"
+        );
+        assert!(
+            warnings[0].contains("regime shift"),
+            "should have boilerplate"
+        );
+        // Boilerplate should appear only once, not per change point
+        assert_eq!(
+            warnings[0].matches("regime shift").count(),
+            1,
+            "boilerplate should not repeat"
+        );
+        // Multiple change points should NOT use the single "at commit" inline format
+        assert!(
+            !warnings[0].contains("at commit"),
+            "multiple change points: should not use 'at commit' inline format"
+        );
+    }
+
+    #[test]
+    fn test_generate_change_point_warnings_wrong_name() {
+        // Commits have a clear regime shift but under a different measurement name.
+        // The filter must exclude them, so no warnings should appear.
+        let commits: Vec<Result<Commit>> = (0..10)
+            .map(|i| {
+                let val = if i < 5 { 20.0 } else { 10.0 };
+                Ok(make_commit_with_measurement(
+                    &format!("sha{:040x}", i),
+                    "other", // wrong name
+                    val,
+                ))
+            })
+            .collect();
+
+        let cp_config = change_point::ChangePointConfig {
+            enabled: true,
+            min_data_points: 5,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.5,
+            penalty: 0.5,
+        };
+
+        let warnings = generate_change_point_warnings(
+            "bench", // asks for "bench", commits only have "other"
+            &commits,
+            &[],
+            &ReductionFunc::Min,
+            false,
+            &cp_config,
+        );
+        assert!(
+            warnings.is_empty(),
+            "Should not warn when no commits match the measurement name"
+        );
+    }
+
+    #[test]
+    fn test_generate_change_point_warnings_suppressed() {
+        // When no_change_point_warning=true, no warnings regardless of data
+        let commits: Vec<Result<Commit>> = (0..10)
+            .map(|i| {
+                let val = if i < 5 { 10.0 } else { 20.0 };
+                Ok(make_commit_with_measurement(
+                    &format!("sha{:040}", i),
+                    "bench",
+                    val,
+                ))
+            })
+            .collect();
+
+        let cp_config = change_point::ChangePointConfig {
+            enabled: true,
+            min_data_points: 5,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.5,
+            penalty: 0.5,
+        };
+
+        let warnings = generate_change_point_warnings(
+            "bench",
+            &commits,
+            &[],
+            &ReductionFunc::Min,
+            true, // no_change_point_warning = true
+            &cp_config,
+        );
+        assert!(
+            warnings.is_empty(),
+            "Warnings should be suppressed when no_change_point_warning=true"
+        );
+    }
+
+    #[test]
+    fn test_generate_change_point_warnings_disabled_config() {
+        // When cp_config.enabled=false, no warnings regardless of data
+        let commits: Vec<Result<Commit>> = (0..10)
+            .map(|i| {
+                let val = if i < 5 { 10.0 } else { 20.0 };
+                Ok(make_commit_with_measurement(
+                    &format!("sha{:040}", i),
+                    "bench",
+                    val,
+                ))
+            })
+            .collect();
+
+        let cp_config = change_point::ChangePointConfig {
+            enabled: false, // disabled
+            min_data_points: 5,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.5,
+            penalty: 0.5,
+        };
+
+        let warnings = generate_change_point_warnings(
+            "bench",
+            &commits,
+            &[],
+            &ReductionFunc::Min,
+            false,
+            &cp_config,
+        );
+        assert!(
+            warnings.is_empty(),
+            "Warnings should be suppressed when cp_config.enabled=false"
+        );
+    }
+
+    #[test]
+    fn test_generate_change_point_warnings_stable_data() {
+        // Stable data → no change points → no warnings
+        let commits: Vec<Result<Commit>> = (0..10)
+            .map(|i| {
+                Ok(make_commit_with_measurement(
+                    &format!("sha{:040}", i),
+                    "bench",
+                    10.0,
+                ))
+            })
+            .collect();
+
+        let cp_config = change_point::ChangePointConfig {
+            enabled: true,
+            min_data_points: 5,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.5,
+            penalty: 0.5,
+        };
+
+        let warnings = generate_change_point_warnings(
+            "bench",
+            &commits,
+            &[],
+            &ReductionFunc::Min,
+            false,
+            &cp_config,
+        );
+        assert!(
+            warnings.is_empty(),
+            "Stable data should produce no warnings"
+        );
+    }
+
+    #[test]
+    fn test_generate_change_point_warnings_with_regime_shift() {
+        // Clear regime shift: 5 × 10.0 then 5 × 20.0 (100% increase)
+        // Commits are ordered newest-first, so index 0 = most recent
+        let commits: Vec<Result<Commit>> = (0..10)
+            .map(|i| {
+                // Newer commits (0..5) have value 20.0, older (5..10) have value 10.0
+                let val = if i < 5 { 20.0 } else { 10.0 };
+                Ok(make_commit_with_measurement(
+                    &format!("sha{:040x}", i),
+                    "bench",
+                    val,
+                ))
+            })
+            .collect();
+
+        let cp_config = change_point::ChangePointConfig {
+            enabled: true,
+            min_data_points: 5,
+            min_magnitude_pct: 5.0,
+            confidence_threshold: 0.5,
+            penalty: 0.5,
+        };
+
+        let warnings = generate_change_point_warnings(
+            "bench",
+            &commits,
+            &[],
+            &ReductionFunc::Min,
+            false,
+            &cp_config,
+        );
+        assert!(
+            !warnings.is_empty(),
+            "Regime shift should produce at least one warning"
+        );
+        assert!(
+            warnings[0].contains("bench"),
+            "Warning should name the measurement"
+        );
+        assert!(
+            warnings[0].contains("WARNING"),
+            "Warning should contain 'WARNING'"
         );
     }
 }
