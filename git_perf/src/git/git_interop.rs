@@ -1693,4 +1693,49 @@ mod test {
             );
         });
     }
+
+    /// Test that execute_notes_operation skips the upstream push when the operation
+    /// makes no changes (no-op prune/remove). Targets the early-return branch:
+    ///   if git_rev_parse(&target)? == current_notes_head { return Ok(()); }
+    /// A mutant that flips `==` to `!=` would reach compact_head and push,
+    /// changing the upstream hash — which this test detects.
+    #[test]
+    fn test_execute_notes_operation_noop_skips_upstream_push() {
+        use tempfile::tempdir;
+
+        with_isolated_cwd_git(|git_dir| {
+            // Set up a bare upstream repo and add it as origin
+            let upstream = tempdir().unwrap();
+            run_git_command(&["init", "--bare"], upstream.path());
+            let upstream_url = format!("file://{}", upstream.path().display());
+            run_git_command(&["remote", "add", "origin", &upstream_url], git_dir);
+            run_git_command(&["push", "origin", "master"], git_dir);
+
+            // Add a measurement and push to create the upstream notes branch
+            add_note_line_to_head("test: 1").expect("add note");
+            push(None, None).expect("push notes");
+
+            let head_before = git_rev_parse(REFS_NOTES_BRANCH).expect("notes branch exists");
+
+            // A closure that does nothing to the target ref is a no-op
+            execute_notes_operation(|_target| Ok(()))
+                .expect("no-op execute_notes_operation should succeed");
+
+            // The notes branch must be unchanged — no spurious push occurred
+            let head_after = git_rev_parse(REFS_NOTES_BRANCH).expect("notes branch still exists");
+            assert_eq!(
+                head_before, head_after,
+                "no-op execute_notes_operation must not advance the notes branch"
+            );
+
+            // All temp rewrite refs must be cleaned up
+            let rewrite_refs = get_refs(vec![format!("{REFS_NOTES_REWRITE_TARGET_PREFIX}*")])
+                .expect("list rewrite refs");
+            assert!(
+                rewrite_refs.is_empty(),
+                "temp rewrite refs must be cleaned up after no-op: {:?}",
+                rewrite_refs
+            );
+        });
+    }
 }
