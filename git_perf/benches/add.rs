@@ -22,11 +22,6 @@ fn prep_repo() -> tempfile::TempDir {
 
     empty_commit();
 
-    // Pre-warm the symbolic write ref so every benchmark iteration measures the
-    // steady-state (warm) path of add_note_line_to_head rather than the one-time
-    // ensure_symbolic_write_ref_exists initialisation overhead.
-    add_note_line_to_head("warmup").expect("Failed to pre-warm write ref");
-
     temp_dir
 }
 
