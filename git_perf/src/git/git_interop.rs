@@ -394,6 +394,15 @@ where
 
     operation(&target)?;
 
+    // Skip push if the operation made no changes to the notes tree.
+    // This avoids unnecessary upstream contention for no-op prune/remove calls.
+    if git_rev_parse(&target)? == current_notes_head {
+        if let Err(e) = remove_reference(&target) {
+            warn!("Failed to delete temp notes ref {target}: {e:?}");
+        }
+        return Ok(());
+    }
+
     compact_head(&target)?;
 
     git_push_notes_ref(&current_notes_head, &target, &None, None)?;
