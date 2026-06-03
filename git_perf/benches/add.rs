@@ -27,15 +27,9 @@ fn prep_repo() -> tempfile::TempDir {
 
 fn add_measurements(c: &mut Criterion) {
     let mut group = c.benchmark_group("add_measurements");
+    group.sample_size(50);
     for num_measurements in [1, 50, 100].into_iter() {
         group.throughput(Throughput::Elements(num_measurements as u64));
-        // The single-measurement case has the highest relative variance (process-spawn
-        // jitter dominates) so it needs more samples for a stable median estimate.
-        if num_measurements == 1 {
-            group.sample_size(50);
-        } else {
-            group.sample_size(10);
-        }
         group.bench_with_input(
             BenchmarkId::new("add_measurement", num_measurements),
             &num_measurements,
