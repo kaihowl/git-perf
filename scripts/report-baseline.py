@@ -20,7 +20,7 @@ import sys
 
 NOTES_REF = "refs/notes/perf-v3"
 DEFAULT_MEASUREMENT = "bench::add_measurements/add_measurement/1::median"
-DELIMITER = "\x1e"
+DELIMITER = "\x1c"
 
 
 def resolve_commit(committish: str) -> str:
@@ -43,7 +43,7 @@ def get_note(commit_sha: str) -> str:
 
 def parse_records(note_text: str):
     records = []
-    for line in note_text.splitlines():
+    for line in note_text.split("\n"):
         line = line.strip()
         if not line:
             continue
