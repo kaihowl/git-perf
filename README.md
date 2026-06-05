@@ -661,6 +661,32 @@ This indicates the audit passed because the performance change was below the con
 
 Both can be configured simultaneously — if either threshold passes, the audit passes.
 
+### 5.5. CoV Warnings (Optional)
+
+When `--max-cov` (or `max_cov` in `.gitperfconfig`) is set, a warning is emitted if the Coefficient of Variation exceeds the threshold:
+
+```
+⚠️ High CoV: tail=8.3%, head=12.1% (threshold: 7.0%)
+```
+
+CoV = `σ/μ × 100%` measures relative noisiness within a dataset. Two values are reported:
+
+- **Tail CoV**: computed from per-commit aggregated values — reflects how stable the historical baseline is across runs.
+- **Head CoV**: computed from the raw repeated measurements at HEAD — reflects within-run repeatability.
+
+A CoV warning is **informational only** and never changes the pass/fail outcome.
+
+#### Relationship between `max_cov` and `min_relative_deviation`
+
+These two parameters measure related but distinct quantities, and together form a complete noise-handling strategy:
+
+| Parameter | Formula | What it measures | Effect on audit |
+|-----------|---------|-----------------|-----------------|
+| `max_cov` | `σ/μ × 100%` | Relative noisiness of the data | Warning only |
+| `min_relative_deviation` | `\|head/tail_median − 1\| × 100%` | Size of the observed change | Pass override |
+
+A practical guideline: set `min_relative_deviation` at or slightly above your expected CoV. If your measurements naturally vary by ~5% (CoV ≈ 5%), a detected "regression" of 2% is indistinguishable from noise. Setting `min_relative_deviation = 5.0` suppresses those false positives, while `max_cov = 5.0` will warn you when the noise level itself has grown unexpectedly high — signalling that the threshold may need revisiting.
+
 ### 6. Skipped Audits
 
 When there aren't enough measurements:
