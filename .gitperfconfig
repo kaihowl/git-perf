@@ -31,9 +31,13 @@ min_measurements = 10
 epoch = "30c698a"
 unit = "ns"
 dispersion_method = "mad"
-sigma = 5.0
+sigma = 3.5
 aggregate_by = "median"
-min_measurements = 3
+min_measurements = 5
+# Baseline reliability study (10 independent CI runs) measured CoV=8.3%, MAD≈3.4%.
+# min_relative_deviation=10% floor suppresses false positives from normal CI jitter
+# (which peaks at ~8%); sigma=3.5 detects sustained regressions above ~10%.
+min_relative_deviation = 10.0
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
