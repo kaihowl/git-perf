@@ -81,6 +81,12 @@ path = "benches/add.rs"
 required-features = ["test-helpers"]
 
 [[bench]]
+name = "report"
+harness = false
+path = "benches/report.rs"
+required-features = ["test-helpers"]
+
+[[bench]]
 name = "sample_ci_bench"
 harness = false
 path = "benches/sample_ci_bench.rs"

@@ -130,12 +130,24 @@
             }}
         </section>
 
-        <!-- Section 3: Report Benchmark -->
+        <!-- Section 3: Report Benchmark (legacy subprocess) -->
         <section class="report-section">
             <h2>📊 Report Benchmark Performance</h2>
             <p>Median performance for report generation with change point detection and epoch boundaries.</p>
             {{SECTION[report-benchmark]
                 measurement-filter: ^(report-benchmark)$
+                aggregate-by: median
+                show-epochs: true
+                show-changes: true
+            }}
+        </section>
+
+        <!-- Section 3b: Criterion Report Benchmark -->
+        <section class="report-section">
+            <h2>⚡ Criterion Report Benchmark</h2>
+            <p>In-process Criterion benchmark of report generation for 10 commits, with change point detection.</p>
+            {{SECTION[criterion-report-benchmark]
+                measurement-filter: ^bench::report/report_generation/10::median$
                 aggregate-by: median
                 show-epochs: true
                 show-changes: true
