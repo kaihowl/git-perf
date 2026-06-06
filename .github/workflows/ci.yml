@@ -23,6 +23,10 @@ jobs:
     env:
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -75,88 +79,37 @@ jobs:
     - name: Run tests
       run: cargo nextest run --no-fail-fast --verbose
 
-    - name: Run fibonacci benchmarks and track performance
-      env:
-        GIT_AUTHOR_NAME: github-actions[bot]
-        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        GIT_COMMITTER_NAME: github-actions[bot]
-        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    - name: Run criterion benchmarks and track performance
       run: |
           set -x
-          # Run fibonacci benchmark with JSON output
-          cargo criterion --bench sample_ci_bench --message-format json > bench-results.json || true
+          run_bench() {
+            local bench=$1 output=$2 features=$3
+            local feat_flag=""
+            [ -n "$features" ] && feat_flag="--features $features"
+            # shellcheck disable=SC2086
+            cargo criterion --bench "$bench" $feat_flag --message-format json > "$output" || true
+            if [ -s "$output" ]; then
+              cargo run -- import criterion-json "$output" \
+                --metadata ci=true \
+                --metadata workflow="${GITHUB_WORKFLOW}" \
+                --metadata os=${{matrix.os}} \
+                --metadata rust=${{matrix.rust}}
+            else
+              echo "No results from $bench benchmark"
+            fi
+          }
 
-          # Import benchmark results
-          if [ -s bench-results.json ]; then
-            cargo run -- import criterion-json bench-results.json \
-              --metadata ci=true \
-              --metadata workflow="${GITHUB_WORKFLOW}" \
-              --metadata os=${{matrix.os}} \
-              --metadata rust=${{matrix.rust}}
-
-            # Push imported measurements
-            cargo run -- push || true
-
-            # Audit fibonacci benchmarks (using mean statistic)
-            # Allow up to 10 sigma deviation to account for CI variability
-            cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
-            cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
-          else
-            echo "No benchmark results to import"
-          fi
-
-    - name: Run add benchmark and track performance
-      env:
-        GIT_AUTHOR_NAME: github-actions[bot]
-        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        GIT_COMMITTER_NAME: github-actions[bot]
-        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-      run: |
-          set -x
-          cargo criterion --bench add --features test-helpers --message-format json > add-bench-results.json
-
-          cargo run -- import criterion-json add-bench-results.json \
-            --metadata ci=true \
-            --metadata os=${{matrix.os}} \
-            --metadata rust=${{matrix.rust}}
+          run_bench sample_ci_bench bench-results.json ""
+          run_bench add             add-bench-results.json "test-helpers"
+          run_bench report          report-bench-results.json "test-helpers"
 
           cargo run -- push || true
 
-          cargo run -- audit -n 40 \
-            -m "bench::add_measurements/add_measurement/1::median" \
-            -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
-            --min-measurements 3 \
-            || echo "add benchmark audit failed (expected on first runs)"
-
-    - name: Run report benchmark and track performance
-      env:
-        GIT_AUTHOR_NAME: github-actions[bot]
-        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        GIT_COMMITTER_NAME: github-actions[bot]
-        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-      run: |
-          set -x
-          cargo criterion --bench report --features test-helpers --message-format json > report-bench-results.json
-
-          cargo run -- import criterion-json report-bench-results.json \
-            --metadata ci=true \
-            --metadata os=${{matrix.os}} \
-            --metadata rust=${{matrix.rust}}
-
-          cargo run -- push || true
-
-          cargo run -- audit -n 40 \
-            -m "bench::report/report_generation/10::median" \
-            -s os=${{matrix.os}} -s rust=${{matrix.rust}} \
-            --min-measurements 3 \
-            || echo "report benchmark audit failed (expected on first runs)"
+          # Fibonacci audits: informational only (add/report covered by blocking audit below)
+          cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
+          cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
 
     - name: Run sample perf measurements
-      env:
-        GIT_AUTHOR_NAME: github-actions[bot]
-        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        GIT_COMMITTER_NAME: github-actions[bot]
-        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
       run: |
           set -x
           # Build release binary for stable performance measurements
