@@ -19,6 +19,7 @@ This document contains the help content for the `git-perf` command-line program.
 * [`git-perf reset`↴](#git-perf-reset)
 * [`git-perf list-commits`↴](#git-perf-list-commits)
 * [`git-perf size`↴](#git-perf-size)
+* [`git-perf study`↴](#git-perf-study)
 * [`git-perf config`↴](#git-perf-config)
 
 ## `git-perf`
@@ -41,6 +42,7 @@ This document contains the help content for the `git-perf` command-line program.
 * `reset` — Drop locally pending measurements that haven't been pushed
 * `list-commits` — List all commits that have performance measurements
 * `size` — Estimate storage size of live performance measurements
+* `study` — Analyze cross-runner variance to recommend .gitperfconfig settings
 * `config` — Manage git-perf configuration
 
 ###### **Options:**
@@ -398,6 +400,44 @@ Examples: git perf size                    # Show total size in human-readable f
 
 * `--disk-size` — Use on-disk size (compressed) instead of logical size
 * `--include-objects` — Include git repository statistics for context
+
+
+
+## `git-perf study`
+
+Analyze cross-runner variance to recommend .gitperfconfig settings
+
+Reads measurements at HEAD that were collected from multiple independent runner instances (each tagged with a group key via --key-value group=N), computes between-group CoV (Coefficient of Variation), and outputs recommended .gitperfconfig parameters.
+
+## Workflow
+
+1. Run the benchmark on N independent CI runners (use a matrix strategy). Each runner stores its measurements and tags them with a group key: `git-perf measure -n 10 -m MEASUREMENT --key-value group=$INSTANCE -- COMMAND` `git-perf push`
+
+2. After all runners finish, pull and run study: `git-perf pull` `git-perf study -m MEASUREMENT`
+
+## Interpretation
+
+- CoV < 10%: stable benchmark — use the recommended config as-is - CoV 10–20%: moderate noise — monitor with max_cov and consider increasing workload - CoV > 20%: too noisy — improve benchmark isolation before merging
+
+## Examples
+
+```bash # Analyze cross-runner variance for a specific measurement git-perf study -m bench::add_measurements/add_measurement/1::median
+
+# Fail if CoV exceeds 20% (useful as a CI gate on PRs) git-perf study -m bench::my_benchmark --max-cov 20 ```
+
+**Usage:** `git-perf study [OPTIONS] --measurement <NAME>`
+
+###### **Options:**
+
+* `-m`, `--measurement <NAME>` — Name of the measurement to analyze
+* `-n`, `--max-count <MAX_COUNT>` — Limit the number of previous commits considered (HEAD is included)
+
+  Default value: `50`
+* `--max-cov <MAX_COV>` — Fail if between-group CoV exceeds this percentage
+* `--commit <COMMIT>` — Target commit to study (default: HEAD)
+* `--group-by <GROUP_BY>` — Metadata key used to identify independent runner groups. Each matrix instance should tag its measurements with --key-value <group-by>=<instance-number>
+
+  Default value: `group`
 
 
 

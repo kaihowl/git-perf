@@ -1,0 +1,155 @@
+name: Benchmark Study
+
+# Reusable workflow for cross-runner variance analysis.
+# Run this on a PR branch before merging a new benchmark to measure
+# between-runner CoV and get recommended .gitperfconfig settings.
+#
+# Usage from an external repo:
+#   jobs:
+#     study:
+#       uses: kaihowl/git-perf/.github/workflows/benchmark-study.yml@VERSION
+#       with:
+#         measurement: bench::my_benchmark/operation::min
+#         command: cargo bench --bench my_benchmark
+#       secrets: inherit
+
+on:
+  workflow_dispatch:
+    inputs:
+      measurement:
+        description: >
+          Full measurement name (e.g. bench::add_measurements/add_measurement/1::median).
+          Must match the name used in the measure/import step.
+        required: true
+        type: string
+      command:
+        description: >
+          Command that runs the benchmark (e.g. cargo bench --bench my_bench).
+          Wrap multi-word commands in quotes.
+        required: true
+        type: string
+      instances:
+        description: Number of independent runner instances (≥ 3 required, 10 recommended)
+        required: false
+        default: '10'
+        type: string
+      reps_per_instance:
+        description: Repetitions per runner instance passed to git-perf measure -n
+        required: false
+        default: '10'
+        type: string
+      max_cov:
+        description: >
+          Fail if between-runner CoV exceeds this percentage (leave empty to only report).
+          Recommended: 20 for a hard gate, or leave empty during initial exploration.
+        required: false
+        default: ''
+        type: string
+
+  workflow_call:
+    inputs:
+      measurement:
+        required: true
+        type: string
+      command:
+        required: true
+        type: string
+      instances:
+        required: false
+        default: '10'
+        type: string
+      reps_per_instance:
+        required: false
+        default: '10'
+        type: string
+      max_cov:
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  measure:
+    name: Measure (instance ${{ matrix.instance }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      # Generate a matrix from 1..instances. GitHub Actions doesn't support
+      # dynamic matrix sizes natively, so we hardcode up to 10 instances and
+      # trim via the 'if' condition below.
+      matrix:
+        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    # Only run the instances the user requested
+    if: ${{ matrix.instance <= fromJSON(inputs.instances) }}
+
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Full history so git-perf can walk commits for push/pull
+          fetch-depth: 0
+
+      - name: Install git-perf
+        uses: kaihowl/git-perf/.github/actions/install@main
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run benchmark and record measurements
+        run: |
+          git perf measure \
+            -n "${{ inputs.reps_per_instance }}" \
+            -m "${{ inputs.measurement }}" \
+            --key-value group=${{ matrix.instance }} \
+            -- ${{ inputs.command }}
+
+      - name: Push measurements
+        run: git perf push
+
+  study:
+    name: Analyze cross-runner variance
+    runs-on: ubuntu-22.04
+    needs: measure
+    if: always() && needs.measure.result != 'skipped'
+
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install git-perf
+        uses: kaihowl/git-perf/.github/actions/install@main
+
+      - name: Pull measurements from all runners
+        run: git perf pull
+
+      - name: Run study analysis
+        run: |
+          MAX_COV_FLAG=""
+          if [ -n "${{ inputs.max_cov }}" ]; then
+            MAX_COV_FLAG="--max-cov ${{ inputs.max_cov }}"
+          fi
+          git perf study -m "${{ inputs.measurement }}" $MAX_COV_FLAG

@@ -20,6 +20,7 @@ pub mod serialization;
 pub mod size;
 pub mod stats;
 pub mod status;
+pub mod study;
 pub mod units;
 
 // Test helpers module - made public for use in unit tests, integration tests, and benchmarks

@@ -609,6 +609,63 @@ pub enum Commands {
         include_objects: bool,
     },
 
+    /// Analyze cross-runner variance to recommend .gitperfconfig settings
+    ///
+    /// Reads measurements at HEAD that were collected from multiple independent
+    /// runner instances (each tagged with a group key via --key-value group=N),
+    /// computes between-group CoV (Coefficient of Variation), and outputs
+    /// recommended .gitperfconfig parameters.
+    ///
+    /// ## Workflow
+    ///
+    /// 1. Run the benchmark on N independent CI runners (use a matrix strategy).
+    ///    Each runner stores its measurements and tags them with a group key:
+    ///    `git-perf measure -n 10 -m MEASUREMENT --key-value group=$INSTANCE -- COMMAND`
+    ///    `git-perf push`
+    ///
+    /// 2. After all runners finish, pull and run study:
+    ///    `git-perf pull`
+    ///    `git-perf study -m MEASUREMENT`
+    ///
+    /// ## Interpretation
+    ///
+    /// - CoV < 10%: stable benchmark — use the recommended config as-is
+    /// - CoV 10–20%: moderate noise — monitor with max_cov and consider increasing workload
+    /// - CoV > 20%: too noisy — improve benchmark isolation before merging
+    ///
+    /// ## Examples
+    ///
+    /// ```bash
+    /// # Analyze cross-runner variance for a specific measurement
+    /// git-perf study -m bench::add_measurements/add_measurement/1::median
+    ///
+    /// # Fail if CoV exceeds 20% (useful as a CI gate on PRs)
+    /// git-perf study -m bench::my_benchmark --max-cov 20
+    /// ```
+    Study {
+        /// Name of the measurement to analyze
+        #[arg(short = 'm', long = "measurement", value_parser=parse_spaceless_string, required = true)]
+        name: String,
+
+        /// Limit the number of previous commits considered (HEAD is included)
+        #[arg(short = 'n', long, default_value = "50")]
+        max_count: usize,
+
+        /// Fail if between-group CoV exceeds this percentage
+        #[arg(long)]
+        max_cov: Option<f64>,
+
+        /// Target commit to study (default: HEAD)
+        #[arg(long = "commit", value_name = "COMMIT")]
+        commit: Option<String>,
+
+        /// Metadata key used to identify independent runner groups.
+        /// Each matrix instance should tag its measurements with
+        /// --key-value <group-by>=<instance-number>.
+        #[arg(long, default_value = "group")]
+        group_by: String,
+    },
+
     /// Manage git-perf configuration
     ///
     /// Display and query git-perf configuration settings, including git context

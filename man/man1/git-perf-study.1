@@ -1,0 +1,46 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH study 1  "study " 
+.SH NAME
+study \- Analyze cross\-runner variance to recommend .gitperfconfig settings
+.SH SYNOPSIS
+\fBstudy\fR <\fB\-m\fR|\fB\-\-measurement\fR> [\fB\-n\fR|\fB\-\-max\-count\fR] [\fB\-\-max\-cov\fR] [\fB\-\-commit\fR] [\fB\-\-group\-by\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Analyze cross\-runner variance to recommend .gitperfconfig settings
+.PP
+Reads measurements at HEAD that were collected from multiple independent runner instances (each tagged with a group key via \-\-key\-value group=N), computes between\-group CoV (Coefficient of Variation), and outputs recommended .gitperfconfig parameters.
+.PP
+## Workflow
+.PP
+1. Run the benchmark on N independent CI runners (use a matrix strategy). Each runner stores its measurements and tags them with a group key: `git\-perf measure \-n 10 \-m MEASUREMENT \-\-key\-value group=$INSTANCE \-\- COMMAND` `git\-perf push`
+.PP
+2. After all runners finish, pull and run study: `git\-perf pull` `git\-perf study \-m MEASUREMENT`
+.PP
+## Interpretation
+.PP
+\- CoV < 10%: stable benchmark — use the recommended config as\-is \- CoV 10–20%: moderate noise — monitor with max_cov and consider increasing workload \- CoV > 20%: too noisy — improve benchmark isolation before merging
+.PP
+## Examples
+.PP
+```bash # Analyze cross\-runner variance for a specific measurement git\-perf study \-m bench::add_measurements/add_measurement/1::median
+.PP
+# Fail if CoV exceeds 20% (useful as a CI gate on PRs) git\-perf study \-m bench::my_benchmark \-\-max\-cov 20 ```
+.SH OPTIONS
+.TP
+\fB\-m\fR, \fB\-\-measurement\fR \fI<NAME>\fR
+Name of the measurement to analyze
+.TP
+\fB\-n\fR, \fB\-\-max\-count\fR \fI<MAX_COUNT>\fR [default: 50]
+Limit the number of previous commits considered (HEAD is included)
+.TP
+\fB\-\-max\-cov\fR \fI<MAX_COV>\fR
+Fail if between\-group CoV exceeds this percentage
+.TP
+\fB\-\-commit\fR \fI<COMMIT>\fR
+Target commit to study (default: HEAD)
+.TP
+\fB\-\-group\-by\fR \fI<GROUP_BY>\fR [default: group]
+Metadata key used to identify independent runner groups. Each matrix instance should tag its measurements with \-\-key\-value <group\-by>=<instance\-number>
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
