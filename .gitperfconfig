@@ -28,7 +28,7 @@ aggregate_by = "min"
 min_measurements = 10
 
 [measurement."bench::add_measurements/add_measurement/1::median"]
-epoch = "30c698a"
+epoch = "66c260b"
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
@@ -37,6 +37,8 @@ min_measurements = 5
 # Baseline reliability study (10 independent CI runs) measured CoV=8.3%, MAD≈3.4%.
 # min_relative_deviation=10% floor suppresses false positives from normal CI jitter
 # (which peaks at ~8%); sigma=3.5 detects sustained regressions above ~10%.
+# Epoch bumped to 66c260b: prior stable tail poisoned by a ~5ms outlier measurement
+# which destabilised MAD and caused repeated false-positive audit failures.
 min_relative_deviation = 10.0
 
 [measurement."add-benchmark"]
