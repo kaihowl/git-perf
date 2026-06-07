@@ -661,7 +661,7 @@ pub enum Commands {
 
         /// Metadata key used to identify independent runner groups.
         /// Each matrix instance should tag its measurements with
-        /// --key-value <group-by>=<instance-number>.
+        /// `--key-value <KEY>=<INSTANCE_NUMBER>`.
         #[arg(long, default_value = "group")]
         group_by: String,
     },

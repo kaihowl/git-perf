@@ -435,7 +435,7 @@ Reads measurements at HEAD that were collected from multiple independent runner 
   Default value: `50`
 * `--max-cov <MAX_COV>` — Fail if between-group CoV exceeds this percentage
 * `--commit <COMMIT>` — Target commit to study (default: HEAD)
-* `--group-by <GROUP_BY>` — Metadata key used to identify independent runner groups. Each matrix instance should tag its measurements with --key-value <group-by>=<instance-number>
+* `--group-by <GROUP_BY>` — Metadata key used to identify independent runner groups. Each matrix instance should tag its measurements with `--key-value <KEY>=<INSTANCE_NUMBER>`
 
   Default value: `group`
 
