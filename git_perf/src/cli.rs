@@ -17,6 +17,7 @@ use crate::reset;
 use crate::size;
 use crate::stats::ReductionFunc;
 use crate::status;
+use crate::study;
 use git_perf_cli_types::{Cli, Commands};
 
 pub fn handle_calls() -> Result<()> {
@@ -207,6 +208,16 @@ pub fn handle_calls() -> Result<()> {
             disk_size,
             include_objects,
         } => size::calculate_measurement_size(detailed, format, disk_size, include_objects),
+        Commands::Study {
+            name,
+            max_count,
+            max_cov,
+            commit,
+            group_by,
+        } => {
+            let commit = commit.as_deref().unwrap_or("HEAD");
+            study::run_study(commit, max_count, &name, max_cov, &group_by)
+        }
         Commands::Config {
             list,
             detailed,
