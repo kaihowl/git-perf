@@ -65,6 +65,12 @@ fn group_measurements(measurements: &[&MeasurementData], key: &str) -> GroupedSt
     }
 }
 
+/// Returns true if MAD is preferred over stddev as the dispersion method.
+/// Requires a low MAD/σ ratio (outliers present) AND at least 5 data points.
+fn is_mad_preferred(mad_sigma_ratio: f64, n: usize) -> bool {
+    mad_sigma_ratio < 0.7 && n >= 5
+}
+
 /// Compute recommendations from between-group aggregate values.
 /// Returns None if there are fewer than 3 data points.
 #[must_use]
@@ -84,7 +90,7 @@ pub fn compute_recommendations(aggregates: &[f64]) -> Option<Recommendations> {
         1.0
     };
 
-    let dispersion_method = if mad_sigma_ratio < 0.7 && aggregates.len() >= 5 {
+    let dispersion_method = if is_mad_preferred(mad_sigma_ratio, aggregates.len()) {
         "mad"
     } else {
         "stddev"
@@ -231,7 +237,7 @@ pub(crate) fn format_output(
              \n  dispersion_method = \"{method}\"",
             method = recs.dispersion_method,
         ));
-        if mad_sigma_ratio < 0.7 && n >= 5 && !mad_sigma_ratio.is_nan() {
+        if is_mad_preferred(mad_sigma_ratio, n) && !mad_sigma_ratio.is_nan() {
             out.push_str(&format!(
                 "  # MAD/σ = {:.2} — outliers between runners detected",
                 mad_sigma_ratio
@@ -623,5 +629,19 @@ mod tests {
         assert!(!grouped.grouped_by_key);
         assert_eq!(grouped.group_aggregates.len(), 3);
         assert_eq!(grouped.total_raw, 3);
+    }
+
+    #[test]
+    fn test_is_mad_preferred_boundary() {
+        // At the exact literal boundary 0.7: strict < is false, <= would be true — kills < vs <= mutant
+        assert!(!is_mad_preferred(0.7, 5));
+        // Below threshold: < and <= both true
+        assert!(is_mad_preferred(0.6, 5));
+        // Above threshold: < and <= both false
+        assert!(!is_mad_preferred(0.8, 5));
+        // n=4 boundary: never preferred regardless of ratio
+        assert!(!is_mad_preferred(0.5, 4));
+        // n=5 with low ratio: preferred
+        assert!(is_mad_preferred(0.5, 5));
     }
 }
