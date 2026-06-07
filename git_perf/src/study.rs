@@ -71,6 +71,20 @@ fn is_mad_preferred(mad_sigma_ratio: f64, n: usize) -> bool {
     mad_sigma_ratio < 0.7 && n >= 5
 }
 
+/// Recommended sigma for given CoV. Returns 3.5 if CoV > 5%, otherwise 4.0.
+fn recommend_sigma(cov: f64) -> f64 {
+    if cov > 5.0 {
+        3.5_f64
+    } else {
+        4.0_f64
+    }
+}
+
+/// Returns true if CoV strictly exceeds the threshold (NaN-safe: NaN > x = false).
+fn exceeds_cov_threshold(cov: f64, threshold: f64) -> bool {
+    cov > threshold
+}
+
 /// Compute recommendations from between-group aggregate values.
 /// Returns None if there are fewer than 3 data points.
 #[must_use]
@@ -93,7 +107,7 @@ pub fn compute_recommendations(aggregates: &[f64]) -> Option<Recommendations> {
         "stddev"
     };
     let aggregate_by = if cov > 10.0 { "median" } else { "min" };
-    let sigma = if cov > 5.0 { 3.5_f64 } else { 4.0_f64 };
+    let sigma = recommend_sigma(cov);
     let min_measurements: u16 = if cov > 10.0 { 5 } else { 3 };
     // Round up to nearest 0.5 for readability
     let min_relative_deviation = (cov * 1.5 * 2.0).ceil() / 2.0;
@@ -200,7 +214,7 @@ pub(crate) fn format_output(
     // CoV verdict
     if !cov.is_nan() {
         let verdict = if let Some(threshold) = max_cov_threshold {
-            if cov > threshold {
+            if exceeds_cov_threshold(cov, threshold) {
                 format!(
                     "\n  ⚠️  CoV {:.1}% exceeds threshold {:.1}% — \
                      benchmark may produce unreliable CI results.\n\
@@ -241,7 +255,7 @@ pub(crate) fn format_output(
             ));
         }
         out.push_str(&format!("\n  sigma = {}", recs.sigma));
-        if cov > 5.0 {
+        if recs.sigma < 4.0 {
             out.push_str("  # tightened threshold for CoV > 5%");
         }
         out.push_str(&format!("\n  aggregate_by = \"{}\"", recs.aggregate_by));
@@ -323,8 +337,8 @@ pub fn run_study(
     if let Some(threshold) = max_cov_threshold {
         let stats = aggregate_measurements(group_aggregates.iter());
         let cov = compute_cov_pct(stats.stddev, stats.mean);
-        // NaN > threshold is false per IEEE 754, so near-zero means safely skip the gate
-        if cov > threshold {
+        // NaN is treated as not exceeding: exceeds_cov_threshold returns false for NaN
+        if exceeds_cov_threshold(cov, threshold) {
             bail!("CoV {:.1}% exceeds threshold {:.1}%", cov, threshold);
         }
     }
@@ -488,12 +502,17 @@ mod tests {
             !out_low.contains("tightened threshold"),
             "low CoV should NOT have sigma tightened comment:\n{out_low}"
         );
+        // Use specific unique strings to distinguish the two CoV > 10% comment locations
         assert!(
-            !out_low.contains("CoV > 10%"),
-            "low CoV should NOT have CoV>10% config comment:\n{out_low}"
+            !out_low.contains("median more stable than min"),
+            "low CoV should NOT have aggregate_by comment:\n{out_low}"
+        );
+        assert!(
+            !out_low.contains("need more history"),
+            "low CoV should NOT have min_measurements comment:\n{out_low}"
         );
 
-        // High CoV (≈ 12%): sigma and CoV>10% comments should appear
+        // High CoV (≈ 12%): sigma and BOTH CoV>10% comments should appear
         let high_cov = vec![100.0, 112.0, 88.0, 115.0, 85.0, 110.0];
         let out_high = format_output("bench", &high_cov, true, 60, "group", None);
         assert!(
@@ -501,8 +520,12 @@ mod tests {
             "high CoV should have sigma tightened comment:\n{out_high}"
         );
         assert!(
-            out_high.contains("CoV > 10%"),
-            "high CoV should have CoV>10% config comment:\n{out_high}"
+            out_high.contains("median more stable than min"),
+            "high CoV should have aggregate_by comment:\n{out_high}"
+        );
+        assert!(
+            out_high.contains("need more history"),
+            "high CoV should have min_measurements comment:\n{out_high}"
         );
     }
 
@@ -721,5 +744,66 @@ mod tests {
         assert!(!is_mad_preferred(0.5, 4));
         // n=5 with low ratio: preferred
         assert!(is_mad_preferred(0.5, 5));
+    }
+
+    #[test]
+    fn test_threshold_helpers() {
+        // recommend_sigma: literal 5.0 distinguishes > 5.0 from >= 5.0
+        assert_eq!(recommend_sigma(5.0), 4.0, "5.0 is NOT > 5.0");
+        assert_eq!(recommend_sigma(5.1), 3.5, "5.1 IS > 5.0");
+        // exceeds_cov_threshold: literal equality distinguishes > from >=
+        assert!(!exceeds_cov_threshold(10.0, 10.0), "10.0 is NOT > 10.0");
+        assert!(exceeds_cov_threshold(10.1, 10.0), "10.1 IS > 10.0");
+    }
+
+    #[test]
+    fn test_recommendations_near_10pct_boundary() {
+        // [90, 100, 110]: Welford gives exact M2=200 → stddev=10.0, mean=100.0
+        // cov = 10.0/100.0*100.0 = 10.0 (IEEE 754 rounds down, excess < half ULP)
+        // cov > 10.0 = false → kills > 10.0 → >= 10.0 mutations in compute_recommendations
+        let data = vec![90.0, 100.0, 110.0];
+        let recs = compute_recommendations(&data).unwrap();
+        assert_eq!(recs.aggregate_by, "min", "cov=10.0 is NOT > 10.0 → min");
+        assert_eq!(
+            recs.min_measurements, 3,
+            "cov=10.0 is NOT > 10.0 → min_measurements=3"
+        );
+    }
+
+    #[test]
+    fn test_format_output_near_10pct_boundary() {
+        // [90, 100, 110]: cov=10.0 exactly (NOT > 10.0)
+        // Kills > 10.0 → >= 10.0 mutations in the three format_output threshold checks
+        let data = vec![90.0, 100.0, 110.0];
+        let out = format_output("bench", &data, true, 3, "group", None);
+        assert!(
+            out.contains("stable"),
+            "cov=10.0 is NOT > 10.0 → stable:\n{out}"
+        );
+        assert!(
+            !out.contains("median more stable than min"),
+            "cov=10.0 → no aggregate_by comment:\n{out}"
+        );
+        assert!(
+            !out.contains("need more history"),
+            "cov=10.0 → no min_measurements comment:\n{out}"
+        );
+    }
+
+    #[test]
+    fn test_format_output_near_20pct_boundary() {
+        // [80, 100, 120]: Welford gives exact M2=800 → stddev=20.0, mean=100.0
+        // cov = 20.0/100.0*100.0 = 20.0 (IEEE 754 rounds down, exact)
+        // cov > 20.0 = false → kills > 20.0 → >= 20.0 mutation in format_output verdict
+        let data = vec![80.0, 100.0, 120.0];
+        let out = format_output("bench", &data, true, 3, "group", None);
+        assert!(
+            !out.contains("too noisy"),
+            "cov=20.0 is NOT > 20.0 → not too noisy:\n{out}"
+        );
+        assert!(
+            out.contains("10\u{2013}20%") || out.contains("moderate"),
+            "cov=20.0 >= 10.0 → moderate verdict:\n{out}"
+        );
     }
 }
