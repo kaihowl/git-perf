@@ -102,7 +102,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@main
+        uses: kaihowl/git-perf/.github/actions/install@master
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -147,7 +147,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@main
+        uses: kaihowl/git-perf/.github/actions/install@master
 
       - name: Pull measurements from all runners
         run: git perf pull
