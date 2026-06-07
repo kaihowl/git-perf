@@ -84,11 +84,8 @@ pub fn compute_recommendations(aggregates: &[f64]) -> Option<Recommendations> {
     }
 
     let cov = stats.stddev / stats.mean * 100.0;
-    let mad_sigma_ratio = if stats.stddev > f64::EPSILON {
-        stats.mad / stats.stddev
-    } else {
-        1.0
-    };
+    // NaN from compute_mad_sigma_ratio (near-zero stddev) maps to "stddev" via is_mad_preferred
+    let mad_sigma_ratio = compute_mad_sigma_ratio(stats.mad, stats.stddev);
 
     let dispersion_method = if is_mad_preferred(mad_sigma_ratio, aggregates.len()) {
         "mad"
@@ -438,12 +435,93 @@ mod tests {
         // compute_mad_pct: near-zero mean → NaN
         assert!(compute_mad_pct(1.0, 0.0).is_nan());
 
+        // compute_mad_pct: exact-EPSILON mean → NaN (EPSILON > EPSILON is false)
+        assert!(compute_mad_pct(1.0, f64::EPSILON).is_nan());
+
         // compute_mad_sigma_ratio: normal input
         let r = compute_mad_sigma_ratio(3.0, 6.0);
         assert!((r - 0.5).abs() < 1e-9, "ratio should be 0.5, got {r}");
 
         // compute_mad_sigma_ratio: near-zero stddev → NaN
         assert!(compute_mad_sigma_ratio(1.0, 0.0).is_nan());
+
+        // compute_mad_sigma_ratio: exact-EPSILON stddev → NaN (EPSILON > EPSILON is false)
+        assert!(compute_mad_sigma_ratio(1.0, f64::EPSILON).is_nan());
+    }
+
+    #[test]
+    fn test_recommendations_near_zero_mean_guard() {
+        // mean = EPSILON → should return None (|| with && mutation would continue instead)
+        // data sums to 3*EPSILON so mean = EPSILON (well below practical significance)
+        let eps_data = vec![f64::EPSILON, f64::EPSILON, f64::EPSILON];
+        assert!(
+            compute_recommendations(&eps_data).is_none(),
+            "near-zero mean should give None"
+        );
+    }
+
+    #[test]
+    fn test_recommendations_at_exact_cov_boundaries() {
+        // [95, 95, 100, 105, 105]: Welford's algorithm for symmetric data gives stddev that
+        // via compute_recommendations cov = stddev/mean*100 lands at or below 5.0, meaning
+        // cov > 5.0 is FALSE → sigma = 4.0. This kills the > 5.0 → >= 5.0 mutant.
+        let data_near_5pct = vec![95.0, 95.0, 100.0, 105.0, 105.0];
+        let recs = compute_recommendations(&data_near_5pct).unwrap();
+        assert!(
+            (recs.sigma - 4.0).abs() < f64::EPSILON,
+            "cov ≤ 5.0: sigma should be 4.0, got {}",
+            recs.sigma
+        );
+        assert_eq!(
+            recs.aggregate_by, "min",
+            "cov ≤ 5.0: should use min aggregation"
+        );
+        assert_eq!(recs.min_measurements, 3, "cov ≤ 5.0: min_measurements = 3");
+    }
+
+    #[test]
+    fn test_format_output_config_block_comments() {
+        // Low CoV (≈ 0.5%): no CoV-threshold config comments
+        let low_cov = vec![100.0, 100.5, 99.5, 100.2, 100.8, 99.8];
+        let out_low = format_output("bench", &low_cov, true, 6, "group", None);
+        assert!(
+            !out_low.contains("tightened threshold"),
+            "low CoV should NOT have sigma tightened comment:\n{out_low}"
+        );
+        assert!(
+            !out_low.contains("CoV > 10%"),
+            "low CoV should NOT have CoV>10% config comment:\n{out_low}"
+        );
+
+        // High CoV (≈ 12%): sigma and CoV>10% comments should appear
+        let high_cov = vec![100.0, 112.0, 88.0, 115.0, 85.0, 110.0];
+        let out_high = format_output("bench", &high_cov, true, 60, "group", None);
+        assert!(
+            out_high.contains("tightened threshold"),
+            "high CoV should have sigma tightened comment:\n{out_high}"
+        );
+        assert!(
+            out_high.contains("CoV > 10%"),
+            "high CoV should have CoV>10% config comment:\n{out_high}"
+        );
+    }
+
+    #[test]
+    fn test_format_output_at_cov_boundaries() {
+        // [95, 95, 100, 105, 105]: Welford's algorithm gives stddev that via
+        // compute_cov_pct lands at or below 5.0 in format_output, meaning
+        // cov > 5.0 is FALSE → no sigma "tightened threshold" comment.
+        // This kills the > 5.0 → >= 5.0 mutant in format_output.
+        let data_near_5pct = vec![95.0, 95.0, 100.0, 105.0, 105.0];
+        let out_5 = format_output("bench", &data_near_5pct, true, 5, "group", None);
+        assert!(
+            !out_5.contains("tightened threshold"),
+            "cov ≤ 5.0: no sigma tightened comment:\n{out_5}"
+        );
+        assert!(
+            out_5.contains("stable"),
+            "cov ≤ 5.0: should show stable verdict:\n{out_5}"
+        );
     }
 
     #[test]
