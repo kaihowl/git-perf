@@ -101,6 +101,8 @@ pub fn compute_recommendations(aggregates: &[f64]) -> Option<Recommendations> {
     // NaN from compute_mad_sigma_ratio (near-zero stddev) maps to "stddev" via is_mad_preferred
     let mad_sigma_ratio = compute_mad_sigma_ratio(stats.mad, stats.stddev);
 
+    // Low MAD/σ means outliers inflate stddev relative to MAD, making MAD the
+    // more robust dispersion method for detecting genuine regressions.
     let dispersion_method = if is_mad_preferred(mad_sigma_ratio, aggregates.len()) {
         "mad"
     } else {

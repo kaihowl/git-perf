@@ -1,5 +1,7 @@
 # Benchmark Study Guide
 
+> **Experimental**: The `git perf study` command and the reusable benchmark-study workflow are new and may change in future releases. Feedback welcome.
+
 Before adding a new benchmark to your CI performance suite, run a **benchmark study** to measure its cross-runner variability (Coefficient of Variation) and get recommended `.gitperfconfig` settings. This prevents noisy benchmarks from causing false audit failures after merging.
 
 ## Why a study?
