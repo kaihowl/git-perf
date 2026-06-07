@@ -68,19 +68,25 @@ on:
         type: string
 
 jobs:
+  setup:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          n="${{ inputs.instances }}"
+          matrix=$(python3 -c "import json; n=int('$n'); print(json.dumps(list(range(1, n+1))))")
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+
   measure:
+    needs: setup
     name: Measure (instance ${{ matrix.instance }})
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
-      # Generate a matrix from 1..instances. GitHub Actions doesn't support
-      # dynamic matrix sizes natively, so we hardcode up to 10 instances and
-      # trim via the 'if' condition below.
       matrix:
-        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-    # Only run the instances the user requested
-    if: ${{ matrix.instance <= fromJSON(inputs.instances) }}
+        instance: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     env:
       GIT_AUTHOR_NAME: github-actions[bot]
@@ -126,7 +132,7 @@ jobs:
     name: Analyze cross-runner variance
     runs-on: ubuntu-22.04
     needs: measure
-    if: always() && needs.measure.result != 'skipped'
+    if: always() && needs.measure.result != 'cancelled'
 
     env:
       GIT_AUTHOR_NAME: github-actions[bot]
