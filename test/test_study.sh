@@ -70,3 +70,14 @@ git perf add -m few_op --key-value group=2 110
 
 assert_failure_with_output output git perf study -m few_op
 assert_contains "$output" "at least 3"
+
+test_section "study: succeeds with exactly 3 groups (minimum boundary)"
+cd_empty_repo
+create_commit
+# Exactly 3 groups: the minimum required for a reliable study.
+# With < 3: 3 < 3 = false → proceeds. With <= 3 (mutant): 3 <= 3 = true → bails.
+git perf add -m min_groups --key-value group=1 100
+git perf add -m min_groups --key-value group=2 105
+git perf add -m min_groups --key-value group=3 110
+
+assert_success git perf study -m min_groups
