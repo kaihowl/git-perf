@@ -101,11 +101,13 @@ jobs:
           # Full history so git-perf can walk commits for push/pull
           fetch-depth: 0
 
-      - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@master
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install git-perf from master
+        run: |
+          cargo install --git https://github.com/kaihowl/git-perf --branch master
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Cache cargo registry
         uses: actions/cache@v5
@@ -146,8 +148,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install git-perf
-        uses: kaihowl/git-perf/.github/actions/install@master
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install git-perf from master
+        run: |
+          cargo install --git https://github.com/kaihowl/git-perf --branch master
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Pull measurements from all runners
         run: git perf pull
