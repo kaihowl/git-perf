@@ -27,19 +27,18 @@ sigma = 3
 aggregate_by = "min"
 min_measurements = 10
 
-[measurement."bench::add_measurements/add_measurement/10::median"]
+[measurement."bench::add_measurements/add_measurement/50::median"]
 epoch = "4493382"
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 5
-# Increased from 1 to 10 items per iteration so that per-element time averages across
-# 10 independent subprocess calls, reducing CoV by ~√10 relative to the single-item case
-# (prior study measured CoV=13.8% with 1 item; expected ~4-5% with 10 items).
-# min_relative_deviation and max_cov to be re-calibrated from a new study.
-min_relative_deviation = 10
-max_cov = 20
+# 50 adds per iteration averages subprocess variance: historical CI data shows CoV ~3.3%
+# (vs 13.8% with 1 item).  min_relative_deviation=7 (2× CoV) and max_cov=10 (3× CoV)
+# are set conservatively pending a formal cross-runner study.
+min_relative_deviation = 7
+max_cov = 10
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
