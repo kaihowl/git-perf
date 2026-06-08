@@ -34,12 +34,13 @@ dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 5
-# Baseline reliability study (10 independent CI runs) measured CoV=8.3%, MAD≈3.4%.
-# min_relative_deviation=10% floor suppresses false positives from normal CI jitter
-# (which peaks at ~8%); sigma=3.5 detects sustained regressions above ~10%.
+# Benchmark study (10 independent CI runners × 10 reps) measured CoV=13.8%, MAD%=4.9%.
+# min_relative_deviation=21 (1.5× CoV) suppresses false positives from normal CI jitter.
+# max_cov=28 warns if between-runner noise grows to 2× current level.
 # Epoch bumped to 66c260b: prior stable tail poisoned by a ~5ms outlier measurement
 # which destabilised MAD and caused repeated false-positive audit failures.
-min_relative_deviation = 10.0
+min_relative_deviation = 21
+max_cov = 28
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
