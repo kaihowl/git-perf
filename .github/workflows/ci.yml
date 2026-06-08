@@ -43,7 +43,7 @@ jobs:
           rust: beta
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.2
       with:
         fetch-depth: 40
 
@@ -193,7 +193,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.2
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -207,7 +207,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.2
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -221,7 +221,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.2
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -237,7 +237,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.2
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -266,7 +266,7 @@ jobs:
       group: gh-pages-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 40
 
@@ -301,7 +301,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.2
       with:
         fetch-depth: 40
 
