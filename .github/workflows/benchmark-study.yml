@@ -106,7 +106,7 @@ jobs:
 
       - name: Install git-perf from master
         run: |
-          cargo install --git https://github.com/kaihowl/git-perf --branch master --package git-perf
+          cargo install --git https://github.com/kaihowl/git-perf --branch master git-perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Cache cargo registry
@@ -153,7 +153,7 @@ jobs:
 
       - name: Install git-perf from master
         run: |
-          cargo install --git https://github.com/kaihowl/git-perf --branch master --package git-perf
+          cargo install --git https://github.com/kaihowl/git-perf --branch master git-perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Pull measurements from all runners
