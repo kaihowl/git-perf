@@ -28,7 +28,7 @@ fn prep_repo() -> tempfile::TempDir {
 fn add_measurements(c: &mut Criterion) {
     let mut group = c.benchmark_group("add_measurements");
     group.sample_size(50);
-    for num_measurements in [1, 50, 100].into_iter() {
+    for num_measurements in [10, 50, 100].into_iter() {
         group.throughput(Throughput::Elements(num_measurements as u64));
         group.bench_with_input(
             BenchmarkId::new("add_measurement", num_measurements),
