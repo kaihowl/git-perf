@@ -34,11 +34,12 @@ dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 5
-# 50 adds per iteration averages subprocess variance: historical CI data shows CoV ~3.3%
-# (vs 13.8% with 1 item).  min_relative_deviation=7 (2× CoV) and max_cov=10 (3× CoV)
-# are set conservatively pending a formal cross-runner study.
-min_relative_deviation = 7
-max_cov = 10
+# Cross-runner study (10 instances): between-runner CoV=34.8%, within-runner MAD%=1.4%.
+# MAD/σ=0.04 — most runners agree tightly but a few outlier runners dominate the variance.
+# The high threshold reflects shared-runner hardware heterogeneity, not benchmark noise.
+# min_relative_deviation=52 (1.5× CoV) and max_cov=70 (2× CoV) per study recommendation.
+min_relative_deviation = 52
+max_cov = 70
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
