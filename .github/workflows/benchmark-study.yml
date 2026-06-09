@@ -105,6 +105,8 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
+      # Serial execution prevents concurrent runner VMs from competing for CPU on shared
+      # physical hosts, which inflates between-group CoV by ~4× in benchmarks.
       max-parallel: 1
       matrix:
         instance: ${{ fromJSON(needs.setup.outputs.matrix) }}
