@@ -34,12 +34,12 @@ dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
 min_measurements = 5
-# Cross-runner study (10 instances): between-runner CoV=34.8%, within-runner MAD%=1.4%.
-# MAD/σ=0.04 — most runners agree tightly but a few outlier runners dominate the variance.
-# The high threshold reflects shared-runner hardware heterogeneity, not benchmark noise.
-# min_relative_deviation=52 (1.5× CoV) and max_cov=70 (2× CoV) per study recommendation.
-min_relative_deviation = 52
-max_cov = 70
+# Parallel study (10 instances) measured CoV=34.8% — inflated by resource contention
+# between concurrent runners.  A sequential re-run (max-parallel: 1) is needed to
+# measure genuine between-runner variance without contention artifacts.
+# Thresholds set conservatively pending that study.
+min_relative_deviation = 10
+max_cov = 20
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
