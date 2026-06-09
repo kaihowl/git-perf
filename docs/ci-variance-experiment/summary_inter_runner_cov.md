@@ -7,16 +7,16 @@ Coefficient of Variation (%) of aggregated values across runners.
 
 | Workload | min | median | mean | max | Verdict (min) |
 |---|---|---|---|---|---|
-| sha256 | 5.93% | 12.25% | 11.93% | 16.15% | GREEN |
-| sort | 3.45% | 8.43% | 10.24% | 23.61% | GREEN |
-| matrix | 3.57% | 8.20% | 10.98% | 43.39% | GREEN |
-| noop | nan% | 52.71% | 18.91% | 49.44% | YELLOW |
+| sha256 | 2.97% | 5.72% | 5.50% | 8.70% | GREEN |
+| sort | 2.98% | 5.13% | 6.95% | 33.73% | GREEN |
+| matrix | 2.75% | 3.35% | 5.18% | 27.43% | GREEN |
+| noop | nan% | 52.71% | 14.17% | 49.44% | YELLOW |
 
 ## OS: ubuntu-22.04
 
 | Workload | min | median | mean | max | Verdict (min) |
 |---|---|---|---|---|---|
-| sha256 | 7.55% | 7.26% | 7.27% | 7.56% | GREEN |
-| sort | 5.95% | 5.48% | 5.41% | 5.45% | GREEN |
-| matrix | 21.09% | 20.66% | 20.68% | 20.88% | RED |
-| noop | 22.56% | 13.18% | 12.59% | 12.07% | YELLOW |
+| sha256 | 10.42% | 10.42% | 10.42% | 10.33% | YELLOW |
+| sort | 9.90% | 9.89% | 9.87% | 9.62% | GREEN |
+| matrix | 23.06% | 22.98% | 22.91% | 23.10% | RED |
+| noop | 21.86% | 19.33% | 15.05% | 11.05% | YELLOW |
