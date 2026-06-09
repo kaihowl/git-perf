@@ -32,14 +32,13 @@ epoch = "4493382"
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
-aggregate_by = "median"
-min_measurements = 5
-# Parallel study (10 instances) measured CoV=34.8% — inflated by resource contention
-# between concurrent runners.  A sequential re-run (max-parallel: 1) is needed to
-# measure genuine between-runner variance without contention artifacts.
-# Thresholds set conservatively pending that study.
-min_relative_deviation = 10
-max_cov = 20
+aggregate_by = "min"
+min_measurements = 3
+# Sequential cross-runner study (10 instances, max-parallel=1): CoV=8.0%, MAD%=4.6%.
+# Parallel study gave 34.8% CoV due to runner resource contention — sequential is accurate.
+# min_relative_deviation=12 (1.5× CoV), max_cov=16 (2× CoV) per study recommendation.
+min_relative_deviation = 12
+max_cov = 16
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
