@@ -9,8 +9,9 @@ name: Benchmark Study
 #     study:
 #       uses: kaihowl/git-perf/.github/workflows/benchmark-study.yml@VERSION
 #       with:
-#         measurement: bench::my_benchmark/operation::min
-#         command: cargo bench --bench my_benchmark
+#         measurement: bench::my_benchmark/operation::median
+#         mode: criterion-json
+#         command: cargo criterion --bench my_benchmark --message-format json
 #       secrets: inherit
 
 on:
@@ -18,23 +19,38 @@ on:
     inputs:
       measurement:
         description: >
-          Full measurement name (e.g. bench::add_measurements/add_measurement/1::median).
-          Must match the name used in the measure/import step.
+          Full measurement name (e.g. bench::add_measurements/add_measurement/50::median).
+          Must match the name produced by the measure/import step.
         required: true
         type: string
       command:
         description: >
-          Command that runs the benchmark (e.g. cargo bench --bench my_bench).
-          Wrap multi-word commands in quotes.
+          measure mode: command whose wall-clock time is recorded
+          (e.g. git -C $REPO perf add -m metric 123).
+          criterion-json mode: cargo criterion command that writes JSON to stdout
+          (e.g. cargo criterion --bench add --features test-helpers --message-format json).
         required: true
         type: string
+      mode:
+        description: >
+          How measurements are collected.
+          measure: git perf measure times the command (reps_per_instance runs stored).
+          criterion-json: command is piped to git perf import criterion-json (one run per instance).
+        required: false
+        default: 'measure'
+        type: choice
+        options:
+          - measure
+          - criterion-json
       instances:
         description: Number of independent runner instances (≥ 3 required, 10 recommended)
         required: false
         default: '10'
         type: string
       reps_per_instance:
-        description: Repetitions per runner instance passed to git-perf measure -n
+        description: >
+          (measure mode only) Repetitions per runner instance passed to git perf measure -n.
+          Ignored in criterion-json mode (criterion collects its own samples internally).
         required: false
         default: '10'
         type: string
@@ -53,6 +69,10 @@ on:
         type: string
       command:
         required: true
+        type: string
+      mode:
+        required: false
+        default: 'measure'
         type: string
       instances:
         required: false
@@ -85,6 +105,9 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
+      # Serial execution prevents concurrent runner VMs from competing for CPU on shared
+      # physical hosts, which inflates between-group CoV by ~4× in benchmarks.
+      max-parallel: 1
       matrix:
         instance: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
@@ -109,6 +132,12 @@ jobs:
           cargo install --git https://github.com/kaihowl/git-perf --branch master git-perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Install cargo-criterion
+        if: inputs.mode == 'criterion-json'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-criterion
+
       - name: Cache cargo registry
         uses: actions/cache@v5
         with:
@@ -119,13 +148,22 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Run benchmark and record measurements
+      - name: Run benchmark (measure mode)
+        if: inputs.mode != 'criterion-json'
         run: |
           git perf measure \
             -n "${{ inputs.reps_per_instance }}" \
             -m "${{ inputs.measurement }}" \
             --key-value group=${{ matrix.instance }} \
             -- ${{ inputs.command }}
+
+      - name: Run benchmark (criterion-json mode)
+        if: inputs.mode == 'criterion-json'
+        run: |
+          set -o pipefail
+          ${{ inputs.command }} \
+            | git perf import criterion-json - \
+                --metadata group=${{ matrix.instance }}
 
       - name: Push measurements
         run: git perf push

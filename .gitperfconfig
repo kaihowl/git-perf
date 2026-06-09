@@ -27,20 +27,18 @@ sigma = 3
 aggregate_by = "min"
 min_measurements = 10
 
-[measurement."bench::add_measurements/add_measurement/1::median"]
-epoch = "66c260b"
+[measurement."bench::add_measurements/add_measurement/50::median"]
+epoch = "4493382"
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
-aggregate_by = "median"
-min_measurements = 5
-# Benchmark study (10 independent CI runners × 10 reps) measured CoV=13.8%, MAD%=4.9%.
-# min_relative_deviation=21 (1.5× CoV) suppresses false positives from normal CI jitter.
-# max_cov=28 warns if between-runner noise grows to 2× current level.
-# Epoch bumped to 66c260b: prior stable tail poisoned by a ~5ms outlier measurement
-# which destabilised MAD and caused repeated false-positive audit failures.
-min_relative_deviation = 21
-max_cov = 28
+aggregate_by = "min"
+min_measurements = 3
+# Sequential cross-runner study (10 instances, max-parallel=1): CoV=8.0%, MAD%=4.6%.
+# Parallel study gave 34.8% CoV due to runner resource contention — sequential is accurate.
+# min_relative_deviation=12 (1.5× CoV), max_cov=16 (2× CoV) per study recommendation.
+min_relative_deviation = 12
+max_cov = 16
 
 [measurement."add-benchmark"]
 epoch = "296bc41"
