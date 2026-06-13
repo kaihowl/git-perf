@@ -64,7 +64,7 @@ jobs:
       run: cargo install cargo-nextest --locked --force
 
     - name: Install cargo-mutants
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@v2.80.0
       with:
         tool: cargo-mutants@25.3.1
 

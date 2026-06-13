@@ -119,7 +119,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           # Full history so git-perf can walk commits for push/pull
           fetch-depth: 0
@@ -134,7 +134,7 @@ jobs:
 
       - name: Install cargo-criterion
         if: inputs.mode == 'criterion-json'
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.80.0
         with:
           tool: cargo-criterion
 
@@ -182,7 +182,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
