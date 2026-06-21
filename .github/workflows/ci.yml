@@ -69,7 +69,7 @@ jobs:
       uses: taiki-e/install-action@nextest
 
     - name: Install cargo-criterion
-      uses: taiki-e/install-action@v2
+      uses: taiki-e/install-action@v2.80.0
       with:
         tool: cargo-criterion
 
