@@ -24,7 +24,7 @@ jobs:
       group: gh-pages-${{ github.ref }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0  # Full checkout required for git perf remove/prune operations
 
