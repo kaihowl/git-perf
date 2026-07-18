@@ -8,20 +8,21 @@
 # ]
 # ///
 """
-Backtest precipitation forecast accuracy for Adlershof, Berlin across models
+Backtest precipitation forecast accuracy for a fixed location across models
 and lead times, using Open-Meteo's Previous Runs API (forecasts) and
-Historical Weather API (ERA5 reanalysis as ground truth).
+Historical Weather API (ERA5 reanalysis as ground truth). Defaults to
+Adlershof, Berlin; pass --location-name/--latitude/--longitude for others.
 
 Usage:
     uv run scripts/precip_backtest.py [options]
 
-Data is cached in a local SQLite database so repeated runs only fetch
-new/missing days instead of re-downloading everything. Only the metrics
-table and chart are always recomputed from the full cache.
+Data is cached (per location) in a local SQLite database so repeated runs
+only fetch new/missing days instead of re-downloading everything. Only the
+metrics table and chart are always recomputed from the full cache.
 
 Output:
-    <out-dir>/metrics.csv           model x lead_time x metric table
-    <out-dir>/skill_degradation.png line chart of MAE and CSI(>1mm) vs lead time
+    <out-dir>/<location-name>/metrics.csv           model x lead_time x metric table
+    <out-dir>/<location-name>/skill_degradation.png  line chart of MAE and CSI(>1mm) vs lead time
 """
 
 import argparse
@@ -43,6 +44,7 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+DEFAULT_LOCATION_NAME = "adlershof"
 ADLERSHOF_LATITUDE = 52.43
 ADLERSHOF_LONGITUDE = 13.53
 
@@ -127,27 +129,69 @@ def fetch_json(session: requests.Session, url: str, params: dict) -> dict:
 # ---------------------------------------------------------------------------
 # SQLite cache
 # ---------------------------------------------------------------------------
-def open_db(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+def _migrate_legacy_schema(conn: sqlite3.Connection) -> None:
+    """Add the `location` column to pre-existing single-location caches,
+    tagging their rows as DEFAULT_LOCATION_NAME, instead of discarding
+    already-fetched data."""
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if "forecast" not in tables:
+        return
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(forecast)")}
+    if "location" in cols:
+        return
+    log.info("Migrating cache schema to support multiple locations")
+    conn.execute("ALTER TABLE forecast RENAME TO forecast_legacy")
+    conn.execute("ALTER TABLE observed RENAME TO observed_legacy")
+    _create_tables(conn)
+    conn.execute(
+        f"""
+        INSERT INTO forecast (date, location, model, lead_time, precip_mm)
+        SELECT date, '{DEFAULT_LOCATION_NAME}', model, lead_time, precip_mm FROM forecast_legacy
+        """
+    )
+    conn.execute(
+        f"""
+        INSERT INTO observed (date, location, precip_mm)
+        SELECT date, '{DEFAULT_LOCATION_NAME}', precip_mm FROM observed_legacy
+        """
+    )
+    conn.execute("DROP TABLE forecast_legacy")
+    conn.execute("DROP TABLE observed_legacy")
+    conn.commit()
+
+
+def _create_tables(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS forecast (
             date TEXT NOT NULL,
+            location TEXT NOT NULL,
             model TEXT NOT NULL,
             lead_time INTEGER NOT NULL,
             precip_mm REAL,
-            PRIMARY KEY (date, model, lead_time)
+            PRIMARY KEY (date, location, model, lead_time)
         )
         """
     )
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS observed (
-            date TEXT PRIMARY KEY,
-            precip_mm REAL
+            date TEXT NOT NULL,
+            location TEXT NOT NULL,
+            precip_mm REAL,
+            PRIMARY KEY (date, location)
         )
         """
     )
+
+
+def open_db(path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(path)
+    _migrate_legacy_schema(conn)
+    _create_tables(conn)
     conn.commit()
     return conn
 
@@ -155,6 +199,7 @@ def open_db(path: Path) -> sqlite3.Connection:
 def fetch_observed(
     conn: sqlite3.Connection,
     session: requests.Session,
+    location: str,
     start: dt.date,
     end: dt.date,
     lat: float,
@@ -162,12 +207,17 @@ def fetch_observed(
 ) -> None:
     all_dates = daterange(start, end)
     cur = conn.execute(
-        "SELECT date FROM observed WHERE date BETWEEN ? AND ?",
-        (start.isoformat(), end.isoformat()),
+        "SELECT date FROM observed WHERE location = ? AND date BETWEEN ? AND ?",
+        (location, start.isoformat(), end.isoformat()),
     )
     present = {dt.date.fromisoformat(row[0]) for row in cur}
     for chunk_start, chunk_end in missing_ranges(all_dates, present):
-        log.info("Fetching ERA5 observed precipitation %s..%s", chunk_start, chunk_end)
+        log.info(
+            "Fetching ERA5 observed precipitation (%s) %s..%s",
+            location,
+            chunk_start,
+            chunk_end,
+        )
         data = fetch_json(
             session,
             ARCHIVE_URL,
@@ -189,9 +239,15 @@ def fetch_observed(
             )
             continue
         daily = data.get("daily", {})
-        rows = list(zip(daily.get("time", []), daily.get("precipitation_sum", [])))
+        rows = [
+            (day, location, precip)
+            for day, precip in zip(
+                daily.get("time", []), daily.get("precipitation_sum", [])
+            )
+        ]
         conn.executemany(
-            "INSERT OR REPLACE INTO observed (date, precip_mm) VALUES (?, ?)", rows
+            "INSERT OR REPLACE INTO observed (date, location, precip_mm) VALUES (?, ?, ?)",
+            rows,
         )
         conn.commit()
 
@@ -199,6 +255,7 @@ def fetch_observed(
 def fetch_forecasts(
     conn: sqlite3.Connection,
     session: requests.Session,
+    location: str,
     start: dt.date,
     end: dt.date,
     lat: float,
@@ -211,18 +268,19 @@ def fetch_forecasts(
         cur = conn.execute(
             """
             SELECT date, COUNT(DISTINCT lead_time) FROM forecast
-            WHERE model = ? AND date BETWEEN ? AND ?
+            WHERE location = ? AND model = ? AND date BETWEEN ? AND ?
             GROUP BY date
             """,
-            (model, start.isoformat(), end.isoformat()),
+            (location, model, start.isoformat(), end.isoformat()),
         )
         complete = {
             dt.date.fromisoformat(row[0]) for row in cur if row[1] >= len(lead_times)
         }
         for chunk_start, chunk_end in missing_ranges(all_dates, complete):
             log.info(
-                "Fetching %s previous-run forecasts %s..%s",
+                "Fetching %s previous-run forecasts (%s) %s..%s",
                 model,
+                location,
                 chunk_start,
                 chunk_end,
             )
@@ -256,7 +314,7 @@ def fetch_forecasts(
                 )
                 for d in daterange(chunk_start, chunk_end):
                     for lt in lead_times:
-                        rows.append((d.isoformat(), model, lt, None))
+                        rows.append((d.isoformat(), location, model, lt, None))
             else:
                 times = data["hourly"]["time"]
                 for lt in lead_times:
@@ -271,9 +329,12 @@ def fetch_forecasts(
                             precip = None
                         else:
                             precip = round(sum(values_for_day), 3)
-                        rows.append((day, model, lt, precip))
+                        rows.append((day, location, model, lt, precip))
             conn.executemany(
-                "INSERT OR REPLACE INTO forecast (date, model, lead_time, precip_mm) VALUES (?, ?, ?, ?)",
+                """
+                INSERT OR REPLACE INTO forecast (date, location, model, lead_time, precip_mm)
+                VALUES (?, ?, ?, ?, ?)
+                """,
                 rows,
             )
             conn.commit()
@@ -282,15 +343,19 @@ def fetch_forecasts(
 # ---------------------------------------------------------------------------
 # Metrics
 # ---------------------------------------------------------------------------
-def load_joined(conn: sqlite3.Connection, start: dt.date, end: dt.date) -> pd.DataFrame:
+def load_joined(
+    conn: sqlite3.Connection, location: str, start: dt.date, end: dt.date
+) -> pd.DataFrame:
     query = """
         SELECT f.date AS date, f.model AS model, f.lead_time AS lead_time,
                f.precip_mm AS forecast_mm, o.precip_mm AS observed_mm
         FROM forecast f
-        JOIN observed o ON o.date = f.date
-        WHERE f.date BETWEEN ? AND ?
+        JOIN observed o ON o.date = f.date AND o.location = f.location
+        WHERE f.location = ? AND f.date BETWEEN ? AND ?
     """
-    return pd.read_sql_query(query, conn, params=(start.isoformat(), end.isoformat()))
+    return pd.read_sql_query(
+        query, conn, params=(location, start.isoformat(), end.isoformat())
+    )
 
 
 def compute_metrics(df: pd.DataFrame, thresholds: list[float]) -> pd.DataFrame:
@@ -329,7 +394,7 @@ def compute_metrics(df: pd.DataFrame, thresholds: list[float]) -> pd.DataFrame:
 # Plotting
 # ---------------------------------------------------------------------------
 def plot_skill_degradation(
-    metrics: pd.DataFrame, out_path: Path, csi_threshold: float
+    metrics: pd.DataFrame, out_path: Path, csi_threshold: float, location: str
 ) -> None:
     fig, (ax_mae, ax_csi) = plt.subplots(1, 2, figsize=(12, 5))
     csi_col = f"csi_{csi_threshold}mm"
@@ -351,7 +416,7 @@ def plot_skill_degradation(
     ax_csi.grid(True, alpha=0.3)
     ax_csi.legend(loc="best", fontsize="small")
 
-    fig.suptitle("Precipitation forecast skill degradation — Adlershof, Berlin")
+    fig.suptitle(f"Precipitation forecast skill degradation — {location}")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -370,6 +435,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--end-date", type=dt.date.fromisoformat, default=dt.date.today()
     )
+    parser.add_argument(
+        "--location-name",
+        default=DEFAULT_LOCATION_NAME,
+        help="Short label used to key the cache and name the output subdirectory",
+    )
     parser.add_argument("--latitude", type=float, default=ADLERSHOF_LATITUDE)
     parser.add_argument("--longitude", type=float, default=ADLERSHOF_LONGITUDE)
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS)
@@ -387,7 +457,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--out-dir",
         type=Path,
         default=Path(__file__).parent / "precip_backtest_output",
-        help="Output directory",
+        help="Output directory (a <location-name> subdirectory is created under it)",
     )
     parser.add_argument(
         "--skip-fetch",
@@ -416,6 +486,7 @@ def main() -> None:
             fetch_observed(
                 conn,
                 session,
+                args.location_name,
                 args.start_date,
                 args.end_date,
                 args.latitude,
@@ -424,6 +495,7 @@ def main() -> None:
             fetch_forecasts(
                 conn,
                 session,
+                args.location_name,
                 args.start_date,
                 args.end_date,
                 args.latitude,
@@ -434,17 +506,19 @@ def main() -> None:
         else:
             log.info("Skipping fetch, using existing cache at %s", args.db)
 
-        df = load_joined(conn, args.start_date, args.end_date)
+        df = load_joined(conn, args.location_name, args.start_date, args.end_date)
         if df.empty:
             log.error(
-                "No overlapping forecast/observed data found for the requested range"
+                "No overlapping forecast/observed data found for %s in the requested range",
+                args.location_name,
             )
             sys.exit(1)
 
         metrics = compute_metrics(df, args.thresholds)
 
-        args.out_dir.mkdir(parents=True, exist_ok=True)
-        metrics_path = args.out_dir / "metrics.csv"
+        out_dir = args.out_dir / args.location_name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        metrics_path = out_dir / "metrics.csv"
         metrics.to_csv(metrics_path, index=False)
         log.info("Wrote %s (%d rows)", metrics_path, len(metrics))
 
@@ -453,8 +527,8 @@ def main() -> None:
             if args.thresholds
             else DEFAULT_THRESHOLDS_MM[1]
         )
-        chart_path = args.out_dir / "skill_degradation.png"
-        plot_skill_degradation(metrics, chart_path, csi_threshold)
+        chart_path = out_dir / "skill_degradation.png"
+        plot_skill_degradation(metrics, chart_path, csi_threshold, args.location_name)
         log.info("Wrote %s", chart_path)
 
         with pd.option_context("display.max_columns", None, "display.width", 200):

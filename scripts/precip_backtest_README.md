@@ -1,8 +1,9 @@
-# Precipitation forecast backtest (Adlershof, Berlin)
+# Precipitation forecast backtest
 
-Backtests precipitation forecast accuracy for Adlershof, Berlin (52.43°N,
-13.53°E) across weather models and lead times, using
-[Open-Meteo](https://open-meteo.com/)'s free APIs (no API key required):
+Backtests precipitation forecast accuracy for a fixed location across
+weather models and lead times, using [Open-Meteo](https://open-meteo.com/)'s
+free APIs (no API key required). Defaults to Adlershof, Berlin
+(52.43°N, 13.53°E):
 
 - **Previous Runs API** — historical forecast values per lead time
   (`precipitation_previous_day1..7`) for `icon_seamless`, `gfs_seamless`,
@@ -19,7 +20,7 @@ uv run scripts/precip_backtest.py
 
 Defaults to the full history since 2024-01-01 through today, all six
 models, lead times 1-7, and thresholds 0.1/1/5 mm. Results are written to
-`scripts/precip_backtest_output/`:
+`scripts/precip_backtest_output/<location-name>/` (`adlershof` by default):
 
 - `metrics.csv` — one row per model × lead time, with `mae_mm`, `bias_mm`,
   and `csi_<t>mm` / `ets_<t>mm` for each threshold.
@@ -27,10 +28,10 @@ models, lead times 1-7, and thresholds 0.1/1/5 mm. Results are written to
   model.
 
 Downloaded data is cached in `scripts/precip_backtest_cache.sqlite`
-(SQLite). Re-running the script only fetches days missing from the cache,
-so it's safe to run repeatedly (e.g. daily via cron) to extend the
-backtest window incrementally — metrics and the chart are always
-recomputed from the full cache.
+(SQLite), keyed per location. Re-running the script only fetches days
+missing from the cache, so it's safe to run repeatedly (e.g. daily via
+cron) to extend the backtest window incrementally — metrics and the chart
+are always recomputed from the full cache.
 
 Useful flags:
 
@@ -38,6 +39,9 @@ Useful flags:
 uv run scripts/precip_backtest.py --start-date 2024-01-01 --end-date 2024-03-01
 uv run scripts/precip_backtest.py --models icon_seamless gfs_seamless --lead-times 1 2 3
 uv run scripts/precip_backtest.py --skip-fetch   # recompute metrics/chart from cache only, no network
+
+# A second location: results land in scripts/precip_backtest_output/oetztal_alps/
+uv run scripts/precip_backtest.py --location-name oetztal_alps --latitude 47.07301 --longitude 10.96844
 ```
 
 Run `uv run scripts/precip_backtest.py --help` for the full option list.
@@ -54,5 +58,9 @@ Run `uv run scripts/precip_backtest.py --help` for the full option list.
   will simply have fewer scored days for early lead times/dates — the
   script doesn't require full coverage.
 - `meteofrance_arome_france` and `meteofrance_arome_france_hd` are
-  short-range regional models with only ~day-1 forecast horizon at this
-  location; longer lead times simply won't have data for them.
+  short-range regional models with only ~day-1 forecast horizon at these
+  locations; longer lead times simply won't have data for them.
+- The cache is keyed by `--location-name`, so pick a distinct, stable name
+  per location. Running an old cache file (from before multi-location
+  support) automatically migrates it in place, tagging existing rows as
+  `adlershof`.
