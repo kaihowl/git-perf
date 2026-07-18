@@ -10,3 +10,7 @@ mutants.out.old/
 tla/*.bin
 tla/*_TTrace_*.tla
 tla/states/
+
+# Precipitation backtest cache/output
+/scripts/precip_backtest_cache.sqlite
+/scripts/precip_backtest_output/
