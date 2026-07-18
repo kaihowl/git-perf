@@ -51,6 +51,7 @@ DEFAULT_MODELS = [
     "gfs_seamless",
     "ecmwf_ifs025",
     "meteofrance_arome_france",
+    "meteofrance_arome_france_hd",
     "ukmo_seamless",
 ]
 DEFAULT_LEAD_TIMES = list(range(1, 8))

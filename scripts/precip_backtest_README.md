@@ -6,7 +6,8 @@ Backtests precipitation forecast accuracy for Adlershof, Berlin (52.43°N,
 
 - **Previous Runs API** — historical forecast values per lead time
   (`precipitation_previous_day1..7`) for `icon_seamless`, `gfs_seamless`,
-  `ecmwf_ifs025`, `meteofrance_arome_france`, and `ukmo_seamless`.
+  `ecmwf_ifs025`, `meteofrance_arome_france`, `meteofrance_arome_france_hd`,
+  and `ukmo_seamless`.
 - **Historical Weather API** (ERA5 reanalysis) — ground truth daily
   precipitation.
 
@@ -16,7 +17,7 @@ Backtests precipitation forecast accuracy for Adlershof, Berlin (52.43°N,
 uv run scripts/precip_backtest.py
 ```
 
-Defaults to the full history since 2024-01-01 through today, all five
+Defaults to the full history since 2024-01-01 through today, all six
 models, lead times 1-7, and thresholds 0.1/1/5 mm. Results are written to
 `scripts/precip_backtest_output/`:
 
@@ -52,3 +53,6 @@ Run `uv run scripts/precip_backtest.py --help` for the full option list.
 - Models with limited history (e.g. before they were added to Open-Meteo)
   will simply have fewer scored days for early lead times/dates — the
   script doesn't require full coverage.
+- `meteofrance_arome_france` and `meteofrance_arome_france_hd` are
+  short-range regional models with only ~day-1 forecast horizon at this
+  location; longer lead times simply won't have data for them.
