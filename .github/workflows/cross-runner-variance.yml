@@ -3,6 +3,9 @@ name: Cross-Runner Variance Experiment
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   measure:
     name: measure (${{ matrix.os }}, instance ${{ matrix.instance }})
@@ -104,6 +107,23 @@ jobs:
 
       - name: Run analysis
         run: python scripts/analyze-variance.py all-results/ analysis-output/
+
+      - name: Print analysis results
+        if: always()
+        run: |
+          echo "=== VERDICT ===" && cat analysis-output/verdict.md || true
+          echo "=== INTER-RUNNER CoV ===" && cat analysis-output/summary_inter_runner_cov.md || true
+          echo "=== WITHIN-RUNNER CoV ===" && cat analysis-output/within_runner_cov.md || true
+
+      - name: Commit results to branch
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+          cp analysis-output/*.md docs/ci-variance-experiment/ 2>/dev/null || true
+          cp analysis-output/*.png docs/ci-variance-experiment/ 2>/dev/null || true
+          git add docs/ci-variance-experiment/
+          git diff --cached --quiet || git commit -m "ci: update variance experiment results from run ${{ github.run_number }}"
+          git push --force origin HEAD:claude/cross-runner-variance-experiment-2dkx2n
 
       - name: Upload analysis artifacts
         uses: actions/upload-artifact@v7
