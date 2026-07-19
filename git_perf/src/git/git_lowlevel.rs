@@ -275,6 +275,16 @@ pub fn get_repository_root() -> Result<String, String> {
     Ok(output.stdout.trim().to_string())
 }
 
+/// Get the repository's common git directory (shared across worktrees, and
+/// the repository directory itself for bare repos), as an absolute path.
+pub(super) fn git_common_dir(working_dir: &Option<&Path>) -> Result<PathBuf, GitError> {
+    let output = capture_git_output(
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        working_dir,
+    )?;
+    Ok(PathBuf::from(output.stdout.trim()))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

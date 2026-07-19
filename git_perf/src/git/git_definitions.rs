@@ -29,3 +29,7 @@ pub const GIT_PERF_REMOTE: &str = "git-perf-origin";
 
 /// The standard git remote name
 pub const GIT_ORIGIN: &str = "origin";
+
+/// Name of the advisory lock file (inside the repository's common git dir)
+/// used to serialize `git push` invocations against the perf-notes ref.
+pub const PUSH_LOCK_FILE_NAME: &str = "git-perf-push.lock";
