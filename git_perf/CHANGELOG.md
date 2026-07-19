@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.21.0...git-perf-v0.22.0) - 2026-07-19
+
+### Added
+
+- *(git_perf)* add study command for pre-merge benchmark COV tuning ([#728](https://github.com/kaihowl/git-perf/pull/728))
+- *(audit)* implement Phase 2 change point warning ([#697](https://github.com/kaihowl/git-perf/pull/697))
+- *(audit)* add CoV flagging with --max-cov threshold ([#696](https://github.com/kaihowl/git-perf/pull/696))
+- *(config)* add [environment] and [defaults] config sections for auto metadata ([#692](https://github.com/kaihowl/git-perf/pull/692))
+
+### Fixed
+
+- *(git_perf)* serialize local git push to fix concurrent-push corruption ([#749](https://github.com/kaihowl/git-perf/pull/749))
+- *(config)* handle measurement names with special chars in config lookup ([#709](https://github.com/kaihowl/git-perf/pull/709))
+- *(git)* eliminate panic, make notes-append lockable, fix wait-status capture
+- *(git)* re-enable --no-separator for git notes append ([#691](https://github.com/kaihowl/git-perf/pull/691))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group across 1 directory with 8 updates ([#751](https://github.com/kaihowl/git-perf/pull/751))
+- *(git_perf)* bump rust-toolchain to 1.97.1 and fix clippy lint ([#750](https://github.com/kaihowl/git-perf/pull/750))
+- *(deps)* bump the cargo-dependencies group across 1 directory with 4 updates ([#741](https://github.com/kaihowl/git-perf/pull/741))
+- *(ci)* increase add_measurements base case from 1 to 10 items ([#733](https://github.com/kaihowl/git-perf/pull/733))
+- *(ci)* replace subprocess report-benchmark with in-process Criterion benchmark ([#724](https://github.com/kaihowl/git-perf/pull/724))
+- *(ci)* improve reliability of add_measurement/1 benchmark ([#720](https://github.com/kaihowl/git-perf/pull/720))
+- *(git)* verify no-op execute_notes_operation skips upstream push ([#719](https://github.com/kaihowl/git-perf/pull/719))
+- *(ci)* replace subprocess add-benchmark with in-process Criterion benchmark ([#704](https://github.com/kaihowl/git-perf/pull/704))
+- *(deps)* bump the cargo-dependencies group with 2 updates ([#702](https://github.com/kaihowl/git-perf/pull/702))
+- *(git)* document reftable lock coverage, fix arm order and comment typo ([#703](https://github.com/kaihowl/git-perf/pull/703))
+- *(git)* batch note content fetching for size --detailed command ([#689](https://github.com/kaihowl/git-perf/pull/689))
+
 ## [0.21.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.20.0...git-perf-v0.21.0) - 2026-05-24
 
 ### Added
