@@ -12,20 +12,22 @@
 Backtest precipitation forecast accuracy for a fixed location across models
 and lead times, using Open-Meteo's Previous Runs API (forecasts) and two
 independent ground-truth references: the Historical Weather API (ERA5
-reanalysis) and, optionally, DWD station observations (via wetterdienst).
+reanalysis) and, optionally, national weather service station observations
+(via wetterdienst: DWD for Germany, GeoSphere Austria/ZAMG for Austria).
 Defaults to Adlershof, Berlin; pass --location-name/--latitude/--longitude
 for others.
 
 Scoring against two references matters because ERA5 is itself produced by
 ECMWF's own model physics: ecmwf_ifs025 can look artificially skillful
 against ERA5 simply from shared-physics agreement, not real forecast
-accuracy. An independent point observation (a DWD station) doesn't have
-that bias, at the cost of being a single point rather than a grid-cell
-average. Comparing both surfaces this via a delta-skill table/chart.
+accuracy. An independent point observation (a station) doesn't have that
+bias, at the cost of being a single point rather than a grid-cell average.
+Comparing both surfaces this via a delta-skill table/chart.
 
 Usage:
     uv run scripts/precip_backtest.py [options]
-    uv run scripts/precip_backtest.py --dwd-station-ids 00433 00427  # + station reference
+    uv run scripts/precip_backtest.py --station-ids 00433 00427                       # DWD (default provider)
+    uv run scripts/precip_backtest.py --station-provider geosphere --station-ids 14631 14622
 
 Data is cached (per location) in a local SQLite database so repeated runs
 only fetch new/missing days instead of re-downloading everything. Only the
@@ -36,7 +38,7 @@ Output:
     <out-dir>/<location-name>/skill_degradation.png   MAE/CSI vs lead time (solid=ERA5, dashed=station)
     <out-dir>/<location-name>/delta_skill.csv         per model/lead_time: ERA5 score minus station score
     <out-dir>/<location-name>/delta_skill_ecmwf.png   ECMWF-specific verification-bias chart (only
-                                                       written when --dwd-station-ids is given)
+                                                       written when --station-ids is given)
 """
 
 import argparse
@@ -74,14 +76,37 @@ DEFAULT_LEAD_TIMES = list(range(1, 8))
 DEFAULT_THRESHOLDS_MM = [0.1, 1.0, 5.0]
 DEFAULT_START_DATE = dt.date(2024, 1, 1)
 
-# DWD station IDs for the Adlershof area, for use with --dwd-station-ids.
-# 00433 = Berlin-Tempelhof. 00427 = "Berlin Brandenburg" — DWD's current name
-# for the long-running station at/near the former Berlin-Schönefeld site,
-# renamed after the BER airport merger; there is no station literally named
-# "Schönefeld" in DWD's registry anymore, but 00427 is its continuation
-# (continuous record since 1957). Values from multiple station IDs are
-# averaged per day into a single "station" reference.
+# Station IDs for the independent --station-ids reference, per location.
+# Values from multiple station IDs are averaged per day into a single
+# "station" reference (bracketing the target location/elevation from
+# nearby stations, since it's rarely exactly on one).
+#
+# Adlershof (--station-provider dwd, the default): 00433 = Berlin-Tempelhof.
+# 00427 = "Berlin Brandenburg" — DWD's current name for the long-running
+# station at/near the former Berlin-Schönefeld site, renamed after the BER
+# airport merger; there is no station literally named "Schönefeld" in DWD's
+# registry anymore, but 00427 is its continuation (continuous record since
+# 1957).
 ADLERSHOF_DWD_STATION_IDS = ["00433", "00427"]
+
+# Oetztal Alps (--station-provider geosphere): 14631 = Umhausen (1035m),
+# 14622 = St. Leonhard im Pitztal (1454m) — GeoSphere Austria (ZAMG)
+# stations ~8.5km/12.5km from the target point, bracketing its ERA5
+# grid-cell elevation (~1175m) from below and above.
+OETZTAL_GEOSPHERE_STATION_IDS = ["14631", "14622"]
+
+STATION_PROVIDERS = {
+    "dwd": (
+        "wetterdienst.provider.dwd.observation",
+        "DwdObservationRequest",
+        "climate_summary",
+    ),
+    "geosphere": (
+        "wetterdienst.provider.geosphere.observation",
+        "GeosphereObservationRequest",
+        "data",
+    ),
+}
 
 PREVIOUS_RUNS_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
@@ -308,14 +333,24 @@ def fetch_station_observed(
     location: str,
     start: dt.date,
     end: dt.date,
+    provider: str,
     station_ids: list[str],
 ) -> None:
-    """Fetch daily precipitation from DWD station observations (via
-    wetterdienst) and cache it as the 'station' reference, averaged across
-    all given station IDs per day (bracketing/interpolating the target
-    location from nearby stations, since it's rarely exactly on one)."""
+    """Fetch daily precipitation from national weather service station
+    observations (via wetterdienst) and cache it as the 'station'
+    reference, averaged across all given station IDs per day
+    (bracketing/interpolating the target location from nearby stations,
+    since it's rarely exactly on one)."""
+    import importlib
+
     import polars as pl
-    from wetterdienst.provider.dwd.observation import DwdObservationRequest
+
+    if provider not in STATION_PROVIDERS:
+        raise ValueError(
+            f"unknown --station-provider {provider!r}, expected one of {sorted(STATION_PROVIDERS)}"
+        )
+    module_name, class_name, dataset_name = STATION_PROVIDERS[provider]
+    request_cls = getattr(importlib.import_module(module_name), class_name)
 
     all_dates = daterange(start, end)
     cur = conn.execute(
@@ -325,14 +360,15 @@ def fetch_station_observed(
     present = {dt.date.fromisoformat(row[0]) for row in cur}
     for chunk_start, chunk_end in missing_ranges(all_dates, present):
         log.info(
-            "Fetching DWD station precipitation (%s, stations %s) %s..%s",
+            "Fetching %s station precipitation (%s, stations %s) %s..%s",
+            provider,
             location,
             ",".join(station_ids),
             chunk_start,
             chunk_end,
         )
-        request = DwdObservationRequest(
-            parameters=[("daily", "climate_summary", "precipitation_height")],
+        request = request_cls(
+            parameters=[("daily", dataset_name, "precipitation_height")],
             start_date=chunk_start.isoformat(),
             end_date=chunk_end.isoformat(),
         ).filter_by_station_id(station_id=station_ids)
@@ -654,16 +690,24 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Only recompute metrics/chart from the existing cache",
     )
     parser.add_argument(
-        "--dwd-station-ids",
+        "--station-provider",
+        choices=sorted(STATION_PROVIDERS),
+        default="dwd",
+        help="National weather service to use for the independent station reference",
+    )
+    parser.add_argument(
+        "--station-ids",
         nargs="+",
         default=None,
         help=(
-            "Optional: also score against DWD station observations (via "
-            "wetterdienst), averaged across the given station IDs. E.g. for "
-            f"Adlershof: {' '.join(ADLERSHOF_DWD_STATION_IDS)} "
-            "(Berlin-Tempelhof, Berlin Brandenburg/former Schoenefeld site). "
-            "Adds a 'reference' column to metrics.csv and writes "
-            "delta_skill.csv / delta_skill_ecmwf.png."
+            "Optional: also score against station observations (via "
+            "wetterdienst), averaged across the given station IDs. E.g. "
+            f"--station-provider dwd --station-ids {' '.join(ADLERSHOF_DWD_STATION_IDS)} "
+            "for Adlershof (Berlin-Tempelhof, Berlin Brandenburg/former "
+            "Schoenefeld site), or --station-provider geosphere --station-ids "
+            f"{' '.join(OETZTAL_GEOSPHERE_STATION_IDS)} for the Oetztal Alps "
+            "(Umhausen, St. Leonhard im Pitztal). Adds a 'reference' column "
+            "to metrics.csv and writes delta_skill.csv / delta_skill_ecmwf.png."
         ),
     )
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -705,13 +749,14 @@ def main() -> None:
                 args.models,
                 args.lead_times,
             )
-            if args.dwd_station_ids:
+            if args.station_ids:
                 fetch_station_observed(
                     conn,
                     args.location_name,
                     args.start_date,
                     args.end_date,
-                    args.dwd_station_ids,
+                    args.station_provider,
+                    args.station_ids,
                 )
         else:
             log.info("Skipping fetch, using existing cache at %s", args.db)
