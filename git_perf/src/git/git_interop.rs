@@ -776,7 +776,7 @@ fn git_push_notes_ref(
 
     match output {
         Ok(output) => {
-            print!("{}", &output.stdout);
+            print!("{}", output.stdout);
             Ok(())
         }
         Err(GitError::ExecError { output, .. }) => {
