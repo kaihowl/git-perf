@@ -1,4 +1,5 @@
 use std::{
+    fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     path::Path,
     process::Stdio,
@@ -21,14 +22,15 @@ use crate::config;
 
 pub use super::git_definitions::REFS_NOTES_BRANCH;
 use super::git_definitions::{
-    GIT_ORIGIN, GIT_PERF_REMOTE, REFS_NOTES_ADD_TARGET_PREFIX, REFS_NOTES_MERGE_BRANCH_PREFIX,
-    REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX, REFS_NOTES_WRITE_SYMBOLIC_REF,
-    REFS_NOTES_WRITE_TARGET_PREFIX,
+    GIT_ORIGIN, GIT_PERF_REMOTE, PUSH_LOCK_FILE_NAME, REFS_NOTES_ADD_TARGET_PREFIX,
+    REFS_NOTES_MERGE_BRANCH_PREFIX, REFS_NOTES_READ_PREFIX, REFS_NOTES_REWRITE_TARGET_PREFIX,
+    REFS_NOTES_WRITE_SYMBOLIC_REF, REFS_NOTES_WRITE_TARGET_PREFIX,
 };
 use super::git_lowlevel::{
-    capture_git_output, get_git_perf_remote, git_rev_parse, git_rev_parse_symbolic_ref,
-    git_symbolic_ref_create_or_update, git_update_ref, internal_get_head_revision, is_shallow_repo,
-    map_git_error, set_git_perf_remote, spawn_git_command,
+    capture_git_output, get_git_perf_remote, git_common_dir, git_rev_parse,
+    git_rev_parse_symbolic_ref, git_symbolic_ref_create_or_update, git_update_ref,
+    internal_get_head_revision, is_shallow_repo, map_git_error, set_git_perf_remote,
+    spawn_git_command,
 };
 use super::git_types::GitError;
 use super::git_types::GitOutput;
@@ -718,6 +720,33 @@ fn raw_push(work_dir: Option<&Path>, remote: Option<&str>) -> Result<(), GitErro
     Ok(())
 }
 
+/// Acquires an exclusive, blocking advisory lock scoped to this repository.
+///
+/// Concurrent `git push` invocations from this machine can corrupt each
+/// other even though the ref update itself is protected by
+/// `--force-with-lease`: each `receive-pack` session gets its own private
+/// object quarantine, so a thin pack from one push can delta against an
+/// object that only exists in another, still in-flight push's quarantine.
+/// The remote's `index-pack` then fails with "unresolved deltas" and the
+/// push is rejected — a failure that happens during object transfer, before
+/// the CAS check ever runs, so *every* concurrent pusher can lose in the
+/// same round instead of exactly one of them winning the ref update. Holding
+/// this lock for the duration of a push ensures at most one `git push` to
+/// this repository's remotes is ever in flight, restoring the property that
+/// the CAS retry loop always makes progress.
+///
+/// The lock is released automatically when the returned `File` is dropped.
+fn acquire_push_lock(working_dir: &Option<&Path>) -> Result<File, GitError> {
+    let lock_path = git_common_dir(working_dir)?.join(PUSH_LOCK_FILE_NAME);
+    let lock_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(lock_path)?;
+    lock_file.lock()?;
+    Ok(lock_file)
+}
+
 fn git_push_notes_ref(
     expected_upstream: &str,
     push_ref: &str,
@@ -726,6 +755,10 @@ fn git_push_notes_ref(
 ) -> Result<(), GitError> {
     // - CAS push the temporary merge ref to upstream using the noted down upstream ref
     //     - In case of concurrent pushes, back off and restart fresh from previous step.
+    // Serialize the actual push against any other push from this repository -
+    // see `acquire_push_lock` for why this is necessary beyond the CAS itself.
+    let _push_lock = acquire_push_lock(working_dir)?;
+
     let remote_name = remote.unwrap_or(GIT_PERF_REMOTE);
     let output = capture_git_output(
         &[
@@ -1298,6 +1331,10 @@ mod test {
     use super::*;
     use crate::test_helpers::{run_git_command, with_isolated_cwd_git};
     use std::process::Command;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
 
     use httptest::{
         http::{header::AUTHORIZATION, Uri},
@@ -1445,6 +1482,93 @@ mod test {
                 }
                 other => panic!("Expected RefFailedToPush error, got: {:?}", other),
             }
+        });
+    }
+
+    /// Verifies the push lock file lives inside the repository's common git
+    /// dir, targeting mutants that could point it at an arbitrary location
+    /// (which would silently defeat serialization between two repos, or
+    /// between a repo and an unrelated directory).
+    #[test]
+    fn test_acquire_push_lock_creates_lock_file_in_git_common_dir() {
+        with_isolated_cwd_git(|git_dir| {
+            let lock = acquire_push_lock(&None).expect("should acquire push lock");
+            drop(lock);
+
+            let expected_path = git_dir.join(".git").join(PUSH_LOCK_FILE_NAME);
+            assert!(
+                expected_path.exists(),
+                "Expected lock file at {:?}",
+                expected_path
+            );
+        });
+    }
+
+    /// Verifies the lock actually excludes concurrent access: a second,
+    /// independent file handle cannot acquire it while the first is held,
+    /// and can once the first is released. This is the core property the
+    /// fix for #732 relies on to prevent two `git push` invocations from
+    /// racing inside receive-pack's object quarantine.
+    #[test]
+    fn test_acquire_push_lock_excludes_concurrent_access() {
+        with_isolated_cwd_git(|_git_dir| {
+            let first = acquire_push_lock(&None).expect("first lock should succeed");
+
+            let lock_path = git_common_dir(&None)
+                .expect("git common dir")
+                .join(PUSH_LOCK_FILE_NAME);
+            let second = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(false)
+                .open(&lock_path)
+                .expect("open lock file for contention probe");
+            assert!(
+                second.try_lock().is_err(),
+                "Second handle should not be able to lock while the first is held"
+            );
+
+            drop(first);
+
+            second
+                .try_lock()
+                .expect("Second handle should acquire the lock once the first is released");
+        });
+    }
+
+    /// Verifies a blocked contender actually wakes up and proceeds once the
+    /// lock is released, rather than deadlocking - the liveness property the
+    /// fix needs so that at least one of two concurrent pushers always makes
+    /// progress instead of both repeatedly corrupting each other's pack
+    /// transfer (see #732 / #745).
+    #[test]
+    fn test_acquire_push_lock_blocks_until_released() {
+        with_isolated_cwd_git(|git_dir| {
+            let git_dir = git_dir.to_path_buf();
+            let first =
+                acquire_push_lock(&Some(git_dir.as_path())).expect("first lock should succeed");
+
+            let acquired = Arc::new(AtomicBool::new(false));
+            let acquired_writer = Arc::clone(&acquired);
+            let waiter_git_dir = git_dir.clone();
+            let waiter = thread::spawn(move || {
+                let _second = acquire_push_lock(&Some(waiter_git_dir.as_path()))
+                    .expect("second lock should eventually succeed");
+                acquired_writer.store(true, Ordering::SeqCst);
+            });
+
+            thread::sleep(Duration::from_millis(200));
+            assert!(
+                !acquired.load(Ordering::SeqCst),
+                "Contender should still be blocked while the first lock is held"
+            );
+
+            drop(first);
+            waiter.join().expect("waiter thread should not panic");
+            assert!(
+                acquired.load(Ordering::SeqCst),
+                "Contender should acquire the lock after it is released"
+            );
         });
     }
 
