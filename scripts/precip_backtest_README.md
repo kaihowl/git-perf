@@ -9,8 +9,27 @@ free APIs (no API key required). Defaults to Adlershof, Berlin
   (`precipitation_previous_day1..7`) for `icon_seamless`, `gfs_seamless`,
   `ecmwf_ifs025`, `meteofrance_arome_france`, `meteofrance_arome_france_hd`,
   and `ukmo_seamless`.
-- **Historical Weather API** (ERA5 reanalysis) — ground truth daily
-  precipitation.
+- **Historical Weather API** (ERA5 reanalysis) — primary ground-truth
+  reference, spatially consistent with each model's grid.
+- **DWD station observations** (optional, via
+  [wetterdienst](https://github.com/earthobservations/wetterdienst)) — a
+  second, independent reference. Enable with `--dwd-station-ids`.
+
+### Why two references
+
+ERA5 is itself produced by ECMWF's model physics, so `ecmwf_ifs025`
+forecasts can look artificially skillful against it just from shared-model
+agreement, not necessarily real forecast accuracy — a verification bias.
+An independent point observation (a DWD station) doesn't share that bias,
+at the cost of being a single point rather than a grid-cell average (and
+of being some distance from the target coordinates). Running both lets
+you compare: `metrics.csv` gets a `reference` column (`era5` / `station`),
+and `delta_skill.csv` / `delta_skill_ecmwf.png` report, per model and lead
+time, "ERA5 score minus station score" — a persistently larger gap for
+`ecmwf_ifs025` than for the independently-developed models is the
+signature of that bias. **When the two references disagree on model
+ranking, weight the station numbers as the tie-breaker** — they're the
+one reference no model's physics could have influenced.
 
 ## Usage
 
@@ -22,10 +41,14 @@ Defaults to the full history since 2024-01-01 through today, all six
 models, lead times 1-7, and thresholds 0.1/1/5 mm. Results are written to
 `scripts/precip_backtest_output/<location-name>/` (`adlershof` by default):
 
-- `metrics.csv` — one row per model × lead time, with `mae_mm`, `bias_mm`,
-  and `csi_<t>mm` / `ets_<t>mm` for each threshold.
+- `metrics.csv` — one row per model × lead time × reference, with
+  `mae_mm`, `bias_mm`, and `csi_<t>mm` / `ets_<t>mm` for each threshold
+  (`reference` is `era5` only unless `--dwd-station-ids` was given).
 - `skill_degradation.png` — MAE and CSI(>1mm) vs. lead time, one line per
-  model.
+  model (solid=ERA5, dashed=station, when both references are present).
+- `delta_skill.csv` / `delta_skill_ecmwf.png` — only written when
+  `--dwd-station-ids` was given: per model/lead time, ERA5 score minus
+  station score, plus an ECMWF-focused chart (see "Why two references").
 
 Downloaded data is cached in `scripts/precip_backtest_cache.sqlite`
 (SQLite), keyed per location. Re-running the script only fetches days
@@ -42,6 +65,9 @@ uv run scripts/precip_backtest.py --skip-fetch   # recompute metrics/chart from 
 
 # A second location: results land in scripts/precip_backtest_output/oetztal_alps/
 uv run scripts/precip_backtest.py --location-name oetztal_alps --latitude 47.07301 --longitude 10.96844
+
+# Add the independent DWD station reference (Adlershof only — these are Berlin stations)
+uv run scripts/precip_backtest.py --dwd-station-ids 00433 00427
 ```
 
 Run `uv run scripts/precip_backtest.py --help` for the full option list.
@@ -64,3 +90,10 @@ Run `uv run scripts/precip_backtest.py --help` for the full option list.
   per location. Running an old cache file (from before multi-location
   support) automatically migrates it in place, tagging existing rows as
   `adlershof`.
+- `--dwd-station-ids 00433 00427` gives Berlin-Tempelhof and "Berlin
+  Brandenburg" — DWD's current name for the long-running station at the
+  former Berlin-Schönefeld site (renamed after the BER airport merger;
+  there's no station literally named "Schönefeld" in DWD's registry
+  anymore). Values from multiple station IDs are averaged per day into a
+  single "station" reference, bracketing the target location from nearby
+  stations rather than relying on just one.

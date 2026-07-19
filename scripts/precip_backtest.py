@@ -5,24 +5,38 @@
 #     "requests",
 #     "pandas",
 #     "matplotlib",
+#     "wetterdienst",
 # ]
 # ///
 """
 Backtest precipitation forecast accuracy for a fixed location across models
-and lead times, using Open-Meteo's Previous Runs API (forecasts) and
-Historical Weather API (ERA5 reanalysis as ground truth). Defaults to
-Adlershof, Berlin; pass --location-name/--latitude/--longitude for others.
+and lead times, using Open-Meteo's Previous Runs API (forecasts) and two
+independent ground-truth references: the Historical Weather API (ERA5
+reanalysis) and, optionally, DWD station observations (via wetterdienst).
+Defaults to Adlershof, Berlin; pass --location-name/--latitude/--longitude
+for others.
+
+Scoring against two references matters because ERA5 is itself produced by
+ECMWF's own model physics: ecmwf_ifs025 can look artificially skillful
+against ERA5 simply from shared-physics agreement, not real forecast
+accuracy. An independent point observation (a DWD station) doesn't have
+that bias, at the cost of being a single point rather than a grid-cell
+average. Comparing both surfaces this via a delta-skill table/chart.
 
 Usage:
     uv run scripts/precip_backtest.py [options]
+    uv run scripts/precip_backtest.py --dwd-station-ids 00433 00427  # + station reference
 
 Data is cached (per location) in a local SQLite database so repeated runs
 only fetch new/missing days instead of re-downloading everything. Only the
 metrics table and chart are always recomputed from the full cache.
 
 Output:
-    <out-dir>/<location-name>/metrics.csv           model x lead_time x metric table
-    <out-dir>/<location-name>/skill_degradation.png  line chart of MAE and CSI(>1mm) vs lead time
+    <out-dir>/<location-name>/metrics.csv            model x lead_time x metric x reference table
+    <out-dir>/<location-name>/skill_degradation.png   MAE/CSI vs lead time (solid=ERA5, dashed=station)
+    <out-dir>/<location-name>/delta_skill.csv         per model/lead_time: ERA5 score minus station score
+    <out-dir>/<location-name>/delta_skill_ecmwf.png   ECMWF-specific verification-bias chart (only
+                                                       written when --dwd-station-ids is given)
 """
 
 import argparse
@@ -59,6 +73,15 @@ DEFAULT_MODELS = [
 DEFAULT_LEAD_TIMES = list(range(1, 8))
 DEFAULT_THRESHOLDS_MM = [0.1, 1.0, 5.0]
 DEFAULT_START_DATE = dt.date(2024, 1, 1)
+
+# DWD station IDs for the Adlershof area, for use with --dwd-station-ids.
+# 00433 = Berlin-Tempelhof. 00427 = "Berlin Brandenburg" — DWD's current name
+# for the long-running station at/near the former Berlin-Schönefeld site,
+# renamed after the BER airport merger; there is no station literally named
+# "Schönefeld" in DWD's registry anymore, but 00427 is its continuation
+# (continuous record since 1957). Values from multiple station IDs are
+# averaged per day into a single "station" reference.
+ADLERSHOF_DWD_STATION_IDS = ["00433", "00427"]
 
 PREVIOUS_RUNS_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
@@ -154,11 +177,37 @@ def _migrate_legacy_schema(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         f"""
-        INSERT INTO observed (date, location, precip_mm)
-        SELECT date, '{DEFAULT_LOCATION_NAME}', precip_mm FROM observed_legacy
+        INSERT INTO observed (date, location, source, precip_mm)
+        SELECT date, '{DEFAULT_LOCATION_NAME}', 'era5', precip_mm FROM observed_legacy
         """
     )
     conn.execute("DROP TABLE forecast_legacy")
+    conn.execute("DROP TABLE observed_legacy")
+    conn.commit()
+
+
+def _migrate_add_reference_source(conn: sqlite3.Connection) -> None:
+    """Add the `source` column to pre-existing single-reference `observed`
+    caches, tagging their rows as 'era5', instead of discarding
+    already-fetched data."""
+    tables = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if "observed" not in tables:
+        return
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(observed)")}
+    if "source" in cols:
+        return
+    log.info("Migrating cache schema to support multiple reference sources")
+    conn.execute("ALTER TABLE observed RENAME TO observed_legacy")
+    _create_tables(conn)
+    conn.execute(
+        """
+        INSERT INTO observed (date, location, source, precip_mm)
+        SELECT date, location, 'era5', precip_mm FROM observed_legacy
+        """
+    )
     conn.execute("DROP TABLE observed_legacy")
     conn.commit()
 
@@ -181,8 +230,9 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS observed (
             date TEXT NOT NULL,
             location TEXT NOT NULL,
+            source TEXT NOT NULL,
             precip_mm REAL,
-            PRIMARY KEY (date, location)
+            PRIMARY KEY (date, location, source)
         )
         """
     )
@@ -191,6 +241,7 @@ def _create_tables(conn: sqlite3.Connection) -> None:
 def open_db(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     _migrate_legacy_schema(conn)
+    _migrate_add_reference_source(conn)
     _create_tables(conn)
     conn.commit()
     return conn
@@ -207,7 +258,7 @@ def fetch_observed(
 ) -> None:
     all_dates = daterange(start, end)
     cur = conn.execute(
-        "SELECT date FROM observed WHERE location = ? AND date BETWEEN ? AND ?",
+        "SELECT date FROM observed WHERE location = ? AND source = 'era5' AND date BETWEEN ? AND ?",
         (location, start.isoformat(), end.isoformat()),
     )
     present = {dt.date.fromisoformat(row[0]) for row in cur}
@@ -240,13 +291,63 @@ def fetch_observed(
             continue
         daily = data.get("daily", {})
         rows = [
-            (day, location, precip)
+            (day, location, "era5", precip)
             for day, precip in zip(
                 daily.get("time", []), daily.get("precipitation_sum", [])
             )
         ]
         conn.executemany(
-            "INSERT OR REPLACE INTO observed (date, location, precip_mm) VALUES (?, ?, ?)",
+            "INSERT OR REPLACE INTO observed (date, location, source, precip_mm) VALUES (?, ?, ?, ?)",
+            rows,
+        )
+        conn.commit()
+
+
+def fetch_station_observed(
+    conn: sqlite3.Connection,
+    location: str,
+    start: dt.date,
+    end: dt.date,
+    station_ids: list[str],
+) -> None:
+    """Fetch daily precipitation from DWD station observations (via
+    wetterdienst) and cache it as the 'station' reference, averaged across
+    all given station IDs per day (bracketing/interpolating the target
+    location from nearby stations, since it's rarely exactly on one)."""
+    import polars as pl
+    from wetterdienst.provider.dwd.observation import DwdObservationRequest
+
+    all_dates = daterange(start, end)
+    cur = conn.execute(
+        "SELECT date FROM observed WHERE location = ? AND source = 'station' AND date BETWEEN ? AND ?",
+        (location, start.isoformat(), end.isoformat()),
+    )
+    present = {dt.date.fromisoformat(row[0]) for row in cur}
+    for chunk_start, chunk_end in missing_ranges(all_dates, present):
+        log.info(
+            "Fetching DWD station precipitation (%s, stations %s) %s..%s",
+            location,
+            ",".join(station_ids),
+            chunk_start,
+            chunk_end,
+        )
+        request = DwdObservationRequest(
+            parameters=[("daily", "climate_summary", "precipitation_height")],
+            start_date=chunk_start.isoformat(),
+            end_date=chunk_end.isoformat(),
+        ).filter_by_station_id(station_id=station_ids)
+        values = request.values.all().df
+        daily = (
+            values.with_columns(pl.col("date").dt.date().alias("day"))
+            .group_by("day")
+            .agg(pl.col("value").mean().alias("precip_mm"))
+        )
+        rows = [
+            (row["day"].isoformat(), location, "station", row["precip_mm"])
+            for row in daily.iter_rows(named=True)
+        ]
+        conn.executemany(
+            "INSERT OR REPLACE INTO observed (date, location, source, precip_mm) VALUES (?, ?, ?, ?)",
             rows,
         )
         conn.commit()
@@ -346,9 +447,13 @@ def fetch_forecasts(
 def load_joined(
     conn: sqlite3.Connection, location: str, start: dt.date, end: dt.date
 ) -> pd.DataFrame:
+    """Joins forecasts against every reference source cached for this
+    location (era5, and station if it was fetched), long-format with one
+    row per (date, model, lead_time, reference)."""
     query = """
         SELECT f.date AS date, f.model AS model, f.lead_time AS lead_time,
-               f.precip_mm AS forecast_mm, o.precip_mm AS observed_mm
+               f.precip_mm AS forecast_mm, o.precip_mm AS observed_mm,
+               o.source AS reference
         FROM forecast f
         JOIN observed o ON o.date = f.date AND o.location = f.location
         WHERE f.location = ? AND f.date BETWEEN ? AND ?
@@ -361,12 +466,15 @@ def load_joined(
 def compute_metrics(df: pd.DataFrame, thresholds: list[float]) -> pd.DataFrame:
     df = df.dropna(subset=["forecast_mm", "observed_mm"])
     results = []
-    for (model, lead_time), group in df.groupby(["model", "lead_time"]):
+    for (model, lead_time, reference), group in df.groupby(
+        ["model", "lead_time", "reference"]
+    ):
         f = group["forecast_mm"]
         o = group["observed_mm"]
         row = {
             "model": model,
             "lead_time": lead_time,
+            "reference": reference,
             "n": len(group),
             "mae_mm": (f - o).abs().mean(),
             "bias_mm": (f - o).mean(),
@@ -387,7 +495,36 @@ def compute_metrics(df: pd.DataFrame, thresholds: list[float]) -> pd.DataFrame:
             )
         results.append(row)
     metrics = pd.DataFrame(results)
-    return metrics.sort_values(["model", "lead_time"]).reset_index(drop=True)
+    return metrics.sort_values(["model", "lead_time", "reference"]).reset_index(
+        drop=True
+    )
+
+
+def compute_delta_skill(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Per model/lead_time: ERA5 score minus station score, for every
+    metric column. Surfaces whether a model (especially ecmwf_ifs025,
+    which shares model physics with ERA5) looks systematically better
+    against ERA5 than against the independent station reference — a sign
+    of verification bias rather than real forecast skill. For mae_mm,
+    negative means "looks more accurate against ERA5"; for csi/ets,
+    positive means "looks more skillful against ERA5". Empty if no
+    station reference was fetched.
+    """
+    if "station" not in set(metrics["reference"]):
+        return pd.DataFrame()
+    metric_cols = [
+        c for c in metrics.columns if c not in ("model", "lead_time", "reference", "n")
+    ]
+    era5 = metrics[metrics["reference"] == "era5"].set_index(["model", "lead_time"])
+    station = metrics[metrics["reference"] == "station"].set_index(
+        ["model", "lead_time"]
+    )
+    common = era5.index.intersection(station.index)
+    delta = (
+        era5.loc[common, metric_cols] - station.loc[common, metric_cols]
+    ).add_prefix("delta_")
+    delta = delta.reset_index()
+    return delta.sort_values(["model", "lead_time"]).reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
@@ -398,12 +535,26 @@ def plot_skill_degradation(
 ) -> None:
     fig, (ax_mae, ax_csi) = plt.subplots(1, 2, figsize=(12, 5))
     csi_col = f"csi_{csi_threshold}mm"
+    multi_reference = metrics["reference"].nunique() > 1
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    color_of = {
+        model: colors[i % len(colors)]
+        for i, model in enumerate(sorted(metrics["model"].unique()))
+    }
+    linestyle_of = {"era5": "-", "station": "--"}
 
-    for model, group in metrics.groupby("model"):
+    for (model, reference), group in metrics.groupby(["model", "reference"]):
         group = group.sort_values("lead_time")
-        ax_mae.plot(group["lead_time"], group["mae_mm"], marker="o", label=model)
+        label = f"{model} ({reference})" if multi_reference else model
+        style = dict(
+            marker="o",
+            color=color_of[model],
+            linestyle=linestyle_of.get(reference, "-"),
+            label=label,
+        )
+        ax_mae.plot(group["lead_time"], group["mae_mm"], **style)
         if csi_col in group:
-            ax_csi.plot(group["lead_time"], group[csi_col], marker="o", label=model)
+            ax_csi.plot(group["lead_time"], group[csi_col], **style)
 
     ax_mae.set_xlabel("Lead time (days)")
     ax_mae.set_ylabel("MAE (mm)")
@@ -416,7 +567,45 @@ def plot_skill_degradation(
     ax_csi.grid(True, alpha=0.3)
     ax_csi.legend(loc="best", fontsize="small")
 
-    fig.suptitle(f"Precipitation forecast skill degradation — {location}")
+    title = f"Precipitation forecast skill degradation — {location}"
+    if multi_reference:
+        title += " (solid=ERA5, dashed=station)"
+    fig.suptitle(title)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_delta_skill_ecmwf(
+    delta_skill: pd.DataFrame, out_path: Path, csi_threshold: float, location: str
+) -> None:
+    """ECMWF-specific verification-bias chart: delta-skill (ERA5 minus
+    station) vs. lead time. A consistent nonzero delta for ecmwf_ifs025
+    (more than for the other models) suggests ERA5 is inflating/deflating
+    its apparent skill via shared model physics."""
+    ecmwf = delta_skill[delta_skill["model"] == "ecmwf_ifs025"].sort_values("lead_time")
+    if ecmwf.empty:
+        log.warning("No ecmwf_ifs025 delta-skill rows to plot, skipping %s", out_path)
+        return
+
+    fig, (ax_mae, ax_csi) = plt.subplots(1, 2, figsize=(12, 5))
+    ax_mae.axhline(0, color="gray", linewidth=0.8)
+    ax_mae.bar(ecmwf["lead_time"], ecmwf["delta_mae_mm"], color="tab:blue")
+    ax_mae.set_xlabel("Lead time (days)")
+    ax_mae.set_ylabel("Delta MAE, ERA5 minus station (mm)")
+    ax_mae.set_title("MAE delta (negative = looks more accurate vs. ERA5)")
+    ax_mae.grid(True, alpha=0.3)
+
+    csi_col = f"delta_csi_{csi_threshold}mm"
+    ax_csi.axhline(0, color="gray", linewidth=0.8)
+    if csi_col in ecmwf:
+        ax_csi.bar(ecmwf["lead_time"], ecmwf[csi_col], color="tab:blue")
+    ax_csi.set_xlabel("Lead time (days)")
+    ax_csi.set_ylabel(f"Delta CSI(>{csi_threshold}mm), ERA5 minus station")
+    ax_csi.set_title("CSI delta (positive = looks more skillful vs. ERA5)")
+    ax_csi.grid(True, alpha=0.3)
+
+    fig.suptitle(f"ECMWF verification-bias check (ERA5 vs. station) — {location}")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
@@ -464,6 +653,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Only recompute metrics/chart from the existing cache",
     )
+    parser.add_argument(
+        "--dwd-station-ids",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional: also score against DWD station observations (via "
+            "wetterdienst), averaged across the given station IDs. E.g. for "
+            f"Adlershof: {' '.join(ADLERSHOF_DWD_STATION_IDS)} "
+            "(Berlin-Tempelhof, Berlin Brandenburg/former Schoenefeld site). "
+            "Adds a 'reference' column to metrics.csv and writes "
+            "delta_skill.csv / delta_skill_ecmwf.png."
+        ),
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
 
@@ -503,6 +705,14 @@ def main() -> None:
                 args.models,
                 args.lead_times,
             )
+            if args.dwd_station_ids:
+                fetch_station_observed(
+                    conn,
+                    args.location_name,
+                    args.start_date,
+                    args.end_date,
+                    args.dwd_station_ids,
+                )
         else:
             log.info("Skipping fetch, using existing cache at %s", args.db)
 
@@ -531,8 +741,23 @@ def main() -> None:
         plot_skill_degradation(metrics, chart_path, csi_threshold, args.location_name)
         log.info("Wrote %s", chart_path)
 
+        delta_skill = compute_delta_skill(metrics)
+        if not delta_skill.empty:
+            delta_path = out_dir / "delta_skill.csv"
+            delta_skill.to_csv(delta_path, index=False)
+            log.info("Wrote %s (%d rows)", delta_path, len(delta_skill))
+
+            delta_chart_path = out_dir / "delta_skill_ecmwf.png"
+            plot_delta_skill_ecmwf(
+                delta_skill, delta_chart_path, csi_threshold, args.location_name
+            )
+            log.info("Wrote %s", delta_chart_path)
+
         with pd.option_context("display.max_columns", None, "display.width", 200):
             print(metrics.to_string(index=False))
+            if not delta_skill.empty:
+                print("\nDelta-skill (ERA5 minus station):")
+                print(delta_skill.to_string(index=False))
     finally:
         conn.close()
 
