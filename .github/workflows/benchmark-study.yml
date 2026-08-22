@@ -134,7 +134,7 @@ jobs:
 
       - name: Install cargo-criterion
         if: inputs.mode == 'criterion-json'
-        uses: taiki-e/install-action@v2.85.1
+        uses: taiki-e/install-action@v2.85.10
         with:
           tool: cargo-criterion
 
