@@ -216,6 +216,18 @@ sigma = 3.5
 min_measurements = 10
 ```
 
+If measurements depend on the machine (e.g. the CPU model), record it as metadata
+(`[environment]` in `.gitperfconfig`) and group audits and report traces with
+`separate_by`. It can be set per measurement, so CPU-bound timings and
+machine-independent sizes can be grouped differently:
+```toml
+[measurement."binary-size"]
+separate_by = ["os", "rust"]
+
+[measurement."bench::parse"]
+separate_by = ["os", "cpu"]
+```
+
 See the [full experiment results](./docs/ci-variance-experiment/README.md) for methodology, plots, and reproduction instructions.
 
 ## ⚠️ Important Notes

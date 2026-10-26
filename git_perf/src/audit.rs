@@ -185,6 +185,40 @@ fn compute_group_values(
     Ok(result)
 }
 
+/// Resolves the grouping keys for one measurement.
+///
+/// A non-empty CLI value replaces the configured one. Configured keys that are also
+/// given as selectors are dropped, as the selector already pins that dimension.
+fn resolve_separate_by(
+    cli_separate_by: &[String],
+    configured: Vec<String>,
+    selectors: &[(String, String)],
+) -> Vec<String> {
+    if !cli_separate_by.is_empty() {
+        return cli_separate_by.to_vec();
+    }
+    configured
+        .into_iter()
+        .filter(|key| !selectors.iter().any(|(k, _)| k == key))
+        .collect()
+}
+
+/// Returns true if the newest commit has a matching measurement for the given selectors.
+fn has_head_measurement(
+    commits: &[Result<Commit>],
+    measurement_name: &str,
+    selectors: &[(String, String)],
+) -> bool {
+    commits
+        .first()
+        .and_then(|r| r.as_ref().ok())
+        .is_some_and(|c| {
+            c.measurements
+                .iter()
+                .any(|m| m.name == measurement_name && m.key_values_is_superset_of(selectors))
+        })
+}
+
 /// Formats a group label from separate_by keys and values.
 /// Example: ["os", "arch"] with ["ubuntu", "x64"] -> "os=ubuntu/arch=x64"
 fn format_group_label(separate_by: &[String], group_values: &[String]) -> String {
@@ -341,6 +375,7 @@ pub fn audit_multiple(
     let mut failed = false;
     let mut total_groups = 0;
     let mut passed_groups = 0;
+    let mut any_grouped = false;
 
     // Phase 3: For each measurement, audit using the pre-loaded commit data
     for measurement in measurements_to_audit {
@@ -364,8 +399,48 @@ pub fn audit_multiple(
             );
         }
 
+        // Resolve grouping: CLI > per-measurement config > [measurement] config > none
+        let from_config = separate_by.is_empty();
+        let mut effective_separate_by = resolve_separate_by(
+            separate_by,
+            config::audit_separate_by(&measurement),
+            selectors,
+        );
+
         // Compute groups for this measurement
-        let groups = compute_group_values(&all_commits, &measurement, selectors, separate_by)?;
+        let mut groups = match compute_group_values(
+            &all_commits,
+            &measurement,
+            selectors,
+            &effective_separate_by,
+        ) {
+            Ok(groups) => groups,
+            Err(e) if from_config => {
+                eprintln!("⚠️  Warning: {e:#}; auditing '{measurement}' without grouping.");
+                effective_separate_by.clear();
+                vec![vec![]]
+            }
+            Err(e) => return Err(e),
+        };
+        let separate_by = effective_separate_by.as_slice();
+
+        // Groups are discovered from the whole history. Configured groups that have no
+        // measurement at HEAD (e.g. a different CPU model) are skipped rather than failing.
+        if from_config && !separate_by.is_empty() {
+            groups.retain(|group_values| {
+                let mut group_selectors = selectors.to_vec();
+                group_selectors.extend(
+                    separate_by
+                        .iter()
+                        .cloned()
+                        .zip(group_values.iter().cloned()),
+                );
+                has_head_measurement(&all_commits, &measurement, &group_selectors)
+            });
+            if groups.is_empty() {
+                bail!("Measurement '{}': No measurement for HEAD.", measurement);
+            }
+        }
 
         // Audit each group independently
         for group_values in &groups {
@@ -417,6 +492,7 @@ pub fn audit_multiple(
             }
 
             if !separate_by.is_empty() {
+                any_grouped = true;
                 total_groups += 1;
                 if result.passed {
                     passed_groups += 1;
@@ -429,7 +505,7 @@ pub fn audit_multiple(
     }
 
     // Print summary if grouping is active
-    if !separate_by.is_empty() {
+    if any_grouped {
         if failed {
             println!(
                 "Overall: FAILED ({}/{} groups passed)",
@@ -872,6 +948,82 @@ mod test {
                 result.is_ok(),
                 "audit_multiple should succeed with empty pattern list"
             );
+        });
+    }
+
+    /// Records `m` on the older commit for cpu=a and cpu=b, then creates a new HEAD
+    /// commit that only has `m` for cpu=a. Returns the result of auditing `m`.
+    fn audit_m_with_group_missing_at_head(
+        git_dir: &std::path::Path,
+        config: &str,
+        cli_separate_by: &[String],
+        tag_key: &str,
+    ) -> Result<()> {
+        crate::test_helpers::write_gitperfconfig(git_dir, config);
+        for (val, tag) in [(1.0, "a"), (2.0, "b")] {
+            crate::measurement_storage::add("m", val, &[(tag_key.to_string(), tag.to_string())])
+                .unwrap();
+        }
+        crate::test_helpers::run_git_command(&["commit", "--allow-empty", "-m", "head"], git_dir);
+        crate::measurement_storage::add("m", 1.0, &[(tag_key.to_string(), "a".to_string())])
+            .unwrap();
+
+        audit_multiple(
+            "HEAD",
+            100,
+            None,
+            None,
+            Some(2),
+            &[],
+            Some(ReductionFunc::Min),
+            Some(2.0),
+            Some(DispersionMethod::StandardDeviation),
+            None,
+            &["^m$".to_string()],
+            cli_separate_by,
+            true,
+        )
+    }
+
+    #[test]
+    fn test_audit_multiple_configured_separate_by_skips_group_missing_at_head() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            let result = audit_m_with_group_missing_at_head(
+                git_dir,
+                "[measurement]\nseparate_by = [\"cpu\"]\n",
+                &[],
+                "cpu",
+            );
+            assert!(result.is_ok(), "{result:?}");
+        });
+    }
+
+    #[test]
+    fn test_audit_multiple_cli_separate_by_still_fails_for_group_missing_at_head() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            // CLI overrides the config, and CLI-given groups are not skipped.
+            let result = audit_m_with_group_missing_at_head(
+                git_dir,
+                "[measurement]\nseparate_by = [\"other\"]\n",
+                &["cpu".to_string()],
+                "cpu",
+            );
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("No measurement for HEAD"), "{err}");
+        });
+    }
+
+    #[test]
+    fn test_audit_multiple_configured_separate_by_without_matching_keys_falls_back() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            // No measurement carries the configured key: audit ungrouped instead of failing.
+            let result = audit_m_with_group_missing_at_head(
+                git_dir,
+                "[measurement]\nseparate_by = [\"nokey\"]\n",
+                &[],
+                "cpu",
+            );
+            assert!(result.is_ok(), "{result:?}");
         });
     }
 
@@ -2858,6 +3010,48 @@ dispersion_method = "mad"
                 key_values: std::collections::HashMap::new(),
             }],
         }
+    }
+
+    fn kv(k: &str, v: &str) -> (String, String) {
+        (k.to_string(), v.to_string())
+    }
+
+    #[test]
+    fn test_resolve_separate_by_cli_replaces_config() {
+        let cli = vec!["os".to_string()];
+        let configured = vec!["cpu".to_string(), "rust".to_string()];
+        assert_eq!(
+            resolve_separate_by(&cli, configured, &[kv("cpu", "x")]),
+            cli
+        );
+    }
+
+    #[test]
+    fn test_resolve_separate_by_config_drops_selector_keys() {
+        let configured = vec!["os".to_string(), "cpu".to_string()];
+        assert_eq!(
+            resolve_separate_by(&[], configured.clone(), &[kv("cpu", "x")]),
+            vec!["os".to_string()]
+        );
+        assert_eq!(
+            resolve_separate_by(&[], configured.clone(), &[]),
+            configured
+        );
+        assert!(resolve_separate_by(&[], vec![], &[]).is_empty());
+    }
+
+    #[test]
+    fn test_has_head_measurement() {
+        let mut commit = make_commit_with_measurement("a", "m", 1.0);
+        commit.measurements[0]
+            .key_values
+            .insert("cpu".to_string(), "x".to_string());
+        let commits = vec![Ok(commit)];
+
+        assert!(has_head_measurement(&commits, "m", &[kv("cpu", "x")]));
+        assert!(!has_head_measurement(&commits, "m", &[kv("cpu", "y")]));
+        assert!(!has_head_measurement(&commits, "other", &[]));
+        assert!(!has_head_measurement(&[], "m", &[]));
     }
 
     fn make_change_point(sha: &str, magnitude_pct: f64) -> change_point::ChangePoint {
