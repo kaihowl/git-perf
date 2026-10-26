@@ -306,6 +306,7 @@ pub enum Commands {
         /// Create individual traces in the graph by grouping with the value of this selector.
         /// Can be specified multiple times to split on multiple dimensions (e.g., -s os -s arch).
         /// Multiple splits create combined group labels like "ubuntu/x64".
+        /// If not given, the `separate_by` setting from the config is used per measurement.
         #[arg(short, long, value_parser=parse_spaceless_string)]
         separate_by: Vec<String>,
 
@@ -366,6 +367,7 @@ pub enum Commands {
     /// - `[measurement].min_measurements = 3`
     /// - `[measurement].aggregate_by = "median"`
     /// - `[measurement].sigma = 3.5`
+    /// - `[measurement].separate_by = ["os", "rust"]` (no grouping if unset)
     ///
     /// **Measurement-specific settings (override defaults):**
     /// - `[measurement."name"].min_relative_deviation = 10.0`
@@ -374,6 +376,12 @@ pub enum Commands {
     /// - `[measurement."name"].min_measurements = 5`
     /// - `[measurement."name"].aggregate_by = "mean"`
     /// - `[measurement."name"].sigma = 4.5`
+    /// - `[measurement."name"].separate_by = ["os", "cpu"]` (replaces the default list)
+    ///
+    /// `-S/--separate-by` on the command line replaces the configured `separate_by`
+    /// instead of merging with it. Configured keys that are also given as selectors
+    /// (`-s`) are ignored, and configured groups without a measurement at HEAD are
+    /// skipped. `git perf report` uses the same key to split traces per measurement.
     ///
     /// ## Precedence
     ///
@@ -430,6 +438,7 @@ pub enum Commands {
         /// Can be specified multiple times to split on multiple dimensions (e.g., -S os -S arch).
         /// Multiple splits create combined group labels like "os=ubuntu/arch=x64".
         /// Each group is audited independently with its own statistical validation.
+        /// If not given, the `separate_by` setting from the config is used.
         #[arg(short = 'S', long, value_parser=parse_spaceless_string)]
         separate_by: Vec<String>,
 

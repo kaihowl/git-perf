@@ -436,6 +436,42 @@ pub fn audit_sigma(measurement: &str) -> Option<f64> {
     None
 }
 
+/// Returns the configured `separate_by` keys for a measurement, or an empty list if not set.
+///
+/// A per-measurement value fully replaces the `[measurement]` default (no merging).
+#[must_use]
+pub fn audit_separate_by(measurement: &str) -> Vec<String> {
+    let Ok(config) = read_hierarchical_config() else {
+        return vec![];
+    };
+    let Ok(mut parent_table) = config.get_table("measurement") else {
+        return vec![];
+    };
+
+    let to_keys = |v: config::Value| -> Option<Vec<String>> {
+        v.into_array()
+            .ok()?
+            .into_iter()
+            .map(|e| e.into_string().ok())
+            .collect()
+    };
+
+    // Specific measurement first, then the parent-level default.
+    if let Some(keys) = parent_table
+        .remove(measurement)
+        .and_then(|v| v.into_table().ok())
+        .and_then(|mut t| t.remove("separate_by"))
+        .and_then(to_keys)
+    {
+        return keys;
+    }
+
+    parent_table
+        .remove("separate_by")
+        .and_then(to_keys)
+        .unwrap_or_default()
+}
+
 /// Returns the configured unit for a measurement, or None if not set.
 #[must_use]
 pub fn measurement_unit(measurement: &str) -> Option<String> {
@@ -1240,6 +1276,44 @@ min_measurements = 3
             // Test no config
             fs::remove_file(&workspace_config_path).unwrap();
             assert_eq!(super::audit_min_measurements("any_measurement"), None);
+        });
+    }
+
+    #[test]
+    fn test_audit_separate_by() {
+        with_isolated_home(|temp_dir| {
+            env::set_current_dir(temp_dir).unwrap();
+            init_repo(temp_dir);
+
+            let workspace_config_path = temp_dir.join(".gitperfconfig");
+            let local_config = r#"
+[measurement]
+separate_by = ["os", "rust"]
+
+[measurement."bench::add/50::median"]
+separate_by = ["os", "cpu"]
+
+[measurement."no_grouping"]
+separate_by = []
+"#;
+            fs::write(&workspace_config_path, local_config).unwrap();
+
+            // Per-measurement value replaces the default
+            assert_eq!(
+                super::audit_separate_by("bench::add/50::median"),
+                vec!["os".to_string(), "cpu".to_string()]
+            );
+            // Fallback to the [measurement] default
+            assert_eq!(
+                super::audit_separate_by("other"),
+                vec!["os".to_string(), "rust".to_string()]
+            );
+            // Explicit empty list disables the default
+            assert!(super::audit_separate_by("no_grouping").is_empty());
+
+            // Test no config
+            fs::remove_file(&workspace_config_path).unwrap();
+            assert!(super::audit_separate_by("any_measurement").is_empty());
         });
     }
 

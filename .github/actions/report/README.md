@@ -95,6 +95,7 @@ The action automatically comments on PRs by default. To disable automatic commen
 - `-m <measurement>`: Specify measurement(s) to audit (can be used multiple times)
 - `-d <threshold>`: Deviation threshold (e.g., `2.0` for 2 standard deviations)
 - `-s <selector>`: Filter by selector (e.g., `-s os=ubuntu`)
+- `-S <key>`: Audit each value of a metadata key separately. Prefer setting `separate_by` per measurement in `.gitperfconfig`, which the audit and the report's traces both use (`-S` replaces it)
 - `--min-measurements <n>`: Minimum number of measurements required
 - `--dispersion-method <method>`: Use `stddev` or `mad` (Median Absolute Deviation)
 - `-a <aggregation>`: Aggregation method (`min`, `max`, `mean`, `median`)

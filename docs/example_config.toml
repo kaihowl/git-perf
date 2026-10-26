@@ -48,6 +48,14 @@
         # Default: "min" (if not specified)
         aggregate_by = "median"
 
+        # Metadata keys to group audits by (same as `git perf audit -S`)
+        # Each distinct combination of values is audited independently.
+        # A per-measurement value replaces this default; `--separate-by` on the CLI
+        # replaces both. Keys also given as selectors (-s) are ignored, and groups
+        # without a measurement at HEAD are skipped.
+        # Default: no grouping (if not specified)
+        separate_by = ["os", "rust"]
+
         # Default epoch for accepting performance changes (hex format)
         epoch = "00000000"
 

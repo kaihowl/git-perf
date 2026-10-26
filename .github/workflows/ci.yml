@@ -47,6 +47,14 @@ jobs:
       with:
         fetch-depth: 40
 
+    - name: Record runner CPU model
+      # GitHub's ubuntu runner pool mixes several CPU models with very different
+      # benchmark timings. Captured as `cpu` metadata via [environment] in
+      # .gitperfconfig so timing audits only compare runs on the same CPU model.
+      run: |
+        CPU=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs | tr -s ' ,' '_')
+        echo "RUNNER_CPU=${CPU:-unknown}" >> "$GITHUB_ENV"
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -106,8 +114,8 @@ jobs:
           cargo run -- push || true
 
           # Fibonacci audits: informational only (add/report covered by blocking audit below)
-          cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
-          cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
+          cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
+          cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
 
     - name: Run sample perf measurements
       run: |
@@ -170,14 +178,26 @@ jobs:
 
           git perf push
 
-          # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -m report-size-benchmark -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s rust=${{matrix.rust}}
+          # Blocking audits: these must pass or CI fails.
+          # Grouping (per toolchain) comes from separate_by in .gitperfconfig.
+          git perf audit -n 40 -m test-measure2 -m report-size-benchmark -s os=${{matrix.os}}
+          # CPU-bound timings are compared per CPU model (separate_by in .gitperfconfig,
+          # pooled across toolchains, which show no timing difference); cross-model jumps
+          # of 30-65% caused false failures. The runner's own CPU model is selected so the
+          # gating decision below refers to the model this job ran on.
+          # Only CPU models with low run-to-run noise gate CI. EPYC 7763 shows ~2% CoV for
+          # these benchmarks; others (e.g. EPYC 9V74 at 8-12% CoV) exceed the audit
+          # thresholds by noise alone, so their audit is informational.
+          GATING_CPUS="AMD_EPYC_7763_64-Core_Processor"
+          if ! git perf audit -n 40 -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU"; then
+            if [[ " $GATING_CPUS " == *" $RUNNER_CPU "* ]]; then
+              exit 1
+            fi
+            echo "Criterion audit failed on $RUNNER_CPU (informational only — not a gating CPU model)"
+          fi
 
           # Informational audits: failures don't block CI
-          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
-          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-benchmark audit failed (informational only — replaced by Criterion benchmark)"
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report audit failed (informational only)"
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
+          git perf audit -n 40 -m add-benchmark -m report-benchmark -m report -m report-size -s os=${{matrix.os}} || echo "informational audit failed (add-benchmark/report-benchmark/report/report-size)"
 
     - name: Archive report
       uses: actions/upload-artifact@v7
@@ -286,8 +306,7 @@ jobs:
       - uses: ./.github/actions/report
         with:
           depth: 40
-          additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median -m release-binary-size --separate-by os --separate-by rust'
+          audit-args: '-m report-size -m report-size-benchmark -m release-binary-size -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median -m add-benchmark -m report-benchmark -m report'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'

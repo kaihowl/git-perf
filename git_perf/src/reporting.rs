@@ -1683,6 +1683,36 @@ fn prepare_sections_and_metadata(
     }
 }
 
+/// Resolves the grouping keys and group values for one measurement of a section.
+///
+/// Explicit keys (CLI or template section) replace the configured `separate_by`.
+/// Without explicit keys, the configured keys for the measurement are used; if no
+/// measurement carries all of them, the traces are not split.
+fn resolve_section_groups<'a>(
+    filtered_measurements: impl Iterator<Item = &'a MeasurementData> + Clone,
+    explicit_separate_by: &[String],
+    measurement_name: &str,
+    context_id: &str,
+) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    if !explicit_separate_by.is_empty() {
+        let groups = compute_group_values_to_process(
+            filtered_measurements,
+            explicit_separate_by,
+            context_id,
+        )?;
+        return Ok((explicit_separate_by.to_vec(), groups));
+    }
+
+    let configured = config::audit_separate_by(measurement_name);
+    match compute_group_values_to_process(filtered_measurements, &configured, context_id) {
+        Ok(groups) => Ok((configured, groups)),
+        Err(e) => {
+            log::warn!("{e:#}; not splitting traces for '{measurement_name}'");
+            Ok((vec![], vec![vec![]]))
+        }
+    }
+}
+
 /// Process a single section using the Reporter trait.
 ///
 /// Calls reporter.begin_section(), filters measurements, processes groups,
@@ -1743,9 +1773,10 @@ fn process_section<'a>(
             .iter()
             .flat_map(|ms| ms.iter().copied().filter(|m| m.name == *measurement_name));
 
-        let group_values_to_process = compute_group_values_to_process(
+        let (separate_by, group_values_to_process) = resolve_section_groups(
             filtered_for_grouping,
             &section.separate_by,
+            measurement_name,
             &format!("Section '{}'", section.id),
         )?;
 
@@ -1761,14 +1792,15 @@ fn process_section<'a>(
                             if group_value.is_empty() {
                                 return true;
                             }
-                            section.separate_by.iter().zip(group_value.iter()).all(
-                                |(key, expected_val)| {
+                            separate_by
+                                .iter()
+                                .zip(group_value.iter())
+                                .all(|(key, expected_val)| {
                                     m.key_values
                                         .get(key)
                                         .map(|v| v == expected_val)
                                         .unwrap_or(false)
-                                },
-                            )
+                                })
                         })
                         .copied()
                         .collect()
@@ -1896,6 +1928,73 @@ pub fn report(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn measurement_with(kvs: &[(&str, &str)]) -> MeasurementData {
+        MeasurementData {
+            epoch: 0,
+            name: "m".to_string(),
+            timestamp: 0.0,
+            val: 1.0,
+            key_values: kvs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
+    }
+
+    const SEPARATE_BY_CONFIG: &str = "[measurement]\nseparate_by = [\"cpu\"]\n";
+
+    #[test]
+    fn test_resolve_section_groups_uses_configured_separate_by() {
+        let (_dir, _guard) = crate::test_helpers::setup_test_env_with_config(SEPARATE_BY_CONFIG);
+        let ms = [
+            measurement_with(&[("cpu", "a"), ("os", "x")]),
+            measurement_with(&[("cpu", "b"), ("os", "x")]),
+        ];
+        let (keys, groups) = resolve_section_groups(ms.iter(), &[], "m", "Section 's'").unwrap();
+        assert_eq!(keys, vec!["cpu".to_string()]);
+        assert_eq!(groups, vec![vec!["a".to_string()], vec!["b".to_string()]]);
+    }
+
+    #[test]
+    fn test_resolve_section_groups_explicit_replaces_configured() {
+        let (_dir, _guard) = crate::test_helpers::setup_test_env_with_config(SEPARATE_BY_CONFIG);
+        let ms = [
+            measurement_with(&[("cpu", "a"), ("os", "x")]),
+            measurement_with(&[("cpu", "b"), ("os", "y")]),
+        ];
+        let explicit = vec!["os".to_string()];
+        let (keys, groups) =
+            resolve_section_groups(ms.iter(), &explicit, "m", "Section 's'").unwrap();
+        assert_eq!(keys, explicit);
+        assert_eq!(groups, vec![vec!["x".to_string()], vec!["y".to_string()]]);
+    }
+
+    #[test]
+    fn test_resolve_section_groups_explicit_keys_still_fail_when_missing() {
+        let (_dir, _guard) = crate::test_helpers::setup_test_env_with_config(SEPARATE_BY_CONFIG);
+        let ms = [measurement_with(&[("cpu", "a")])];
+        let explicit = vec!["nokey".to_string()];
+        assert!(resolve_section_groups(ms.iter(), &explicit, "m", "Section 's'").is_err());
+    }
+
+    #[test]
+    fn test_resolve_section_groups_configured_keys_missing_falls_back_to_ungrouped() {
+        let (_dir, _guard) = crate::test_helpers::setup_test_env_with_config(SEPARATE_BY_CONFIG);
+        let ms = [measurement_with(&[("os", "x")])];
+        let (keys, groups) = resolve_section_groups(ms.iter(), &[], "m", "Section 's'").unwrap();
+        assert!(keys.is_empty());
+        assert_eq!(groups, vec![Vec::<String>::new()]);
+    }
+
+    #[test]
+    fn test_resolve_section_groups_without_config_is_ungrouped() {
+        let (_dir, _guard) = crate::test_helpers::setup_test_env_with_config("");
+        let ms = [measurement_with(&[("cpu", "a")])];
+        let (keys, groups) = resolve_section_groups(ms.iter(), &[], "m", "Section 's'").unwrap();
+        assert!(keys.is_empty());
+        assert_eq!(groups, vec![Vec::<String>::new()]);
+    }
 
     #[test]
     fn test_convert_to_x_y_empty() {
