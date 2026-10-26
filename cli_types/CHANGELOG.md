@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.7.0...git_perf_cli_types-v0.7.1) - 2026-10-26
+
+### Added
+
+- *(audit)* read separate_by per measurement from .gitperfconfig ([#774](https://github.com/kaihowl/git-perf/pull/774))
+
 ## [0.7.0](https://github.com/kaihowl/git-perf/compare/git_perf_cli_types-v0.6.0...git_perf_cli_types-v0.7.0) - 2026-08-16
 
 ### Added

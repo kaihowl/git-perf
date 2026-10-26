@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1](https://github.com/kaihowl/git-perf/compare/git-perf-v0.22.0...git-perf-v0.22.1) - 2026-10-26
+
+### Added
+
+- *(audit)* read separate_by per measurement from .gitperfconfig ([#774](https://github.com/kaihowl/git-perf/pull/774))
+
+### Other
+
+- *(deps)* bump the cargo-dependencies group across 1 directory with 10 updates ([#769](https://github.com/kaihowl/git-perf/pull/769))
+
 ## [0.22.0](https://github.com/kaihowl/git-perf/compare/git-perf-v0.21.0...git-perf-v0.22.0) - 2026-08-16
 
 ### Added
