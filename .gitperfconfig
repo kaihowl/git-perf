@@ -49,7 +49,8 @@ unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "min"
-min_measurements = 3
+# Per-CPU history: a short tail gives an unreliable MAD and false failures
+min_measurements = 10
 # Sequential cross-runner study (10 instances, max-parallel=1): CoV=8.0%, MAD%=4.6%.
 # Parallel study gave 34.8% CoV due to runner resource contention — sequential is accurate.
 # min_relative_deviation=12 (1.5× CoV), max_cov=16 (2× CoV) per study recommendation.
@@ -85,5 +86,6 @@ unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5
 aggregate_by = "median"
-min_measurements = 5
+# Per-CPU history: a short tail gives an unreliable MAD and false failures
+min_measurements = 10
 min_relative_deviation = 10.0

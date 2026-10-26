@@ -12,7 +12,7 @@ on:
       commits:
         description: Number of recent first-parent master commits to measure (must exceed the largest min_measurements)
         required: false
-        default: '6'
+        default: '11'
         type: string
 
 permissions:
