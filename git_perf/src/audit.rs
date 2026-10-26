@@ -382,21 +382,6 @@ pub fn audit_multiple(
                 format!(" ({})", format_group_label(separate_by, group_values))
             };
 
-            // Groups are discovered from the whole history, so a group may have no
-            // measurement at HEAD (e.g. a runner type that did not run this commit).
-            // Skip such a group instead of aborting the audit of all other groups.
-            if !separate_by.is_empty()
-                && !head_has_measurement(&all_commits, &measurement, &group_selectors)
-            {
-                println!("Auditing measurement \"{}\"{}:", measurement, group_label);
-                println!("  ⏭️ '{measurement}'");
-                println!("  No measurement for HEAD in this group. Skipping.");
-                println!();
-                total_groups += 1;
-                passed_groups += 1;
-                continue;
-            }
-
             let result = audit_with_commits(&measurement, &all_commits, &group_selectors, &params)?;
 
             let cp_config = config::change_point_config(&measurement);
@@ -463,23 +448,6 @@ pub fn audit_multiple(
     }
 
     Ok(())
-}
-
-/// Returns true if the HEAD commit (first entry) has a measurement with the given
-/// name whose key-values are a superset of the selectors.
-fn head_has_measurement(
-    commits: &[Result<Commit>],
-    measurement: &str,
-    selectors: &[(String, String)],
-) -> bool {
-    commits
-        .first()
-        .and_then(|r| r.as_ref().ok())
-        .is_some_and(|c| {
-            c.measurements
-                .iter()
-                .any(|m| m.name == measurement && m.key_values_is_superset_of(selectors))
-        })
 }
 
 /// Audits a measurement using pre-loaded commit data.
@@ -1870,47 +1838,6 @@ dispersion_method = "mad"
                 "Should use default dispersion of stddev"
             );
         }
-    }
-
-    #[test]
-    fn test_head_has_measurement() {
-        use crate::data::{Commit, MeasurementData};
-        use std::collections::HashMap;
-
-        let commit = |measurements: Vec<MeasurementData>| -> Result<Commit> {
-            Ok(Commit {
-                commit: "abc123".to_string(),
-                title: "test: commit".to_string(),
-                author: "Test Author".to_string(),
-                measurements,
-            })
-        };
-        let measurement = |name: &str, cpu: &str| MeasurementData {
-            epoch: 0,
-            name: name.to_string(),
-            timestamp: 1000.0,
-            val: 1.0,
-            key_values: HashMap::from([("cpu".to_string(), cpu.to_string())]),
-        };
-        let cpu = |v: &str| vec![("cpu".to_string(), v.to_string())];
-
-        let commits = vec![
-            commit(vec![measurement("t", "a"), measurement("u", "b")]),
-            commit(vec![measurement("t", "b")]),
-        ];
-
-        assert!(head_has_measurement(&commits, "t", &cpu("a")));
-        assert!(head_has_measurement(&commits, "t", &[]));
-        // Name matches but selectors don't
-        assert!(!head_has_measurement(&commits, "t", &cpu("b")));
-        // Selectors match but name doesn't
-        assert!(!head_has_measurement(&commits, "x", &cpu("a")));
-        // Only HEAD (first commit) counts
-        assert!(!head_has_measurement(&commits[1..1], "t", &cpu("b")));
-        assert!(head_has_measurement(&commits[1..], "t", &cpu("b")));
-        // Erroneous HEAD commit
-        let errored: Vec<Result<Commit>> = vec![Err(anyhow!("broken"))];
-        assert!(!head_has_measurement(&errored, "t", &[]));
     }
 
     #[test]
