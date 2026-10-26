@@ -1,0 +1,97 @@
+name: Backfill per-CPU benchmark history
+
+# CI audits Criterion timings per CPU model (`-s cpu=...`). A CPU model without
+# enough history is skipped by the audit, so after introducing the `cpu` tag (or
+# when GitHub adds a new runner CPU model) the timing audits gate nothing until
+# history accumulates. This workflow seeds that history: each instance lands on
+# some runner CPU and re-measures the most recent master commits on it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      commits:
+        description: Number of recent first-parent master commits to measure (must exceed the largest min_measurements)
+        required: false
+        default: '6'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    name: backfill (instance ${{ matrix.instance }})
+    runs-on: ubuntu-22.04
+    env:
+      GIT_AUTHOR_NAME: github-actions[bot]
+      GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: github-actions[bot]
+      GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+    strategy:
+      fail-fast: false
+      matrix:
+        instance: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7.0.1
+      with:
+        ref: master
+        fetch-depth: 0
+
+    - name: Record runner CPU model
+      run: |
+        CPU=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs | tr -s ' ,' '_')
+        echo "RUNNER_CPU=${CPU:-unknown}" >> "$GITHUB_ENV"
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: stable
+
+    - name: Install cargo-criterion
+      uses: taiki-e/install-action@v2.87.21
+      with:
+        tool: cargo-criterion
+
+    - name: Measure recent commits on this runner
+      env:
+        COMMITS: ${{ inputs.commits }}
+      run: |
+          set -x
+          cargo build --release -p git-perf
+          GIT_PERF="$PWD/target/release/git-perf"
+          "$GIT_PERF" pull
+
+          # Share one target dir so only the git-perf crate is rebuilt per commit
+          export CARGO_TARGET_DIR="$PWD/target"
+
+          for commit in $(git rev-list --first-parent -n "$COMMITS" HEAD); do
+            WT="$RUNNER_TEMP/wt-$commit"
+            git worktree add --detach "$WT" "$commit"
+            for spec in "add add-bench-results.json" "report report-bench-results.json"; do
+              read -r bench output <<< "$spec"
+              (cd "$WT" && cargo criterion --bench "$bench" --features test-helpers --message-format json > "$output") || true
+              if [ -s "$WT/$output" ]; then
+                # Import from inside the worktree so the notes attach to $commit.
+                # Same metadata as ci.yml, plus cpu explicitly (older commits'
+                # .gitperfconfig has no [environment] section) and a backfill marker.
+                (cd "$WT" && "$GIT_PERF" import criterion-json "$output" \
+                  --metadata ci=true \
+                  --metadata workflow=ci \
+                  --metadata os=ubuntu-22.04 \
+                  --metadata rust=stable \
+                  --metadata cpu="$RUNNER_CPU" \
+                  --metadata backfill=true)
+              else
+                echo "No results from $bench benchmark at $commit"
+              fi
+            done
+            git worktree remove --force "$WT"
+          done
+
+          "$GIT_PERF" push

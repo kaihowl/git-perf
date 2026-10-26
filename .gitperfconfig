@@ -1,3 +1,8 @@
+# Tag every measurement with the runner's CPU model (exported by CI) so that
+# timing audits can be separated per CPU model with `-s cpu=...`.
+[environment]
+cpu = "RUNNER_CPU"
+
 [measurement."report-size"]
 epoch = "fedee674"
 min_relative_deviation = 10.0

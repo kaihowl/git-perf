@@ -47,6 +47,14 @@ jobs:
       with:
         fetch-depth: 40
 
+    - name: Record runner CPU model
+      # GitHub's ubuntu runner pool mixes several CPU models with very different
+      # benchmark timings. Captured as `cpu` metadata via [environment] in
+      # .gitperfconfig so timing audits only compare runs on the same CPU model.
+      run: |
+        CPU=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs | tr -s ' ,' '_')
+        echo "RUNNER_CPU=${CPU:-unknown}" >> "$GITHUB_ENV"
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -106,8 +114,8 @@ jobs:
           cargo run -- push || true
 
           # Fibonacci audits: informational only (add/report covered by blocking audit below)
-          cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
-          cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s rust=${{matrix.rust}} --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
+          cargo run -- audit -n 40 -m "bench::fibonacci_10::mean" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" --min-measurements 3 --sigma 10 || echo "Fibonacci 10 audit failed (expected on first runs)"
+          cargo run -- audit -n 40 -m "bench::fibonacci_20::mean" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" --min-measurements 3 --sigma 10 || echo "Fibonacci 20 audit failed (expected on first runs)"
 
     - name: Run sample perf measurements
       run: |
@@ -171,7 +179,10 @@ jobs:
           git perf push
 
           # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -m report-size-benchmark -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s rust=${{matrix.rust}}
+          git perf audit -n 40 -m test-measure2 -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
+          # CPU-bound timings are compared per CPU model (pooled across toolchains, which
+          # show no timing difference); cross-model jumps of 30-65% caused false failures.
+          git perf audit -n 40 -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU"
 
           # Informational audits: failures don't block CI
           git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
