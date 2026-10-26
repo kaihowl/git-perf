@@ -430,6 +430,7 @@ pub enum Commands {
         /// Can be specified multiple times to split on multiple dimensions (e.g., -S os -S arch).
         /// Multiple splits create combined group labels like "os=ubuntu/arch=x64".
         /// Each group is audited independently with its own statistical validation.
+        /// If not given, the `separate_by` setting from the config is used.
         #[arg(short = 'S', long, value_parser=parse_spaceless_string)]
         separate_by: Vec<String>,
 

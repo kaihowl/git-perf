@@ -152,9 +152,11 @@ min_relative_deviation = 5.0
 min_measurements = 3
 aggregate_by = "median"             # min, max, median, mean
 sigma = 3.5
+separate_by = ["os", "rust"]        # Audit groups by these metadata keys (like `audit -S`)
 
 [measurement."specific_test"]       # Per-measurement overrides
 min_relative_deviation = 10.0
+separate_by = ["os", "cpu"]         # Replaces the default list; CLI -S replaces both
 
 [change_point]
 penalty = 0.5                       # PELT sensitivity (0.3=high, 0.5=default, 1.0+=low)
