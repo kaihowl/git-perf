@@ -182,7 +182,16 @@ jobs:
           git perf audit -n 40 -m test-measure2 -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
           # CPU-bound timings are compared per CPU model (pooled across toolchains, which
           # show no timing difference); cross-model jumps of 30-65% caused false failures.
-          git perf audit -n 40 -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU"
+          # Only CPU models with low run-to-run noise gate CI. EPYC 7763 shows ~2% CoV for
+          # these benchmarks; others (e.g. EPYC 9V74 at 8-12% CoV) exceed the audit
+          # thresholds by noise alone, so their audit is informational.
+          GATING_CPUS="AMD_EPYC_7763_64-Core_Processor"
+          if ! git perf audit -n 40 -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU"; then
+            if [[ " $GATING_CPUS " == *" $RUNNER_CPU "* ]]; then
+              exit 1
+            fi
+            echo "Criterion audit failed on $RUNNER_CPU (informational only — not a gating CPU model)"
+          fi
 
           # Informational audits: failures don't block CI
           git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
