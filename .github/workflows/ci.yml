@@ -298,7 +298,10 @@ jobs:
         with:
           depth: 40
           additional-args: '-s rust'
-          audit-args: '-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median -m release-binary-size --separate-by os --separate-by rust'
+          # CPU-bound Criterion timings are audited per CPU model, like in the test job
+          audit-args: |
+            -m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust
+            -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median --separate-by os --separate-by cpu
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'

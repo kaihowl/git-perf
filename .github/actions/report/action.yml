@@ -171,10 +171,18 @@ runs:
       id: audit
       shell: bash
       if: ${{ inputs.audit-args != '' }}
+      env:
+        AUDIT_ARGS: ${{ inputs.audit-args }}
+        DEPTH: ${{ inputs.depth }}
       run: |
+        # Each non-empty line of audit-args is a separate git perf audit invocation,
+        # e.g. to audit different measurements with different --separate-by keys.
         {
           echo 'audit-output<<EOF'
-          git perf audit -n ${{ inputs.depth }} ${{ inputs.audit-args }} 2>&1 || echo "Audit failed, but continuing..."
+          while IFS= read -r args; do
+            [[ -z "${args//[[:space:]]/}" ]] && continue
+            eval "git perf audit -n \"\$DEPTH\" $args" 2>&1 || echo "Audit failed, but continuing..."
+          done <<< "$AUDIT_ARGS"
           echo EOF
         } >> "$GITHUB_OUTPUT"
 
