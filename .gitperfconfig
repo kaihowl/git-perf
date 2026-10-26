@@ -1,31 +1,41 @@
 # Tag every measurement with the runner's CPU model (exported by CI) so that
-# timing audits can be separated per CPU model with `-s cpu=...`.
+# CPU-bound timings can be audited and plotted per CPU model (`separate_by` below).
 [environment]
 cpu = "RUNNER_CPU"
 
+# Grouping for audits and report traces (`git perf audit -S`, `git perf report -s`).
+# Sizes are compared per toolchain; CPU-bound timings per CPU model (pooled across
+# toolchains, which show no timing difference; cross-model jumps of 30-65% caused
+# false failures). Groups without a measurement at HEAD are skipped by audit.
+
 [measurement."report-size"]
+separate_by = ["os", "rust"]
 epoch = "fedee674"
 min_relative_deviation = 10.0
 unit = "bytes"
 min_measurements = 10
 
 [measurement."report"]
+separate_by = ["os", "cpu"]
 epoch = "fedee674"
 unit = "ns"
 min_measurements = 10
 
 [measurement."test-measure2"]
+separate_by = ["os", "rust"]
 epoch = "439374ca"
 min_relative_deviation = 10.0
 unit = "ns"
 
 [measurement."release-binary-size"]
+separate_by = ["os", "rust"]
 epoch = "3a1aff1"
 unit = "bytes"
 min_relative_deviation = 10.0
 min_measurements = 10
 
 [measurement."report-benchmark"]
+separate_by = ["os", "cpu"]
 epoch = "296bc41"
 unit = "ns"
 sigma = 3
@@ -33,6 +43,7 @@ aggregate_by = "min"
 min_measurements = 10
 
 [measurement."bench::add_measurements/add_measurement/50::median"]
+separate_by = ["os", "cpu"]
 epoch = "4493382"
 unit = "ns"
 dispersion_method = "mad"
@@ -46,6 +57,7 @@ min_relative_deviation = 12
 max_cov = 16
 
 [measurement."add-benchmark"]
+separate_by = ["os", "cpu"]
 epoch = "296bc41"
 unit = "ns"
 dispersion_method = "mad"
@@ -59,6 +71,7 @@ min_measurements = 10
 min_relative_deviation = 10.0
 
 [measurement."report-size-benchmark"]
+separate_by = ["os", "rust"]
 epoch = "fe2d91f5"
 unit = "bytes"
 min_relative_deviation = 10.0
@@ -67,6 +80,7 @@ aggregate_by = "median"
 min_measurements = 10
 
 [measurement."bench::report/report_generation/10::median"]
+separate_by = ["os", "cpu"]
 unit = "ns"
 dispersion_method = "mad"
 sigma = 3.5

@@ -197,7 +197,7 @@ Create an HTML performance report
 * `-m`, `--measurement <MEASUREMENT>` — Select an individual measurements instead of all
 * `-k`, `--key-value <KEY_VALUE>` — Key-value pairs separated by '=', select only matching measurements
 * `-f`, `--filter <FILTER>` — Filter measurements by regex pattern (can be specified multiple times). If any filter matches, the measurement is included (OR logic). Patterns are unanchored by default. Use ^pattern$ for exact matches. Example: -f "bench.*" -f "test_.*"
-* `-s`, `--separate-by <SEPARATE_BY>` — Create individual traces in the graph by grouping with the value of this selector. Can be specified multiple times to split on multiple dimensions (e.g., -s os -s arch). Multiple splits create combined group labels like "ubuntu/x64"
+* `-s`, `--separate-by <SEPARATE_BY>` — Create individual traces in the graph by grouping with the value of this selector. Can be specified multiple times to split on multiple dimensions (e.g., -s os -s arch). Multiple splits create combined group labels like "ubuntu/x64". If not given, the `separate_by` setting from the config is used per measurement
 * `-a`, `--aggregate-by <AGGREGATE_BY>` — What to aggregate the measurements in each group with
 
   Possible values: `min`, `max`, `median`, `mean`
@@ -228,9 +228,11 @@ The audit supports two methods for calculating statistical dispersion:
 
 Configuration is done via the `.gitperfconfig` file:
 
-**Default settings:** - `[measurement].min_relative_deviation = 5.0` - `[measurement].min_absolute_deviation = 0.5` - `[measurement].dispersion_method = "mad"` - `[measurement].min_measurements = 3` - `[measurement].aggregate_by = "median"` - `[measurement].sigma = 3.5`
+**Default settings:** - `[measurement].min_relative_deviation = 5.0` - `[measurement].min_absolute_deviation = 0.5` - `[measurement].dispersion_method = "mad"` - `[measurement].min_measurements = 3` - `[measurement].aggregate_by = "median"` - `[measurement].sigma = 3.5` - `[measurement].separate_by = ["os", "rust"]` (no grouping if unset)
 
-**Measurement-specific settings (override defaults):** - `[measurement."name"].min_relative_deviation = 10.0` - `[measurement."name"].min_absolute_deviation = 1.0` - `[measurement."name"].dispersion_method = "stddev"` - `[measurement."name"].min_measurements = 5` - `[measurement."name"].aggregate_by = "mean"` - `[measurement."name"].sigma = 4.5`
+**Measurement-specific settings (override defaults):** - `[measurement."name"].min_relative_deviation = 10.0` - `[measurement."name"].min_absolute_deviation = 1.0` - `[measurement."name"].dispersion_method = "stddev"` - `[measurement."name"].min_measurements = 5` - `[measurement."name"].aggregate_by = "mean"` - `[measurement."name"].sigma = 4.5` - `[measurement."name"].separate_by = ["os", "cpu"]` (replaces the default list)
+
+`-S/--separate-by` on the command line replaces the configured `separate_by` instead of merging with it. Configured keys that are also given as selectors (`-s`) are ignored, and configured groups without a measurement at HEAD are skipped. `git perf report` uses the same key to split traces per measurement.
 
 ## Precedence
 

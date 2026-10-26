@@ -22,9 +22,11 @@ The audit supports two methods for calculating statistical dispersion:
 .PP
 Configuration is done via the `.gitperfconfig` file:
 .PP
-**Default settings:** \- `[measurement].min_relative_deviation = 5.0` \- `[measurement].min_absolute_deviation = 0.5` \- `[measurement].dispersion_method = "mad"` \- `[measurement].min_measurements = 3` \- `[measurement].aggregate_by = "median"` \- `[measurement].sigma = 3.5`
+**Default settings:** \- `[measurement].min_relative_deviation = 5.0` \- `[measurement].min_absolute_deviation = 0.5` \- `[measurement].dispersion_method = "mad"` \- `[measurement].min_measurements = 3` \- `[measurement].aggregate_by = "median"` \- `[measurement].sigma = 3.5` \- `[measurement].separate_by = ["os", "rust"]` (no grouping if unset)
 .PP
-**Measurement\-specific settings (override defaults):** \- `[measurement."name"].min_relative_deviation = 10.0` \- `[measurement."name"].min_absolute_deviation = 1.0` \- `[measurement."name"].dispersion_method = "stddev"` \- `[measurement."name"].min_measurements = 5` \- `[measurement."name"].aggregate_by = "mean"` \- `[measurement."name"].sigma = 4.5`
+**Measurement\-specific settings (override defaults):** \- `[measurement."name"].min_relative_deviation = 10.0` \- `[measurement."name"].min_absolute_deviation = 1.0` \- `[measurement."name"].dispersion_method = "stddev"` \- `[measurement."name"].min_measurements = 5` \- `[measurement."name"].aggregate_by = "mean"` \- `[measurement."name"].sigma = 4.5` \- `[measurement."name"].separate_by = ["os", "cpu"]` (replaces the default list)
+.PP
+`\-S/\-\-separate\-by` on the command line replaces the configured `separate_by` instead of merging with it. Configured keys that are also given as selectors (`\-s`) are ignored, and configured groups without a measurement at HEAD are skipped. `git perf report` uses the same key to split traces per measurement.
 .PP
 ## Precedence
 .PP

@@ -178,17 +178,12 @@ jobs:
 
           git perf push
 
-          # Blocking audits: these must pass or CI fails
-          git perf audit -n 40 -m test-measure2 -m report-size-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}}
-          # CPU-bound timings are compared per CPU model (pooled across toolchains, which
-          # show no timing difference); cross-model jumps of 30-65% caused false failures.
-          git perf audit -n 40 -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU"
+          # Blocking audits: these must pass or CI fails.
+          # Grouping (per toolchain or per CPU model) comes from separate_by in .gitperfconfig.
+          git perf audit -n 40 -m test-measure2 -m report-size-benchmark -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}}
 
           # Informational audits: failures don't block CI
-          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
-          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "report-benchmark audit failed (informational only — replaced by Criterion benchmark)"
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "report audit failed (informational only)"
-          git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
+          git perf audit -n 40 -m add-benchmark -m report-benchmark -m report -m report-size -s os=${{matrix.os}} || echo "informational audit failed (add-benchmark/report-benchmark/report/report-size)"
 
     - name: Archive report
       uses: actions/upload-artifact@v7
@@ -294,33 +289,10 @@ jobs:
           cargo install --locked --path git_perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Compose audit arguments
-        id: audit-args
-        run: |
-          git perf pull || echo "Warning: git perf pull failed; per-CPU audits may be missing"
-          # Timings depend on the runner CPU model and are audited per CPU model that
-          # measured HEAD, with the same selection as the audits in the test job, so a
-          # failure there shows up here with its numbers. Sizes are audited per toolchain.
-          per_cpu() {
-            local cpus
-            cpus=$(git perf report -n 1 -o - "$@" 2>/dev/null | grep -o 'cpu=[^[:space:]]*' | sort -u || true)
-            for cpu in $cpus; do
-              echo "$* -s os=ubuntu-22.04 -s $cpu"
-            done
-          }
-          {
-            echo 'args<<EOF'
-            echo "-m report-size -m report-size-benchmark -m release-binary-size --separate-by os --separate-by rust"
-            per_cpu -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median
-            per_cpu -m add-benchmark -m report-benchmark -m report
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-
       - uses: ./.github/actions/report
         with:
           depth: 40
-          additional-args: '-s rust'
-          audit-args: ${{ steps.audit-args.outputs.args }}
+          audit-args: '-m report-size -m report-size-benchmark -m release-binary-size -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median -m add-benchmark -m report-benchmark -m report'
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
