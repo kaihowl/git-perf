@@ -951,6 +951,82 @@ mod test {
         });
     }
 
+    /// Records `m` on the older commit for cpu=a and cpu=b, then creates a new HEAD
+    /// commit that only has `m` for cpu=a. Returns the result of auditing `m`.
+    fn audit_m_with_group_missing_at_head(
+        git_dir: &std::path::Path,
+        config: &str,
+        cli_separate_by: &[String],
+        tag_key: &str,
+    ) -> Result<()> {
+        crate::test_helpers::write_gitperfconfig(git_dir, config);
+        for (val, tag) in [(1.0, "a"), (2.0, "b")] {
+            crate::measurement_storage::add("m", val, &[(tag_key.to_string(), tag.to_string())])
+                .unwrap();
+        }
+        crate::test_helpers::run_git_command(&["commit", "--allow-empty", "-m", "head"], git_dir);
+        crate::measurement_storage::add("m", 1.0, &[(tag_key.to_string(), "a".to_string())])
+            .unwrap();
+
+        audit_multiple(
+            "HEAD",
+            100,
+            None,
+            None,
+            Some(2),
+            &[],
+            Some(ReductionFunc::Min),
+            Some(2.0),
+            Some(DispersionMethod::StandardDeviation),
+            None,
+            &["^m$".to_string()],
+            cli_separate_by,
+            true,
+        )
+    }
+
+    #[test]
+    fn test_audit_multiple_configured_separate_by_skips_group_missing_at_head() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            let result = audit_m_with_group_missing_at_head(
+                git_dir,
+                "[measurement]\nseparate_by = [\"cpu\"]\n",
+                &[],
+                "cpu",
+            );
+            assert!(result.is_ok(), "{result:?}");
+        });
+    }
+
+    #[test]
+    fn test_audit_multiple_cli_separate_by_still_fails_for_group_missing_at_head() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            // CLI overrides the config, and CLI-given groups are not skipped.
+            let result = audit_m_with_group_missing_at_head(
+                git_dir,
+                "[measurement]\nseparate_by = [\"other\"]\n",
+                &["cpu".to_string()],
+                "cpu",
+            );
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("No measurement for HEAD"), "{err}");
+        });
+    }
+
+    #[test]
+    fn test_audit_multiple_configured_separate_by_without_matching_keys_falls_back() {
+        with_isolated_test_setup(|git_dir, _home_path| {
+            // No measurement carries the configured key: audit ungrouped instead of failing.
+            let result = audit_m_with_group_missing_at_head(
+                git_dir,
+                "[measurement]\nseparate_by = [\"nokey\"]\n",
+                &[],
+                "cpu",
+            );
+            assert!(result.is_ok(), "{result:?}");
+        });
+    }
+
     // MUTATION TESTING COVERAGE TESTS - Exercise actual production code paths
 
     #[test]
