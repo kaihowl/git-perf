@@ -958,7 +958,7 @@ dependencies = [
 
 [[package]]
 name = "git-perf"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "anyhow",
  "average",
@@ -1001,7 +1001,7 @@ dependencies = [
 
 [[package]]
 name = "git_perf_cli_types"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "chrono",
