@@ -185,9 +185,9 @@ jobs:
           git perf audit -n 40 -m "bench::add_measurements/add_measurement/50::median" -m "bench::report/report_generation/10::median" -s os=${{matrix.os}} -s cpu="$RUNNER_CPU"
 
           # Informational audits: failures don't block CI
-          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
-          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-benchmark audit failed (informational only — replaced by Criterion benchmark)"
-          git perf audit -n 40 -m report -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report audit failed (informational only)"
+          git perf audit -n 40 -m add-benchmark -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "add-benchmark audit failed (informational only — replaced by Criterion benchmark)"
+          git perf audit -n 40 -m report-benchmark -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "report-benchmark audit failed (informational only — replaced by Criterion benchmark)"
+          git perf audit -n 40 -m report -s os=${{matrix.os}} -s cpu="$RUNNER_CPU" || echo "report audit failed (informational only)"
           git perf audit -n 40 -m report-size -s os=${{matrix.os}} -s rust=${{matrix.rust}} || echo "report-size audit failed (informational only)"
 
     - name: Archive report
@@ -298,17 +298,21 @@ jobs:
         id: audit-args
         run: |
           git perf pull || echo "Warning: git perf pull failed; per-CPU audits may be missing"
-          CRITERION='-m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median'
-          # CPU models that measured the Criterion timings at HEAD (one per test job runner)
-          CPUS=$(git perf report -n 1 -o - $CRITERION 2>/dev/null | grep -o 'cpu=[^[:space:]]*' | sort -u || true)
+          # Timings depend on the runner CPU model and are audited per CPU model that
+          # measured HEAD, with the same selection as the audits in the test job, so a
+          # failure there shows up here with its numbers. Sizes are audited per toolchain.
+          per_cpu() {
+            local cpus
+            cpus=$(git perf report -n 1 -o - "$@" 2>/dev/null | grep -o 'cpu=[^[:space:]]*' | sort -u || true)
+            for cpu in $cpus; do
+              echo "$* -s os=ubuntu-22.04 -s $cpu"
+            done
+          }
           {
             echo 'args<<EOF'
-            echo "-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust"
-            # Same per-CPU selection as the blocking audit in the test job, so a failure there
-            # shows up here with its numbers
-            for cpu in $CPUS; do
-              echo "$CRITERION -s os=ubuntu-22.04 -s $cpu"
-            done
+            echo "-m report-size -m report-size-benchmark -m release-binary-size --separate-by os --separate-by rust"
+            per_cpu -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median
+            per_cpu -m add-benchmark -m report-benchmark -m report
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
