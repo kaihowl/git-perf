@@ -141,6 +141,39 @@ git perf add -m timer 20
 assert_failure_with_output output git perf audit -m timer -S os
 assert_contains "$output" "no measurements have all required keys"
 
+test_section "Audit with separate-by: group without HEAD measurement is skipped"
+
+cd_empty_repo
+
+# Group cpu=b only exists in history, not at HEAD (e.g. a runner type that
+# did not run this commit). It must be skipped without aborting the audit of
+# other groups and other measurements.
+create_commit
+git perf add -m timer --key-value cpu=a 10
+git perf add -m timer --key-value cpu=b 20
+git perf add -m other --key-value cpu=a 5
+create_commit
+git perf add -m timer --key-value cpu=a 10
+git perf add -m timer --key-value cpu=b 20
+git perf add -m other --key-value cpu=a 5
+create_commit
+git perf add -m timer --key-value cpu=a 10
+git perf add -m other --key-value cpu=a 5
+
+assert_success_with_output output git perf audit -m timer -m other -S cpu
+assert_contains "$output" "Auditing measurement \"timer\" (cpu=b):"
+assert_contains "$output" "No measurement for HEAD in this group. Skipping."
+assert_contains "$output" "Auditing measurement \"other\" (cpu=a):"
+assert_contains "$output" "Overall: PASSED (3/3 groups passed)"
+
+# A failing group is still reported alongside the skipped one
+create_commit
+git perf add -m timer --key-value cpu=a 50
+git perf add -m other --key-value cpu=a 5
+assert_failure_with_output output git perf audit -m timer -m other -S cpu
+assert_contains "$output" "No measurement for HEAD in this group. Skipping."
+assert_contains "$output" "Overall: FAILED (2/3 groups passed)"
+
 test_section "Audit without separate-by: no summary line printed"
 
 cd_empty_repo
