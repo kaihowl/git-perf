@@ -179,8 +179,13 @@ runs:
         # e.g. to audit different measurements with different --separate-by keys.
         {
           echo 'audit-output<<EOF'
+          invocations=$(grep -c '[^[:space:]]' <<< "$AUDIT_ARGS" || true)
           while IFS= read -r args; do
             [[ -z "${args//[[:space:]]/}" ]] && continue
+            # With several invocations, show which arguments produced each block
+            if (( invocations > 1 )); then
+              echo "\$ git perf audit -n $DEPTH $args"
+            fi
             eval "git perf audit -n \"\$DEPTH\" $args" 2>&1 || echo "Audit failed, but continuing..."
           done <<< "$AUDIT_ARGS"
           echo EOF

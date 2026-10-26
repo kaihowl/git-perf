@@ -294,14 +294,29 @@ jobs:
           cargo install --locked --path git_perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Compose audit arguments
+        id: audit-args
+        run: |
+          git perf pull || echo "Warning: git perf pull failed; per-CPU audits may be missing"
+          CRITERION='-m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median'
+          # CPU models that measured the Criterion timings at HEAD (one per test job runner)
+          CPUS=$(git perf report -n 1 -o - $CRITERION 2>/dev/null | grep -o 'cpu=[^[:space:]]*' | sort -u || true)
+          {
+            echo 'args<<EOF'
+            echo "-m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust"
+            # Same per-CPU selection as the blocking audit in the test job, so a failure there
+            # shows up here with its numbers
+            for cpu in $CPUS; do
+              echo "$CRITERION -s os=ubuntu-22.04 -s $cpu"
+            done
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
       - uses: ./.github/actions/report
         with:
           depth: 40
           additional-args: '-s rust'
-          # CPU-bound Criterion timings are audited per CPU model, like in the test job
-          audit-args: |
-            -m report -m report-size -m report-benchmark -m report-size-benchmark -m add-benchmark -m release-binary-size --separate-by os --separate-by rust
-            -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median --separate-by os --separate-by cpu
+          audit-args: ${{ steps.audit-args.outputs.args }}
           git-perf-version: 'skip'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           show-size: 'true'
