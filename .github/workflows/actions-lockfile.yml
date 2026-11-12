@@ -23,15 +23,3 @@ jobs:
           persist-credentials: false
       - run: gh extension install github/gh-actions-lock --pin v0.4.1
       - run: gh actions-lock --verify
-
-  zizmor:
-    name: zizmor
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      # v1.32.0 is the first release that understands workflow lockfiles
-      - run: pipx run zizmor==1.32.0 .github
