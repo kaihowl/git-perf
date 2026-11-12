@@ -26,6 +26,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
       with:
+        persist-credentials: false
         # Need full history to generate diff against base branch
         fetch-depth: 0
 

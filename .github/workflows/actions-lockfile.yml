@@ -1,0 +1,37 @@
+name: actions-lockfile
+
+# Verifies that .github/workflows/actions.lock is complete and untampered.
+# See https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify actions.lock
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: gh extension install github/gh-actions-lock --pin v0.4.1
+      - run: gh actions-lock --verify
+
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      # v1.32.0 is the first release that understands workflow lockfiles
+      - run: pipx run zizmor==1.32.0 .github
