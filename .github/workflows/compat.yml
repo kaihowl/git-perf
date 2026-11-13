@@ -88,7 +88,10 @@ jobs:
 
           # 2. Configure Git with the desired installation prefix
           #    --prefix ensures Git knows where its files will be found after installation
-          ./configure --prefix="${INSTALL_PATH}"
+          #    CFLAGS pins -std=gnu17: GCC 15 (ubuntu-latest) defaults to C23, whose
+          #    <stddef.h> `unreachable()` macro breaks older Git releases (< 2.47)
+          #    that define a function of the same name in reflog.c.
+          ./configure --prefix="${INSTALL_PATH}" CFLAGS="-g -O2 -Wall -std=gnu17"
 
           # 3. Compile Git
           make -j$(nproc) all # 'all' is the default target, explicitly mentioned for clarity
