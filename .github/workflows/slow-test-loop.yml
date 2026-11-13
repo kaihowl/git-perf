@@ -34,6 +34,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -61,7 +63,7 @@ jobs:
 
     - name: Create issue on scheduled workflow failure
       if: failure() && github.event_name == 'schedule'
-      uses: actions/github-script@v9
+      uses: actions/github-script@v9.0.0
       with:
         script: |
           const title = '🔴 Scheduled Slow Test Loop Failed';
