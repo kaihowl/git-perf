@@ -41,6 +41,14 @@ fi
 export GIT_CONFIG_NOSYSTEM=true
 export GIT_CONFIG_GLOBAL=/dev/null
 
+# Disable automatic background maintenance. Since Git 2.54 the default
+# "geometric" strategy may repack reachable objects as a side effect of
+# commands like `git commit`. Packed objects survive `git prune --expire=now`,
+# which breaks tests that rely on making commits unreachable.
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=maintenance.auto
+export GIT_CONFIG_VALUE_0=false
+
 # Set git author and committer info for tests
 export GIT_COMMITTER_NAME="github-actions[bot]"
 export GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
