@@ -83,7 +83,11 @@ jobs:
 
           # 2. Configure Git with the desired installation prefix
           #    --prefix ensures Git knows where its files will be found after installation
-          ./configure --prefix="${INSTALL_PATH}"
+          #    Old Git releases (< 2.45) define their own `unreachable()` helper, which
+          #    clashes with the `unreachable()` macro that GCC 15 (the default on
+          #    ubuntu-latest) provides in <stddef.h> under its C23 default. Pin the
+          #    C dialect to gnu17 so these versions still compile.
+          ./configure --prefix="${INSTALL_PATH}" CFLAGS="-g -O2 -std=gnu17"
 
           # 3. Compile Git
           make -j$(nproc) all # 'all' is the default target, explicitly mentioned for clarity
