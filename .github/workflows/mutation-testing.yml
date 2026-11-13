@@ -265,7 +265,7 @@ jobs:
         cat mutation-summary.md >> $GITHUB_STEP_SUMMARY
 
     - name: Upload mutation testing artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       if: always()
       with:
         name: weekly-mutation-testing-report-${{ github.run_number }}
@@ -277,7 +277,7 @@ jobs:
 
     - name: Create issue on scheduled workflow failure
       if: failure() && github.event_name == 'schedule'
-      uses: actions/github-script@v9
+      uses: actions/github-script@v9.0.0
       with:
         script: |
           const title = '🔴 Scheduled Mutation Testing Workflow Failed';

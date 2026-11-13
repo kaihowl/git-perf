@@ -76,7 +76,7 @@ jobs:
           done
 
       - name: Upload CSV artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: results-${{ matrix.os }}-${{ matrix.instance }}-${{ github.run_number }}
           path: results_*.csv
@@ -95,7 +95,7 @@ jobs:
           persist-credentials: false
 
       - name: Download all CSV artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           pattern: results-*
           merge-multiple: true
@@ -113,7 +113,7 @@ jobs:
         run: python scripts/analyze-variance.py all-results/ analysis-output/
 
       - name: Upload analysis artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: analysis-${{ github.run_number }}
           path: analysis-output/
