@@ -61,7 +61,7 @@ jobs:
         toolchain: ${{ matrix.rust }}
 
     - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@v2.9.3
       with:
         shared-key: ${{ matrix.rust }}
 
@@ -200,7 +200,7 @@ jobs:
           git perf audit -n 40 -m add-benchmark -m report-benchmark -m report -m report-size -s os=${{matrix.os}} || echo "informational audit failed (add-benchmark/report-benchmark/report/report-size)"
 
     - name: Archive report
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       if: always()
       with:
         include-hidden-files: true
@@ -214,6 +214,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -228,6 +230,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -242,6 +246,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -258,6 +264,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -296,14 +304,14 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Install git-perf from branch
         run: |
           cargo install --locked --path git_perf
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - uses: ./.github/actions/report
+      - uses: $/.github/actions/report
         with:
           depth: 40
           audit-args: '-m report-size -m report-size-benchmark -m release-binary-size -m bench::add_measurements/add_measurement/50::median -m bench::report/report_generation/10::median -m add-benchmark -m report-benchmark -m report'
@@ -357,7 +365,7 @@ jobs:
         ./target/release/git-perf audit -n 40 -m release-binary-size -s os=ubuntu-22.04 -s rust=stable
 
     - name: Upload size artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: release-binary-size
         path: metrics/release_binary_size.txt

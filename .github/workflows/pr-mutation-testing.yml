@@ -26,6 +26,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
       with:
+        persist-credentials: false
         # Need full history to generate diff against base branch
         fetch-depth: 0
 
@@ -246,7 +247,7 @@ jobs:
 
     - name: Comment on PR with results
       if: always() && env.SKIP_MUTATION_TESTING != 'true'
-      uses: actions/github-script@v9
+      uses: actions/github-script@v9.0.0
       with:
         script: |
           const fs = require('fs');
@@ -298,7 +299,7 @@ jobs:
 
     - name: Upload mutation testing artifacts
       if: always() && env.SKIP_MUTATION_TESTING != 'true'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: pr-mutation-report-${{ github.event.pull_request.number }}-${{ github.run_number }}
         path: |

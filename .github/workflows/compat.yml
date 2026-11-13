@@ -2,6 +2,9 @@ name: Git Compatibility Checks
 
 on: pull_request
 
+permissions:
+  contents: read
+
 jobs:
   test_with_git_versions:
     runs-on: ubuntu-latest
@@ -27,6 +30,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master

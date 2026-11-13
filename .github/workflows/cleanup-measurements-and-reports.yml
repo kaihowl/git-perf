@@ -36,7 +36,7 @@ jobs:
           echo "$PWD/target/release" >> $GITHUB_PATH
 
       - name: Cleanup old measurements and reports
-        uses: ./.github/actions/cleanup
+        uses: $/.github/actions/cleanup
         with:
           retention-days: 730
           backup: true
@@ -46,7 +46,7 @@ jobs:
 
       - name: Create issue on scheduled workflow failure
         if: failure() && github.event_name == 'schedule'
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const title = '🔴 Scheduled Cleanup Workflow Failed';

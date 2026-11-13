@@ -1,0 +1,52 @@
+name: relock-actions
+
+# Manually regenerates .github/workflows/actions.lock with `gh actions-lock`
+# and commits it to the branch the workflow is run on. Run this after adding
+# a workflow or changing any `uses:` line, or to advance moved refs
+# (set `relock` to true).
+#
+# Commits made with GITHUB_TOKEN do not trigger other workflows; close and
+# reopen the PR or push an unrelated commit afterwards to re-run CI.
+on:
+  workflow_dispatch:
+    inputs:
+      relock:
+        description: Advance moved refs (gh actions-lock --relock)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  relock:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELOCK: ${{ inputs.relock }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        # Credentials are needed to push the regenerated lockfile.
+        with:
+          persist-credentials: true
+      - run: gh extension install github/gh-actions-lock --pin v0.4.1
+      - name: Generate lockfile
+        run: |
+          if [ "$RELOCK" = "true" ]; then
+            gh actions-lock --relock
+          else
+            gh actions-lock
+          fi
+      - name: Commit lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows
+          if git diff --cached --quiet; then
+            echo "Lockfile already up to date"
+          else
+            git commit -m "chore(ci): update actions.lock"
+            git push
+          fi
