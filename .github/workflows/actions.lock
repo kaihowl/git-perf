@@ -13,12 +13,12 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@master'
         - 'swatinem/rust-cache@v2.9.3'
-        - 'taiki-e/install-action@v2.87.21'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/benchmark-study.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@stable'
-        - 'taiki-e/install-action@v2.87.21'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v8.0.0'
@@ -28,7 +28,7 @@ workflows:
         - 'rlespinasse/github-slug-action@v5.7.1'
         - 'swatinem/rust-cache@v2.9.3'
         - 'taiki-e/install-action@nextest'
-        - 'taiki-e/install-action@v2.87.21'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/cleanup-measurements-and-reports.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
@@ -40,7 +40,7 @@ workflows:
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/download-artifact@v8.0.2'
-        - 'actions/setup-python@v7.0.0'
+        - 'actions/setup-python@v7.1.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@stable'
     '.github/workflows/mutation-testing.yml':
@@ -49,14 +49,14 @@ workflows:
         - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@stable'
-        - 'taiki-e/install-action@v2.87.21'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/pr-mutation-testing.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'dtolnay/rust-toolchain@stable'
-        - 'taiki-e/install-action@v2.87.21'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/pr-title-check.yml':
         - 'actions/github-script@v9.0.0'
     '.github/workflows/pre-release-slow-tests.yml':
@@ -69,7 +69,7 @@ workflows:
         - 'dtolnay/rust-toolchain@nightly'
     '.github/workflows/release-plz.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/create-github-app-token@v3.2.0'
+        - 'actions/create-github-app-token@v3.3.0'
         - 'dtolnay/rust-toolchain@stable'
         - 'release-plz/action@main'
     '.github/workflows/release.yml':
@@ -106,9 +106,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/create-github-app-token@v3.2.0':
-        ref: 'v3.2.0'
-        commit: 'sha1-bcd2ba49218906704ab6c1aa796996da409d3eb1'
+    'actions/create-github-app-token@v3.3.0':
+        ref: 'v3.3.0'
+        commit: 'sha1-64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
         owner_id: 44036562
         repo_id: 642580244
     'actions/download-artifact@v4':
@@ -131,9 +131,9 @@ dependencies:
         commit: 'sha1-3a2844b7e9c422d3c10d287c895573f7108da1b3'
         owner_id: 44036562
         repo_id: 205262760
-    'actions/setup-python@v7.0.0':
-        ref: 'v7.0.0'
-        commit: 'sha1-5fda3b95a4ea91299a34e894583c3862153e4b97'
+    'actions/setup-python@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
         owner_id: 44036562
         repo_id: 192625525
     'actions/upload-artifact@v4':
@@ -218,8 +218,8 @@ dependencies:
         commit: 'sha1-7c48f0a661edab95fdc666d1526d9ef945205245'
         owner_id: 43724913
         repo_id: 442947557
-    'taiki-e/install-action@v2.87.21':
-        ref: 'v2.87.21'
-        commit: 'sha1-4cef1412cce204788f482e778a0b9187f9626a29'
+    'taiki-e/install-action@v2.88.0':
+        ref: 'v2.88.0'
+        commit: 'sha1-86f7a0ffb25f40114606501a311ebcfaf882ea32'
         owner_id: 43724913
         repo_id: 442947557
