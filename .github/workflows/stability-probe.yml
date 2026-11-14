@@ -1,0 +1,97 @@
+name: Benchmark Stability Probe
+
+# Experiment: which speed-independent metrics (hardware counters, Valgrind
+# instruction counts, rusage, syscalls) are available on GitHub-hosted runners,
+# and how much do they vary across runners and CPU models compared to wall time?
+# Also runs an A/A test to quantify same-runner relative (interleaved) timing.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ 'claude/**' ]
+    paths:
+      - '.github/workflows/stability-probe.yml'
+      - 'scripts/stability-probe/**'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: probe (${{ matrix.os }}, ${{ matrix.instance }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        include:
+          - { os: ubuntu-24.04-arm, instance: 1 }
+          - { os: ubuntu-24.04-arm, instance: 2 }
+          - { os: ubuntu-24.04-arm, instance: 3 }
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2.9.3
+      with:
+        shared-key: stability-probe
+
+    - name: Install measurement tools
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y -q valgrind strace
+        # perf matching the running (Azure) kernel; fall back to the generic tools
+        sudo apt-get install -y -q "linux-tools-$(uname -r)" linux-tools-common \
+          || sudo apt-get install -y -q linux-tools-azure linux-tools-common \
+          || sudo apt-get install -y -q linux-tools-generic linux-tools-common || true
+        sudo sysctl -w kernel.perf_event_paranoid=-1 || true
+        ls /usr/lib/linux-tools/*/perf || true
+
+    - name: Build git-perf
+      run: cargo build --release -p git-perf
+
+    - name: Run probe
+      run: |
+        LABEL="${{ matrix.os }}-${{ matrix.instance }}"
+        scripts/stability-probe/probe.sh target/release/git-perf "probe-$LABEL.csv" "$LABEL"
+        cat "probe-$LABEL.csv.env"
+        python3 scripts/stability-probe/summarize.py "probe-$LABEL.csv" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload results
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: probe-${{ matrix.os }}-${{ matrix.instance }}
+        path: probe-*.csv*
+
+  summarize:
+    needs: probe
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+    - name: Download results
+      uses: actions/download-artifact@v8.0.2
+      with:
+        path: results
+        merge-multiple: true
+    - name: Summarize
+      run: |
+        cat results/*.env
+        cat results/*.csv
+        for arch in x86 arm; do
+          if [ $arch = arm ]; then files=$(ls results/probe-*arm*.csv); else files=$(ls results/probe-*.csv | grep -v arm); fi
+          echo "## $arch" | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 scripts/stability-probe/summarize.py $files | tee -a "$GITHUB_STEP_SUMMARY"
+        done
