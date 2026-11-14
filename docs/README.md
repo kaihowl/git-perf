@@ -74,11 +74,11 @@ Resources for contributors and developers:
 ## Research & Analysis
 
 - **[CI Runner Variance Experiment](./ci-variance-experiment/README.md)** - Quantified inter-runner noise on GitHub Actions
-- **[Benchmark Stability Options](./benchmark-stability-options.md)** - Measured options for CPU-model-independent CI benchmarks (instruction counts, ARM runners, paired timing)
   - 100 runner instances across Ubuntu and macOS
   - Aggregation and dispersion method comparison
   - Minimum detectable effect (MDE) analysis
   - Recommended configuration for CI environments
+- **[Benchmark Stability Options](./benchmark-stability-options.md)** - Measured options for CPU-model-independent CI benchmarks (instruction counts, ARM runners, paired timing)
 
 ## Additional Resources
 
