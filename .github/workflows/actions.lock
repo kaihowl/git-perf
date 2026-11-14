@@ -27,7 +27,6 @@ workflows:
         - 'peaceiris/actions-gh-pages@v4.1.0'
         - 'rlespinasse/github-slug-action@v5.7.1'
         - 'swatinem/rust-cache@v2.9.3'
-        - 'taiki-e/install-action@nextest'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/cleanup-measurements-and-reports.yml':
         - 'actions/checkout@v7.0.1'
@@ -35,7 +34,7 @@ workflows:
     '.github/workflows/compat.yml':
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@master'
-        - 'taiki-e/install-action@nextest'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/cross-runner-variance.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
@@ -62,7 +61,7 @@ workflows:
     '.github/workflows/pre-release-slow-tests.yml':
         - 'actions/checkout@v7.0.1'
         - 'dtolnay/rust-toolchain@master'
-        - 'taiki-e/install-action@nextest'
+        - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/publish-check.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
@@ -84,7 +83,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
         - 'dtolnay/rust-toolchain@master'
-        - 'taiki-e/install-action@nextest'
+        - 'taiki-e/install-action@v2.88.0'
 dependencies:
     'actions/cache@v6.1.0':
         ref: 'v6.1.0'
@@ -211,11 +210,6 @@ dependencies:
     'taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39':
         ref: 'v2.90.3'
         commit: 'sha1-cfdb7ed4ccc7c7dce37759eae89dc5674b469b39'
-        owner_id: 43724913
-        repo_id: 442947557
-    'taiki-e/install-action@nextest':
-        ref: 'nextest'
-        commit: 'sha1-7c48f0a661edab95fdc666d1526d9ef945205245'
         owner_id: 43724913
         repo_id: 442947557
     'taiki-e/install-action@v2.88.0':

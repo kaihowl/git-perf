@@ -109,7 +109,9 @@ jobs:
           which git
 
       - name: Install nextest
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@v2.88.0
+        with:
+          tool: nextest
 
       - name: Build git-perf
         run: cargo build --verbose ${{ env.TARGET_FLAGS }}
