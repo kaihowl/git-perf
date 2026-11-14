@@ -54,7 +54,9 @@ PERF=""
 for p in perf $(ls /usr/lib/linux-tools/*/perf 2>/dev/null); do
   if command -v "$p" >/dev/null && "$p" --version >/dev/null 2>&1; then PERF=$p; break; fi
 done
-SUDO=""; [ "$(id -u)" != 0 ] && command -v sudo >/dev/null && SUDO="sudo -E"
+# perf runs as the invoking user (CI sets perf_event_paranoid=-1); under sudo git
+# would refuse the runner-owned repository ("dubious ownership").
+SUDO=""
 EVENTS=instructions:u,instructions,cycles:u,branches:u,cache-references,cache-misses,LLC-load-misses,page-faults,context-switches,task-clock
 
 for w in add report; do

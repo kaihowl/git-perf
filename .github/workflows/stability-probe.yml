@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-24.04]
         instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         include:
           - { os: ubuntu-24.04-arm, instance: 1 }
