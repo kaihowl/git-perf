@@ -23,13 +23,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
-        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        os: [ubuntu-22.04, ubuntu-24.04]
+        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         include:
-          - { os: ubuntu-24.04, instance: 1 }
-          - { os: ubuntu-24.04, instance: 2 }
           - { os: ubuntu-24.04-arm, instance: 1 }
           - { os: ubuntu-24.04-arm, instance: 2 }
+          - { os: ubuntu-24.04-arm, instance: 3 }
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.1
@@ -90,6 +89,7 @@ jobs:
     - name: Summarize
       run: |
         cat results/*.env
+        cat results/*.csv
         for arch in x86 arm; do
           if [ $arch = arm ]; then files=$(ls results/probe-*arm*.csv); else files=$(ls results/probe-*.csv | grep -v arm); fi
           echo "## $arch" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -45,3 +45,16 @@ if aa:
         x = 100 * (st.median(d["report-aa-a"]) / st.median(d["report-aa-b"]) - 1); diffs.append(x)
         print(f"| {r} | {cpu_of[r]} | {x:+.2f} |")
     print(f"\nA/A spread across runners: stdev {st.pstdev(diffs):.2f} pp, max |diff| {max(map(abs, diffs)):.2f} %")
+
+# Per-runner medians of key metrics (to attribute cross-runner differences)
+KEY = ["wall_ns", "vg:Irefs", "vg:LLmisses", "perf:instructions:u", "minflt", "maxrss_kb", "syscalls"]
+for w in ("add", "report"):
+    print(f"\n### Per-runner medians ({w})\n")
+    print("| runner | cpu | " + " | ".join(KEY) + " |\n|---|---|" + "---|" * len(KEY))
+    runners = sorted({(r, c) for m in KEY for r, c, _ in rows.get((w, m), [])})
+    for r, c in runners:
+        cells = []
+        for m in KEY:
+            v = [x for rr, _, x in rows.get((w, m), []) if rr == r]
+            cells.append(f"{st.median(v):.0f}" if v else "NA")
+        print(f"| {r} | {c} | " + " | ".join(cells) + " |")
