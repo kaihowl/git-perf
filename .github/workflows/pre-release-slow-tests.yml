@@ -59,7 +59,9 @@ jobs:
       run: sudo apt-get install libfaketime
 
     - name: Install nextest
-      uses: taiki-e/install-action@nextest
+      uses: taiki-e/install-action@v2.88.0
+      with:
+        tool: nextest
 
     - name: Build git-perf
       run: cargo build --verbose
