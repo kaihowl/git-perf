@@ -152,17 +152,17 @@ dependencies:
         repo_id: 321270638
     'dtolnay/rust-toolchain@master':
         ref: 'master'
-        commit: 'sha1-683b588c487a69d01f6c6ddf40f036ff682cc2c8'
+        commit: 'sha1-df2a88e9fe4098bad09cb42c3dec7187f15861fc'
         owner_id: 1940490
         repo_id: 260749683
     'dtolnay/rust-toolchain@nightly':
         ref: 'nightly'
-        commit: 'sha1-2c76c034f9e32a5d6e2c104dc4df23a22476db04'
+        commit: 'sha1-6a52aad76a94a5fbc50d567bb5be24419801c1fb'
         owner_id: 1940490
         repo_id: 260749683
     'dtolnay/rust-toolchain@stable':
         ref: 'stable'
-        commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
+        commit: 'sha1-39008827e6b4319a349e9a42dfc90579dd25f1ca'
         owner_id: 1940490
         repo_id: 260749683
     'peaceiris/actions-gh-pages@v4.1.0':
