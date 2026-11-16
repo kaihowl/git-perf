@@ -6,24 +6,24 @@ workflows:
     '.github/workflows/action_ci.yml':
         - 'actions/checkout@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@master'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
     '.github/workflows/actions-lockfile.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/backfill-cpu-benchmarks.yml':
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@master'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'swatinem/rust-cache@v2.9.3'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/benchmark-study.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v8.0.0'
         - 'actions/upload-artifact@v7.0.2'
-        - 'dtolnay/rust-toolchain@master'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'peaceiris/actions-gh-pages@v4.1.0'
         - 'rlespinasse/github-slug-action@v5.7.1'
         - 'swatinem/rust-cache@v2.9.3'
@@ -33,7 +33,7 @@ workflows:
         - 'actions/github-script@v9.0.0'
     '.github/workflows/compat.yml':
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@master'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/cross-runner-variance.yml':
         - 'actions/cache@v6.1.0'
@@ -41,48 +41,46 @@ workflows:
         - 'actions/download-artifact@v8.0.2'
         - 'actions/setup-python@v7.1.0'
         - 'actions/upload-artifact@v7.0.2'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
     '.github/workflows/mutation-testing.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/pr-mutation-testing.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/pr-title-check.yml':
         - 'actions/github-script@v9.0.0'
     '.github/workflows/pre-release-slow-tests.yml':
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@master'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'taiki-e/install-action@v2.88.0'
     '.github/workflows/publish-check.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@nightly'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
     '.github/workflows/release-plz.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/create-github-app-token@v3.3.0'
-        - 'dtolnay/rust-toolchain@stable'
-        - 'release-plz/action@main'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
+        - 'release-plz/action@v0.5.148'
     '.github/workflows/release.yml':
         - 'actions/checkout@v4'
         - 'actions/download-artifact@v4'
         - 'actions/upload-artifact@v4'
-    '.github/workflows/relock-actions.yml':
-        - 'actions/checkout@v7.0.1'
     '.github/workflows/set-latest-tag.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/slow-test-loop.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
-        - 'dtolnay/rust-toolchain@master'
+        - 'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         - 'taiki-e/install-action@v2.88.0'
 dependencies:
     'actions/cache@v6.1.0':
@@ -145,24 +143,14 @@ dependencies:
         commit: 'sha1-cf430e030ddbb5b0abf93d22962f4752f3646cd9'
         owner_id: 44036562
         repo_id: 192625955
-    'cargo-bins/cargo-binstall@5885714d0a40a14b2535c6ffc051fd8e49aa9665':
-        ref: 'v1.27.0'
-        commit: 'sha1-5885714d0a40a14b2535c6ffc051fd8e49aa9665'
+    'cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f':
+        ref: 'v1.26.2'
+        commit: 'sha1-851112458b5f28a29e5bc14a690c3f283d9dcc6f'
         owner_id: 110581826
         repo_id: 321270638
-    'dtolnay/rust-toolchain@master':
-        ref: 'master'
+    'dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8':
+        ref: 'v1'
         commit: 'sha1-683b588c487a69d01f6c6ddf40f036ff682cc2c8'
-        owner_id: 1940490
-        repo_id: 260749683
-    'dtolnay/rust-toolchain@nightly':
-        ref: 'nightly'
-        commit: 'sha1-2c76c034f9e32a5d6e2c104dc4df23a22476db04'
-        owner_id: 1940490
-        repo_id: 260749683
-    'dtolnay/rust-toolchain@stable':
-        ref: 'stable'
-        commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
         owner_id: 1940490
         repo_id: 260749683
     'peaceiris/actions-gh-pages@v4.1.0':
@@ -170,15 +158,15 @@ dependencies:
         commit: 'sha1-84c30a85c19949d7eee79c4ff27748b70285e453'
         owner_id: 30958501
         repo_id: 187915200
-    'release-plz/action@main':
-        ref: 'main'
-        commit: 'sha1-8261f9827cc1782042edf3fd62813c5982744323'
+    'release-plz/action@v0.5.148':
+        ref: 'v0.5.148'
+        commit: 'sha1-66b324fd6c72d05d2a08568492ecdd62bfb8a62b'
         owner_id: 188756284
         repo_id: 476470908
         uses:
-            - 'cargo-bins/cargo-binstall@5885714d0a40a14b2535c6ffc051fd8e49aa9665'
+            - 'cargo-bins/cargo-binstall@851112458b5f28a29e5bc14a690c3f283d9dcc6f'
             - 'release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4'
-            - 'taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39'
+            - 'taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b'
     'release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4':
         ref: 'v0.1.2'
         commit: 'sha1-59144859caf016f8b817a2ac9b051578729173c4'
@@ -207,9 +195,9 @@ dependencies:
         commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
         owner_id: 580492
         repo_id: 298565987
-    'taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39':
-        ref: 'v2.90.3'
-        commit: 'sha1-cfdb7ed4ccc7c7dce37759eae89dc5674b469b39'
+    'taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b':
+        ref: 'v2.89.0'
+        commit: 'sha1-1919c4a95903d2c33e4a221102edca87309fc14b'
         owner_id: 43724913
         repo_id: 442947557
     'taiki-e/install-action@v2.88.0':

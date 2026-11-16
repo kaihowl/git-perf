@@ -56,7 +56,7 @@ jobs:
         echo "RUNNER_CPU=${CPU:-unknown}" >> "$GITHUB_ENV"
 
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: ${{ matrix.rust }}
 
@@ -219,7 +219,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: stable
         components: rustfmt
@@ -235,7 +235,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: stable
         components: clippy
@@ -251,7 +251,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: stable
         components: rustfmt
@@ -269,7 +269,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: stable
     - name: Generate documentation
@@ -301,7 +301,7 @@ jobs:
           fetch-depth: 40
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
 
@@ -335,7 +335,7 @@ jobs:
         fetch-depth: 40
 
     - name: Install Rust (stable)
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: stable
 

@@ -23,7 +23,9 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
 
       - name: Cache cargo registry
         uses: actions/cache@v6.1.0

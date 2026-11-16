@@ -32,7 +32,7 @@ runs:
         fetch-depth: 40
     - name: Install Rust
       if: ${{ inputs.release == 'branch' }}
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
       with:
         toolchain: stable
     - name: install-branch
