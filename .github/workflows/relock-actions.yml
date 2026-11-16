@@ -1,13 +1,26 @@
 name: relock-actions
 
-# Manually regenerates .github/workflows/actions.lock with `gh actions-lock`
-# and commits it to the branch the workflow is run on. Run this after adding
-# a workflow or changing any `uses:` line, or to advance moved refs
-# (set `relock` to true).
+# Regenerates .github/workflows/actions.lock with `gh actions-lock` and commits
+# it to the branch the workflow runs on.
 #
-# Commits made with GITHUB_TOKEN do not trigger other workflows; close and
-# reopen the PR or push an unrelated commit afterwards to re-run CI.
+# - Automatically on Dependabot PRs that touch workflows or local actions, since
+#   Dependabot edits `uses:` lines but cannot update the lockfile.
+# - Manually (workflow_dispatch) after adding a workflow or changing any
+#   `uses:` line; set `relock` to true to advance moved refs.
+#
+# Pushing changes under .github/workflows requires the `workflows` permission,
+# which GITHUB_TOKEN can never have. The push therefore uses a GitHub App token
+# (the same app as release-plz.yml). The app needs `Workflows: read and write`
+# and `Contents: read and write`, and the APP_ID / APP_PRIVATE_KEY secrets must
+# also be added as *Dependabot* secrets, because Dependabot-triggered runs do
+# not see regular Actions secrets.
+#
+# Pushes made with the app token trigger CI again, so no manual re-run is needed.
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
   workflow_dispatch:
     inputs:
       relock:
@@ -20,19 +33,32 @@ permissions:
 
 jobs:
   relock:
+    # On pull requests only act on Dependabot's branches, never on forks.
+    if: github.event_name == 'workflow_dispatch' || (github.actor == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     env:
-      GH_TOKEN: ${{ github.token }}
       RELOCK: ${{ inputs.relock }}
+      HEAD_REF: ${{ github.head_ref || github.ref_name }}
     steps:
-      - uses: actions/checkout@v7.0.1
-        # Credentials are needed to push the regenerated lockfile.
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@v3.3.0
+        id: generate-token
         with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          token: ${{ steps.generate-token.outputs.token }}
+          # Credentials are needed to push the regenerated lockfile.
           persist-credentials: true
-      - run: gh extension install github/gh-actions-lock --pin v0.4.1
+      - name: Install gh-actions-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh extension install github/gh-actions-lock --pin v0.4.1
       - name: Generate lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$RELOCK" = "true" ]; then
             gh actions-lock --relock
@@ -48,5 +74,5 @@ jobs:
             echo "Lockfile already up to date"
           else
             git commit -m "chore(ci): update actions.lock"
-            git push
+            git push origin "HEAD:${HEAD_REF}"
           fi
