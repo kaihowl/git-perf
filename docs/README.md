@@ -78,6 +78,7 @@ Resources for contributors and developers:
   - Aggregation and dispersion method comparison
   - Minimum detectable effect (MDE) analysis
   - Recommended configuration for CI environments
+- **[Benchmark Stability Options](./benchmark-stability-options.md)** - Measured options for CPU-model-independent CI benchmarks (instruction counts, ARM runners, paired timing)
 
 ## Additional Resources
 
