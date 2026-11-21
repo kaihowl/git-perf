@@ -825,7 +825,11 @@ fn extract_pid_from_staging_ref(refname: &str, prefix: &str) -> Option<u32> {
 fn is_process_alive(pid: u32) -> bool {
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
     let pid = Pid::from(pid as usize);
-    let mut system = System::new();
+    // If the system cannot be queried, assume the process is alive so that
+    // staging refs are never deleted based on missing information.
+    let Ok(mut system) = System::new() else {
+        return true;
+    };
     system.refresh_processes_specifics(
         ProcessesToUpdate::Some(&[pid]),
         false,
