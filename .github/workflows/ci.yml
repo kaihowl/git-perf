@@ -74,12 +74,12 @@ jobs:
         fi
 
     - name: Install nextest
-      uses: taiki-e/install-action@v2.89.0
+      uses: taiki-e/install-action@v2.90.2
       with:
         tool: nextest
 
     - name: Install cargo-criterion
-      uses: taiki-e/install-action@v2.89.0
+      uses: taiki-e/install-action@v2.90.2
       with:
         tool: cargo-criterion
 
