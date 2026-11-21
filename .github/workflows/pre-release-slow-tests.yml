@@ -59,7 +59,7 @@ jobs:
       run: sudo apt-get install libfaketime
 
     - name: Install nextest
-      uses: taiki-e/install-action@v2.88.0
+      uses: taiki-e/install-action@v2.89.0
       with:
         tool: nextest
 
